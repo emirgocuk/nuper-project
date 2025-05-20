@@ -1,53 +1,61 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 const Bulletins = ({ darkMode }) => {
   const bulletins = [
     {
       id: '1',
-      title: 'Girişimcilik 101: İlk Adımlar',
-      summary: 'Girişimcilik dünyasına adım atmak isteyenler için temel bilgiler ve ipuçları. İş fikri nasıl bulunur, ilk adımlar nasıl atılır? Bu bültende, sıfırdan bir iş kurmanın temel adımlarını ve dikkat edilmesi gereken noktaları ele alıyoruz. Yeni başlayanlar için pratik öneriler ve ilham verici hikayelerle dolu!',
-      image: 'https://via.placeholder.com/300x200.png?text=Girişimcilik+101'
+      title: 'Mayıs 2025 Bülteni',
+      date: '20 Mayıs 2025',
+      content: 'Bu ayın öne çıkan etkinlikleri: Bilim Olimpiyatları, Sanat Yarışması ve Kodlama Hackathonu. Detaylar için fırsatlar sayfamızı ziyaret edin! Yeni üyelerimiz için özel indirimler de mevcut.',
     },
     {
       id: '2',
-      title: 'Yatırımcılarla Tanışma Rehberi',
-      summary: 'Yatırımcılarla nasıl iletişim kurulur? Projenizi nasıl sunarsınız? Başarılı bir pitch için gerekenler. Bu bültende, yatırımcılarla etkili iletişim kurmanın yollarını ve bir pitch sırasında nelere dikkat etmeniz gerektiğini detaylıca anlatıyoruz. Fikrinizi hayata geçirmek için ihtiyacınız olan desteği nasıl alırsınız?',
-      image: 'https://via.placeholder.com/300x200.png?text=Yatırımcı+Rehberi'
+      title: 'Haziran 2025 Bülteni',
+      date: '15 Haziran 2025',
+      content: 'Yaz dönemi etkinlikleri başlıyor! Fotoğrafçılık Atölyesi ve Robotik Kodlama Kampı ile yeteneklerinizi geliştirin. Katılım için kayıt formunu doldurun.',
     },
     {
       id: '3',
-      title: 'Sürdürülebilir Girişimcilik',
-      summary: 'Çevre dostu iş modelleri ve sürdürülebilirlik odaklı girişimler nasıl oluşturulur? Yeşil ekonomi fırsatları. Bu bültende, çevresel etkileri göz önünde bulundurarak nasıl yenilikçi ve sürdürülebilir bir iş modeli oluşturabileceğinizi keşfedeceksiniz. Gelecek nesillere daha iyi bir dünya bırakmak için neler yapabilirsiniz?',
-      image: 'https://via.placeholder.com/300x200.png?text=Sürdürülebilirlik'
+      title: 'Eylül 2025 Bülteni',
+      date: '1 Eylül 2025',
+      content: 'Yeni eğitim yılına özel: Matematik Yarışması ve Edebiyat Semineri. Öğrenciler için burs fırsatları da duyuruldu. Detaylar yakında!',
     },
   ];
 
   return (
-    <div className={`${darkMode ? 'dark bg-nuper-dark' : 'bg-nuper-gray'} min-h-screen font-sans text-gray-900 dark:text-nuper-light-text pt-24 pb-16`}>
-      <div className="max-w-6xl mx-auto px-4">
-        <h1 className={`text-4xl font-heading font-bold text-center mb-8 animate-fade-in ${darkMode ? 'text-nuper-light-text' : 'text-nuper-blue'}`}>Girişimcilik Bültenleri</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {bulletins.map((bulletin) => (
-            <div
-              key={bulletin.id}
-              className={`${darkMode ? 'bg-nuper-dark border-nuper-dark-gray' : 'bg-white'} rounded-xl border shadow-lg overflow-hidden transform transition-all duration-300 hover:scale-105 hover:shadow-xl`}
-            >
-              <img src={bulletin.image} alt={bulletin.title} className="w-full h-48 object-cover" />
-              <div className="p-6">
-                <h2 className={`text-xl font-heading font-semibold ${darkMode ? 'text-nuper-light-text' : 'text-nuper-blue'} mb-2`}>{bulletin.title}</h2>
-                <p className="text-gray-700 dark:text-nuper-light-text leading-relaxed mb-4 line-clamp-3">{bulletin.summary}</p>
-                <Link
-                  to={`/bulletin/${bulletin.id}`}
-                  className={`inline-block text-nuper-blue hover:underline font-heading`}
-                >
-                  Devamını Oku →
-                </Link>
-              </div>
-            </div>
-          ))}
+    <div className={`${darkMode ? 'bg-nuper-dark-gray text-nuper-light-text' : 'bg-white text-gray-900'} min-h-screen font-serif transition-colors duration-500 pt-16`}>
+      <section className="py-16">
+        <div className="max-w-4xl mx-auto px-4">
+          <h2 className={`text-4xl font-heading font-bold text-center mb-12 ${darkMode ? 'text-nuper-light-text' : 'text-nuper-blue'} animate-fade-in`}>Bültenler</h2>
+          <div className="flex flex-col items-center space-y-12">
+            {bulletins.map((bulletin) => (
+              <motion.div
+                key={bulletin.id}
+                className={`${darkMode ? 'bg-nuper-dark border-nuper-dark-gray' : 'bg-white border-gray-200'} rounded-lg border shadow-lg p-8 max-w-2xl w-full`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <h3 className={`text-2xl font-serif font-semibold mb-4 ${darkMode ? 'text-nuper-light-text' : 'text-gray-900'}`}>{bulletin.title}</h3>
+                <p className={`text-sm text-gray-600 dark:text-gray-400 mb-4`}>{bulletin.date}</p>
+                <p className={`text-lg font-serif leading-relaxed ${darkMode ? 'text-nuper-light-text' : 'text-gray-700'}`}>
+                  {bulletin.content}
+                </p>
+              </motion.div>
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
+
+      <footer className={`${darkMode ? 'bg-nuper-dark-gray' : 'bg-nuper-blue'} text-nuper-light-text py-6 text-center`}>
+        <p className="animate-fade-in">
+          Bizi takip et:{' '}
+          <a href="https://x.com/nuperplatform" className="text-nuper-gray hover:text-nuper-blue">X</a> |{' '}
+          <a href="https://linkedin.com/company/nuperplatform" className="text-nuper-gray hover:text-nuper-blue">LinkedIn</a>
+        </p>
+        <p className="mt-2 animate-fade-in font-heading">Nuper © 2025</p>
+      </footer>
     </div>
   );
 };
