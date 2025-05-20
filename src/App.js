@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 import About from './components/About';
 import Opportunities from './components/Opportunities';
@@ -14,7 +15,7 @@ const events = [
 ];
 
 const HomeHeader = () => {
-  const [isScrolled, setIsScrolled] = React.useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   React.useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -43,7 +44,7 @@ const HomeHeader = () => {
 };
 
 const DefaultHeader = () => {
-  const [isScrolled, setIsScrolled] = React.useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   React.useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -70,6 +71,13 @@ const DefaultHeader = () => {
 };
 
 const App = () => {
+  const [currentSet, setCurrentSet] = useState(0);
+  const cardsPerSet = 3;
+  const visibleEvents = events.slice(currentSet * cardsPerSet, (currentSet + 1) * cardsPerSet);
+
+  const handleNext = () => setCurrentSet((prev) => (prev + 1) % Math.ceil(events.length / cardsPerSet));
+  const handlePrev = () => setCurrentSet((prev) => (prev - 1 + Math.ceil(events.length / cardsPerSet)) % Math.ceil(events.length / cardsPerSet));
+
   return (
     <Router>
       <div className="min-h-screen font-sans text-gray-900">
@@ -82,6 +90,45 @@ const App = () => {
                   <h1 className="text-4xl font-heading font-bold">Nuper ile Geleceğini Şekillendir!</h1>
                   <p className="mt-4 text-lg">Öğrenciler için yarışmalar, etkinlikler ve fırsatlar tek platformda!</p>
                   <Link to="/#register" className="bg-white text-nuper-blue mt-6 inline-block px-6 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading">Şimdi Kaydol</Link>
+                </div>
+              </section>
+              <section id="opportunities" className="bg-nuper-gray py-16">
+                <div className="max-w-6xl mx-auto px-4">
+                  <h2 className="text-3xl font-heading font-bold text-center mb-8 text-nuper-blue">Fırsatları Keşfet</h2>
+                  <div className="relative">
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={`set-${currentSet}`}
+                        className="flex space-x-6 py-4 justify-center"
+                        initial={{ opacity: 0, x: 50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -50 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        {visibleEvents.map((event) => (
+                          <Link to={`/event/${event.id}`} key={event.id} className="flex-shrink-0 w-96 h-64 bg-white rounded-xl border shadow-lg p-6">
+                            <div className="flex flex-col h-full">
+                              <div className="flex space-x-4">
+                                <img src={event.image} alt={event.title} className="w-1/3 h-32 object-cover rounded-lg" />
+                                <div className="flex-1">
+                                  <h3 className="text-lg font-heading font-semibold text-nuper-blue">{event.title}</h3>
+                                  <p className="text-gray-600">{event.date}</p>
+                                  <p className="text-gray-600">{event.organizer}</p>
+                                </div>
+                              </div>
+                              <p className="mt-2 text-gray-700">Detaylar için tıklayın</p>
+                            </div>
+                          </Link>
+                        ))}
+                      </motion.div>
+                    </AnimatePresence>
+                    <button onClick={handlePrev} className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-nuper-dark-blue shadow-md">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <button onClick={handleNext} className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-nuper-dark-blue shadow-md">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                  </div>
                 </div>
               </section>
               <section id="register" className="bg-white py-16">
@@ -97,9 +144,9 @@ const App = () => {
               </section>
             </>
           } />
-          <Route path="/about" element={<><DefaultHeader /><About /></>} />
-          <Route path="/opportunities" element={<><DefaultHeader /><Opportunities /></>} />
-          <Route path="/bulletins" element={<><DefaultHeader /><Bulletins /></>} />
+          <Route path="/about" element={<><DefaultHeader /><div className="pt-16"><About /></div></>} />
+          <Route path="/opportunities" element={<><DefaultHeader /><div className="pt-16"><Opportunities /></div></>} />
+          <Route path="/bulletins" element={<><DefaultHeader /><div className="pt-16"><Bulletins /></div></>} />
           <Route path="/event/:id" element={<><DefaultHeader /><EventDetail /></>} />
           <Route path="/bulletin/:id" element={<><DefaultHeader /><BulletinDetail /></>} />
         </Routes>
