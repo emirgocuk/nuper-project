@@ -1,57 +1,43 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-// Font Awesome importları artık bu dosyada kullanılmadığı için kaldırıldı.
-// FontAwesomeIcon bileşenini de artık kullanmayacağız, dolayısıyla import etmiyoruz.
-// import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-
-
-// Örnek Bülten Verileri (Firebase entegrasyonundan sonra bu kaldırılacak)
-const bulletins = [
-    {
-        id: 'b-1',
-        slug: 'otomotiv-sektorunde-dort-ayin-rontgeni-yine-mis-gibi-yaptik',
-        type: 'bülten',
-        publisher: 'Pareto Mobilite', // Bu bilgi burada kalabilir ama sayfada gösterilmeyecek
-        publisherLogo: 'https://via.placeholder.com/40x40.png?text=PM',
-        title: 'Otomotiv sektöründe dört ayın röntgeni: Yine -\'mış gibi\' yaptık',
-        summary: 'Yılın ilk çeyreği, otomotiv sektörü için “bahar rüzgarı” havasında geçti. Satışlar yine rekor seviyedeydi, elektrikli otomobil pazarı yükseliş ivmesi gösterdi ve Rekabet Kurulu’ndan dev birleşmeye onay çıktı. Fakat sektör, esasında “-mış gibi” yaptığı bir dönemi geride...',
-        image: 'https://via.placeholder.com/800x450.png?text=OtomotivSektoru',
-        authorName: 'Ahmet Çelik',
-        date: '21 Mayıs 2025',
-        fullContent: `Otomotiv sektöründe 2025 yılının ilk dört ayı, beklentilerin üzerinde bir satış performansıyla geçti. Özellikle elektrikli araç segmentinde yaşanan büyüme, sektördeki dönüşümün hızlandığını gösteriyor. Ancak, küresel tedarik zinciri sorunları ve hammadde fiyatlarındaki dalgalanmalar, sektörün önündeki belirsizlikleri koruyor.
-        
-        Rekabet Kurulu'ndan gelen dev birleşme onayı, sektörde konsolidasyon eğilimlerinin devam edeceğinin sinyallerini verdi. Bu birleşmelerin, pazar dinamiklerini nasıl etkileyeceği merak konusu. Öte yandan, Ar-Ge yatırımları ve otonom sürüş teknolojilerine olan ilgi artarak devam ediyor. Sektör temsilcileri, sürdürülebilirlik ve dijitalleşmenin önümüzdeki dönemin ana gündem maddeleri olacağını belirtiyor.`,
-        tags: ['otomotiv', 'elektrikli araç', 'ekonomi', 'sektör analizi']
-    },
-    {
-      id: 'b-2',
-      slug: 'yapay-zeka-ve-gelecegimiz-yeni-donemin-trendleri',
-      type: 'bülten',
-      publisher: 'Dijital Türkiye',
-      publisherLogo: 'https://via.placeholder.com/40x40.png?text=DT',
-      title: 'Yapay Zeka ve Geleceğimiz: Yeni Dönemin Trendleri',
-      summary: 'Yapay zeka teknolojileri, hayatımızın her alanına hızla entegre olmaya devam ediyor. Bu bülten, en son yapay zeka trendlerini, iş dünyasına etkilerini ve gelecekte bizi nelerin beklediğini derinlemesine inceliyor...',
-      image: 'https://via.placeholder.com/350x250.png?text=YapayZeka',
-      authorName: 'Ayşe Yılmaz',
-      date: '10 Nisan 2025',
-      fullContent: `Yapay zeka, sadece teknoloji dünyasında değil, sağlık, eğitim, finans gibi birçok sektörde devrim niteliğinde değişimler yaratıyor. Makine öğrenimi, derin öğrenme ve doğal dil işleme gibi alt dallarındaki gelişmeler, yapay zekanın yeteneklerini her geçen gün artırıyor. Bu bültende, en güncel yapay zeka uygulamalarını, etik tartışmaları ve gelecekteki potansiyelini ele alıyoruz.`,
-      tags: ['yapay zeka', 'teknoloji', 'inovasyon', 'gelecek']
-    },
-];
+import { doc, getDoc, getFirestore } from 'firebase/firestore'; // Firebase Firestore fonksiyonları
+import { app } from '../firebaseConfig'; // Firebase uygulamanızın yapılandırması
 
 const BulletinDetail = () => {
-    const { slug } = useParams();
-    const [bulletin, setBulletin] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { slug } = useParams(); // URL'den bültenin 'slug' değerini alırız
+    const [bulletin, setBulletin] = useState(null); // Bülten verisini tutar
+    const [loading, setLoading] = useState(true); // Yüklenme durumunu tutar
+    const [error, setError] = useState(null); // Hata durumunu tutar
+
+    const db = getFirestore(app); // Firestore veritabanı örneğini başlatırız
 
     useEffect(() => {
-        const foundBulletin = bulletins.find((b) => b.slug === slug);
-        if (foundBulletin) {
-            setBulletin(foundBulletin);
-        }
-        setLoading(false);
-    }, [slug]);
+        const fetchBulletin = async () => {
+            try {
+                // Firestore'dan belirli bir bülteni çekmek için kullanılır.
+                // Burada 'slug' değerinin aynı zamanda Firestore belge ID'si olduğunu varsayıyoruz.
+                // Eğer 'slug' belge ID'si değil de belgenin içindeki bir alan ise,
+                // bunun yerine bir sorgu (query) kullanmanız gerekirdi.
+                const bulletinRef = doc(db, "bulletins", slug);
+                const docSnap = await getDoc(bulletinRef); // Belgeyi getir
 
+                if (docSnap.exists()) { // Belge varsa
+                    setBulletin({ id: docSnap.id, ...docSnap.data() });
+                } else {
+                    setError("Bülten bulunamadı."); // Belge yoksa hata mesajı
+                }
+            } catch (err) {
+                console.error("Bülten çekilirken hata oluştu:", err);
+                setError("Bülten yüklenirken bir sorun oluştu."); // Hata oluşursa genel hata mesajı
+            } finally {
+                setLoading(false); // Yükleme tamamlandı
+            }
+        };
+
+        fetchBulletin(); // Bülteni getir fonksiyonunu çalıştır
+    }, [slug, db]); // 'slug' veya 'db' değiştiğinde tekrar çalışır
+
+    // Yüklenme durumunda gösterilecek UI
     if (loading) {
         return (
             <div className="pt-16 flex justify-center items-center h-screen">
@@ -60,6 +46,16 @@ const BulletinDetail = () => {
         );
     }
 
+    // Hata durumunda gösterilecek UI
+    if (error) {
+        return (
+            <div className="pt-16 flex justify-center items-center h-screen">
+                <p className="text-xl text-red-600">{error}</p>
+            </div>
+        );
+    }
+
+    // Bülten bulunamadıysa (ancak 'error' durumu yoksa) gösterilecek UI
     if (!bulletin) {
         return (
             <div className="pt-16 flex justify-center items-center h-screen">
@@ -68,44 +64,52 @@ const BulletinDetail = () => {
         );
     }
 
+    // Bülten verisi yüklendiyse gösterilecek UI
     return (
         <div className="pt-16 bg-nuper-gray min-h-screen">
-            <div className="max-w-4xl mx-auto px-4 py-8 bg-white rounded-lg shadow-md"> {/* İçeriği bir kart içine aldık */}
+            <div className="max-w-4xl mx-auto px-4 py-8 bg-white rounded-lg shadow-md">
                 {/* Başlık */}
                 <h1 className="text-4xl md:text-5xl font-heading font-bold text-nuper-blue mb-4 leading-tight">
                     {bulletin.title}
                 </h1>
 
-                {/* Tarih - Sola dayalı, gri ve sönük. mb-4 boşluk ekliyoruz */}
-                <p className="text-gray-500 text-sm font-sans mb-8"> {/* mb-8 ile daha fazla boşluk */}
-                    {bulletin.date}
+                {/* Tarih */}
+                <p className="text-gray-500 text-sm font-sans mb-8">
+                    {/* Eğer Firebase'den gelen tarih bir Timestamp ise, okunabilir bir formata dönüştürün */}
+                    {bulletin.date || (bulletin.createdAt && new Date(bulletin.createdAt.toDate()).toLocaleDateString('tr-TR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    })) || 'Tarih Bilgisi Yok'}
                 </p>
 
-                {/* Görsel Alanı (Tarihten sonra, içerikten önce) */}
+                {/* Görsel Alanı */}
                 {bulletin.image && (
                     <img
                         src={bulletin.image}
                         alt={bulletin.title}
-                        className="w-full h-auto max-h-96 object-cover rounded-lg shadow-md mb-8" // mb-8 ile daha fazla boşluk
+                        className="w-full h-auto max-h-96 object-cover rounded-lg shadow-md mb-8"
                     />
                 )}
 
-                {/* Özet ve Tam İçerik - Font büyüklükleri aynı (text-lg) */}
+                {/* Özet ve Tam İçerik */}
                 {(bulletin.summary || bulletin.fullContent) && (
                     <div className="mb-8 text-gray-800 font-sans leading-relaxed">
                         {bulletin.summary && (
-                            <p className="text-lg mb-4"> {/* text-lg olarak ayarlandı */}
+                            <p className="text-lg mb-4">
                                 {bulletin.summary}
                             </p>
                         )}
                         {bulletin.fullContent && (
-                            <p className="text-lg whitespace-pre-line"> {/* text-lg olarak ayarlandı */}
+                            // 'whitespace-pre-line' ile içeriğin içindeki satır sonlarını koruruz
+                            <p className="text-lg whitespace-pre-line">
                                 {bulletin.fullContent}
                             </p>
                         )}
                     </div>
                 )}
 
+                {/* Tüm Bültenlere Geri Dön Linki */}
                 <div className="text-center mt-12">
                     <Link to="/bulletins" className="text-nuper-blue hover:underline font-semibold font-sans">
                         Tüm Bültenleri Görüntüle
