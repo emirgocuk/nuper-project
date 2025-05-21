@@ -1,5 +1,10 @@
 // src/components/admin/AdminBulletinForm.js
-import React, { useState, useEffect } => {
+import React, { useState, useEffect } from 'react'; // <-- Burası düzeltildi!
+import { useNavigate, useParams } from 'react-router-dom';
+import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
+import { app } from '../../firebaseConfig';
+
+const AdminBulletinForm = () => {
     const { slug } = useParams();
     const navigate = useNavigate();
     const db = getFirestore(app);
