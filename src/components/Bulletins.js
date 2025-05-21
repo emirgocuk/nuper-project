@@ -3,20 +3,23 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
+// Slug eklenmiş örnek Bülten Verileri
 const bulletinsData = [
   {
     id: 'b-1',
+    slug: 'otomotiv-sektorunde-dort-ayin-rontgeni-yine-mis-gibi-yaptik', // Yeni slug
     type: 'bülten',
     publisher: 'Pareto Mobilite',
     publisherLogo: 'https://via.placeholder.com/40x40.png?text=PM',
     title: 'Otomotiv sektöründe dört ayın röntgeni: Yine -\'mış gibi\' yaptık',
     summary: 'Yılın ilk çeyreği, otomotiv sektörü için “bahar rüzgarı” havasında geçti. Satışlar yine rekor seviyedeydi, elektrikli otomobil pazarı yükseliş ivmesi gösterdi ve Rekabet Kurulu’ndan dev birleşmeye onay çıktı. Fakat sektör, esasında “-mış gibi” yaptığı bir dönemi geride...',
     image: 'https://via.placeholder.com/350x250.png?text=Otomotiv',
-    authorName: 'Ahmet Çelik', // Bu bilgi alt kısımdan kaldırılacak
+    authorName: 'Ahmet Çelik',
     date: '21 Mayıs 2025',
   },
   {
     id: 'b-2',
+    slug: 'yapay-zeka-ve-gelecegimiz-yeni-donemin-trendleri', // Yeni slug
     type: 'bülten',
     publisher: 'Dijital Türkiye',
     publisherLogo: 'https://via.placeholder.com/40x40.png?text=DT',
@@ -28,6 +31,7 @@ const bulletinsData = [
   },
   {
     id: 'b-3',
+    slug: 'uzaktan-egitimde-yeni-yaklasimlar-neler-degisti', // Yeni slug
     type: 'bülten',
     publisher: 'Eğitim Gündemi',
     publisherLogo: 'https://via.placeholder.com/40x40.png?text=EG',
@@ -52,12 +56,9 @@ const Bulletins = () => {
             transition={{ duration: 0.5 }}
             className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col md:flex-row items-stretch border border-gray-200"
           >
-            {/* Metin İçerik Alanı */}
             <div className="p-6 flex-1 flex flex-col justify-between">
-              {/* Üst Kısım: Logo, İsim, Tip (Publisher olarak) */}
               <div className="flex items-center text-sm text-gray-600 mb-3">
                 {bulletin.publisherLogo && (
-                  // 'rounded-full' yerine 'rounded-md' (hafif radiuslu kare)
                   <img src={bulletin.publisherLogo} alt={bulletin.publisher} className="w-8 h-8 rounded-md mr-2 object-cover" />
                 )}
                 <span className="font-semibold text-nuper-blue">{bulletin.publisher}</span>
@@ -65,10 +66,10 @@ const Bulletins = () => {
                 <span className="text-gray-700 font-medium">{bulletin.type.toUpperCase()}</span>
               </div>
 
-              {/* Başlık ve Özet */}
               <div className="flex-1">
                 <h2 className="text-2xl md:text-3xl font-heading font-bold text-gray-900 leading-tight mb-3">
-                  <Link to={`/bulletin/${bulletin.id}`} className="hover:text-nuper-blue transition-colors duration-200">
+                  {/* Link slug ile güncellendi */}
+                  <Link to={`/bulletin/${bulletin.slug}`} className="hover:text-nuper-blue transition-colors duration-200">
                     {bulletin.title}
                   </Link>
                 </h2>
@@ -77,16 +78,13 @@ const Bulletins = () => {
                 </p>
               </div>
 
-              {/* Alt Kısım: Sadece Tarih */}
               <div className="flex justify-between items-center text-sm text-gray-600 mt-4">
                 <div className="flex items-center">
-                  {/* Yazar ismi kaldırıldı */}
                   <span className="text-gray-700">{bulletin.date}</span>
                 </div>
               </div>
             </div>
 
-            {/* Görsel Alanı */}
             {bulletin.image && (
               <div className="w-full md:w-2/5 flex-shrink-0">
                 <img

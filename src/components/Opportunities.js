@@ -5,11 +5,12 @@ import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
 
-// Örnek Etkinlik Verileri (Şimdilik burada tutuyoruz, sonra Firebase'den gelecek)
+// Slug eklenmiş örnek Etkinlik Verileri
 const opportunitiesData = [
   {
-    id: 'o-1',
-    type: 'etkinlik', // 'fırsat' yerine 'etkinlik' olarak değiştirildi
+    id: 'o-1', // ID'ler hala kendi içlerinde benzersiz kalabilir, ancak linkleme slug ile
+    slug: 'ulusal-bilim-olimpiyatlari-basvurulari-basladi', // Yeni slug
+    type: 'etkinlik',
     organizerName: 'Türkiye Bilim Kurumu',
     organizerLogo: 'https://via.placeholder.com/40x40.png?text=TBK',
     title: 'Ulusal Bilim Olimpiyatları Başvuruları Başladı!',
@@ -21,7 +22,8 @@ const opportunitiesData = [
   },
   {
     id: 'o-2',
-    type: 'etkinlik', // 'fırsat' yerine 'etkinlik' olarak değiştirildi
+    slug: 'genc-sanatcilar-resim-ve-muzik-yarismasi', // Yeni slug
+    type: 'etkinlik',
     organizerName: 'İstanbul Sanat Vakfı',
     organizerLogo: 'https://via.placeholder.com/40x40.png?text=ISV',
     title: 'Genç Sanatçılar Resim ve Müzik Yarışması',
@@ -33,7 +35,8 @@ const opportunitiesData = [
   },
   {
     id: 'o-3',
-    type: 'etkinlik', // 'fırsat' yerine 'etkinlik' olarak değiştirildi
+    slug: '24-saatlik-yenilikci-kodlama-hackathonu', // Yeni slug
+    type: 'etkinlik',
     organizerName: 'Tech Türkiye',
     organizerLogo: 'https://via.placeholder.com/40x40.png?text=TT',
     title: '24 Saatlik Yenilikçi Kodlama Hackathonu',
@@ -49,7 +52,7 @@ const opportunitiesData = [
 const Opportunities = () => {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-4xl font-heading font-bold text-center text-nuper-blue mb-12">Etkinlikler</h1> {/* Başlık da 'Etkinlikler' olarak değiştirildi */}
+      <h1 className="text-4xl font-heading font-bold text-center text-nuper-blue mb-12">Etkinlikler</h1>
       <div className="grid grid-cols-1 gap-8">
         {opportunitiesData.map((opportunity) => (
           <motion.div
@@ -59,23 +62,20 @@ const Opportunities = () => {
             transition={{ duration: 0.5 }}
             className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col md:flex-row items-stretch border border-gray-200"
           >
-            {/* Metin İçerik Alanı */}
             <div className="p-6 flex-1 flex flex-col justify-between">
-              {/* Üst Kısım: Logo, İsim, Tip */}
               <div className="flex items-center text-sm text-gray-600 mb-3">
                 {opportunity.organizerLogo && (
-                  // 'rounded-full' yerine 'rounded-md' (hafif radiuslu kare)
                   <img src={opportunity.organizerLogo} alt={opportunity.organizerName} className="w-8 h-8 rounded-md mr-2 object-cover" />
                 )}
                 <span className="font-semibold text-nuper-blue">{opportunity.organizerName}</span>
                 <span className="mx-2">•</span>
-                <span className="text-gray-700 font-medium">{opportunity.type.toUpperCase()}</span> {/* 'type' alanı 'etkinlik' olduğu için doğru görünecek */}
+                <span className="text-gray-700 font-medium">{opportunity.type.toUpperCase()}</span>
               </div>
 
-              {/* Başlık ve Özet */}
               <div className="flex-1">
                 <h2 className="text-2xl md:text-3xl font-heading font-bold text-gray-900 leading-tight mb-3">
-                  <Link to={`/event/${opportunity.id}`} className="hover:text-nuper-blue transition-colors duration-200">
+                  {/* Link slug ile güncellendi */}
+                  <Link to={`/event/${opportunity.slug}`} className="hover:text-nuper-blue transition-colors duration-200">
                     {opportunity.title}
                   </Link>
                 </h2>
@@ -84,7 +84,6 @@ const Opportunities = () => {
                 </p>
               </div>
 
-              {/* Alt Kısım: Tarih, Katılımcı, Lokasyon */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm text-gray-600 mt-4">
                 <div className="flex items-center mb-2 sm:mb-0">
                   <span className="font-medium">{opportunity.date}</span>
@@ -100,7 +99,6 @@ const Opportunities = () => {
               </div>
             </div>
 
-            {/* Görsel Alanı */}
             {opportunity.image && (
               <div className="w-full md:w-2/5 flex-shrink-0">
                 <img

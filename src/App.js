@@ -1,20 +1,22 @@
+// src/App.js
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 import About from './components/About';
-import Opportunities from './components/Opportunities';
+import Opportunities from './components/Opportunities'; // Etkinlikler sayfasının adı
 import Bulletins from './components/Bulletins';
 import EventDetail from './components/EventDetail';
 import BulletinDetail from './components/BulletinDetail';
 
+// Slug eklenmiş events verisi
 const events = [
-  { id: '1', title: 'Bilim Olimpiyatları', date: '30 Haziran 2025', organizer: 'Türkiye Bilim Kurumu', image: 'https://via.placeholder.com/400x250.png?text=Bilim+Olimpiyatları', description: 'Genç bilim insanlarının yeteneklerini sergileyebileceği bir platform.', additionalInfo: 'Katılımcılar için özel mentorluk programları ve hazırlık destekleri sunulmaktadır.', participants: 'Lise ve üniversite öğrencileri.' },
-  { id: '2', title: 'Sanat Yarışması', date: '15 Temmuz 2025', organizer: 'İstanbul Sanat Vakfı', image: 'https://via.placeholder.com/400x250.png?text=Sanat+Yarışması', description: 'Resim ve müzik alanında yeteneklerini sergilemek isteyenler için bir fırsat.', additionalInfo: 'Eserler profesyonel bir jüri tarafından değerlendirilecek ve en iyileri sergilenecektir.', participants: '18-25 yaş arası sanatçılar.' },
-  { id: '3', title: 'Kodlama Hackathonu', date: '10 Ağustos 2025', organizer: 'Tech Türkiye', image: 'https://via.placeholder.com/400x250.png?text=Kodlama+Hackathonu', description: 'Yazılım tutkunları için 24 saat sürecek yenilikçi projeler geliştirme etkinliği.', additionalInfo: 'Ekiplerin projeleri, sektör liderleri ve potansiyel yatırımcılar karşısında sunulacaktır.', participants: 'Geliştiriciler ve öğrenciler.' },
-  { id: '4', title: 'Robotik Atölyesi', date: '5 Eylül 2025', organizer: 'Robotik Topluluğu', image: 'https://via.placeholder.com/400x250.png?text=Robotik+Atölyesi', description: 'Robot yapımı ve programlama üzerine uygulamalı eğitim.', additionalInfo: 'Temel robotik bilgisi olan veya olmayan herkes için uygun, eğlenceli ve öğretici bir deneyim.', participants: 'Ortaokul ve lise öğrencileri.' },
-  { id: '5', title: 'Edebiyat Maratonu', date: '20 Eylül 2025', organizer: 'Yazarlar Birliği', image: 'https://via.placeholder.com/400x250.png?text=Edebiyat+Maratonu', description: 'Genç yazarlar için ilham verici bir etkinlik: şiir, öykü ve deneme atölyeleri.', additionalInfo: 'Katılımcılar, ünlü yazarların mentorluğunda kendi eserlerini geliştirme şansı bulacak.', participants: 'Tüm yaş grupları.' },
-  { id: '6', title: 'Girişimcilik Zirvesi', date: '1 Ekim 2025', organizer: 'Girişimcilik Vakfı', image: 'https://via.placeholder.com/400x250.png?text=Girişimcilik+Zirvesi', description: 'Yenilikçi fikirleri olan gençler için ilham veren konuşmalar ve mentorluk seansları.', additionalInfo: 'Zirve, yeni nesil girişimcileri bir araya getirerek iş fikirlerini gerçeğe dönüştürmelerine yardımcı olmayı hedefliyor.', participants: 'Üniversite öğrencileri ve genç profesyoneller.' },
+  { id: '1', slug: 'bilim-olimpiyatlari', title: 'Bilim Olimpiyatları', date: '30 Haziran 2025', organizer: 'Türkiye Bilim Kurumu', image: 'https://via.placeholder.com/400x250.png?text=Bilim+Olimpiyatları', description: 'Genç bilim insanlarının yeteneklerini sergileyebileceği bir platform.', additionalInfo: 'Katılımcılar için özel mentorluk programları ve hazırlık destekleri sunulmaktadır.', participants: 'Lise ve üniversite öğrencileri.' },
+  { id: '2', slug: 'sanat-yarismasi', title: 'Sanat Yarışması', date: '15 Temmuz 2025', organizer: 'İstanbul Sanat Vakfı', image: 'https://via.placeholder.com/400x250.png?text=Sanat+Yarışması', description: 'Resim ve müzik alanında yeteneklerini sergilemek isteyenler için bir fırsat.', additionalInfo: 'Eserler profesyonel bir jüri tarafından değerlendirilecek ve en iyileri sergilenecektir.', participants: '18-25 yaş arası sanatçılar.' },
+  { id: '3', slug: 'kodlama-hackathonu', title: 'Kodlama Hackathonu', date: '10 Ağustos 2025', organizer: 'Tech Türkiye', image: 'https://via.placeholder.com/400x250.png?text=Kodlama+Hackathonu', description: 'Yazılım tutkunları için 24 saat sürecek yenilikçi projeler geliştirme etkinliği.', additionalInfo: 'Ekiplerin projeleri, sektör liderleri ve potansiyel yatırımcılar karşısında sunulacaktır.', participants: 'Geliştiriciler ve öğrenciler.' },
+  { id: '4', slug: 'robotik-atolyesi', title: 'Robotik Atölyesi', date: '5 Eylül 2025', organizer: 'Robotik Topluluğu', image: 'https://via.placeholder.com/400x250.png?text=Robotik+Atölyesi', description: 'Robot yapımı ve programlama üzerine uygulamalı eğitim.', additionalInfo: 'Temel robotik bilgisi olan veya olmayan herkes için uygun, eğlenceli ve öğretici bir deneyim.', participants: 'Ortaokul ve lise öğrencileri.' },
+  { id: '5', slug: 'edebiyat-maratonu', title: 'Edebiyat Maratonu', date: '20 Eylül 2025', organizer: 'Yazarlar Birliği', image: 'https://via.placeholder.com/400x250.png?text=Edebiyat+Maratonu', description: 'Genç yazarlar için ilham verici bir etkinlik: şiir, öykü ve deneme atölyeleri.', additionalInfo: 'Katılımcılar, ünlü yazarların mentorluğunda kendi eserlerini geliştirme şansı bulacak.', participants: 'Tüm yaş grupları.' },
+  { id: '6', slug: 'girisimcilik-zirvesi', title: 'Girişimcilik Zirvesi', date: '1 Ekim 2025', organizer: 'Girişimcilik Vakfı', image: 'https://via.placeholder.com/400x250.png?text=Girişimcilik+Zirvesi', description: 'Yenilikçi fikirleri olan gençler için ilham veren konuşmalar ve mentorluk seansları.', additionalInfo: 'Zirve, yeni nesil girişimcileri bir araya getirerek iş fikirlerini gerçeğe dönüştürmelerine yardımcı olmayı hedefliyor.', participants: 'Üniversite öğrencileri ve genç profesyoneller.' },
 ];
 
 const useHomeReset = (setExpandedEventId) => {
@@ -51,7 +53,7 @@ const HomeHeader = ({ setExpandedEventId }) => {
           <div className="hidden md:flex items-center space-x-4">
             <Link to="/" onClick={handleHomeClick} className={`font-sans py-2 ${textColorClass} hover:text-nuper-dark-blue`}>Ana Sayfa</Link>
             <Link to="/about" className={`font-sans py-2 ${textColorClass} hover:text-nuper-dark-blue`}>Hakkında</Link>
-            <Link to="/opportunities" className={`font-sans py-2 ${textColorClass} hover:text-nuper-dark-blue`}>Fırsatlar</Link>
+            <Link to="/opportunities" className={`font-sans py-2 ${textColorClass} hover:text-nuper-dark-blue`}>Etkinlikler</Link> {/* Fırsatlar -> Etkinlikler */}
             <Link to="/bulletins" className={`font-sans py-2 ${textColorClass} hover:text-nuper-dark-blue`}>Bültenler</Link>
             <Link to="/#register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
           </div>
@@ -71,7 +73,6 @@ const DefaultHeader = () => {
   }, []);
 
   return (
-    // 'fixed top-0' sınıfları eklendi
     <nav className={`fixed top-0 w-full z-20 shadow-lg ${isScrolled ? 'bg-white/90' : 'bg-white'}`}>
       <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
         <Link to="/">
@@ -81,7 +82,7 @@ const DefaultHeader = () => {
           <div className="hidden md:flex items-center space-x-4">
             <Link to="/" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Ana Sayfa</Link>
             <Link to="/about" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Hakkında</Link>
-            <Link to="/opportunities" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Fırsatlar</Link>
+            <Link to="/opportunities" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Etkinlikler</Link> {/* Fırsatlar -> Etkinlikler */}
             <Link to="/bulletins" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Bültenler</Link>
             <Link to="/#register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
           </div>
@@ -94,7 +95,7 @@ const DefaultHeader = () => {
 
 const App = () => {
   const [currentSet, setCurrentSet] = useState(0);
-  const [expandedEventId, setExpandedEventId] = useState(null);
+  const [expandedEventId, setExpandedEventId] = useState(null); // ID yerine slug tutacağız
   const cardsPerSet = 3;
   const totalSets = Math.ceil(events.length / cardsPerSet);
   const visibleEvents = events.slice(currentSet * cardsPerSet, (currentSet + 1) * cardsPerSet);
@@ -108,8 +109,9 @@ const App = () => {
     setCurrentSet((prev) => (prev - 1 + totalSets) % totalSets);
   };
 
-  const handleCardClick = (eventId) => {
-    setExpandedEventId(eventId);
+  // Artık id yerine slug kullanıyoruz
+  const handleCardClick = (eventSlug) => {
+    setExpandedEventId(eventSlug);
   };
 
   const handleCloseExpanded = (e) => {
@@ -117,7 +119,8 @@ const App = () => {
     setExpandedEventId(null);
   };
 
-  const selectedEvent = events.find(event => event.id === expandedEventId);
+  // Event'i slug ile buluyoruz
+  const selectedEvent = events.find(event => event.slug === expandedEventId);
 
   const getCardPositionClass = (index) => {
     const cardIndexInSet = index % cardsPerSet;
@@ -141,9 +144,9 @@ const App = () => {
                   <Link to="/#register" className="bg-white text-nuper-blue mt-6 inline-block px-6 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading transition-colors duration-300">Şimdi Kaydol</Link>
                 </div>
               </section>
-              <section id="opportunities" className="bg-nuper-gray py-16">
+              <section id="opportunities-home" className="bg-nuper-gray py-16"> {/* id'yi opportunities-home olarak değiştirdim, opportunities sayfasıyla karışmasın */}
                 <div className="max-w-6xl mx-auto px-4 relative">
-                  <h2 className="text-3xl font-heading font-bold text-center mb-8 text-nuper-blue">Fırsatları Keşfet</h2>
+                  <h2 className="text-3xl font-heading font-bold text-center mb-8 text-nuper-blue">Öne Çıkan Etkinlikler</h2> {/* Fırsatları Keşfet -> Öne Çıkan Etkinlikler */}
                   <div className="relative z-0 h-64">
                     <AnimatePresence mode="wait">
                       {expandedEventId && selectedEvent ? (
@@ -184,7 +187,8 @@ const App = () => {
                             <p className="text-gray-600 text-sm font-sans mt-2 mb-0.5">
                               <strong className="text-nuper-blue">Kimler Katılabilir:</strong> {selectedEvent.participants}
                             </p>
-                            <Link to={`/event/${selectedEvent.id}`} className="text-nuper-blue text-sm font-semibold hover:underline font-sans mt-1">
+                            {/* Link slug ile güncellendi */}
+                            <Link to={`/event/${selectedEvent.slug}`} className="text-nuper-blue text-sm font-semibold hover:underline font-sans mt-1">
                               Detaylı Etkinlik Sayfasına Git
                             </Link>
                           </div>
@@ -201,8 +205,8 @@ const App = () => {
                           {visibleEvents.map((event, index) => (
                             <motion.div
                               key={event.id}
-                              layoutId={`card-${event.id}`}
-                              onClick={() => handleCardClick(event.id)}
+                              layoutId={`card-${event.id}`} // layoutId hala id ile olabilir, animasyon için daha tutarlı
+                              onClick={() => handleCardClick(event.slug)} // Tıklamada slug kullan
                               className={`flex-shrink-0 w-96 h-64 bg-white rounded-xl border shadow-lg p-6 cursor-pointer hover:shadow-xl transition-shadow duration-200 flex flex-col justify-between ${getCardPositionClass(index)}`}
                             >
                               <div className="flex space-x-4 items-center">
@@ -245,12 +249,12 @@ const App = () => {
               </section>
             </>
           } />
-          {/* DefaultHeader'ın kullanıldığı tüm sayfalara pt-16 eklendi */}
+          {/* Rota tanımlamalarında ':id' yerine ':slug' kullanıldı */}
           <Route path="/about" element={<><DefaultHeader /><div className="pt-16"><About /></div></>} />
           <Route path="/opportunities" element={<><DefaultHeader /><div className="pt-16"><Opportunities /></div></>} />
           <Route path="/bulletins" element={<><DefaultHeader /><div className="pt-16"><Bulletins /></div></>} />
-          <Route path="/event/:id" element={<><DefaultHeader /><div className="pt-16"><EventDetail /></div></>} /> {/* pt-16 eklendi */}
-          <Route path="/bulletin/:id" element={<><DefaultHeader /><div className="pt-16"><BulletinDetail /></div></>} /> {/* pt-16 eklendi */}
+          <Route path="/event/:slug" element={<><DefaultHeader /><div className="pt-16"><EventDetail /></div></>} /> {/* ':slug' olarak değiştirildi */}
+          <Route path="/bulletin/:slug" element={<><DefaultHeader /><div className="pt-16"><BulletinDetail /></div></>} /> {/* ':slug' olarak değiştirildi */}
         </Routes>
       </div>
     </Router>
