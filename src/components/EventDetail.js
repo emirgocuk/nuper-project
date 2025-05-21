@@ -1,4 +1,3 @@
-// src/components/EventDetail.js
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -41,19 +40,18 @@ const events = [
 
 
 const EventDetail = () => {
-    const { slug } = useParams(); // ID yerine slug çekiyoruz
+    const { slug } = useParams();
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         // Normalde burada Firebase'den veya API'den slug'a göre veri çekilir
-        // Örneğin: const q = query(collection(db, "events"), where("slug", "==", slug)); getDocs(q).then(querySnapshot => { ... });
-        const foundEvent = events.find((e) => e.slug === slug); // Slug ile etkinlik buluyoruz
+        const foundEvent = events.find((e) => e.slug === slug);
         if (foundEvent) {
             setEvent(foundEvent);
         }
         setLoading(false);
-    }, [slug]); // Bağımlılık slug'a göre ayarlandı
+    }, [slug]);
 
     if (loading) {
         return (
@@ -73,27 +71,21 @@ const EventDetail = () => {
 
     return (
         <div className="pt-16 bg-nuper-gray min-h-screen">
-            <div className="max-w-4xl mx-auto px-4 py-8">
-                {event.image && (
-                    <img
-                        src={event.image}
-                        alt={event.title}
-                        className="w-full h-auto max-h-96 object-cover rounded-lg shadow-md mb-8"
-                    />
-                )}
-
-                <h1 className="text-4xl md:text-5xl font-heading font-bold text-nuper-blue mb-6 leading-tight">
+            <div className="max-w-4xl mx-auto px-4 py-8 bg-white rounded-lg shadow-md"> {/* İçeriği bir kart içine aldık */}
+                {/* Başlık */}
+                <h1 className="text-4xl md:text-5xl font-heading font-bold text-nuper-blue mb-4 leading-tight">
                     {event.title}
                 </h1>
-
+                
+                {/* Özet (Artık text-lg) */}
                 {event.summary && (
-                    <p className="text-xl text-gray-700 font-sans mb-8 leading-relaxed">
+                    <p className="text-lg text-gray-700 font-sans mb-8 leading-relaxed">
                         {event.summary}
                     </p>
                 )}
-
-                <div className="bg-white p-6 rounded-lg shadow-sm mb-8 border border-gray-200">
-                    <h2 className="text-2xl font-heading font-bold text-nuper-blue mb-4">Etkinlik Detayları</h2>
+                
+                {/* Temel Bilgiler */}
+                <div className="mb-8">
                     <ul className="space-y-3 text-gray-800 font-sans">
                         <li>
                             <FontAwesomeIcon icon={faCalendarAlt} className="text-nuper-blue mr-3 w-5" />
@@ -118,26 +110,35 @@ const EventDetail = () => {
                     </ul>
                 </div>
 
-                {event.description && (
-                    <div className="bg-white p-6 rounded-lg shadow-sm mb-8 border border-gray-200">
-                        <h2 className="text-2xl font-heading font-bold text-nuper-blue mb-4">Etkinlik Hakkında</h2>
-                        <p className="text-gray-800 leading-relaxed font-sans whitespace-pre-line">
-                            {event.description}
-                        </p>
-                    </div>
+                {/* Etkinlik Görseli (Buraya, temel bilgilerden sonra taşındı) */}
+                {event.image && (
+                    <img
+                        src={event.image}
+                        alt={event.title}
+                        className="w-full h-auto max-h-96 object-cover rounded-lg shadow-md mb-8"
+                    />
                 )}
 
-                {event.additionalInfo && (
-                    <div className="bg-white p-6 rounded-lg shadow-sm mb-8 border border-gray-200">
-                        <h2 className="text-2xl font-heading font-bold text-nuper-blue mb-4">Ek Bilgiler</h2>
-                        <p className="text-gray-800 leading-relaxed font-sans whitespace-pre-line">
-                            {event.additionalInfo}
-                        </p>
+                {/* Detaylı Açıklama ve Ek Bilgiler birleştirildi - Başlık kaldırıldı */}
+                {(event.description || event.additionalInfo) && (
+                    <div className="mb-8">
+                        {/* Description (Artık text-lg) */}
+                        {event.description && (
+                            <p className="text-lg text-gray-800 leading-relaxed font-sans whitespace-pre-line mb-4">
+                                {event.description}
+                            </p>
+                        )}
+                        {event.additionalInfo && (
+                            <p className="text-lg text-gray-800 leading-relaxed font-sans whitespace-pre-line">
+                                {event.additionalInfo}
+                            </p>
+                        )}
                     </div>
                 )}
-
+                
+                {/* Program Akışı */}
                 {event.programSchedule && event.programSchedule.length > 0 && (
-                    <div className="bg-white p-6 rounded-lg shadow-sm mb-8 border border-gray-200">
+                    <div className="mb-8">
                         <h2 className="text-2xl font-heading font-bold text-nuper-blue mb-4">Program Akışı</h2>
                         <ul className="space-y-3 text-gray-800 font-sans">
                             {event.programSchedule.map((item, index) => (
@@ -152,6 +153,7 @@ const EventDetail = () => {
                     </div>
                 )}
 
+                {/* Eylem Butonları */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
                     {event.registrationLink && (
                         <a

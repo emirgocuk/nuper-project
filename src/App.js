@@ -52,7 +52,7 @@ const HomeHeader = ({ setExpandedEventId }) => {
         <div className="flex items-center space-x-4">
           <div className="hidden md:flex items-center space-x-4">
             <Link to="/" onClick={handleHomeClick} className={`font-sans py-2 ${textColorClass} hover:text-nuper-dark-blue`}>Ana Sayfa</Link>
-            <Link to="/about" className={`font-sans py-2 ${textColorClass} hover:text-nuper-dark-blue`}>Hakkında</Link>
+            <Link to="/about" className={`font-sans py-2 ${textColorClass} hover:text-nuper-dark-blue`}>Hakkımızda</Link>
             <Link to="/opportunities" className={`font-sans py-2 ${textColorClass} hover:text-nuper-dark-blue`}>Etkinlikler</Link> {/* Fırsatlar -> Etkinlikler */}
             <Link to="/bulletins" className={`font-sans py-2 ${textColorClass} hover:text-nuper-dark-blue`}>Bültenler</Link>
             <Link to="/#register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
@@ -81,7 +81,7 @@ const DefaultHeader = () => {
         <div className="flex items-center space-x-4">
           <div className="hidden md:flex items-center space-x-4">
             <Link to="/" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Ana Sayfa</Link>
-            <Link to="/about" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Hakkında</Link>
+            <Link to="/about" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Hakkımızda</Link>
             <Link to="/opportunities" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Etkinlikler</Link> {/* Fırsatlar -> Etkinlikler */}
             <Link to="/bulletins" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Bültenler</Link>
             <Link to="/#register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>

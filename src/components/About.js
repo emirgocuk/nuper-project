@@ -1,21 +1,22 @@
+// src/pages/About.js
 import React from 'react';
 
-const About = () => {
+const About = () => { // Bileşen adını About olarak bırakıyoruz
   return (
-    <section className="bg-white py-16">
-      <div className="max-w-4xl mx-auto px-4">
-        <h2 className="text-3xl font-heading font-bold text-center mb-8 text-nuper-blue">Nuper Nedir?</h2>
-        <p className="text-lg leading-relaxed text-gray-700">
-          Nuper, öğrencilerin kişisel ve akademik gelişimlerini destekleyen bir platformdur. Yarışmalar, atölyeler ve etkinlikler keşfet, okul duyurularını takip et, projelerini sosyal medyada tanıt! Herkes için bir şeyler var, potansiyelini burada keşfet. Biz, gençlerin yeteneklerini ortaya çıkarmalarına ve geleceğe adım atmalarına yardımcı oluyoruz.
+    <div className="pt-16 bg-nuper-gray min-h-screen flex items-center justify-center">
+      {/* BURADA DEĞİŞİKLİK: bg-white rounded-lg shadow-md kaldırıldı */}
+      <div className="max-w-4xl mx-auto px-4 py-8 text-center">
+        <h1 className="text-4xl md:text-5xl font-heading font-bold text-nuper-blue mb-6">
+          Hakkımızda
+        </h1>
+        <p className="text-lg text-gray-700 leading-relaxed font-sans mb-4">
+          Nuper olarak, genç yeteneklerin ve kariyerine yön vermek isteyen herkesin bilgiye ulaşımını kolaylaştırmayı hedefliyoruz. Bilimden sanata, teknolojiden inovasyona kadar geniş bir yelpazede güncel bültenler, ilham veren etkinlikler ve özel kariyer fırsatları sunuyoruz. Amacımız, dinamik bir öğrenme ve gelişim platformu yaratarak, bireylerin potansiyellerini tam anlamıyla keşfetmelerine ve geleceğe güvenle adım atmalarına yardımcı olmaktır.
         </p>
-        <div className="mt-8">
-          <h3 className="text-2xl font-heading font-semibold mb-4 text-nuper-blue">Misyonumuz</h3>
-          <p className="text-lg leading-relaxed text-gray-700">
-            Eğitimde fırsat eşitliği sağlamak ve gençlerin yaratıcılığını teşvik etmek. Teknoloji ve sanatı bir araya getirerek yenilikçi çözümler sunuyoruz.
-          </p>
-        </div>
+        <p className="text-lg text-gray-700 leading-relaxed font-sans">
+          Ekibimiz, sürekli değişen dünyada en doğru ve güncel bilgiyi size ulaştırmak için tutkuyla çalışıyor. Her bir içeriğimiz, sizlere değer katmak ve yolculuğunuzda ışık tutmak amacıyla özenle hazırlanmaktadır. Nuper ailesi olarak, bilginin gücüne inanıyor ve bu gücü sizinle paylaşmaktan mutluluk duyuyoruz. Geleceğin liderlerini ve yenilikçilerini birlikte inşa etmek için buradayız.
+        </p>
       </div>
-    </section>
+    </div>
   );
 };
 
