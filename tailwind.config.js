@@ -30,6 +30,9 @@ module.exports = {
           '100%': { transform: 'translateY(0)', opacity: 1 },
         },
       },
+      screens: {
+        '3xl': '1920px', // 1920px ve üzeri ekranlar için
+      },
     },
   },
   plugins: [],
