@@ -14,6 +14,7 @@ import Opportunities from './components/Opportunities';
 import Bulletins from './components/Bulletins';
 import OpportunityDetail from './components/EventDetail';
 import BulletinDetail from './components/BulletinDetail';
+import Register from './components/Register'; // <<<<<<<<<<<< BU SATIRI EKLEYİN
 
 // Admin Bileşen importları
 import AdminLogin from './components/AdminLogin';
@@ -23,7 +24,7 @@ import AdminEventForm from './components/admin/AdminEventForm';
 import AdminBulletinsList from './components/admin/AdminBulletinsList';
 import AdminBulletinForm from './components/admin/AdminBulletinForm';
 
-// Sizin mevcut HomeHeader ve DefaultHeader bileşenleriniz
+// Sizin mevcut HomeHeader ve DefaultHeader bileşenleriniz (DEĞİŞİKLİK YOK)
 const useHomeReset = (setExpandedEventId) => {
     const navigate = useNavigate();
 
@@ -63,7 +64,8 @@ const HomeHeader = ({ setExpandedEventId }) => {
                         <Link to="/about" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Hakkımızda</Link>
                         <Link to="/opportunities" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Etkinlikler</Link>
                         <Link to="/bulletins" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Bültenler</Link>
-                        <Link to="/#register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
+                        {/* "Kaydol" butonu artık "/register" rotasına yönlendiren bir Link */}
+                        <Link to="/register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
                     </div>
 
                     {/* Mobil Menü Butonu (Hamburger) */}
@@ -116,10 +118,11 @@ const HomeHeader = ({ setExpandedEventId }) => {
                             >
                                 Bültenler
                             </Link>
+                            {/* Mobil menüdeki "Kaydol" linki de "/register" rotasına yönlendiriyor */}
                             <Link
-                                to="/#register"
-                                onClick={() => setIsMenuOpen(false)}
-                                className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}
+                                to="/register"
+                                onClick={() => setIsMenuOpen(false)} // Menüyü kapatmak için
+                                className={`block px-3 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans text-left`}
                             >
                                 Kaydol
                             </Link>
@@ -131,7 +134,7 @@ const HomeHeader = ({ setExpandedEventId }) => {
     );
 };
 
-const DefaultHeader = () => {
+const DefaultHeader = () => { // DEĞİŞİKLİK YOK
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false); // Mobil menü durumu
 
@@ -154,7 +157,8 @@ const DefaultHeader = () => {
                         <Link to="/about" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Hakkımızda</Link>
                         <Link to="/opportunities" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Etkinlikler</Link>
                         <Link to="/bulletins" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Bültenler</Link>
-                        <Link to="/#register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
+                        {/* "Kaydol" butonu artık "/register" rotasına yönlendiren bir Link */}
+                        <Link to="/register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
                     </div>
 
                     {/* Mobil Menü Butonu (Hamburger) */}
@@ -207,10 +211,11 @@ const DefaultHeader = () => {
                             >
                                 Bültenler
                             </Link>
+                            {/* Mobil menüdeki "Kaydol" linki de "/register" rotasına yönlendiriyor */}
                             <Link
-                                to="/#register"
-                                onClick={() => setIsMenuOpen(false)}
-                                className="block px-3 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans"
+                                to="/register"
+                                onClick={() => setIsMenuOpen(false)} // Menüyü kapatmak için
+                                className="block px-3 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans text-left"
                             >
                                 Kaydol
                             </Link>
@@ -222,7 +227,7 @@ const DefaultHeader = () => {
     );
 };
 
-// Footer bileşenini App.js içinde tanımlayalım (eğer dışarıda değilse)
+// Footer bileşenini App.js içinde tanımlayalım (eğer dışarıda değilse) (DEĞİŞİKLİK YOK)
 const Footer = () => {
     return (
         <footer className="bg-nuper-dark-blue text-white py-8">
@@ -300,20 +305,22 @@ const App = () => {
         return '';
     };
 
+    // Ana sayfa hero bölümündeki "Şimdi Kaydol" butonu için basit Link
+    const handleHeroRegisterLink = "/register";
+
+
     return (
-        <Router>
-            <div className="min-h-screen font-sans text-gray-900">
+        <div className="min-h-screen font-sans text-gray-900">
+            <Router> {/* <<<<<<<<<<<< ROUTER BURADA BAŞLIYOR */}
                 <Routes>
-                    {/* Public sayfaları için Layout (HomeHeader veya DefaultHeader + Footer) */}
                     <Route element={<MainLayout setExpandedEventId={setExpandedEventId} />}>
-                        {/* HomePage'i özel route içinde render edeceğiz çünkü onun header'ı farklı */}
                         <Route path="/" element={
                             <>
                                 <section id="home" className="bg-gradient-to-r from-nuper-blue to-nuper-dark-blue min-h-screen flex items-center justify-center text-center text-white">
                                     <div className="max-w-4xl mx-auto px-4 py-20">
                                         <h1 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold leading-tight">Nuper ile Geleceğini Şekillendir!</h1>
                                         <p className="mt-4 text-lg md:text-xl font-sans">Öğrenciler için yarışmalar, etkinlikler ve fırsatlar tek platformda!</p>
-                                        <Link to="/#register" className="bg-white text-nuper-blue mt-6 inline-block px-6 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading transition-colors duration-300">Şimdi Kaydol</Link>
+                                        <Link to={handleHeroRegisterLink} className="bg-white text-nuper-blue mt-6 inline-block px-6 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading transition-colors duration-300">Şimdi Kaydol</Link>
                                     </div>
                                 </section>
                                 <section id="opportunities-home" className="bg-nuper-gray py-16">
@@ -352,7 +359,7 @@ const App = () => {
 
                                                             {selectedEvent.additionalInfo && (
                                                                 <p className="text-gray-700 text-sm font-sans mb-1">
-                                                                    {selectedEvent.additionalInfo}
+                                                                    <strong>Ek Bilgi:</strong> {selectedEvent.additionalInfo}
                                                                 </p>
                                                             )}
 
@@ -413,50 +420,37 @@ const App = () => {
                                         </div>
                                     </div>
                                 </section>
-                                <section id="register" className="bg-white py-16">
-                                    <div className="max-w-4xl mx-auto px-4">
-                                        <h2 className="text-3xl font-heading font-bold text-center mb-6 text-nuper-blue">Hemen Katıl!</h2>
-                                        <p className="text-lg text-gray-700 text-center mb-6 font-sans">
-                                            Öğrenci veya okul temsilcisiysen, Nuper’a katıl ve fırsatları yakala! Hemen formu doldur, aramıza katıl.
-                                        </p>
-                                        <div className="max-w-2xl mx-auto">
-                                            <iframe src="https://emirgocuk.notion.site/ebd/1f92ec2b978c8028aa7dc9820b6b9c56" width="100%" height="600" frameBorder="0" className="bg-white rounded-lg shadow-md border" allowFullScreen></iframe>
-                                        </div>
-                                    </div>
-                                </section>
                             </>
                         } />
-                        {/* Diğer public sayfalar (DefaultHeader ve Footer kullanır) */}
                         <Route path="/about" element={<div className="pt-16"><About /></div>} />
                         <Route path="/opportunities" element={<div className="pt-16"><Opportunities /></div>} />
                         <Route path="/bulletins" element={<div className="pt-16"><Bulletins /></div>} />
                         <Route path="/opportunity/:slug" element={<div className="pt-16"><OpportunityDetail /></div>} />
                         <Route path="/bulletin/:slug" element={<div className="pt-16"><BulletinDetail /></div>} />
+
+                        {/* <<<<<<<<<<<< BU SATIR GÜNCELLENDİ >>>>>>>>>>>> */}
+                        <Route path="/register" element={<Register />} />
+                        {/* <<<<<<<<<<<< YUKARIDAKİ SATIR GÜNCELLENDİ >>>>>>>>>>>> */}
+
                     </Route>
 
-                    {/* Admin Giriş Sayfası (Kendi başına durur, Header/Footer içermez) */}
                     <Route path="/admin/login" element={<AdminLogin />} />
 
-                    {/* Admin Paneli ve Alt Roteleri (AdminPanel layout'unu kullanır) */}
                     <Route path="/admin" element={<AdminPanel />}>
-                        {/* Admin paneli ana sayfası */}
                         <Route index element={
                             <div className="pt-8">
                                 <h2 className="text-3xl font-heading font-bold text-center text-nuper-dark-blue mb-4">Admin Paneline Hoş Geldiniz!</h2>
                                 <p className="text-center text-gray-700">Lütfen yukarıdaki menüden bir yönetim seçeneği belirleyin.</p>
                             </div>
                         } />
-                        {/* Etkinlik Yönetimi Roteleri */}
                         <Route path="events" element={<AdminEventsList />} />
                         <Route path="events/new" element={<AdminEventForm />} />
                         <Route path="events/edit/:slug" element={<AdminEventForm />} />
-                        {/* Bülten Yönetimi Roteleri */}
                         <Route path="bulletins" element={<AdminBulletinsList />} />
                         <Route path="bulletins/new" element={<AdminBulletinForm />} />
                         <Route path="bulletins/edit/:slug" element={<AdminBulletinForm />} />
                     </Route>
 
-                    {/* 404 Sayfası - Hiçbir rotaya uymuyorsa */}
                     <Route path="*" element={
                         <div className="pt-16 flex flex-col items-center justify-center min-h-screen bg-gray-100">
                             <h1 className="text-5xl font-bold text-red-600">404</h1>
@@ -466,12 +460,12 @@ const App = () => {
                     } />
 
                 </Routes>
-            </div>
-        </Router>
+            </Router> {/* <<<<<<<<<<<< ROUTER BURADA KAPANIYOR */}
+        </div>
     );
 };
 
-// Public sayfalar için Header ve Footer'ı yöneten Layout bileşeni
+// Public sayfalar için Header ve Footer'ı yöneten Layout bileşeni (DEĞİŞİKLİK YOK)
 const MainLayout = ({ setExpandedEventId }) => {
     const location = useLocation();
     const isHomePage = location.pathname === '/';
