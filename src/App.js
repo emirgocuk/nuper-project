@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
@@ -15,7 +15,7 @@ const events = [
 ];
 
 const HomeHeader = () => {
-  const [isScrolled, setIsScrolled] = React.useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   React.useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -44,7 +44,7 @@ const HomeHeader = () => {
 };
 
 const DefaultHeader = () => {
-  const [isScrolled, setIsScrolled] = React.useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   React.useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -70,76 +70,8 @@ const DefaultHeader = () => {
   );
 };
 
-const AtomAnimation = () => {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const p5 = window.p5;
-    if (!p5) return;
-
-    const sketch = (p) => {
-      let angle1 = 0;
-      let angle2 = 0;
-      let angle3 = 0;
-
-      p.setup = () => {
-        p.createCanvas(300, 300);
-        p.background(0, 0, 0, 0); // Şeffaf arka plan
-      };
-
-      p.draw = () => {
-        p.clear();
-        p.translate(p.width / 2, p.height / 2);
-
-        // Merkezdeki çekirdek
-        p.fill(255);
-        p.noStroke();
-        p.ellipse(0, 0, 30, 30);
-
-        // Yörüngeler
-        p.stroke(255, 100);
-        p.noFill();
-        p.ellipse(0, 0, 100, 100); // 1. yörünge
-        p.ellipse(0, 0, 150, 150); // 2. yörünge
-        p.ellipse(0, 0, 200, 200); // 3. yörünge
-
-        // Parçacıklar
-        p.fill(255);
-        p.noStroke();
-        // 1. parçacık
-        let x1 = 50 * p.cos(angle1);
-        let y1 = 50 * p.sin(angle1);
-        p.ellipse(x1, y1, 10, 10);
-
-        // 2. parçacık
-        let x2 = 75 * p.cos(angle2);
-        let y2 = 75 * p.sin(angle2);
-        p.ellipse(x2, y2, 10, 10);
-
-        // 3. parçacık
-        let x3 = 100 * p.cos(angle3);
-        let y3 = 100 * p.sin(angle3);
-        p.ellipse(x3, y3, 10, 10);
-
-        // Açıyı güncelle
-        angle1 += 0.05;
-        angle2 -= 0.03;
-        angle3 += 0.02;
-      };
-    };
-
-    new p5(sketch, canvasRef.current);
-
-    return () => {
-      canvasRef.current.innerHTML = '';
-    };
-  }, []);
-
-  return <div ref={canvasRef} />;
-};
-
 const App = () => {
-  const [currentSet, setCurrentSet] = React.useState(0);
+  const [currentSet, setCurrentSet] = useState(0);
   const cardsPerSet = 3;
   const visibleEvents = events.slice(currentSet * cardsPerSet, (currentSet + 1) * cardsPerSet);
 
@@ -153,16 +85,11 @@ const App = () => {
           <Route path="/" element={
             <>
               <HomeHeader />
-              <section id="home" className="bg-gradient-to-r from-nuper-blue to-nuper-dark-blue min-h-screen flex items-center justify-center text-white">
-                <div className="max-w-6xl mx-auto px-4 flex items-center justify-between">
-                  <div className="w-1/2 text-left">
-                    <h1 className="text-4xl font-heading font-bold">Nuper ile Geleceğini Şekillendir!</h1>
-                    <p className="mt-4 text-lg">Öğrenciler için yarışmalar, etkinlikler ve fırsatlar tek platformda!</p>
-                    <Link to="/#register" className="bg-white text-nuper-blue mt-6 inline-block px-6 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading">Şimdi Kaydol</Link>
-                  </div>
-                  <div className="w-1/2 flex justify-center">
-                    <AtomAnimation />
-                  </div>
+              <section id="home" className="bg-gradient-to-r from-nuper-blue to-nuper-dark-blue min-h-screen flex items-center justify-center text-center text-white">
+                <div className="max-w-4xl mx-auto px-4">
+                  <h1 className="text-4xl font-heading font-bold">Nuper ile Geleceğini Şekillendir!</h1>
+                  <p className="mt-4 text-lg">Öğrenciler için yarışmalar, etkinlikler ve fırsatlar tek platformda!</p>
+                  <Link to="/#register" className="bg-white text-nuper-blue mt-6 inline-block px-6 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading">Şimdi Kaydol</Link>
                 </div>
               </section>
               <section id="opportunities" className="bg-nuper-gray py-16">
