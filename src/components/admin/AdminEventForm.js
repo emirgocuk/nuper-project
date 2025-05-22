@@ -25,9 +25,8 @@ const AdminEventForm = () => {
     const [currentEventId, setCurrentEventId] = useState(null);
     const [imageUploadLoading, setImageUploadLoading] = useState(false); // Resim yükleme durumu için
 
-    // Imgur Client ID'nizi buraya ekleyin
-    // NOT: Client Secret'ı BURAYA EKLEMEYİN! SADECE CLIENT ID!
-    const IMGUR_CLIENT_ID = 'c8504be46b33df2'; // <-- Buraya kendi Client ID'nizi yapıştırdınız
+    // ImgBB API Anahtarınız buraya eklendi
+    const IMGBB_API_KEY = '8ab17bcf2c1347f94a929352547a29ba'; 
 
     useEffect(() => {
         if (slug) {
@@ -64,52 +63,61 @@ const AdminEventForm = () => {
         }));
     };
 
-    // Resim seçildiğinde otomatik Imgur'a yükleme
+    // Resim seçildiğinde otomatik ImgBB'ye yükleme
     const handleImageFileChange = async (e) => {
         const file = e.target.files[0];
         if (!file) {
-            // Dosya seçimi iptal edildiğinde mevcut resmi koru
             return;
         }
 
-        setImageUploadLoading(true); // Yükleme başladı
-        setError(null); // Önceki hataları temizle
+        setImageUploadLoading(true); 
+        setError(null); 
 
         try {
-            const formDataImgur = new FormData();
-            formDataImgur.append('image', file);
+            const formDataImgBB = new FormData();
+            const reader = new FileReader();
 
-            const response = await fetch('https://api.imgur.com/3/image', {
-                method: 'POST',
-                headers: {
-                    Authorization: `Client-ID ${IMGUR_CLIENT_ID}`, // Client ID kullanılıyor
-                },
-                body: formDataImgur,
-            });
+            reader.onloadend = async () => {
+                const base64Image = reader.result.split(',')[1]; 
+                formDataImgBB.append('image', base64Image); 
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`Resim yükleme hatası: ${errorData.data.error || response.statusText}`);
-            }
+                const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+                    method: 'POST',
+                    body: formDataImgBB,
+                });
 
-            const result = await response.json();
-            // BURASI TEKRAR KONTROL EDİLDİ: result.data.link doğru görünüyor.
-            if (result.success && result.data && result.data.link) {
-                setFormData(prevState => ({
-                    ...prevState,
-                    image: result.data.link, // Imgur'dan gelen doğru link
-                }));
-                console.log("Imgur'a yüklenen ve forma eklenen link:", result.data.link);
-                alert('Resim Imgur\'a başarıyla yüklendi ve forma eklendi!');
-            } else {
-                throw new Error('Imgur yüklemesi başarısız oldu veya link bulunamadı.');
-            }
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`Resim yükleme hatası: ${errorData.error.message || response.statusText}`);
+                }
+
+                const result = await response.json();
+                if (result.success && result.data && result.data.url) {
+                    setFormData(prevState => ({
+                        ...prevState,
+                        image: result.data.url, 
+                    }));
+                    console.log("ImgBB'ye yüklenen ve forma eklenen link:", result.data.url);
+                    alert('Resim ImgBB\'ye başarıyla yüklendi ve forma eklendi!');
+                } else {
+                    throw new Error('ImgBB yüklemesi başarısız oldu veya link bulunamadı.');
+                }
+                setImageUploadLoading(false); 
+                e.target.value = null; 
+            };
+
+            reader.onerror = (err) => {
+                console.error("Dosya okuma hatası:", err);
+                setError("Dosya okuma sırasında bir hata oluştu.");
+                setImageUploadLoading(false);
+            };
+
+            reader.readAsDataURL(file); 
+
         } catch (err) {
-            console.error("Imgur'a resim yüklenirken hata oluştu:", err);
+            console.error("ImgBB'ye resim yüklenirken hata oluştu:", err);
             setError("Resim yüklenirken bir hata oluştu: " + err.message);
-        } finally {
-            setImageUploadLoading(false); // Yükleme bitti
-            // Yükleme bittikten sonra inputu sıfırla ki aynı resmi tekrar seçtiğinde onChange tetiklensin
+            setImageUploadLoading(false); 
             e.target.value = null; 
         }
     };
@@ -132,7 +140,6 @@ const AdminEventForm = () => {
         setLoading(true);
         setError(null);
 
-        // Resim alanı boşsa hata ver
         if (!formData.image) {
             setError("Lütfen bir resim yükleyin veya resim URL'si girin.");
             setLoading(false);
@@ -253,7 +260,7 @@ const AdminEventForm = () => {
 
                 {/* Resim Yükleme ve Manuel URL Girişi Bölümü */}
                 <div className="border p-4 rounded-md bg-gray-50">
-                    <label htmlFor="imageFile" className="block text-gray-700 text-sm font-bold mb-2">Resim Yükle (Imgur'a otomatik yükle)</label>
+                    <label htmlFor="imageFile" className="block text-gray-700 text-sm font-bold mb-2">Resim Yükle (ImgBB'ye otomatik yükle)</label>
                     <input
                         type="file"
                         id="imageFile"
@@ -269,14 +276,14 @@ const AdminEventForm = () => {
 
                     <label htmlFor="imageUrl" className="block text-gray-700 text-sm font-bold mb-2">Resim URL'si (Manuel Girin)</label>
                     <input
-                        type="url" // URL tipi, tarayıcıda geçerlilik kontrolü sağlar
-                        id="image" // Burası "image" olmalı ki formData.image'ı güncellesin
+                        type="url" 
+                        id="image" 
                         name="image"
                         value={formData.image}
                         onChange={handleChange}
                         className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                        placeholder="https://i.imgur.com/your-image.jpg"
-                        disabled={imageUploadLoading} // Resim yüklenirken devre dışı bırak
+                        placeholder="https://i.ibb.co/your-image.jpg"
+                        disabled={imageUploadLoading} 
                     />
                     {formData.image && !imageUploadLoading && (
                         <p className="text-sm text-gray-600 mt-2">Mevcut Resim: <a href={formData.image} target="_blank" rel="noopener noreferrer" className="text-nuper-blue hover:underline">Görüntüle</a></p>
@@ -299,7 +306,7 @@ const AdminEventForm = () => {
                 <button
                     type="submit"
                     className="bg-nuper-blue hover:bg-nuper-dark-blue text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline w-full transition-colors duration-200"
-                    disabled={loading || imageUploadLoading} // Resim yüklenirken de submit etmeyi engelle
+                    disabled={loading || imageUploadLoading} 
                 >
                     {loading ? 'Kaydediliyor...' : (isEditing ? 'Değişiklikleri Kaydet' : 'Etkinliği Ekle')}
                 </button>

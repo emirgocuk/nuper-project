@@ -1,5 +1,5 @@
 // src/components/admin/AdminBulletinForm.js
-import React, { useState, useEffect } from 'react'; // <-- Burası düzeltildi!
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { app } from '../../firebaseConfig';
@@ -11,9 +11,9 @@ const AdminBulletinForm = () => {
 
     const [formData, setFormData] = useState({
         title: '',
-        date: '',
-        publisher: '',
-        content: '',
+        date: '', // Bültenin yayın tarihi için
+        publisher: '', // Bülteni yayınlayan kişi/kurum
+        content: '', // Bültenin ana içeriği
         image: '', // Resim URL'si için burası kullanılacak
         slug: ''
     });
@@ -23,9 +23,8 @@ const AdminBulletinForm = () => {
     const [currentBulletinId, setCurrentBulletinId] = useState(null);
     const [imageUploadLoading, setImageUploadLoading] = useState(false); // Resim yükleme durumu için
 
-    // Imgur Client ID'nizi buraya ekleyin
-    // NOT: Client Secret'ı BURAYA EKLEMEYİN! SADECE CLIENT ID!
-    const IMGUR_CLIENT_ID = 'c8504be46b33df2'; // <-- Buraya kendi Client ID'nizi yapıştırdınız
+    // ImgBB API Anahtarınızı buraya ekleyin
+    const IMGBB_API_KEY = '8ab17bcf2c1347f94a929352547a29ba'; 
 
     useEffect(() => {
         if (slug) {
@@ -62,48 +61,69 @@ const AdminBulletinForm = () => {
         }));
     };
 
-    // Resim seçildiğinde otomatik Imgur'a yükleme
+    // Resim seçildiğinde otomatik ImgBB'ye yükleme
     const handleImageFileChange = async (e) => {
         const file = e.target.files[0];
-        if (!file) return;
+        if (!file) {
+            // Dosya seçimi iptal edildiğinde mevcut resmi koru
+            return;
+        }
 
         setImageUploadLoading(true); // Yükleme başladı
         setError(null); // Önceki hataları temizle
 
         try {
-            const formDataImgur = new FormData();
-            formDataImgur.append('image', file);
+            const formDataImgBB = new FormData();
+            // ImgBB'nin API'si, resim dosyasını base64 formatında 'image' parametresiyle ister.
+            // Bu nedenle FileReader kullanarak dosyayı base64'e dönüştüreceğiz.
+            const reader = new FileReader();
 
-            const response = await fetch('https://api.imgur.com/3/image', {
-                method: 'POST',
-                headers: {
-                    Authorization: `Client-ID ${IMGUR_CLIENT_ID}`, // Client ID kullanılıyor
-                },
-                body: formDataImgur,
-            });
+            reader.onloadend = async () => {
+                const base64Image = reader.result.split(',')[1]; // 'data:image/png;base64,' kısmını at
+                formDataImgBB.append('image', base64Image); // Base64 formatında gönder
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`Resim yükleme hatası: ${errorData.data.error || response.statusText}`);
-            }
+                const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+                    method: 'POST',
+                    body: formDataImgBB,
+                });
 
-            const result = await response.json();
-            if (result.success) {
-                setFormData(prevState => ({
-                    ...prevState,
-                    image: result.data.link,
-                }));
-                alert('Resim Imgur\'a başarıyla yüklendi!');
-            } else {
-                throw new Error('Imgur yüklemesi başarısız oldu.');
-            }
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`Resim yükleme hatası: ${errorData.error.message || response.statusText}`);
+                }
+
+                const result = await response.json();
+                // ImgBB API yanıtında genellikle resim linki `data.url` içinde bulunur.
+                if (result.success && result.data && result.data.url) {
+                    setFormData(prevState => ({
+                        ...prevState,
+                        image: result.data.url, // ImgBB'den gelen doğru link
+                    }));
+                    console.log("ImgBB'ye yüklenen ve forma eklenen link:", result.data.url);
+                    alert('Resim ImgBB\'ye başarıyla yüklendi ve forma eklendi!');
+                } else {
+                    throw new Error('ImgBB yüklemesi başarısız oldu veya link bulunamadı.');
+                }
+                setImageUploadLoading(false); // Yükleme bitti
+                e.target.value = null; // Inputu sıfırla
+            };
+
+            reader.onerror = (err) => {
+                console.error("Dosya okuma hatası:", err);
+                setError("Dosya okuma sırasında bir hata oluştu.");
+                setImageUploadLoading(false);
+            };
+
+            reader.readAsDataURL(file); // Dosyayı Base64 olarak oku
+
         } catch (err) {
-            console.error("Imgur'a resim yüklenirken hata oluştu:", err);
+            console.error("ImgBB'ye resim yüklenirken hata oluştu:", err);
             setError("Resim yüklenirken bir hata oluştu: " + err.message);
-        } finally {
-            setImageUploadLoading(false); // Yükleme bitti
+            setImageUploadLoading(false); // Hata durumunda da yüklemeyi durdur
+            e.target.value = null; // Inputu sıfırla
         }
     };
+
 
     const generateSlug = (title) => {
         return title
@@ -122,6 +142,13 @@ const AdminBulletinForm = () => {
         setLoading(true);
         setError(null);
 
+        // Resim alanı boşsa hata ver
+        if (!formData.image) {
+            setError("Lütfen bir resim yükleyin veya resim URL'si girin.");
+            setLoading(false);
+            return;
+        }
+
         try {
             const finalSlug = isEditing && formData.slug ? formData.slug : generateSlug(formData.title);
 
@@ -131,6 +158,7 @@ const AdminBulletinForm = () => {
                 createdAt: isEditing ? formData.createdAt : new Date(),
                 updatedAt: new Date()
             };
+            console.log("Firebase'e kaydedilecek veri:", dataToSave); 
 
             if (isEditing && currentBulletinId) {
                 await updateDoc(doc(db, "bulletins", currentBulletinId), dataToSave);
@@ -208,35 +236,39 @@ const AdminBulletinForm = () => {
                         required
                     ></textarea>
                 </div>
-                <div>
-                    <label htmlFor="imageFile" className="block text-gray-700 text-sm font-bold mb-2">Resim Yükle</label>
+                
+                {/* Resim Yükleme ve Manuel URL Girişi Bölümü */}
+                <div className="border p-4 rounded-md bg-gray-50">
+                    <label htmlFor="imageFile" className="block text-gray-700 text-sm font-bold mb-2">Resim Yükle (ImgBB'ye otomatik yükle)</label>
                     <input
                         type="file"
                         id="imageFile"
                         name="imageFile"
                         accept="image/*"
-                        onChange={handleImageFileChange} // Yeni fonksiyonu çağırıyoruz
+                        onChange={handleImageFileChange}
                         className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-nuper-blue file:text-white hover:file:bg-nuper-dark-blue"
                         disabled={imageUploadLoading}
                     />
                     {imageUploadLoading && <p className="text-nuper-blue text-sm mt-1">Resim yükleniyor...</p>}
-                    {formData.image && (
-                        <div className="mt-2">
-                            <label htmlFor="image" className="block text-gray-700 text-sm font-bold mb-2">Resim URL'si (Otomatik Dolduruldu)</label>
-                            <input
-                                type="text"
-                                id="image"
-                                name="image"
-                                value={formData.image}
-                                onChange={handleChange} // Kullanıcı manuel de değiştirebilir
-                                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-100"
-                                placeholder="https://example.com/resim.jpg"
-                                readOnly={imageUploadLoading}
-                            />
-                            <p className="text-sm text-gray-600 mt-2">Mevcut Resim: <a href={formData.image} target="_blank" rel="noopener noreferrer" className="text-nuper-blue hover:underline">Görüntüle</a></p>
-                        </div>
+                    
+                    <p className="text-center text-gray-500 my-3">-- VEYA --</p>
+
+                    <label htmlFor="imageUrl" className="block text-gray-700 text-sm font-bold mb-2">Resim URL'si (Manuel Girin)</label>
+                    <input
+                        type="url" 
+                        id="image" 
+                        name="image"
+                        value={formData.image}
+                        onChange={handleChange}
+                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                        placeholder="https://i.ibb.co/your-image.jpg"
+                        disabled={imageUploadLoading} 
+                    />
+                    {formData.image && !imageUploadLoading && (
+                        <p className="text-sm text-gray-600 mt-2">Mevcut Resim: <a href={formData.image} target="_blank" rel="noopener noreferrer" className="text-nuper-blue hover:underline">Görüntüle</a></p>
                     )}
                 </div>
+
                 <div>
                     <label htmlFor="slug" className="block text-gray-700 text-sm font-bold mb-2">URL Slug (Otomatik oluşturulur, düzenlenebilir)</label>
                     <input
@@ -245,7 +277,7 @@ const AdminBulletinForm = () => {
                         name="slug"
                         value={formData.slug}
                         onChange={handleChange}
-                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-50"
+                        className="shadow appearance-appearance border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-50"
                         placeholder="bulten-ornek"
                     />
                     <p className="text-xs text-gray-500 mt-1">Örn: "mayis-bulteni". Otomatik oluşturulur ancak düzenlenebilir.</p>
