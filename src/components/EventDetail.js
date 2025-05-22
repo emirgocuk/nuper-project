@@ -1,57 +1,51 @@
+// src/pages/EventDetail.js
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCalendarAlt, faBuilding, faMapMarkerAlt, faUsers, faInfoCircle, faClipboardList, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
-
-// App.js'deki events verisini burada kullanmak için kopyaladım ve slug ekledim.
-// Normalde bu veri props olarak gelir veya Firebase'den çekilir.
-const events = [
-    {
-        id: '1',
-        slug: 'ulusal-bilim-olimpiyatlari-basvurulari-basladi', // Slug eklendi
-        title: 'Ulusal Bilim Olimpiyatları Başvuruları Başladı!',
-        date: '30 Haziran 2025',
-        organizer: 'Türkiye Bilim Kurumu',
-        image: 'https://via.placeholder.com/800x450.png?text=Ulusal+Bilim+Olimpiyatları',
-        location: 'Ankara Üniversitesi Kampüsü',
-        summary: 'Genç bilim insanlarının yeteneklerini sergileyebileceği, akademik kariyerlerine yön verecek ulusal çapta prestijli bir platform. Matematik, Fizik, Kimya ve Biyoloji dallarında yeteneklerini test etme fırsatı seni bekliyor...',
-        description: `Ülke genelindeki lise ve üniversite öğrencilerini kapsayan Ulusal Bilim Olimpiyatları, bilimsel düşünme ve problem çözme becerilerini geliştirmeyi hedeflemektedir. Katılımcılar, alanında uzman akademisyenler tarafından hazırlanan sorularla bilgi ve yeteneklerini sınayacaklardır. Bu etkinlik, geleceğin bilim insanlarını keşfetmek ve onlara destek olmak amacıyla düzenlenmektedir. Olimpiyatlar, aynı zamanda öğrencilere farklı üniversitelerin akademik ortamlarını tanıma ve bilimsel networklerini geliştirme imkanı sunar.`,
-        additionalInfo: `Olimpiyatlara katılım için online başvuru formu doldurulması gerekmektedir. Son başvuru tarihi 15 Haziran 2025'tir. Ön eleme sınavları çevrimiçi yapılacak olup, finale kalan öğrenciler Ankara'daki kampüste yüz yüze yarışacaklardır. Konaklama ve yemek masrafları organizasyon tarafından karşılanacaktır. Detaylı bilgilere ve geçmiş yıl sorularına web sitemizden ulaşabilirsiniz.`,
-        participants: 'Lise ve üniversite öğrencileri (14-23 yaş arası)',
-        programSchedule: [
-            { time: '09:00', activity: 'Kayıt ve Açılış Seremonisi' },
-            { time: '10:00', activity: 'Matematik Sınavı (1. Oturum)' },
-            { time: '11:30', activity: 'Fizik Sınavı (1. Oturum)' },
-            { time: '13:00', activity: 'Öğle Yemeği' },
-            { time: '14:00', activity: 'Kimya Sınavı (2. Oturum)' },
-            { time: '15:30', activity: 'Biyoloji Sınavı (2. Oturum)' },
-            { time: '17:00', activity: 'Kapanış Konuşması ve Ödül Töreni' },
-        ],
-        registrationLink: 'https://form.example.com/bilim-olimpiyatlari',
-        contactEmail: 'bilimolimpiyatlari@example.com'
-    },
-    {
-      id: '2',
-      slug: 'sanat-yarismasi', // Slug eklendi
-      title: 'Sanat Yarışması', date: '15 Temmuz 2025', organizer: 'İstanbul Sanat Vakfı', image: 'https://via.placeholder.com/400x250.png?text=Sanat+Yarışması', description: 'Resim ve müzik alanında yeteneklerini sergilemek isteyenler için bir fırsat.', additionalInfo: 'Eserler profesyonel bir jüri tarafından değerlendirilecek ve en iyileri sergilenecektir.', participants: '18-25 yaş arası sanatçılar.', location: 'İstanbul Sanat Merkezi'
-    },
-    // ... diğer etkinlik verileri buraya eklenebilir
-];
-
+import { collection, getDocs, getFirestore, query, where } from 'firebase/firestore'; // Gerekli importlar
+import { app } from '../firebaseConfig';
 
 const EventDetail = () => {
     const { slug } = useParams();
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    const db = getFirestore(app);
 
     useEffect(() => {
-        // Normalde burada Firebase'den veya API'den slug'a göre veri çekilir
-        const foundEvent = events.find((e) => e.slug === slug);
-        if (foundEvent) {
-            setEvent(foundEvent);
+        const fetchEvent = async () => {
+            setLoading(true); // Yükleme her fetch çağrıldığında başlasın
+            setError(null);   // Hata durumunu temizle
+            try {
+                console.log(`EventDetail: Fetching event with slug: "${slug}"`); // Debug için
+
+                const q = query(collection(db, "events"), where("slug", "==", slug));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    const docSnap = querySnapshot.docs[0];
+                    console.log("EventDetail: Event found:", docSnap.data()); // Debug için
+                    setEvent({ id: docSnap.id, ...docSnap.data() });
+                } else {
+                    console.log(`EventDetail: No event found with slug: "${slug}"`); // Debug için
+                    setError("Etkinlik bulunamadı.");
+                }
+            } catch (err) {
+                console.error("EventDetail: Etkinlik çekilirken hata oluştu:", err);
+                setError("Etkinlik yüklenirken bir sorun oluştu.");
+            } finally {
+                setLoading(false);
+                console.log("EventDetail: Loading finished."); // Debug için
+            }
+        };
+
+        if (slug) { // Slug değeri varsa çekmeye çalış
+            fetchEvent();
+        } else {
+            setLoading(false);
+            setError("Geçersiz etkinlik URL'si.");
         }
-        setLoading(false);
-    }, [slug]);
+    }, [slug, db]); // slug veya db değiştiğinde tekrar çalışır
 
     if (loading) {
         return (
@@ -61,56 +55,43 @@ const EventDetail = () => {
         );
     }
 
-    if (!event) {
+    if (error) {
         return (
             <div className="pt-16 flex justify-center items-center h-screen">
-                <p className="text-xl text-red-600">Etkinlik bulunamadı.</p>
+                <p className="text-xl text-red-600">{error}</p>
             </div>
         );
     }
 
+    // KRİTİK KONTROL: event null ise, aşağıdaki render kısmına geçmemeliyiz
+    if (!event) {
+        // Bu durum, yükleme bittiğinde ve hata yokken bile etkinlik bulunamazsa oluşur.
+        // Genellikle yukarıdaki `setError` ile yakalanır, ancak yine de bir fallback iyidir.
+        return (
+            <div className="pt-16 flex justify-center items-center h-screen">
+                <p className="text-xl text-red-600">Etkinlik detayı görüntülenemiyor.</p>
+            </div>
+        );
+    }
+
+    // Event verisi başarıyla çekildiğinde render edilecek kısım
     return (
         <div className="pt-16 bg-nuper-gray min-h-screen">
-            <div className="max-w-4xl mx-auto px-4 py-8 bg-white rounded-lg shadow-md"> {/* İçeriği bir kart içine aldık */}
-                {/* Başlık */}
+            <div className="max-w-4xl mx-auto px-4 py-8 bg-white rounded-lg shadow-md">
                 <h1 className="text-4xl md:text-5xl font-heading font-bold text-nuper-blue mb-4 leading-tight">
                     {event.title}
                 </h1>
-                
-                {/* Özet (Artık text-lg) */}
-                {event.summary && (
-                    <p className="text-lg text-gray-700 font-sans mb-8 leading-relaxed">
-                        {event.summary}
-                    </p>
-                )}
-                
-                {/* Temel Bilgiler */}
-                <div className="mb-8">
-                    <ul className="space-y-3 text-gray-800 font-sans">
-                        <li>
-                            <FontAwesomeIcon icon={faCalendarAlt} className="text-nuper-blue mr-3 w-5" />
-                            <strong>Tarih:</strong> {event.date}
-                        </li>
-                        <li>
-                            <FontAwesomeIcon icon={faBuilding} className="text-nuper-blue mr-3 w-5" />
-                            <strong>Düzenleyen:</strong> {event.organizer}
-                        </li>
-                        {event.location && (
-                            <li>
-                                <FontAwesomeIcon icon={faMapMarkerAlt} className="text-nuper-blue mr-3 w-5" />
-                                <strong>Yer:</strong> {event.location}
-                            </li>
-                        )}
-                        {event.participants && (
-                            <li>
-                                <FontAwesomeIcon icon={faUsers} className="text-nuper-blue mr-3 w-5" />
-                                <strong>Katılımcılar:</strong> {event.participants}
-                            </li>
-                        )}
-                    </ul>
-                </div>
 
-                {/* Etkinlik Görseli (Buraya, temel bilgilerden sonra taşındı) */}
+                <p className="text-gray-500 text-sm font-sans mb-8">
+                    {/* `date` alanı formdan elle giriliyor. `createdAt` ise Firestore Timestamp.
+                        Her ikisi de yoksa 'Tarih Bilgisi Yok' gösteririz. */}
+                    {event.date || (event.createdAt && new Date(event.createdAt.toDate()).toLocaleDateString('tr-TR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    })) || 'Tarih Bilgisi Yok'}
+                </p>
+
                 {event.image && (
                     <img
                         src={event.image}
@@ -119,66 +100,28 @@ const EventDetail = () => {
                     />
                 )}
 
-                {/* Detaylı Açıklama ve Ek Bilgiler birleştirildi - Başlık kaldırıldı */}
+                {/* AdminEventForm'daki alan adlarına göre güncellendi */}
                 {(event.description || event.additionalInfo) && (
-                    <div className="mb-8">
-                        {/* Description (Artık text-lg) */}
+                    <div className="mb-8 text-gray-800 font-sans leading-relaxed">
                         {event.description && (
-                            <p className="text-lg text-gray-800 leading-relaxed font-sans whitespace-pre-line mb-4">
+                            <p className="text-lg mb-4 whitespace-pre-line">
                                 {event.description}
                             </p>
                         )}
                         {event.additionalInfo && (
-                            <p className="text-lg text-gray-800 leading-relaxed font-sans whitespace-pre-line">
+                            <p className="text-lg whitespace-pre-line">
                                 {event.additionalInfo}
                             </p>
                         )}
                     </div>
                 )}
-                
-                {/* Program Akışı */}
-                {event.programSchedule && event.programSchedule.length > 0 && (
-                    <div className="mb-8">
-                        <h2 className="text-2xl font-heading font-bold text-nuper-blue mb-4">Program Akışı</h2>
-                        <ul className="space-y-3 text-gray-800 font-sans">
-                            {event.programSchedule.map((item, index) => (
-                                <li key={index} className="flex items-start">
-                                    <FontAwesomeIcon icon={faClipboardList} className="text-nuper-blue mr-3 mt-1 flex-shrink-0 w-5" />
-                                    <span>
-                                        <strong>{item.time}:</strong> {item.activity}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-
-                {/* Eylem Butonları */}
-                <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
-                    {event.registrationLink && (
-                        <a
-                            href={event.registrationLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-nuper-blue text-white px-8 py-3 rounded-lg font-semibold hover:bg-nuper-dark-blue transition-colors duration-300 flex items-center justify-center font-heading"
-                        >
-                            <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-2" />
-                            Hemen Kaydol
-                        </a>
-                    )}
-                    {event.contactEmail && (
-                        <a
-                            href={`mailto:${event.contactEmail}`}
-                            className="bg-gray-200 text-nuper-blue px-8 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors duration-300 flex items-center justify-center font-heading"
-                        >
-                            <FontAwesomeIcon icon={faInfoCircle} className="mr-2" />
-                            İletişime Geç
-                        </a>
-                    )}
-                </div>
 
                 <div className="text-center mt-12">
-                    <Link to="/opportunities" className="text-nuper-blue hover:underline font-semibold font-sans">
+                    {/* AdminEventForm'dan gelen diğer bilgiler */}
+                    {event.organizer && <p className="text-lg text-gray-800 mb-2"><strong>Organizatör:</strong> {event.organizer}</p>}
+                    {event.participants && <p className="text-lg text-gray-800 mb-4"><strong>Katılımcılar:</strong> {event.participants}</p>}
+                    
+                    <Link to="/events" className="text-nuper-blue hover:underline font-semibold font-sans">
                         Tüm Etkinlikleri Görüntüle
                     </Link>
                 </div>

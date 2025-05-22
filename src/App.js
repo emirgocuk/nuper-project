@@ -1,6 +1,6 @@
 // src/App.js
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Outlet, NavLink } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 
@@ -8,15 +8,15 @@ import './index.css';
 import { app, analytics } from './firebaseConfig';
 import { getFirestore, collection, getDocs, orderBy, query } from 'firebase/firestore';
 
-// Public Bileşen importları
+// Public Bileşen importları (Düzeltildi)
 import About from './components/About';
-import Opportunities from './components/Opportunities';
+import Events from './components/Events'; // 'Opportunities' yerine 'Events'
 import Bulletins from './components/Bulletins';
-import OpportunityDetail from './components/EventDetail';
+import EventDetail from './components/EventDetail'; // 'OpportunityDetail' yerine 'EventDetail'
 import BulletinDetail from './components/BulletinDetail';
-import Register from './components/Register'; // <<<<<<<<<<<< BU SATIRI EKLEYİN
+import Register from './components/Register';
 
-// Admin Bileşen importları
+// Admin Bileşen importları (Değişiklik yok, zaten doğru isimler)
 import AdminLogin from './components/AdminLogin';
 import AdminPanel from './components/AdminPanel';
 import AdminEventsList from './components/admin/AdminEventsList';
@@ -62,9 +62,9 @@ const HomeHeader = ({ setExpandedEventId }) => {
                     <div className="hidden md:flex items-center space-x-4">
                         <Link to="/" onClick={handleHomeClick} className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Ana Sayfa</Link>
                         <Link to="/about" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Hakkımızda</Link>
-                        <Link to="/opportunities" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Etkinlikler</Link>
+                        {/* 'opportunities' yerine 'events' olarak güncellendi */}
+                        <Link to="/events" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Etkinlikler</Link>
                         <Link to="/bulletins" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Bültenler</Link>
-                        {/* "Kaydol" butonu artık "/register" rotasına yönlendiren bir Link */}
                         <Link to="/register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
                     </div>
 
@@ -104,8 +104,9 @@ const HomeHeader = ({ setExpandedEventId }) => {
                             >
                                 Hakkımızda
                             </Link>
+                            {/* 'opportunities' yerine 'events' olarak güncellendi */}
                             <Link
-                                to="/opportunities"
+                                to="/events"
                                 onClick={() => setIsMenuOpen(false)}
                                 className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}
                             >
@@ -118,10 +119,9 @@ const HomeHeader = ({ setExpandedEventId }) => {
                             >
                                 Bültenler
                             </Link>
-                            {/* Mobil menüdeki "Kaydol" linki de "/register" rotasına yönlendiriyor */}
                             <Link
                                 to="/register"
-                                onClick={() => setIsMenuOpen(false)} // Menüyü kapatmak için
+                                onClick={() => setIsMenuOpen(false)}
                                 className={`block px-3 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans text-left`}
                             >
                                 Kaydol
@@ -134,7 +134,7 @@ const HomeHeader = ({ setExpandedEventId }) => {
     );
 };
 
-const DefaultHeader = () => { // DEĞİŞİKLİK YOK
+const DefaultHeader = () => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false); // Mobil menü durumu
 
@@ -155,9 +155,9 @@ const DefaultHeader = () => { // DEĞİŞİKLİK YOK
                     <div className="hidden md:flex items-center space-x-4">
                         <Link to="/" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Ana Sayfa</Link>
                         <Link to="/about" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Hakkımızda</Link>
-                        <Link to="/opportunities" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Etkinlikler</Link>
+                        {/* 'opportunities' yerine 'events' olarak güncellendi */}
+                        <Link to="/events" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Etkinlikler</Link>
                         <Link to="/bulletins" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Bültenler</Link>
-                        {/* "Kaydol" butonu artık "/register" rotasına yönlendiren bir Link */}
                         <Link to="/register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
                     </div>
 
@@ -197,8 +197,9 @@ const DefaultHeader = () => { // DEĞİŞİKLİK YOK
                             >
                                 Hakkımızda
                             </Link>
+                            {/* 'opportunities' yerine 'events' olarak güncellendi */}
                             <Link
-                                to="/opportunities"
+                                to="/events"
                                 onClick={() => setIsMenuOpen(false)}
                                 className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray"
                             >
@@ -211,10 +212,9 @@ const DefaultHeader = () => { // DEĞİŞİKLİK YOK
                             >
                                 Bültenler
                             </Link>
-                            {/* Mobil menüdeki "Kaydol" linki de "/register" rotasına yönlendiriyor */}
                             <Link
                                 to="/register"
-                                onClick={() => setIsMenuOpen(false)} // Menüyü kapatmak için
+                                onClick={() => setIsMenuOpen(false)}
                                 className="block px-3 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans text-left"
                             >
                                 Kaydol
@@ -255,6 +255,7 @@ const App = () => {
     useEffect(() => {
         const fetchEvents = async () => {
             try {
+                // KOLEKSİYON ADINI 'events' OLARAK DÜZELTTİK
                 const q = query(collection(db, "events"), orderBy("createdAt", "desc"));
                 const querySnapshot = await getDocs(q);
 
@@ -311,7 +312,7 @@ const App = () => {
 
     return (
         <div className="min-h-screen font-sans text-gray-900">
-            <Router> {/* <<<<<<<<<<<< ROUTER BURADA BAŞLIYOR */}
+            <Router>
                 <Routes>
                     <Route element={<MainLayout setExpandedEventId={setExpandedEventId} />}>
                         <Route path="/" element={
@@ -323,7 +324,7 @@ const App = () => {
                                         <Link to={handleHeroRegisterLink} className="bg-white text-nuper-blue mt-6 inline-block px-6 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading transition-colors duration-300">Şimdi Kaydol</Link>
                                     </div>
                                 </section>
-                                <section id="opportunities-home" className="bg-nuper-gray py-16">
+                                <section id="events-home" className="bg-nuper-gray py-16"> {/* id 'opportunities-home' yerine 'events-home' olarak güncellendi */}
                                     <div className="max-w-6xl mx-auto px-4 relative">
                                         <h2 className="text-3xl font-heading font-bold text-center mb-8 text-nuper-blue">Öne Çıkan Etkinlikler</h2>
                                         <div className="relative z-0 h-64">
@@ -368,7 +369,8 @@ const App = () => {
                                                             <p className="text-gray-600 text-sm font-sans mt-2 mb-0.5">
                                                                 <strong className="text-nuper-blue">Kimler Katılabilir:</strong> {selectedEvent.participants}
                                                             </p>
-                                                            <Link to={`/opportunity/${selectedEvent.slug}`} className="text-nuper-blue text-sm font-semibold hover:underline font-sans mt-1">
+                                                            {/* '/opportunity/:slug' yerine '/event/:slug' olarak güncellendi */}
+                                                            <Link to={`/event/${selectedEvent.slug}`} className="text-nuper-blue text-sm font-semibold hover:underline font-sans mt-1">
                                                                 Detaylı Etkinlik Sayfasına Git
                                                             </Link>
                                                         </div>
@@ -423,15 +425,14 @@ const App = () => {
                             </>
                         } />
                         <Route path="/about" element={<div className="pt-16"><About /></div>} />
-                        <Route path="/opportunities" element={<div className="pt-16"><Opportunities /></div>} />
+                        {/* '/opportunities' yerine '/events' olarak güncellendi */}
+                        <Route path="/events" element={<div className="pt-16"><Events /></div>} />
                         <Route path="/bulletins" element={<div className="pt-16"><Bulletins /></div>} />
-                        <Route path="/opportunity/:slug" element={<div className="pt-16"><OpportunityDetail /></div>} />
+                        {/* '/opportunity/:slug' yerine '/event/:slug' olarak güncellendi */}
+                        <Route path="/event/:slug" element={<div className="pt-16"><EventDetail /></div>} />
                         <Route path="/bulletin/:slug" element={<div className="pt-16"><BulletinDetail /></div>} />
 
-                        {/* <<<<<<<<<<<< BU SATIR GÜNCELLENDİ >>>>>>>>>>>> */}
                         <Route path="/register" element={<Register />} />
-                        {/* <<<<<<<<<<<< YUKARIDAKİ SATIR GÜNCELLENDİ >>>>>>>>>>>> */}
-
                     </Route>
 
                     <Route path="/admin/login" element={<AdminLogin />} />
@@ -460,7 +461,7 @@ const App = () => {
                     } />
 
                 </Routes>
-            </Router> {/* <<<<<<<<<<<< ROUTER BURADA KAPANIYOR */}
+            </Router>
         </div>
     );
 };

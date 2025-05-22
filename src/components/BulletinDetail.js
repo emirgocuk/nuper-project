@@ -1,6 +1,7 @@
+// src/pages/BulletinDetail.js
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { doc, getDoc, getFirestore } from 'firebase/firestore'; // Firebase Firestore fonksiyonları
+import { collection, getDocs, getFirestore, query, where } from 'firebase/firestore'; // Gerekli importlar güncellendi
 import { app } from '../firebaseConfig'; // Firebase uygulamanızın yapılandırması
 
 const BulletinDetail = () => {
@@ -13,28 +14,39 @@ const BulletinDetail = () => {
 
     useEffect(() => {
         const fetchBulletin = async () => {
+            setLoading(true); // Yükleme her fetch çağrıldığında başlasın
+            setError(null);   // Hata durumunu temizle
             try {
-                // Firestore'dan belirli bir bülteni çekmek için kullanılır.
-                // Burada 'slug' değerinin aynı zamanda Firestore belge ID'si olduğunu varsayıyoruz.
-                // Eğer 'slug' belge ID'si değil de belgenin içindeki bir alan ise,
-                // bunun yerine bir sorgu (query) kullanmanız gerekirdi.
-                const bulletinRef = doc(db, "bulletins", slug);
-                const docSnap = await getDoc(bulletinRef); // Belgeyi getir
+                console.log(`BulletinDetail: Fetching bulletin with slug: "${slug}"`); // Debug için
 
-                if (docSnap.exists()) { // Belge varsa
+                // Firestore'dan belirli bir bülteni çekmek için sorgu kullanırız.
+                // 'slug' alanı URL'den gelen 'slug' değerine eşit olan belgeyi ararız.
+                const q = query(collection(db, "bulletins"), where("slug", "==", slug));
+                const querySnapshot = await getDocs(q); // Sorguyu çalıştır ve sonuçları al
+
+                if (!querySnapshot.empty) { // Belge varsa
+                    const docSnap = querySnapshot.docs[0]; // İlk belgeyi al
+                    console.log("BulletinDetail: Bulletin found:", docSnap.data()); // Debug için
                     setBulletin({ id: docSnap.id, ...docSnap.data() });
                 } else {
+                    console.log(`BulletinDetail: No bulletin found with slug: "${slug}"`); // Debug için
                     setError("Bülten bulunamadı."); // Belge yoksa hata mesajı
                 }
             } catch (err) {
-                console.error("Bülten çekilirken hata oluştu:", err);
+                console.error("BulletinDetail: Bülten çekilirken hata oluştu:", err);
                 setError("Bülten yüklenirken bir sorun oluştu."); // Hata oluşursa genel hata mesajı
             } finally {
                 setLoading(false); // Yükleme tamamlandı
+                console.log("BulletinDetail: Loading finished."); // Debug için
             }
         };
 
-        fetchBulletin(); // Bülteni getir fonksiyonunu çalıştır
+        if (slug) { // Slug değeri varsa çekmeye çalış
+            fetchBulletin();
+        } else {
+            setLoading(false);
+            setError("Geçersiz bülten URL'si.");
+        }
     }, [slug, db]); // 'slug' veya 'db' değiştiğinde tekrar çalışır
 
     // Yüklenme durumunda gösterilecek UI
@@ -55,11 +67,13 @@ const BulletinDetail = () => {
         );
     }
 
-    // Bülten bulunamadıysa (ancak 'error' durumu yoksa) gösterilecek UI
+    // KRİTİK KONTROL: bulletin null ise, aşağıdaki render kısmına geçmemeliyiz
     if (!bulletin) {
+        // Bu durum, yükleme bittiğinde ve hata yokken bile bülten bulunamazsa oluşur.
+        // Genellikle yukarıdaki `setError` ile yakalanır, ancak yine de bir fallback iyidir.
         return (
             <div className="pt-16 flex justify-center items-center h-screen">
-                <p className="text-xl text-red-600">Bülten bulunamadı.</p>
+                <p className="text-xl text-red-600">Bülten detayı görüntülenemiyor.</p>
             </div>
         );
     }
@@ -73,14 +87,16 @@ const BulletinDetail = () => {
                     {bulletin.title}
                 </h1>
 
-                {/* Tarih */}
+                {/* Tarih ve Yayınlayan */}
                 <p className="text-gray-500 text-sm font-sans mb-8">
-                    {/* Eğer Firebase'den gelen tarih bir Timestamp ise, okunabilir bir formata dönüştürün */}
+                    {/* `date` alanı formdan elle giriliyor. `createdAt` ise Firestore Timestamp.
+                        Her ikisi de yoksa 'Tarih Bilgisi Yok' gösteririz. */}
                     {bulletin.date || (bulletin.createdAt && new Date(bulletin.createdAt.toDate()).toLocaleDateString('tr-TR', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'
                     })) || 'Tarih Bilgisi Yok'}
+                    {bulletin.publisher && ` - ${bulletin.publisher}`}
                 </p>
 
                 {/* Görsel Alanı */}
@@ -92,20 +108,12 @@ const BulletinDetail = () => {
                     />
                 )}
 
-                {/* Özet ve Tam İçerik */}
-                {(bulletin.summary || bulletin.fullContent) && (
+                {/* İçerik */}
+                {bulletin.content && ( // content alanını kullanıyoruz
                     <div className="mb-8 text-gray-800 font-sans leading-relaxed">
-                        {bulletin.summary && (
-                            <p className="text-lg mb-4">
-                                {bulletin.summary}
-                            </p>
-                        )}
-                        {bulletin.fullContent && (
-                            // 'whitespace-pre-line' ile içeriğin içindeki satır sonlarını koruruz
-                            <p className="text-lg whitespace-pre-line">
-                                {bulletin.fullContent}
-                            </p>
-                        )}
+                        <p className="text-lg whitespace-pre-line">
+                            {bulletin.content}
+                        </p>
                     </div>
                 )}
 
