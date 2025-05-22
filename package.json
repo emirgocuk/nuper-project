@@ -14,6 +14,8 @@
     "framer-motion": "^12.12.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-easy-crop": "^5.4.2",
+    "react-quill": "^2.0.0",
     "react-router-dom": "^7.6.0",
     "react-scripts": "5.0.1",
     "react-sweetalert2": "^0.6.0",
