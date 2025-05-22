@@ -67,7 +67,10 @@ const AdminEventForm = () => {
     // Resim seçildiğinde otomatik Imgur'a yükleme
     const handleImageFileChange = async (e) => {
         const file = e.target.files[0];
-        if (!file) return;
+        if (!file) {
+            // Dosya seçimi iptal edildiğinde mevcut resmi koru
+            return;
+        }
 
         setImageUploadLoading(true); // Yükleme başladı
         setError(null); // Önceki hataları temizle
@@ -90,20 +93,24 @@ const AdminEventForm = () => {
             }
 
             const result = await response.json();
-            if (result.success) {
+            // BURASI TEKRAR KONTROL EDİLDİ: result.data.link doğru görünüyor.
+            if (result.success && result.data && result.data.link) {
                 setFormData(prevState => ({
                     ...prevState,
-                    image: result.data.link, // Gelen Imgur linkini state'e ata
+                    image: result.data.link, // Imgur'dan gelen doğru link
                 }));
-                alert('Resim Imgur\'a başarıyla yüklendi!');
+                console.log("Imgur'a yüklenen ve forma eklenen link:", result.data.link);
+                alert('Resim Imgur\'a başarıyla yüklendi ve forma eklendi!');
             } else {
-                throw new Error('Imgur yüklemesi başarısız oldu.');
+                throw new Error('Imgur yüklemesi başarısız oldu veya link bulunamadı.');
             }
         } catch (err) {
             console.error("Imgur'a resim yüklenirken hata oluştu:", err);
             setError("Resim yüklenirken bir hata oluştu: " + err.message);
         } finally {
             setImageUploadLoading(false); // Yükleme bitti
+            // Yükleme bittikten sonra inputu sıfırla ki aynı resmi tekrar seçtiğinde onChange tetiklensin
+            e.target.value = null; 
         }
     };
 
@@ -125,6 +132,13 @@ const AdminEventForm = () => {
         setLoading(true);
         setError(null);
 
+        // Resim alanı boşsa hata ver
+        if (!formData.image) {
+            setError("Lütfen bir resim yükleyin veya resim URL'si girin.");
+            setLoading(false);
+            return;
+        }
+
         try {
             const finalSlug = isEditing && formData.slug ? formData.slug : generateSlug(formData.title);
 
@@ -134,6 +148,7 @@ const AdminEventForm = () => {
                 createdAt: isEditing ? formData.createdAt : new Date(),
                 updatedAt: new Date()
             };
+            console.log("Firebase'e kaydedilecek veri:", dataToSave); 
 
             if (isEditing && currentEventId) {
                 await updateDoc(doc(db, "events", currentEventId), dataToSave);
@@ -235,35 +250,39 @@ const AdminEventForm = () => {
                         required
                     />
                 </div>
-                <div>
-                    <label htmlFor="imageFile" className="block text-gray-700 text-sm font-bold mb-2">Resim Yükle</label>
+
+                {/* Resim Yükleme ve Manuel URL Girişi Bölümü */}
+                <div className="border p-4 rounded-md bg-gray-50">
+                    <label htmlFor="imageFile" className="block text-gray-700 text-sm font-bold mb-2">Resim Yükle (Imgur'a otomatik yükle)</label>
                     <input
                         type="file"
                         id="imageFile"
                         name="imageFile"
                         accept="image/*"
-                        onChange={handleImageFileChange} // Yeni fonksiyonu çağırıyoruz
+                        onChange={handleImageFileChange}
                         className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-nuper-blue file:text-white hover:file:bg-nuper-dark-blue"
-                        disabled={imageUploadLoading} // Yüklenirken devre dışı bırak
+                        disabled={imageUploadLoading}
                     />
                     {imageUploadLoading && <p className="text-nuper-blue text-sm mt-1">Resim yükleniyor...</p>}
-                    {formData.image && (
-                        <div className="mt-2">
-                             <label htmlFor="image" className="block text-gray-700 text-sm font-bold mb-2">Resim URL'si (Otomatik Dolduruldu)</label>
-                            <input
-                                type="text"
-                                id="image"
-                                name="image"
-                                value={formData.image}
-                                onChange={handleChange} // Kullanıcı manuel de değiştirebilir
-                                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-100"
-                                placeholder="https://example.com/resim.jpg"
-                                readOnly={imageUploadLoading} // Yüklenirken salt okunur yap
-                            />
-                            <p className="text-sm text-gray-600 mt-2">Mevcut Resim: <a href={formData.image} target="_blank" rel="noopener noreferrer" className="text-nuper-blue hover:underline">Görüntüle</a></p>
-                        </div>
+                    
+                    <p className="text-center text-gray-500 my-3">-- VEYA --</p>
+
+                    <label htmlFor="imageUrl" className="block text-gray-700 text-sm font-bold mb-2">Resim URL'si (Manuel Girin)</label>
+                    <input
+                        type="url" // URL tipi, tarayıcıda geçerlilik kontrolü sağlar
+                        id="image" // Burası "image" olmalı ki formData.image'ı güncellesin
+                        name="image"
+                        value={formData.image}
+                        onChange={handleChange}
+                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                        placeholder="https://i.imgur.com/your-image.jpg"
+                        disabled={imageUploadLoading} // Resim yüklenirken devre dışı bırak
+                    />
+                    {formData.image && !imageUploadLoading && (
+                        <p className="text-sm text-gray-600 mt-2">Mevcut Resim: <a href={formData.image} target="_blank" rel="noopener noreferrer" className="text-nuper-blue hover:underline">Görüntüle</a></p>
                     )}
                 </div>
+
                 <div>
                     <label htmlFor="slug" className="block text-gray-700 text-sm font-bold mb-2">URL Slug (Otomatik oluşturulur, düzenlenebilir)</label>
                     <input
@@ -275,7 +294,7 @@ const AdminEventForm = () => {
                         className="shadow appearance-appearance border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-50"
                         placeholder="slug-ornek"
                     />
-                     <p className="text-xs text-gray-500 mt-1">Örn: "bilim-olimpiyatlari". Otomatik oluşturulur ancak düzenlenebilir.</p>
+                    <p className="text-xs text-gray-500 mt-1">Örn: "bilim-olimpiyatlari". Otomatik oluşturulur ancak düzenlenebilir.</p>
                 </div>
                 <button
                     type="submit"
