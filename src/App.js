@@ -8,15 +8,15 @@ import './index.css';
 import { app, analytics } from './firebaseConfig';
 import { getFirestore, collection, getDocs, orderBy, query } from 'firebase/firestore';
 
-// Public Bileşen importları (Düzeltildi)
+// Public Bileşen importları
 import About from './components/About';
-import Events from './components/Events'; // 'Opportunities' yerine 'Events'
+import Events from './components/Events'; 
 import Bulletins from './components/Bulletins';
-import EventDetail from './components/EventDetail'; // 'OpportunityDetail' yerine 'EventDetail'
+import EventDetail from './components/EventDetail'; 
 import BulletinDetail from './components/BulletinDetail';
 import Register from './components/Register';
 
-// Admin Bileşen importları (Değişiklik yok, zaten doğru isimler)
+// Admin Bileşen importları
 import AdminLogin from './components/AdminLogin';
 import AdminPanel from './components/AdminPanel';
 import AdminEventsList from './components/admin/AdminEventsList';
@@ -24,7 +24,6 @@ import AdminEventForm from './components/admin/AdminEventForm';
 import AdminBulletinsList from './components/admin/AdminBulletinsList';
 import AdminBulletinForm from './components/admin/AdminBulletinForm';
 
-// Sizin mevcut HomeHeader ve DefaultHeader bileşenleriniz (DEĞİŞİKLİK YOK)
 const useHomeReset = (setExpandedEventId) => {
     const navigate = useNavigate();
 
@@ -39,7 +38,7 @@ const useHomeReset = (setExpandedEventId) => {
 
 const HomeHeader = ({ setExpandedEventId }) => {
     const [isScrolled, setIsScrolled] = useState(false);
-    const [isMenuOpen, setIsMenuOpen] = useState(false); // Mobil menü durumu
+    const [isMenuOpen, setIsMenuOpen] = useState(false); 
     const handleHomeClick = useHomeReset(setExpandedEventId);
 
     useEffect(() => {
@@ -49,7 +48,7 @@ const HomeHeader = ({ setExpandedEventId }) => {
     }, []);
 
     const textColorClass = isScrolled ? 'text-nuper-blue' : 'text-white';
-    const linkHoverClass = isScrolled ? 'hover:text-nuper-dark-blue' : 'hover:text-nuper-gray'; // Renk uyumu için
+    const linkHoverClass = isScrolled ? 'hover:text-nuper-dark-blue' : 'hover:text-nuper-gray'; 
 
     return (
         <nav className={`fixed w-full z-20 shadow-lg ${isScrolled ? 'bg-white/90' : 'bg-transparent'}`}>
@@ -62,7 +61,6 @@ const HomeHeader = ({ setExpandedEventId }) => {
                     <div className="hidden md:flex items-center space-x-4">
                         <Link to="/" onClick={handleHomeClick} className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Ana Sayfa</Link>
                         <Link to="/about" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Hakkımızda</Link>
-                        {/* 'opportunities' yerine 'events' olarak güncellendi */}
                         <Link to="/events" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Etkinlikler</Link>
                         <Link to="/bulletins" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Bültenler</Link>
                         <Link to="/register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
@@ -104,7 +102,6 @@ const HomeHeader = ({ setExpandedEventId }) => {
                             >
                                 Hakkımızda
                             </Link>
-                            {/* 'opportunities' yerine 'events' olarak güncellendi */}
                             <Link
                                 to="/events"
                                 onClick={() => setIsMenuOpen(false)}
@@ -136,7 +133,7 @@ const HomeHeader = ({ setExpandedEventId }) => {
 
 const DefaultHeader = () => {
     const [isScrolled, setIsScrolled] = useState(false);
-    const [isMenuOpen, setIsMenuOpen] = useState(false); // Mobil menü durumu
+    const [isMenuOpen, setIsMenuOpen] = useState(false); 
 
     useEffect(() => {
         const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -155,7 +152,6 @@ const DefaultHeader = () => {
                     <div className="hidden md:flex items-center space-x-4">
                         <Link to="/" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Ana Sayfa</Link>
                         <Link to="/about" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Hakkımızda</Link>
-                        {/* 'opportunities' yerine 'events' olarak güncellendi */}
                         <Link to="/events" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Etkinlikler</Link>
                         <Link to="/bulletins" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Bültenler</Link>
                         <Link to="/register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
@@ -197,7 +193,6 @@ const DefaultHeader = () => {
                             >
                                 Hakkımızda
                             </Link>
-                            {/* 'opportunities' yerine 'events' olarak güncellendi */}
                             <Link
                                 to="/events"
                                 onClick={() => setIsMenuOpen(false)}
@@ -227,7 +222,6 @@ const DefaultHeader = () => {
     );
 };
 
-// Footer bileşenini App.js içinde tanımlayalım (eğer dışarıda değilse) (DEĞİŞİKLİK YOK)
 const Footer = () => {
     return (
         <footer className="bg-nuper-dark-blue text-white py-8">
@@ -247,7 +241,6 @@ const App = () => {
     const [currentSet, setCurrentSet] = useState(0);
     const [expandedEventId, setExpandedEventId] = useState(null);
 
-    // Firebase'den etkinlikleri çekme state'leri
     const [events, setEvents] = useState([]);
     const [loadingEvents, setLoadingEvents] = useState(true);
     const db = getFirestore(app);
@@ -255,7 +248,6 @@ const App = () => {
     useEffect(() => {
         const fetchEvents = async () => {
             try {
-                // KOLEKSİYON ADINI 'events' OLARAK DÜZELTTİK
                 const q = query(collection(db, "events"), orderBy("createdAt", "desc"));
                 const querySnapshot = await getDocs(q);
 
@@ -306,9 +298,7 @@ const App = () => {
         return '';
     };
 
-    // Ana sayfa hero bölümündeki "Şimdi Kaydol" butonu için basit Link
     const handleHeroRegisterLink = "/register";
-
 
     return (
         <div className="min-h-screen font-sans text-gray-900">
@@ -324,7 +314,7 @@ const App = () => {
                                         <Link to={handleHeroRegisterLink} className="bg-white text-nuper-blue mt-6 inline-block px-6 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading transition-colors duration-300">Şimdi Kaydol</Link>
                                     </div>
                                 </section>
-                                <section id="events-home" className="bg-nuper-gray py-16"> {/* id 'opportunities-home' yerine 'events-home' olarak güncellendi */}
+                                <section id="events-home" className="bg-nuper-gray py-16">
                                     <div className="max-w-6xl mx-auto px-4 relative">
                                         <h2 className="text-3xl font-heading font-bold text-center mb-8 text-nuper-blue">Öne Çıkan Etkinlikler</h2>
                                         <div className="relative z-0 h-64">
@@ -339,13 +329,15 @@ const App = () => {
                                                         animate={{ opacity: 1, scale: 1 }}
                                                         exit={{ opacity: 0, scale: 0.8 }}
                                                         transition={{ duration: 0.3 }}
-                                                        className="absolute inset-0 z-10 bg-white rounded-xl border shadow-lg p-6 flex flex-col md:flex-row items-start text-left gap-4 h-64"
+                                                        className="absolute inset-0 z-10 bg-white rounded-xl border shadow-lg p-6 flex flex-col md:flex-row items-start text-left gap-4 h-64 overflow-hidden"
                                                     >
                                                         <button
                                                             onClick={handleCloseExpanded}
                                                             className="absolute top-4 right-4 text-gray-700 hover:text-gray-900 transition-colors duration-200 z-20 p-2"
                                                         >
-                                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
                                                         </button>
                                                         <img
                                                             src={selectedEvent.image}
@@ -356,23 +348,36 @@ const App = () => {
                                                             <h3 className="text-xl font-heading font-bold text-nuper-blue mb-0.5 leading-tight">{selectedEvent.title}</h3>
                                                             <p className="text-gray-700 text-base font-sans mb-0.5">{selectedEvent.date}</p>
                                                             <p className="text-gray-700 text-base font-sans mb-2">{selectedEvent.organizer}</p>
-                                                            <p className="text-gray-800 leading-snug text-sm font-sans mb-1">{selectedEvent.description}</p>
 
-                                                            {selectedEvent.additionalInfo && (
-                                                                <p className="text-gray-700 text-sm font-sans mb-1">
-                                                                    <strong>Ek Bilgi:</strong> {selectedEvent.additionalInfo}
+                                                            <div className="overflow-hidden relative flex-grow">
+                                                                <p className="text-gray-800 leading-snug text-sm font-sans mb-1 line-clamp-3">
+                                                                    {selectedEvent.description}
                                                                 </p>
-                                                            )}
+                                                                {selectedEvent.additionalInfo && (
+                                                                    <p className="text-gray-700 text-sm font-sans mb-1 line-clamp-3">
+                                                                        <strong>Ek Bilgi:</strong> {selectedEvent.additionalInfo}
+                                                                    </p>
+                                                                )}
+                                                                <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white via-white/80 to-transparent"></div>
+                                                            </div>
 
-                                                            <div className="flex-grow"></div>
-
-                                                            <p className="text-gray-600 text-sm font-sans mt-2 mb-0.5">
-                                                                <strong className="text-nuper-blue">Kimler Katılabilir:</strong> {selectedEvent.participants}
-                                                            </p>
-                                                            {/* '/opportunity/:slug' yerine '/event/:slug' olarak güncellendi */}
-                                                            <Link to={`/event/${selectedEvent.slug}`} className="text-nuper-blue text-sm font-semibold hover:underline font-sans mt-1">
-                                                                Detaylı Etkinlik Sayfasına Git
-                                                            </Link>
+                                                            {/* Yeni düzen: justify-between ve items-end ile sağa dayama */}
+                                                            <div className="flex flex-wrap justify-between items-end gap-x-4 gap-y-1 mt-2 text-nuper-blue text-sm font-sans">
+                                                                <div className="flex flex-wrap gap-x-4 gap-y-1"> {/* Bilgiler için ayrı bir div */}
+                                                                    <p className="font-semibold whitespace-nowrap">
+                                                                        <span className="text-nuper-blue">Kimler Katılabilir:</span> <span className="text-gray-600">{selectedEvent.participants}</span>
+                                                                    </p>
+                                                                    {selectedEvent.location && (
+                                                                        <p className="font-semibold whitespace-nowrap">
+                                                                            <span className="text-nuper-blue">Konum:</span> <span className="text-gray-600">{selectedEvent.location}</span>
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                {/* Detaylı etkinlik linki sağa dayalı olacak */}
+                                                                <Link to={`/event/${selectedEvent.slug}`} className="font-semibold hover:underline whitespace-nowrap">
+                                                                    Detaylı Etkinlik Sayfasına Git
+                                                                </Link>
+                                                            </div>
                                                         </div>
                                                     </motion.div>
                                                 ) : (
@@ -425,10 +430,8 @@ const App = () => {
                             </>
                         } />
                         <Route path="/about" element={<div className="pt-16"><About /></div>} />
-                        {/* '/opportunities' yerine '/events' olarak güncellendi */}
                         <Route path="/events" element={<div className="pt-16"><Events /></div>} />
                         <Route path="/bulletins" element={<div className="pt-16"><Bulletins /></div>} />
-                        {/* '/opportunity/:slug' yerine '/event/:slug' olarak güncellendi */}
                         <Route path="/event/:slug" element={<div className="pt-16"><EventDetail /></div>} />
                         <Route path="/bulletin/:slug" element={<div className="pt-16"><BulletinDetail /></div>} />
 
@@ -466,7 +469,6 @@ const App = () => {
     );
 };
 
-// Public sayfalar için Header ve Footer'ı yöneten Layout bileşeni (DEĞİŞİKLİK YOK)
 const MainLayout = ({ setExpandedEventId }) => {
     const location = useLocation();
     const isHomePage = location.pathname === '/';

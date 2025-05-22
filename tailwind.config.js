@@ -16,5 +16,7 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/line-clamp'), // kartlarda sonunu kesen üç nokta için
+  ], // Bu kapanan parantezin olduğundan emin olun!
 }

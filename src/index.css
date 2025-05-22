@@ -1,39 +1,11 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
-
 @tailwind base;
 @tailwind components;
-@tailwind utilities;  
-
-/* Mevcut stiller buraya geliyor (kısaltarak eklemiyorum, kendi dosyanı kontrol et) */
+@tailwind utilities;
 
 /* Tema renkleri */
 :root {
-  --nuper-blue: #2563eb;
-  --nuper-dark-blue: #1e40af;
-  --nuper-gray: #f3f4f6;
-  --nuper-dark: #1f2937;
-  --nuper-dark-gray: #374151;
-  --nuper-light-text: #e5e7eb;
-}
-
-/* Mevcut stiller buraya geliyor (kısaltarak eklemiyorum, kendi dosyanı kontrol et) */
-
-/* Tema renkleri */
-:root {
-  --nuper-blue: #2563eb;
-  --nuper-dark-blue: #1e40af;
+  --nuper-blue: #2563eb; /* Veya istediğiniz nuper-blue değeri */
+  --nuper-dark-blue: #1e40af; /* Veya istediğiniz nuper-dark-blue değeri */
   --nuper-gray: #f3f4f6;
   --nuper-dark: #1f2937;
   --nuper-dark-gray: #374151;
@@ -153,4 +125,19 @@ code {
   }
 }
 
-/* Mevcut diğer stiller buraya devam eder */
+/* Diğer özel CSS stilleriniz buraya gelebilir */
+
+/* Genel body ve code stilleri */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
