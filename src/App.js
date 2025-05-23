@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 // Firebase importları
 import { app, analytics } from './firebaseConfig';
