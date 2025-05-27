@@ -1,115 +1,104 @@
-// src/pages/Bulletins.js
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { collection, getDocs, getFirestore, query, orderBy } from 'firebase/firestore'; // Firebase Firestore fonksiyonları
-import { app } from '../firebaseConfig'; // Firebase uygulamanızın yapılandırması
+// src/pages/Bulletin.js
 
-const Bulletins = () => {
-    const [bulletins, setBulletins] = useState([]); // Bültenlerin listesini tutar
-    const [loading, setLoading] = useState(true); // Yüklenme durumunu tutar
-    const [error, setError] = useState(null); // Hata durumunu tutar
-    const db = getFirestore(app); // Firestore veritabanı örneğini başlatırız
+import React, { useEffect, useState } from 'react';
+import { collection, getDocs, getFirestore, query, orderBy } from 'firebase/firestore';
+import { app } from '../firebaseConfig';
+import { Link } from 'react-router-dom';
+
+const Bulletin = () => {
+    const [bulletins, setBulletins] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    const db = getFirestore(app);
 
     useEffect(() => {
         const fetchBulletins = async () => {
+            setLoading(true);
+            setError(null);
             try {
-                console.log("Firebase'den bültenler çekiliyor...");
-                // "bulletins" koleksiyonundaki belgeleri 'createdAt' alanına göre azalan sırada sorgularız.
-                // Firestore'da 'createdAt' adında bir Timestamp alanı olmalı.
                 const q = query(collection(db, "bulletins"), orderBy("createdAt", "desc"));
-                const querySnapshot = await getDocs(q); // Sorguyu çalıştır ve sonuçları al
-
-                const bulletinsData = querySnapshot.docs.map(doc => {
-                    console.log("Çekilen bülten belge ID:", doc.id, "Veri:", doc.data());
-
-                    // Firebase Timestamp'ini okunabilir bir tarih formatına dönüştür
-                    const date = doc.data().createdAt ? new Date(doc.data().createdAt.toDate()).toLocaleDateString('tr-TR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    }) : 'Tarih Yok';
-
+                const querySnapshot = await getDocs(q);
+                const bulletinsList = querySnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    let summaryText = '';
+                    if (data.content) {
+                        // HTML'den etiketleri temizleyip kısaltma (basit bir DOMParser kullanımı)
+                        // Bu yöntem tarayıcı ortamında çalışır ve daha güvenlidir.
+                        const doc = new DOMParser().parseFromString(data.content, 'text/html');
+                        summaryText = doc.body.textContent || '';
+                        summaryText = summaryText.substring(0, 150) + (summaryText.length > 150 ? '...' : '');
+                    }
                     return {
-                        id: doc.id, // Belge ID'si
-                        ...doc.data(), // Belgenin tüm verileri
-                        date: date, // Formatlanmış tarih
-                        // Listeleme görünümünde 'summary' alanını kullanmak daha uygun olabilir.
-                        // Eğer 'summary' yoksa 'fullContent' veya 'İçerik yok.' gösterir.
-                        summary: doc.data().summary || doc.data().fullContent || 'İçerik yok.',
-                        // Eğer 'authorName' alanı varsa onu kullan, yoksa 'Yazar Bilgisi Yok' göster
-                        author: doc.data().authorName || 'Yazar Bilgisi Yok'
+                        id: doc.id,
+                        ...data,
+                        summary: summaryText // Özeti buraya ekliyoruz
                     };
                 });
-                setBulletins(bulletinsData); // Bülten verilerini state'e kaydet
-                console.log("Çekilen toplam bülten sayısı:", bulletinsData.length);
+                setBulletins(bulletinsList);
             } catch (err) {
                 console.error("Bültenler çekilirken hata oluştu:", err);
-                setError("Bültenler yüklenirken bir sorun oluştu."); // Hata durumunda mesaj ayarla
+                setError("Bültenler yüklenirken bir sorun oluştu.");
             } finally {
-                setLoading(false); // Yükleme tamamlandı
-                console.log("Bülten yüklemesi tamamlandı. Loading durumu:", false);
+                setLoading(false);
             }
         };
+        fetchBulletins();
+    }, [db]);
 
-        fetchBulletins(); // Bültenleri çek fonksiyonunu çalıştır
-    }, [db]); // 'db' değiştiğinde tekrar çalışır
-
-    // Yüklenme durumunda gösterilecek UI
     if (loading) {
         return (
-            <div className="flex justify-center items-center h-screen">
-                <p className="text-xl text-nuper-blue">Bültenler yükleniyor...</p>
+            <div className="pt-16 flex justify-center items-center h-screen">
+                <p className="text-xl text-nuper-blue">Bültenler Yükleniyor...</p>
             </div>
         );
     }
 
-    // Hata durumunda gösterilecek UI
     if (error) {
         return (
-            <div className="flex justify-center items-center h-screen">
+            <div className="pt-16 flex justify-center items-center h-screen">
                 <p className="text-xl text-red-600">{error}</p>
             </div>
         );
     }
 
-    // Bülten listesi yüklendiyse gösterilecek UI
     return (
-        <div className="pt-16 min-h-screen bg-gray-100 py-12">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                <h1 className="text-4xl font-heading font-bold text-center text-nuper-blue mb-10">Tüm Bültenler</h1>
-
+        <div className="pt-16 bg-nuper-gray min-h-screen">
+            <div className="max-w-6xl mx-auto px-4 py-8">
+                <h1 className="text-4xl font-heading font-bold text-nuper-blue mb-8 text-center">Tüm Bültenler</h1>
                 {bulletins.length === 0 ? (
-                    <p className="text-center text-lg text-gray-600">Henüz bülten bulunamadı.</p>
+                    <p className="text-center text-gray-600 text-lg">Henüz hiç bülten bulunmuyor.</p>
                 ) : (
-                    // Bültenleri tek sütunlu bir liste olarak gösterir
-                    <div className="flex flex-col gap-8">
-                        {bulletins.map((bulletin) => (
-                            // Her bülten için detay sayfasına giden bir Link oluşturur
-                            <Link to={`/bulletin/${bulletin.slug}`} key={bulletin.id} className="block w-full">
-                                <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col md:flex-row h-full">
-                                    {bulletin.image && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {bulletins.map(bulletin => (
+                            <Link to={`/bulletin/${bulletin.slug}`} key={bulletin.id}>
+                                <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 h-full flex flex-col">
+                                    {bulletin.cardImage && (
                                         <img
-                                            src={bulletin.image}
+                                            src={bulletin.cardImage}
                                             alt={bulletin.title}
-                                            className="w-full md:w-1/3 h-48 md:h-auto object-cover"
+                                            className="w-full h-48 object-cover object-center"
                                         />
                                     )}
-                                    <div className="p-6 flex-grow flex flex-col justify-between md:w-2/3">
-                                        <div>
-                                            <h2 className="text-xl font-heading font-semibold text-nuper-dark-blue mb-2">
-                                                {bulletin.title}
-                                            </h2>
-                                            {/* Tarih ve yazar bilgilerini gösterir */}
-                                            <p className="text-gray-600 text-sm mb-4">
-                                                {bulletin.date} - {bulletin.author}
-                                            </p>
-                                            {/* Bültenin özetini gösterir */}
-                                            <p className="text-gray-700 text-base">
+                                    <div className="p-6 flex flex-col flex-grow">
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-2 truncate">
+                                            {bulletin.title}
+                                        </h2>
+                                        <p className="text-gray-500 text-sm mb-4">
+                                            {bulletin.date || (bulletin.createdAt && new Date(bulletin.createdAt.toDate()).toLocaleDateString('tr-TR', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric'
+                                            })) || 'Tarih Bilgisi Yok'}
+                                            {bulletin.publisher && ` - ${bulletin.publisher}`}
+                                        </p>
+                                        {bulletin.summary && ( // Önizlemeyi göster
+                                            <p className="text-gray-700 text-base mb-4 flex-grow">
                                                 {bulletin.summary}
                                             </p>
-                                        </div>
-                                        <div className="mt-4">
-                                            <span className="text-nuper-blue hover:underline font-medium">
+                                        )}
+                                        <div className="text-right mt-auto">
+                                            <span className="text-nuper-blue hover:underline font-semibold text-sm">
                                                 Devamını Oku
                                             </span>
                                         </div>
@@ -124,4 +113,4 @@ const Bulletins = () => {
     );
 };
 
-export default Bulletins;
+export default Bulletin;

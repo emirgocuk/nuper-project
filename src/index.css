@@ -4,8 +4,8 @@
 
 /* Tema renkleri */
 :root {
-  --nuper-blue: #2563eb; /* Veya istediğiniz nuper-blue değeri */
-  --nuper-dark-blue: #1e40af; /* Veya istediğiniz nuper-dark-blue değeri */
+  --nuper-blue: #2563eb;
+  --nuper-dark-blue: #1e40af;
   --nuper-gray: #f3f4f6;
   --nuper-dark: #1f2937;
   --nuper-dark-gray: #374151;
@@ -125,14 +125,11 @@
   }
 }
 
-/* Diğer özel CSS stilleriniz buraya gelebilir */
-
 /* Genel body ve code stilleri */
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  /* Tailwind config'den gelen 'sans' fontunu kullanır */
+  font-family: theme('fontFamily.sans'), sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -140,4 +137,139 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* React-Quill Genişlik Ayarı (Admin Formu için) */
+.ql-container, .ql-editor {
+  width: 100% !important;
+  min-height: 200px;
+}
+
+/* React-Quill İçeriği Ortalamak İçin (Admin Formu için) */
+.ql-editor p,
+.ql-editor h1,
+.ql-editor h2,
+.ql-editor h3,
+.ql-editor h4,
+.ql-editor h5,
+.ql-editor h6,
+.ql-editor li,
+.ql-editor blockquote {
+  text-align: center !important;
+}
+
+/* React-Quill İçindeki Resimleri Ortalamak İçin (Admin Formu için) */
+.ql-editor .ql-align-center {
+  text-align: center;
+}
+
+.ql-editor img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Kart önizlemesi için genişlik ve ortalama ayarı (Admin Formu için) */
+.card-preview-container {
+  width: 100% !important;
+  max-width: none !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Kart önizlemesi içindeki resim (Admin Formu için) */
+.card-preview-container img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Ana resim önizlemesi kapsayıcısı (Admin Formu için) */
+.main-image-preview-container {
+    width: 100% !important;
+    max-width: none !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Ana resim önizlemesi içindeki img (Admin Formu için) */
+.main-image-preview-container img {
+    object-fit: contain;
+}
+
+/* bulletin ve event detay sayfaları için genel ortalama */
+.bulletin-detail-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* İçeriği yatayda ortala */
+    max-width: 800px; /* Okunabilirliği artırmak için maksimum genişlik ver */
+    margin: 0 auto; /* Kapsayıcının kendisini sayfada ortala */
+    padding: 20px;
+}
+
+/* Başlık ortalama */
+.bulletin-title {
+    text-align: center;
+    width: 100%; /* Başlığın tam genişlik almasını sağlar */
+    margin-bottom: 20px;
+    font-family: theme('fontFamily.heading'), serif; /* Başlık fontunu uygula */
+}
+
+/* Tarih/Yayınlayan metni de ortalayalım */
+.bulletin-detail-container .text-gray-500.text-sm.font-sans {
+    text-align: center;
+    width: 100%;
+}
+
+/* Resim Kapsayıcı ve Resmi Ortala */
+.bulletin-image-wrapper {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    justify-content: center; /* Resmi yatayda ortala */
+    margin-bottom: 20px;
+}
+
+.bulletin-main-image {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* React-Quill tarafından render edilen içeriği ortala - DAHA GÜÇLÜ KURALLAR */
+/* bulletin-detail-container içindeki tüm doğrudan p, h1-h6, li, blockquote elemanlarını hedefle */
+/* DİKKAT: .prose sınıfını kaldırıyoruz, bu yüzden doğrudan ql-editor-display hedefliyoruz */
+.bulletin-detail-container .ql-editor-display p,
+.bulletin-detail-container .ql-editor-display h1,
+.bulletin-detail-container .ql-editor-display h2,
+.bulletin-detail-container .ql-editor-display h3,
+.bulletin-detail-container .ql-editor-display h4,
+.bulletin-detail-container .ql-editor-display h5,
+.bulletin-detail-container .ql-editor-display h6,
+.bulletin-detail-container .ql-editor-display li,
+.bulletin-detail-container .ql-editor-display blockquote {
+    text-align: center !important;
+    font-family: theme('fontFamily.sans'), sans-serif !important; /* İçerik fontunu uygula */
+}
+
+/* Resimleri ortala - Özellikle .ql-editor-display içindeki img elemanlarını hedefle */
+.bulletin-detail-container .ql-editor-display img {
+    display: block !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    max-width: 100% !important;
+    height: auto !important;
+}
+
+/* linklerin de ortalı ve doğru fontta olması için */
+.bulletin-detail-container .text-nuper-blue.hover\\:underline {
+    text-align: center !important;
+    width: 100%;
+    display: block; /* linkin ortalanması için blok elemanı yapalım */
+    font-family: theme('fontFamily.sans'), sans-serif !important;
 }

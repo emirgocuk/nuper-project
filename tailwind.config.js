@@ -6,17 +6,20 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        heading: ['Playfair Display', 'serif'],
+        // Font isimlerini buraya, tam olarak Google Fonts'tan aldığınız gibi yazmalısınız.
+        // Tırnak işaretlerinin ('') içinde font adını yazın. Eğer font adında boşluk varsa,
+        // hem tek tırnak hem de çift tırnak kullanmalısınız (örn: ['"Playfair Display"', 'serif']).
+        heading: ['"Playfair Display"', 'serif'], // Başlık fontu için (örnek)
+        sans: ['Inter', 'sans-serif'],           // Metin fontu için (örnek)
       },
       colors: {
-        'nuper-blue': '#1a73e8', // Ana mavi tonu
-        'nuper-dark-blue': '#0d0f5e', // Daha koyu mavi tonu (eskisi #155bb5 idi)
-        'nuper-gray': '#f5f5f5', // Açık gri arka plan
+        'nuper-blue': '#1E3A8A',
+        'nuper-dark-blue': '#172554',
+        'nuper-gray': '#F3F4F6',
       },
     },
   },
   plugins: [
-    require('@tailwindcss/line-clamp'), // kartlarda sonunu kesen üç nokta için
-  ], // Bu kapanan parantezin olduğundan emin olun!
-}
+    require('@tailwindcss/typography'), // Eklenti burada doğru şekilde import ediliyor
+  ],
+};
