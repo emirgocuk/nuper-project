@@ -1,15 +1,14 @@
-// src/pages/Bulletin.js
+// src/pages/Bulletins.js
 
 import React, { useEffect, useState } from 'react';
 import { collection, getDocs, getFirestore, query, orderBy } from 'firebase/firestore';
 import { app } from '../firebaseConfig';
 import { Link } from 'react-router-dom';
 
-const Bulletin = () => {
+const Bulletins = () => {
     const [bulletins, setBulletins] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
     const db = getFirestore(app);
 
     useEffect(() => {
@@ -23,17 +22,11 @@ const Bulletin = () => {
                     const data = doc.data();
                     let summaryText = '';
                     if (data.content) {
-                        // HTML'den etiketleri temizleyip kısaltma (basit bir DOMParser kullanımı)
-                        // Bu yöntem tarayıcı ortamında çalışır ve daha güvenlidir.
-                        const doc = new DOMParser().parseFromString(data.content, 'text/html');
-                        summaryText = doc.body.textContent || '';
+                        const domDoc = new DOMParser().parseFromString(data.content, 'text/html');
+                        summaryText = domDoc.body.textContent || '';
                         summaryText = summaryText.substring(0, 150) + (summaryText.length > 150 ? '...' : '');
                     }
-                    return {
-                        id: doc.id,
-                        ...data,
-                        summary: summaryText // Özeti buraya ekliyoruz
-                    };
+                    return { id: doc.id, ...data, summary: summaryText };
                 });
                 setBulletins(bulletinsList);
             } catch (err) {
@@ -46,61 +39,37 @@ const Bulletin = () => {
         fetchBulletins();
     }, [db]);
 
-    if (loading) {
-        return (
-            <div className="pt-16 flex justify-center items-center h-screen">
-                <p className="text-xl text-nuper-blue">Bültenler Yükleniyor...</p>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="pt-16 flex justify-center items-center h-screen">
-                <p className="text-xl text-red-600">{error}</p>
-            </div>
-        );
-    }
+    if (loading) return <div className="pt-16 flex justify-center items-center h-screen"><p className="text-xl text-nuper-blue">Yükleniyor...</p></div>;
+    if (error) return <div className="pt-16 flex justify-center items-center h-screen"><p className="text-xl text-red-600">{error}</p></div>;
 
     return (
-        <div className="pt-16 bg-nuper-gray min-h-screen">
-            <div className="max-w-6xl mx-auto px-4 py-8">
-                <h1 className="text-4xl font-heading font-bold text-nuper-blue mb-8 text-center">Tüm Bültenler</h1>
+        <div className="pt-24 pb-12 bg-gray-100 min-h-screen">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="text-center mb-12">
+                    <h1 className="text-4xl font-heading font-bold text-nuper-blue">Bültenler</h1>
+                    <p className="mt-2 text-lg text-gray-600">Sektörlerden haberler, kariyer ipuçları ve ilham verici içerikler.</p>
+                </div>
                 {bulletins.length === 0 ? (
-                    <p className="text-center text-gray-600 text-lg">Henüz hiç bülten bulunmuyor.</p>
+                    <p className="text-center text-lg text-gray-600">Henüz bülten bulunmuyor.</p>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {bulletins.map(bulletin => (
-                            <Link to={`/bulletin/${bulletin.slug}`} key={bulletin.id}>
+                            <Link to={`/bulletin/${bulletin.slug}`} key={bulletin.id} className="block group">
                                 <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 h-full flex flex-col">
                                     {bulletin.cardImage && (
-                                        <img
-                                            src={bulletin.cardImage}
-                                            alt={bulletin.title}
-                                            className="w-full h-48 object-cover object-center"
-                                        />
+                                        <div className="w-full aspect-w-1 aspect-h-1 bg-gray-200 overflow-hidden">
+                                            <img src={bulletin.cardImage} alt={bulletin.title} className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300" />
+                                        </div>
                                     )}
                                     <div className="p-6 flex flex-col flex-grow">
-                                        <h2 className="text-xl font-semibold text-gray-800 mb-2 truncate">
-                                            {bulletin.title}
-                                        </h2>
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-2 group-hover:text-nuper-blue transition-colors duration-300">{bulletin.title}</h2>
                                         <p className="text-gray-500 text-sm mb-4">
-                                            {bulletin.date || (bulletin.createdAt && new Date(bulletin.createdAt.toDate()).toLocaleDateString('tr-TR', {
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric'
-                                            })) || 'Tarih Bilgisi Yok'}
+                                            {bulletin.date || (bulletin.createdAt?.toDate ? new Date(bulletin.createdAt.toDate()).toLocaleDateString('tr-TR') : '')}
                                             {bulletin.publisher && ` - ${bulletin.publisher}`}
                                         </p>
-                                        {bulletin.summary && ( // Önizlemeyi göster
-                                            <p className="text-gray-700 text-base mb-4 flex-grow">
-                                                {bulletin.summary}
-                                            </p>
-                                        )}
+                                        <p className="text-gray-700 text-base mb-4 flex-grow line-clamp-3">{bulletin.summary}</p>
                                         <div className="text-right mt-auto">
-                                            <span className="text-nuper-blue hover:underline font-semibold text-sm">
-                                                Devamını Oku
-                                            </span>
+                                            <span className="text-nuper-blue font-semibold text-sm">Devamını Oku &rarr;</span>
                                         </div>
                                     </div>
                                 </div>
@@ -113,4 +82,4 @@ const Bulletin = () => {
     );
 };
 
-export default Bulletin;
+export default Bulletins;

@@ -6,7 +6,7 @@ import './index.css';
 import { SpeedInsights } from "@vercel/speed-insights/react"
 
 // Firebase importları
-import { app, analytics } from './firebaseConfig';
+import { app } from './firebaseConfig';
 import { getFirestore, collection, getDocs, orderBy, query } from 'firebase/firestore';
 
 // Public Bileşen importları
@@ -27,13 +27,11 @@ import AdminBulletinForm from './components/admin/AdminBulletinForm';
 
 const useHomeReset = (setExpandedEventId) => {
     const navigate = useNavigate();
-
     const handleHomeClick = (e) => {
         e.preventDefault();
         setExpandedEventId(null);
         navigate('/');
     };
-
     return handleHomeClick;
 };
 
@@ -58,7 +56,6 @@ const HomeHeader = ({ setExpandedEventId }) => {
                     <h1 className={`text-2xl font-heading font-bold ${textColorClass} cursor-pointer`}>Nuper</h1>
                 </Link>
                 <div className="flex items-center space-x-4">
-                    {/* Desktop Navigasyon */}
                     <div className="hidden md:flex items-center space-x-4">
                         <Link to="/" onClick={handleHomeClick} className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Ana Sayfa</Link>
                         <Link to="/about" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Hakkımızda</Link>
@@ -66,8 +63,6 @@ const HomeHeader = ({ setExpandedEventId }) => {
                         <Link to="/bulletins" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Bültenler</Link>
                         <Link to="/register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
                     </div>
-
-                    {/* Mobil Menü Butonu (Hamburger) */}
                     <div className="md:hidden">
                         <button onClick={() => setIsMenuOpen(!isMenuOpen)} className={`focus:outline-none ${textColorClass}`}>
                             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -77,8 +72,6 @@ const HomeHeader = ({ setExpandedEventId }) => {
                     </div>
                 </div>
             </div>
-
-            {/* Mobil Menü İçeriği */}
             <AnimatePresence>
                 {isMenuOpen && (
                     <motion.div
@@ -89,41 +82,11 @@ const HomeHeader = ({ setExpandedEventId }) => {
                         className={`md:hidden ${isScrolled ? 'bg-white' : 'bg-nuper-dark-blue'} py-2 px-4 shadow-lg`}
                     >
                         <nav className="flex flex-col space-y-2">
-                            <Link
-                                to="/"
-                                onClick={() => { handleHomeClick(); setIsMenuOpen(false); }}
-                                className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}
-                            >
-                                Ana Sayfa
-                            </Link>
-                            <Link
-                                to="/about"
-                                onClick={() => setIsMenuOpen(false)}
-                                className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}
-                            >
-                                Hakkımızda
-                            </Link>
-                            <Link
-                                to="/events"
-                                onClick={() => setIsMenuOpen(false)}
-                                className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}
-                            >
-                                Etkinlikler
-                            </Link>
-                            <Link
-                                to="/bulletins"
-                                onClick={() => setIsMenuOpen(false)}
-                                className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}
-                            >
-                                Bültenler
-                            </Link>
-                            <Link
-                                to="/register"
-                                onClick={() => setIsMenuOpen(false)}
-                                className={`block px-3 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans text-left`}
-                            >
-                                Kaydol
-                            </Link>
+                            <Link to="/" onClick={() => { handleHomeClick(); setIsMenuOpen(false); }} className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}>Ana Sayfa</Link>
+                            <Link to="/about" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}>Hakkımızda</Link>
+                            <Link to="/events" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}>Etkinlikler</Link>
+                            <Link to="/bulletins" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}>Bültenler</Link>
+                            <Link to="/register" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans text-left`}>Kaydol</Link>
                         </nav>
                     </motion.div>
                 )}
@@ -132,7 +95,7 @@ const HomeHeader = ({ setExpandedEventId }) => {
     );
 };
 
-const DefaultHeader = () => {
+const DefaultHeader = ({ setExpandedEventId }) => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false); 
 
@@ -149,7 +112,6 @@ const DefaultHeader = () => {
                     <h1 className="text-2xl font-heading font-bold text-nuper-blue cursor-pointer">Nuper</h1>
                 </Link>
                 <div className="flex items-center space-x-4">
-                    {/* Desktop Navigasyon */}
                     <div className="hidden md:flex items-center space-x-4">
                         <Link to="/" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Ana Sayfa</Link>
                         <Link to="/about" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Hakkımızda</Link>
@@ -157,8 +119,6 @@ const DefaultHeader = () => {
                         <Link to="/bulletins" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Bültenler</Link>
                         <Link to="/register" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Kaydol</Link>
                     </div>
-
-                    {/* Mobil Menü Butonu (Hamburger) */}
                     <div className="md:hidden">
                         <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="focus:outline-none text-nuper-blue">
                             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -168,8 +128,6 @@ const DefaultHeader = () => {
                     </div>
                 </div>
             </div>
-
-            {/* Mobil Menü İçeriği */}
             <AnimatePresence>
                 {isMenuOpen && (
                     <motion.div
@@ -180,41 +138,11 @@ const DefaultHeader = () => {
                         className="md:hidden bg-white py-2 px-4 shadow-lg"
                     >
                         <nav className="flex flex-col space-y-2">
-                            <Link
-                                to="/"
-                                onClick={() => setIsMenuOpen(false)}
-                                className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray"
-                            >
-                                Ana Sayfa
-                            </Link>
-                            <Link
-                                to="/about"
-                                onClick={() => setIsMenuOpen(false)}
-                                className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray"
-                            >
-                                Hakkımızda
-                            </Link>
-                            <Link
-                                to="/events"
-                                onClick={() => setIsMenuOpen(false)}
-                                className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray"
-                            >
-                                Etkinlikler
-                            </Link>
-                            <Link
-                                to="/bulletins"
-                                onClick={() => setIsMenuOpen(false)}
-                                className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray"
-                            >
-                                Bültenler
-                            </Link>
-                            <Link
-                                to="/register"
-                                onClick={() => setIsMenuOpen(false)}
-                                className="block px-3 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans text-left"
-                            >
-                                Kaydol
-                            </Link>
+                            <Link to="/" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray">Ana Sayfa</Link>
+                            <Link to="/about" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray">Hakkımızda</Link>
+                            <Link to="/events" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray">Etkinlikler</Link>
+                            <Link to="/bulletins" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray">Bültenler</Link>
+                            <Link to="/register" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans text-left">Kaydol</Link>
                         </nav>
                     </motion.div>
                 )}
@@ -251,7 +179,6 @@ const App = () => {
             try {
                 const q = query(collection(db, "events"), orderBy("createdAt", "desc"));
                 const querySnapshot = await getDocs(q);
-
                 const eventsData = querySnapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
@@ -263,7 +190,6 @@ const App = () => {
                 setLoadingEvents(false);
             }
         };
-
         fetchEvents();
     }, [db]);
 
@@ -319,65 +245,36 @@ const App = () => {
                                     <div className="max-w-6xl mx-auto px-4 relative">
                                         <h2 className="text-3xl font-heading font-bold text-center mb-8 text-nuper-blue">Öne Çıkan Etkinlikler</h2>
                                         <div className="relative z-0 h-64">
-                                            <AnimatePresence mode="wait">
+                                            <AnimatePresence>
                                                 {loadingEvents ? (
                                                     <div className="text-center text-nuper-blue font-semibold">Etkinlikler yükleniyor...</div>
                                                 ) : expandedEventId && selectedEvent ? (
                                                     <motion.div
                                                         key="expanded-card"
                                                         layoutId={`card-${expandedEventId}`}
-                                                        initial={{ opacity: 0, scale: 0.8 }}
-                                                        animate={{ opacity: 1, scale: 1 }}
-                                                        exit={{ opacity: 0, scale: 0.8 }}
-                                                        transition={{ duration: 0.3 }}
-                                                        className="absolute inset-0 z-10 bg-white rounded-xl border shadow-lg p-6 flex flex-col md:flex-row items-start text-left gap-4 h-64 overflow-hidden"
+                                                        className="absolute inset-0 z-10 bg-white rounded-xl border shadow-lg p-6 flex items-start text-left gap-6 h-64 overflow-hidden"
                                                     >
-                                                        <button
-                                                            onClick={handleCloseExpanded}
-                                                            className="absolute top-4 right-4 text-gray-700 hover:text-gray-900 transition-colors duration-200 z-20 p-2"
-                                                        >
-                                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                                            </svg>
-                                                        </button>
-                                                        <img
-                                                            src={selectedEvent.image}
-                                                            alt={selectedEvent.title}
-                                                            className="w-1/3 h-full object-cover rounded-lg flex-shrink-0"
-                                                        />
-                                                        <div className="flex-1 text-left flex flex-col py-0.5">
-                                                            <h3 className="text-xl font-heading font-bold text-nuper-blue mb-0.5 leading-tight">{selectedEvent.title}</h3>
-                                                            <p className="text-gray-700 text-base font-sans mb-0.5">{selectedEvent.date}</p>
-                                                            <p className="text-gray-700 text-base font-sans mb-2">{selectedEvent.organizer}</p>
-
-                                                            <div className="overflow-hidden relative flex-grow">
-                                                                <p className="text-gray-800 leading-snug text-sm font-sans mb-1 line-clamp-3">
-                                                                    {selectedEvent.description}
-                                                                </p>
-                                                                {selectedEvent.additionalInfo && (
-                                                                    <p className="text-gray-700 text-sm font-sans mb-1 line-clamp-3">
-                                                                        <strong>Ek Bilgi:</strong> {selectedEvent.additionalInfo}
-                                                                    </p>
-                                                                )}
-                                                                <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white via-white/80 to-transparent"></div>
-                                                            </div>
-
-                                                            {/* Yeni düzen: justify-between ve items-end ile sağa dayama */}
-                                                            <div className="flex flex-wrap justify-between items-end gap-x-4 gap-y-1 mt-2 text-nuper-blue text-sm font-sans">
-                                                                <div className="flex flex-wrap gap-x-4 gap-y-1"> {/* Bilgiler için ayrı bir div */}
-                                                                    <p className="font-semibold whitespace-nowrap">
-                                                                        <span className="text-nuper-blue">Kimler Katılabilir:</span> <span className="text-gray-600">{selectedEvent.participants}</span>
-                                                                    </p>
-                                                                    {selectedEvent.location && (
-                                                                        <p className="font-semibold whitespace-nowrap">
-                                                                            <span className="text-nuper-blue">Konum:</span> <span className="text-gray-600">{selectedEvent.location}</span>
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                                {/* Detaylı etkinlik linki sağa dayalı olacak */}
-                                                                <Link to={`/event/${selectedEvent.slug}`} className="font-semibold hover:underline whitespace-nowrap">
-                                                                    Detaylı Etkinlik Sayfasına Git
+                                                        <button onClick={handleCloseExpanded} className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 p-2 z-20"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                                                        
+                                                        {selectedEvent.cardImage && (
+                                                            <img src={selectedEvent.cardImage} alt={selectedEvent.title} className="w-48 h-48 object-cover rounded-lg flex-shrink-0" />
+                                                        )}
+                                                        <div className="flex-1 flex flex-col h-full">
+                                                            <h3 className="text-xl font-heading font-bold text-nuper-blue mb-1 leading-tight">{selectedEvent.title}</h3>
+                                                            <p className="text-sm text-gray-500">{selectedEvent.organizer}</p>
+                                                            <p className="text-sm text-gray-600 font-medium mb-2">{selectedEvent.date}</p>
+                                                            <p className="text-gray-800 text-sm leading-snug line-clamp-3 mb-2 flex-grow">{selectedEvent.description}</p>
+                                                            
+                                                            <div className="mt-auto flex justify-between items-center text-sm">
+                                                                <Link to={`/event/${selectedEvent.slug}`} className="font-semibold text-nuper-blue hover:underline">
+                                                                    Detaylı Görüntüle &rarr;
                                                                 </Link>
+                                                                <div className="flex items-center gap-1 text-teal-600">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                                                    </svg>
+                                                                    <span className="font-medium">{selectedEvent.location}</span>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </motion.div>
@@ -390,39 +287,41 @@ const App = () => {
                                                         exit={{ opacity: 0, x: -50 }}
                                                         transition={{ duration: 0.3 }}
                                                     >
-                                                        {visibleEvents.length > 0 ? (
-                                                            visibleEvents.map((event, index) => (
-                                                                <motion.div
-                                                                    key={event.id}
-                                                                    layoutId={`card-${event.id}`}
-                                                                    onClick={() => handleCardClick(event.slug)}
-                                                                    className={`flex-shrink-0 w-96 h-64 bg-white rounded-xl border shadow-lg p-6 cursor-pointer hover:shadow-xl transition-shadow duration-200 flex flex-col justify-between ${getCardPositionClass(index)}`}
-                                                                >
-                                                                    <div className="flex space-x-4 items-center">
-                                                                        <img src={event.image} alt={event.title} className="w-1/3 h-32 object-cover rounded-lg" />
-                                                                        <div className="flex-1">
-                                                                            <h3 className="text-lg font-heading font-semibold text-nuper-blue">{event.title}</h3>
-                                                                            <p className="text-gray-600 font-sans">{event.date}</p>
-                                                                            <p className="text-gray-600 font-sans">{event.organizer}</p>
-                                                                        </div>
+                                                        {visibleEvents.map((event, index) => (
+                                                            <motion.div
+                                                                key={event.id}
+                                                                layoutId={`card-${event.id}`}
+                                                                onClick={() => handleCardClick(event.slug)}
+                                                                className={`flex-shrink-0 w-96 h-64 bg-white rounded-xl border shadow-lg p-6 cursor-pointer hover:shadow-xl transition-shadow flex flex-col justify-between ${getCardPositionClass(index)}`}
+                                                            >
+                                                                <div className="flex space-x-4 items-start">
+                                                                    {event.cardImage && (
+                                                                        <img src={event.cardImage} alt={event.title} className="w-24 h-24 object-cover rounded-lg flex-shrink-0" />
+                                                                    )}
+                                                                    <div className="flex-1">
+                                                                        <h3 className="text-lg font-heading font-semibold text-nuper-blue mb-1">{event.title}</h3>
+                                                                        <p className="text-gray-500 font-sans text-xs">{event.organizer}</p>
+                                                                        <p className="text-gray-600 font-sans text-sm">{event.date}</p>
                                                                     </div>
-                                                                    <p className="mt-4 text-nuper-blue font-semibold hover:underline font-sans">Detaylar için tıklayın</p>
-                                                                </motion.div>
-                                                            ))
-                                                        ) : (
-                                                            !loadingEvents && <div className="text-center text-gray-600">Henüz etkinlik bulunmamaktadır.</div>
-                                                        )}
+                                                                </div>
+                                                                <div className="flex justify-between items-center mt-4">
+                                                                    <p className="text-nuper-blue font-semibold hover:underline font-sans self-start">Detaylar için tıklayın</p>
+                                                                    <div className="flex items-center gap-1 text-teal-600 text-sm">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                                            <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                                                        </svg>
+                                                                        <span>{event.location}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </motion.div>
+                                                        ))}
                                                     </motion.div>
                                                 )}
                                             </AnimatePresence>
                                             {!expandedEventId && !loadingEvents && events.length > cardsPerSet && (
                                                 <>
-                                                    <button onClick={handlePrev} className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-nuper-dark-blue shadow-md transition-colors duration-200">
-                                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-                                                    </button>
-                                                    <button onClick={handleNext} className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-nuper-dark-blue shadow-md transition-colors duration-200">
-                                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-                                                    </button>
+                                                    <button onClick={handlePrev} className="absolute left-0 top-1/2 -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md">&lt;</button>
+                                                    <button onClick={handleNext} className="absolute right-0 top-1/2 -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md">&gt;</button>
                                                 </>
                                             )}
                                         </div>
@@ -435,19 +334,11 @@ const App = () => {
                         <Route path="/bulletins" element={<div className="pt-16"><Bulletins /></div>} />
                         <Route path="/event/:slug" element={<div className="pt-16"><EventDetail /></div>} />
                         <Route path="/bulletin/:slug" element={<div className="pt-16"><BulletinDetail /></div>} />
-
                         <Route path="/register" element={<Register />} />
                     </Route>
-
                     <Route path="/admin/login" element={<AdminLogin />} />
-
                     <Route path="/admin" element={<AdminPanel />}>
-                        <Route index element={
-                            <div className="pt-8">
-                                <h2 className="text-3xl font-heading font-bold text-center text-nuper-dark-blue mb-4">Admin Paneline Hoş Geldiniz!</h2>
-                                <p className="text-center text-gray-700">Lütfen yukarıdaki menüden bir yönetim seçeneği belirleyin.</p>
-                            </div>
-                        } />
+                        <Route index element={<div className="pt-8"><h2 className="text-3xl font-heading font-bold text-center text-nuper-dark-blue mb-4">Admin Paneline Hoş Geldiniz!</h2><p className="text-center text-gray-700">Lütfen yukarıdaki menüden bir yönetim seçeneği belirleyin.</p></div>} />
                         <Route path="events" element={<AdminEventsList />} />
                         <Route path="events/new" element={<AdminEventForm />} />
                         <Route path="events/edit/:slug" element={<AdminEventForm />} />
@@ -455,15 +346,7 @@ const App = () => {
                         <Route path="bulletins/new" element={<AdminBulletinForm />} />
                         <Route path="bulletins/edit/:slug" element={<AdminBulletinForm />} />
                     </Route>
-
-                    <Route path="*" element={
-                        <div className="pt-16 flex flex-col items-center justify-center min-h-screen bg-gray-100">
-                            <h1 className="text-5xl font-bold text-red-600">404</h1>
-                            <p className="text-xl text-gray-700 mt-4">Sayfa Bulunamadı</p>
-                            <Link to="/" className="mt-8 text-nuper-blue hover:underline">Ana Sayfaya Dön</Link>
-                        </div>
-                    } />
-
+                    <Route path="*" element={<div className="pt-16 flex flex-col items-center justify-center min-h-screen bg-gray-100"><h1 className="text-5xl font-bold text-red-600">404</h1><p className="text-xl text-gray-700 mt-4">Sayfa Bulunamadı</p><Link to="/" className="mt-8 text-nuper-blue hover:underline">Ana Sayfaya Dön</Link></div>} />
                 </Routes>
             </Router>
         </div>

@@ -7,7 +7,7 @@ const Register = () => {
             <div className="max-w-4xl mx-auto px-4">
                 <h2 className="text-3xl font-heading font-bold text-center mb-6 text-nuper-blue">Nuper'a Kaydol!</h2>
                 <p className="text-lg text-gray-700 text-center mb-6 font-sans">
-                    Öğrenci veya okul temsilcisiysen, Nuper’a katıl ve fırsatları yakala! Hemen formu doldur, aramıza katıl.
+                    Girişimci, yatırımcı veya projene destek arıyan bir öğrenciysen, Nuper’e katıl ve fırsatları yakala! Hemen formu doldur, aramıza katıl.
                 </p>
                 <div className="max-w-2xl mx-auto">
                     <iframe
