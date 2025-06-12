@@ -159,41 +159,34 @@ const AdminEventForm = () => {
       if (!croppedImageBlob) {
         throw new Error('Kırpılmış resim oluşturulamadı.');
       }
-      const reader = new FileReader();
-      reader.readAsDataURL(croppedImageBlob);
-      reader.onloadend = async () => {
-        const base64Image = reader.result.split(',')[1];
-        const formDataImgBB = new FormData();
-        formDataImgBB.append('image', base64Image);
-        const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-          method: 'POST',
-          body: formDataImgBB,
-        });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`ImgBB yükleme hatası: ${errorData.error.message || response.statusText}`);
-        }
-        const result = await response.json();
-        if (result.success && result.data && result.data.url) {
-          const imageUrl = result.data.url;
-          setFormData((prevState) => ({
-            ...prevState,
-            [currentCropType + 'Image']: imageUrl,
-          }));
-          alert(`${currentCropType === 'card' ? 'Kart Resmi' : 'Ana Resim'} başarıyla kırpıldı ve ImgBB'ye yüklendi!`);
-          setShowCropper(false);
-          setImageSrc(null);
-          setCurrentCropType(null);
-          setCrop({ x: 0, y: 0 });
-          setZoom(1);
-          setCroppedAreaPixels(null);
-        } else {
-          throw new Error('ImgBB yüklemesi başarısız oldu veya link bulunamadı.');
-        }
-      };
-      reader.onerror = (err) => {
-        throw new Error('Kırpılmış resmi okuma hatası: ' + err.message);
-      };
+      
+      const formDataImgBB = new FormData();
+      formDataImgBB.append('image', croppedImageBlob, 'cropped-image.jpg');
+
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+        method: 'POST',
+        body: formDataImgBB,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`ImgBB yükleme hatası: ${errorData.error.message || response.statusText}`);
+      }
+
+      const result = await response.json();
+      if (result.success && result.data && result.data.url) {
+        const imageUrl = result.data.url;
+        setFormData((prevState) => ({
+          ...prevState,
+          [currentCropType + 'Image']: imageUrl,
+        }));
+        alert(`${currentCropType === 'card' ? 'Kart Resmi' : 'Ana Resim'} başarıyla kırpıldı ve ImgBB'ye yüklendi!`);
+        setShowCropper(false);
+        setImageSrc(null);
+        setCurrentCropType(null);
+      } else {
+        throw new Error('ImgBB yüklemesi başarısız oldu veya link bulunamadı.');
+      }
     } catch (err) {
       console.error('Resim kırpılırken veya yüklenirken hata oluştu:', err);
       setError('Resim işlemi sırasında bir hata oluştu: ' + err.message);
@@ -501,9 +494,6 @@ const AdminEventForm = () => {
                     setImageSrc(null);
                     setCurrentCropType(null);
                     setError(null);
-                    setCrop({ x: 0, y: 0 });
-                    setZoom(1);
-                    setCroppedAreaPixels(null);
                   }}
                   className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
                 >
@@ -513,7 +503,7 @@ const AdminEventForm = () => {
                   type="button"
                   onClick={handleCropAndUpload}
                   className="bg-nuper-blue hover:bg-nuper-dark-blue text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
-                  disabled={imageUploadLoading}
+                  disabled={imageUploadLoading || !croppedAreaPixels}
                 >
                   {imageUploadLoading ? 'Yükleniyor...' : 'Resmi Kırp ve Yükle'}
                 </button>
