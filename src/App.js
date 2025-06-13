@@ -15,6 +15,7 @@ import Bulletins from './components/Bulletins';
 import EventDetail from './components/EventDetail'; 
 import BulletinDetail from './components/BulletinDetail';
 import Register from './components/Register';
+import SpaceHero from './components/SpaceHero'; // En üste ekleyin
 
 // Admin Bileşen importları
 import AdminLogin from './components/AdminLogin';
@@ -253,8 +254,13 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
 
     return (
         <>
-            <section id="home" className="bg-gradient-to-r from-nuper-blue to-nuper-dark-blue min-h-screen flex items-center justify-center text-center text-white">
-                <div className="max-w-4xl mx-auto px-4 py-20">
+            <section id="home" className="relative bg-gradient-to-r from-nuper-blue to-nuper-dark-blue min-h-screen flex items-center justify-center text-center text-white overflow-hidden">
+                {/* SpaceHero arka plan animasyonu */}
+                <div className="absolute inset-0 w-full h-full pointer-events-none z-0">
+                    <SpaceHero />
+                </div>
+                {/* Ana içerik */}
+                <div className="max-w-4xl mx-auto px-4 py-20 relative z-10">
                     <h1 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold leading-tight">Nuper ile Geleceğini Şekillendir!</h1>
                     <p className="mt-4 text-lg md:text-xl font-sans">Öğrenciler için yarışmalar, etkinlikler ve fırsatlar tek platformda!</p>
                     <Link to="/register" className="bg-white text-nuper-blue mt-6 inline-block px-6 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading transition-colors duration-300">Şimdi Kaydol</Link>
