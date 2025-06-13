@@ -10,9 +10,9 @@ import { getFirestore, collection, getDocs, orderBy, query } from 'firebase/fire
 
 // Public Bileşen importları
 import About from './components/About';
-import Events from './components/Events'; 
+import Events from './components/Events';
 import Bulletins from './components/Bulletins';
-import EventDetail from './components/EventDetail'; 
+import EventDetail from './components/EventDetail';
 import BulletinDetail from './components/BulletinDetail';
 import Register from './components/Register';
 import SpaceHero from './components/SpaceHero';
@@ -25,13 +25,16 @@ import AdminEventForm from './components/admin/AdminEventForm';
 import AdminBulletinsList from './components/admin/AdminBulletinsList';
 import AdminBulletinForm from './components/admin/AdminBulletinForm';
 
-// --- Yardımcı ve Layout Bileşenleri ---
 
-// Ekran boyutu algılama hook'u
+// --- YARDIMCI VE LAYOUT BİLEŞENLERİ ---
+
 const useMediaQuery = (query) => {
-    const [matches, setMatches] = useState(window.matchMedia(query).matches);
+    const isBrowser = typeof window !== 'undefined';
+    const [matches, setMatches] = useState(isBrowser ? window.matchMedia(query).matches : false);
 
     useEffect(() => {
+        if (!isBrowser) return;
+
         const mediaQueryList = window.matchMedia(query);
         const listener = (event) => setMatches(event.matches);
         
@@ -41,6 +44,8 @@ const useMediaQuery = (query) => {
             mediaQueryList.addListener(listener);
         }
 
+        setMatches(mediaQueryList.matches);
+
         return () => {
             try {
                 mediaQueryList.removeEventListener('change', listener);
@@ -48,11 +53,10 @@ const useMediaQuery = (query) => {
                 mediaQueryList.removeListener(listener);
             }
         };
-    }, [query]);
+    }, [query, isBrowser]);
 
     return matches;
 };
-
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
@@ -76,7 +80,7 @@ const useHomeReset = (setExpandedEventId) => {
 
 const HomeHeader = ({ setExpandedEventId }) => {
     const [isScrolled, setIsScrolled] = useState(false);
-    const [isMenuOpen, setIsMenuOpen] = useState(false); 
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const handleHomeClick = useHomeReset(setExpandedEventId);
 
     useEffect(() => {
@@ -86,7 +90,7 @@ const HomeHeader = ({ setExpandedEventId }) => {
     }, []);
 
     const textColorClass = isScrolled ? 'text-nuper-blue' : 'text-white';
-    const linkHoverClass = isScrolled ? 'hover:text-nuper-dark-blue' : 'hover:text-nuper-gray'; 
+    const linkHoverClass = isScrolled ? 'hover:text-nuper-dark-blue' : 'hover:text-nuper-gray';
 
     return (
         <nav className={`fixed w-full z-20 shadow-lg ${isScrolled ? 'bg-white/90 backdrop-blur-sm' : 'bg-transparent'}`}>
@@ -127,14 +131,7 @@ const HomeHeader = ({ setExpandedEventId }) => {
 };
 
 const DefaultHeader = () => {
-    const [isScrolled, setIsScrolled] = useState(false);
-    const [isMenuOpen, setIsMenuOpen] = useState(false); 
-
-    useEffect(() => {
-        const handleScroll = () => setIsScrolled(window.scrollY > 50);
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     return (
         <nav className={`fixed top-0 w-full z-20 shadow-lg bg-white/90 backdrop-blur-sm`}>
@@ -173,26 +170,24 @@ const DefaultHeader = () => {
 };
 
 
-const Footer = () => {
-    return (
-        <footer className="bg-nuper-dark-blue text-white py-8">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                <p className="text-sm font-sans">&copy; {new Date().getFullYear()} Nuper. Tüm Hakları Saklıdır.</p>
-                <div className="flex justify-center space-x-4 mt-4"><a href="#!" className="hover:text-nuper-blue transition-colors duration-200">Gizlilik Politikası</a><a href="#!" className="hover:text-nuper-blue transition-colors duration-200">Kullanım Koşulları</a></div>
-            </div>
-        </footer>
-    );
-};
+const Footer = () => (
+    <footer className="bg-nuper-dark-blue text-white py-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p className="text-sm font-sans">&copy; {new Date().getFullYear()} Nuper. Tüm Hakları Saklıdır.</p>
+            <div className="flex justify-center space-x-4 mt-4"><a href="#!" className="hover:text-nuper-blue transition-colors duration-200">Gizlilik Politikası</a><a href="#!" className="hover:text-nuper-blue transition-colors duration-200">Kullanım Koşulları</a></div>
+        </div>
+    </footer>
+);
 
 const MainLayout = ({ setExpandedEventId }) => {
     const location = useLocation();
     const isHomePage = location.pathname === '/';
     
     useEffect(() => {
-        if (location.pathname !== '/') {
+        if (!isHomePage) {
             setExpandedEventId(null);
         }
-    }, [location.pathname, setExpandedEventId]);
+    }, [location.pathname, isHomePage, setExpandedEventId]);
 
     return (
         <>
@@ -203,34 +198,50 @@ const MainLayout = ({ setExpandedEventId }) => {
     );
 };
 
-// ===============================================
-// DEĞİŞİKLİKLERİN BAŞLADIĞI YER: HomePage Bileşeni
-// ===============================================
 
 const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
-    const isDesktop = useMediaQuery('(min-width: 1024px)'); // Tailwind'in lg breakpoint'i
-    const [currentSet, setCurrentSet] = useState(0);
+    const navigate = useNavigate();
+    const isDesktop = useMediaQuery('(min-width: 1024px)');
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [direction, setDirection] = useState(0);
 
-    // Ekran boyutuna göre bir sette gösterilecek kart sayısını ayarla
     const cardsPerSet = isDesktop ? 3 : 1;
-
-    const totalSets = Math.ceil(events.length / cardsPerSet);
+    const totalEvents = events.length;
     
-    // Gösterilecek kartları hesapla. Boş dizi kontrolü eklendi.
-    const visibleEvents = events.length > 0 ? 
-        Array.from({ length: cardsPerSet }).map((_, i) => events[(currentSet * cardsPerSet + i) % events.length]) 
-        : [];
-        
-    const handleNext = () => {
-        if (totalSets > 0) setCurrentSet((prev) => (prev + 1) % totalSets);
-    }
-    const handlePrev = () => {
-        if (totalSets > 0) setCurrentSet((prev) => (prev - 1 + totalSets) % totalSets);
-    }
+    // Masaüstünde setler arasında, mobilde tek tek gezinme
+    const step = isDesktop ? cardsPerSet : 1;
+    const totalSets = Math.ceil(totalEvents / step);
+    const currentSet = Math.floor(currentIndex / step);
+    const canCycle = totalEvents > cardsPerSet;
 
-    const handleCardClick = (slug) => setExpandedEventId(slug);
+    const paginate = useCallback((newDirection) => {
+        if (!canCycle) return;
+        setDirection(newDirection);
+        // Set bazlı geçiş
+        const newSet = (currentSet + newDirection + totalSets) % totalSets;
+        setCurrentIndex(newSet * step);
+    }, [currentSet, totalSets, step, canCycle]);
+    
+    const visibleEvents = [];
+    if (totalEvents > 0) {
+        const start = isDesktop ? currentSet * cardsPerSet : currentIndex;
+        for (let i = 0; i < cardsPerSet; i++) {
+            const eventIndex = (start + i) % totalEvents;
+            if (visibleEvents.length < cardsPerSet) {
+                 visibleEvents.push(events[eventIndex]);
+            }
+        }
+    }
+    
+    const handleCardClick = (event) => setExpandedEventId(event.slug);
     const handleCloseExpanded = (e) => { e.stopPropagation(); setExpandedEventId(null); };
     const selectedEvent = events.find(event => event.slug === expandedEventId);
+
+    const variants = {
+        enter: (direction) => ({ opacity: 0, x: isDesktop ? direction * 300 : 0 }),
+        center: { opacity: 1, x: 0 },
+        exit: (direction) => ({ opacity: 0, x: isDesktop ? direction * -300 : 0 }),
+    };
 
     return (
         <>
@@ -245,63 +256,84 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
                 </div>
             </section>
             
-            <section id="events-home" className="bg-nuper-gray py-16">
-                 {/* Genişletilmiş kart görünümü için portal benzeri yapı */}
-                <AnimatePresence>
-                    {expandedEventId && selectedEvent && (
-                         <motion.div
-                            key="expanded-card-overlay"
-                            className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"
-                            onClick={handleCloseExpanded}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
+            <AnimatePresence>
+                {expandedEventId && selectedEvent && (
+                    <motion.div
+                        key="overlay"
+                        className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+                        onClick={handleCloseExpanded}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                    >
+                        <motion.div
+                            layoutId={`card-${expandedEventId}`}
+                            className="bg-white rounded-xl shadow-lg w-full max-w-lg max-h-[90vh] flex flex-col"
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            <motion.div
-                                layoutId={`card-${expandedEventId}`}
-                                className="bg-white rounded-xl border shadow-lg p-6 flex flex-col md:flex-row items-start text-left gap-6 w-full max-w-2xl"
-                                onClick={(e) => e.stopPropagation()} // Kartın kendisine tıklayınca kapanmasını engelle
-                            >
-                                <button onClick={handleCloseExpanded} className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 p-1 z-20">
+                            <div className="relative">
+                                {selectedEvent.cardImage && <img src={selectedEvent.cardImage} alt={selectedEvent.title} className="w-full h-48 object-cover rounded-t-xl" />}
+                                <button onClick={handleCloseExpanded} className="absolute top-2 right-2 bg-white/70 rounded-full p-1 text-gray-700 hover:text-black hover:bg-white transition-all">
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
-                                {selectedEvent.cardImage && <img src={selectedEvent.cardImage} alt={selectedEvent.title} className="w-full h-48 md:w-48 md:h-full object-cover rounded-lg flex-shrink-0" />}
-                                <div className="flex-1 flex flex-col h-full overflow-hidden">
-                                    <h3 className="text-xl font-heading font-bold text-nuper-blue mb-1 leading-tight">{selectedEvent.title}</h3>
-                                    <div className="mb-2">
-                                        <p className="text-sm font-medium text-gray-600">{selectedEvent.organizer}</p>
-                                        <p className="text-sm text-gray-500">{selectedEvent.date}</p>
-                                    </div>
-                                    <div className="relative flex-grow overflow-y-auto pr-2">
-                                        <p className="text-gray-800 text-sm leading-snug">{selectedEvent.description}</p>
-                                    </div>
-                                    <div className="mt-4 flex justify-between items-center text-sm pt-2 border-t">
-                                        <Link to={`/event/${selectedEvent.slug}`} className="font-semibold text-nuper-blue hover:underline text-xs">Detaylı Görüntüle &rarr;</Link>
-                                        {selectedEvent.location &&
-                                            <div className="flex items-center gap-1 text-teal-600">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
-                                                <span className="font-medium">{selectedEvent.location}</span>
-                                            </div>
-                                        }
-                                    </div>
+                            </div>
+                            <div className="flex-1 p-6 flex flex-col overflow-hidden">
+                                <h3 className="text-2xl font-heading font-bold text-nuper-blue mb-2 leading-tight">{selectedEvent.title}</h3>
+                                <div className="mb-4 text-sm text-gray-500">
+                                    <p>{selectedEvent.organizer}</p>
+                                    <p>{selectedEvent.date}</p>
                                 </div>
-                            </motion.div>
+                                <div className="relative flex-1 overflow-hidden">
+                                    <p className="text-gray-800 text-base leading-relaxed">{selectedEvent.description}</p>
+                                    <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+                                </div>
+                                <div className="mt-auto pt-4 border-t flex justify-between items-center text-sm">
+                                    <Link to={`/event/${selectedEvent.slug}`} className="font-semibold text-nuper-blue hover:underline">Detaylı Görüntüle &rarr;</Link>
+                                    {selectedEvent.location && (
+                                        <div className="flex items-center gap-1 text-teal-600">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
+                                            <span className="font-medium">{selectedEvent.location}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </motion.div>
-                    )}
-                </AnimatePresence>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
+            <section id="events-home" className="bg-nuper-gray py-16">
                 <div className="max-w-6xl mx-auto px-4 relative">
                     <h2 className="text-3xl font-heading font-bold text-center mb-8 text-nuper-blue">Öne Çıkan Etkinlikler</h2>
-                    <div className="relative min-h-[16rem]"> {/* min-h-64 yerine min-h-[16rem] kullanımı daha tutarlı */}
-                        {loading ? (<div className="text-center text-nuper-blue font-semibold">Yükleniyor...</div>) 
-                        : (
-                            <div className="flex flex-col md:flex-row items-center justify-center gap-8 py-4">
-                                {visibleEvents.map((event) => (
-                                    <motion.div 
-                                        key={event.id} 
-                                        layoutId={`card-${event.id}`} 
-                                        onClick={() => handleCardClick(event.slug)} 
-                                        className="w-full max-w-sm lg:max-w-none lg:w-96 h-64 bg-white rounded-xl border shadow-lg p-6 cursor-pointer hover:shadow-xl transition-shadow flex flex-col"
+                    <div className="relative h-72 flex items-center justify-center">
+                         {canCycle && (
+                            <>
+                                <button onClick={() => paginate(-1)} className="absolute left-0 -translate-x-4 top-1/2 -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10">&lt;</button>
+                                <button onClick={() => paginate(1)} className="absolute right-0 translate-x-4 top-1/2 -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10">&gt;</button>
+                            </>
+                        )}
+                        <AnimatePresence initial={false} custom={direction}>
+                            <motion.div
+                                key={currentSet}
+                                custom={direction}
+                                variants={variants}
+                                initial="enter"
+                                animate="center"
+                                exit="exit"
+                                transition={{
+                                    x: { type: "spring", stiffness: 300, damping: 30 },
+                                    opacity: { duration: 0.2 }
+                                }}
+                                className="absolute flex items-center justify-center gap-8"
+                            >
+                                {loading ? (
+                                    <div className="text-center text-nuper-blue font-semibold">Yükleniyor...</div>
+                                ) : visibleEvents.map((event) => (
+                                    <motion.div
+                                        key={event.id}
+                                        layoutId={`card-${event.id}`}
+                                        onClick={() => handleCardClick(event)}
+                                        className="flex-shrink-0 w-96 h-64 bg-white rounded-xl border shadow-lg p-6 cursor-pointer hover:shadow-xl transition-shadow flex flex-col"
                                     >
                                         <div className="flex-grow">
                                             <div className="flex items-start gap-4 mb-2">
@@ -324,14 +356,8 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
                                         </div>
                                     </motion.div>
                                 ))}
-                            </div>
-                        )}
-                        {!expandedEventId && !loading && events.length > cardsPerSet && (
-                            <>
-                                <button onClick={handlePrev} className="absolute left-0 top-1/2 -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10">&lt;</button>
-                                <button onClick={handleNext} className="absolute right-0 top-1/2 -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10">&gt;</button>
-                            </>
-                        )}
+                            </motion.div>
+                        </AnimatePresence>
                     </div>
                 </div>
             </section>
@@ -339,9 +365,6 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
     );
 };
 
-// ===============================================
-// DEĞİŞİKLİKLERİN BİTTİĞİ YER
-// ===============================================
 
 const App = () => {
     const [expandedEventId, setExpandedEventId] = useState(null);
