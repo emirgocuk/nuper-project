@@ -206,40 +206,52 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
 
     const cardsPerSet = isDesktop ? 3 : 1;
     const totalEvents = events.length;
-    
-    // Masaüstünde setler arasında, mobilde tek tek gezinme
-    const step = isDesktop ? cardsPerSet : 1;
-    const totalSets = Math.ceil(totalEvents / step);
-    const currentSet = Math.floor(currentIndex / step);
     const canCycle = totalEvents > cardsPerSet;
 
     const paginate = useCallback((newDirection) => {
         if (!canCycle) return;
         setDirection(newDirection);
-        // Set bazlı geçiş
-        const newSet = (currentSet + newDirection + totalSets) % totalSets;
-        setCurrentIndex(newSet * step);
-    }, [currentSet, totalSets, step, canCycle]);
-    
-    const visibleEvents = [];
-    if (totalEvents > 0) {
-        const start = isDesktop ? currentSet * cardsPerSet : currentIndex;
-        for (let i = 0; i < cardsPerSet; i++) {
-            const eventIndex = (start + i) % totalEvents;
-            if (visibleEvents.length < cardsPerSet) {
-                 visibleEvents.push(events[eventIndex]);
+        setCurrentIndex(prevIndex => {
+            let nextIndex = prevIndex + newDirection;
+            if (nextIndex < 0) {
+                nextIndex = totalEvents - 1;
+            } else if (nextIndex >= totalEvents) {
+                nextIndex = 0;
             }
+            return nextIndex;
+        });
+    }, [canCycle, totalEvents]);
+
+    // Görüntülenecek olayları hesaplayan mantık
+    const visibleEvents = [];
+    if (!loading && totalEvents > 0) {
+        for (let i = 0; i < cardsPerSet; i++) {
+            if (i >= totalEvents) break; // <-- Hatalıydı, şimdi düzeltildi (if parantez içinde)
+            const eventIndex = (currentIndex + i) % totalEvents;
+            visibleEvents.push(events[eventIndex]);
         }
     }
-    
+
     const handleCardClick = (event) => setExpandedEventId(event.slug);
     const handleCloseExpanded = (e) => { e.stopPropagation(); setExpandedEventId(null); };
     const selectedEvent = events.find(event => event.slug === expandedEventId);
 
+    // DÜZELTİLMİŞ ANİMASYON DEĞERLERİ
     const variants = {
-        enter: (direction) => ({ opacity: 0, x: isDesktop ? direction * 300 : 0 }),
-        center: { opacity: 1, x: 0 },
-        exit: (direction) => ({ opacity: 0, x: isDesktop ? direction * -300 : 0 }),
+        enter: (direction) => ({
+            x: direction > 0 ? 100 : -100,
+            opacity: 0
+        }),
+        center: {
+            zIndex: 1,
+            x: 0,
+            opacity: 1
+        },
+        exit: (direction) => ({
+            zIndex: 0,
+            x: direction < 0 ? 100 : -100,
+            opacity: 0
+        })
     };
 
     return (
@@ -257,43 +269,21 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
             
             <AnimatePresence>
                 {expandedEventId && selectedEvent && (
-                    <motion.div
-                        key="overlay"
-                        className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-                        onClick={handleCloseExpanded}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                    >
-                        <motion.div
-                            layoutId={`card-${expandedEventId}`}
-                            className="bg-white rounded-xl shadow-lg w-full max-w-lg max-h-[90vh] flex flex-col"
-                            onClick={(e) => e.stopPropagation()}
-                        >
+                    <motion.div key="overlay" className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={handleCloseExpanded} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <motion.div layoutId={`card-${expandedEventId}`} className="bg-white rounded-xl shadow-lg w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                             <div className="relative">
                                 {selectedEvent.cardImage && <img src={selectedEvent.cardImage} alt={selectedEvent.title} className="w-full h-48 object-cover rounded-t-xl" />}
                                 <button onClick={handleCloseExpanded} className="absolute top-2 right-2 bg-white/70 rounded-full p-1 text-gray-700 hover:text-black hover:bg-white transition-all">
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
-                            <div className="flex-1 p-6 flex flex-col overflow-hidden">
+                            <div className="p-6 flex flex-col flex-1 overflow-y-auto">
                                 <h3 className="text-2xl font-heading font-bold text-nuper-blue mb-2 leading-tight">{selectedEvent.title}</h3>
-                                <div className="mb-4 text-sm text-gray-500">
-                                    <p>{selectedEvent.organizer}</p>
-                                    <p>{selectedEvent.date}</p>
-                                </div>
-                                <div className="relative flex-1 overflow-hidden">
-                                    <p className="text-gray-800 text-base leading-relaxed">{selectedEvent.description}</p>
-                                    <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-white to-transparent pointer-events-none" />
-                                </div>
+                                <div className="mb-4 text-sm text-gray-500"><p>{selectedEvent.organizer}</p><p>{selectedEvent.date}</p></div>
+                                <p className="text-gray-800 text-base leading-relaxed mb-4">{selectedEvent.description}</p>
                                 <div className="mt-auto pt-4 border-t flex justify-between items-center text-sm">
                                     <Link to={`/event/${selectedEvent.slug}`} className="font-semibold text-nuper-blue hover:underline">Detaylı Görüntüle &rarr;</Link>
-                                    {selectedEvent.location && (
-                                        <div className="flex items-center gap-1 text-teal-600">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
-                                            <span className="font-medium">{selectedEvent.location}</span>
-                                        </div>
-                                    )}
+                                    {selectedEvent.location && (<div className="flex items-center gap-1 text-teal-600"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg><span className="font-medium">{selectedEvent.location}</span></div>)}
                                 </div>
                             </div>
                         </motion.div>
@@ -301,60 +291,60 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
                 )}
             </AnimatePresence>
 
+            {/* === ÖNE ÇIKAN ETKİNLİKLER BÖLÜMÜ (Tasarım ve Animasyon Düzeltmeleriyle) === */}
             <section id="events-home" className="bg-nuper-gray py-16">
-                <div className="max-w-6xl mx-auto px-4 relative">
-                    <h2 className="text-3xl font-heading font-bold text-center mb-8 text-nuper-blue">Öne Çıkan Etkinlikler</h2>
-                    <div className="relative h-72 flex items-center justify-center">
-                         {canCycle && (
+                <div className="max-w-6xl mx-auto px-4">
+                    <h2 className="text-3xl font-heading font-bold text-center mb-12 text-nuper-blue">Öne Çıkan Etkinlikler</h2>
+                    <div className="relative flex items-center justify-center min-h-[26rem] overflow-hidden">
+                        {canCycle && (
                             <>
-                                <button onClick={() => paginate(-1)} className="absolute left-0 -translate-x-4 top-1/2 -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10">&lt;</button>
-                                <button onClick={() => paginate(1)} className="absolute right-0 translate-x-4 top-1/2 -translate-y-1/2 bg-nuper-blue text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10">&gt;</button>
+                                <button onClick={() => paginate(-1)} className="absolute left-0 -translate-x-4 md:-translate-x-8 top-1/2 -translate-y-1/2 bg-white text-nuper-blue w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10 hover:bg-gray-100 transition-colors">&lt;</button>
+                                <button onClick={() => paginate(1)} className="absolute right-0 translate-x-4 md:translate-x-8 top-1/2 -translate-y-1/2 bg-white text-nuper-blue w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10 hover:bg-gray-100 transition-colors">&gt;</button>
                             </>
                         )}
                         <AnimatePresence initial={false} custom={direction}>
                             <motion.div
-                                key={currentSet}
+                                key={currentIndex}
                                 custom={direction}
                                 variants={variants}
                                 initial="enter"
                                 animate="center"
                                 exit="exit"
-                                transition={{
-                                    x: { type: "spring", stiffness: 300, damping: 30 },
-                                    opacity: { duration: 0.2 }
-                                }}
-                                className="absolute flex items-center justify-center gap-8"
+                                transition={{ x: { type: "spring", stiffness: 300, damping: 30 }, opacity: { duration: 0.2 } }}
+                                className="absolute flex flex-wrap justify-center gap-8"
                             >
                                 {loading ? (
                                     <div className="text-center text-nuper-blue font-semibold">Yükleniyor...</div>
-                                ) : visibleEvents.map((event) => (
-                                    <motion.div
-                                        key={event.id}
-                                        layoutId={`card-${event.id}`}
-                                        onClick={() => handleCardClick(event)}
-                                        className="flex-shrink-0 w-96 h-64 bg-white rounded-xl border shadow-lg p-6 cursor-pointer hover:shadow-xl transition-shadow flex flex-col"
-                                    >
-                                        <div className="flex-grow">
-                                            <div className="flex items-start gap-4 mb-2">
-                                                {event.cardImage && <img src={event.cardImage} alt={event.title} className="w-24 h-24 object-cover rounded-lg flex-shrink-0" />}
-                                                <div className="flex-1">
-                                                    <h3 className="text-lg font-heading font-semibold text-nuper-blue mb-2">{event.title}</h3>
-                                                    <p className="text-sm font-medium text-gray-600">{event.organizer}</p>
-                                                    <p className="text-sm text-gray-500">{event.date}</p>
+                                ) : (
+                                    (isDesktop ? visibleEvents : events.length > 0 ? [events[currentIndex]] : []).map((event) => event && (
+                                        <motion.div
+                                            key={event.slug}
+                                            layoutId={`card-${event.slug}`}
+                                            onClick={() => handleCardClick(event)}
+                                            className="group w-80 h-96 bg-white rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 cursor-pointer flex flex-col overflow-hidden"
+                                        >
+                                            <div className="w-full h-40 bg-gray-200 overflow-hidden">
+                                                {event.cardImage ? (
+                                                    <img src={event.cardImage} alt={event.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                                ) : <div className="w-full h-full bg-gray-300"></div>}
+                                            </div>
+                                            <div className="p-4 flex flex-col flex-grow">
+                                                <h3 className="text-lg font-heading font-semibold text-nuper-dark-blue mb-1 group-hover:text-nuper-blue transition-colors line-clamp-2" title={event.title}>
+                                                    {event.title}
+                                                </h3>
+                                                <p className="text-sm text-gray-500 mb-2">{event.date}</p>
+                                                <p className="text-sm text-gray-700 flex-grow line-clamp-3">
+                                                    {event.description || event.organizer}
+                                                </p>
+                                                <div className="mt-auto pt-2 text-right">
+                                                    <span className="text-sm font-semibold text-nuper-blue opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        Detayları Gör &rarr;
+                                                    </span>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="flex justify-between items-center mt-auto">
-                                            <p className="text-xs text-nuper-blue font-semibold hover:underline">Detaylar için tıklayın</p>
-                                            {event.location && (
-                                                <div className="flex items-center gap-1 text-teal-600 text-sm">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
-                                                    <span>{event.location}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                ))}
+                                        </motion.div>
+                                    ))
+                                )}
                             </motion.div>
                         </AnimatePresence>
                     </div>

@@ -111,10 +111,6 @@ const BulletinDetail = () => {
                     {bulletin.date} {bulletin.publisher && `- ${bulletin.publisher}`}
                 </p>
 
-                {bulletin.cardImage && (
-                    <img src={bulletin.cardImage} alt={bulletin.title} className="w-full h-auto max-h-96 object-cover rounded-lg shadow-md my-8 not-prose" />
-                )}
-
                 {/* İçerik render alanı */}
                 {bulletin.content && bulletin.content.blocks ? (
                     bulletin.content.blocks.map(block => renderBlock(block))

@@ -3,47 +3,50 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, doc, getDoc } from 'firebase/firestore'; // getFirestore, doc, getDoc import edildi
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { app } from '../firebaseConfig';
 
 const AdminPanel = () => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [isAuthorized, setIsAuthorized] = useState(false); // Yetki durumu için yeni state
+    const [isAuthorized, setIsAuthorized] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
     const auth = getAuth(app);
-    const db = getFirestore(app); // Firestore instance'ı
+    const db = getFirestore(app);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                try {
+            try {
+                if (currentUser) {
                     const userDocRef = doc(db, "users", currentUser.uid);
                     const userDocSnap = await getDoc(userDocRef);
 
                     if (userDocSnap.exists() && userDocSnap.data().role === 'admin') {
                         setUser(currentUser);
-                        setIsAuthorized(true); // Kullanıcı yetkili
+                        setIsAuthorized(true);
                     } else {
-                        // Yetkili değilse, anasayfaya yönlendir.
+                        // Yetkili değilse veya kullanıcı dökümanı yoksa
                         setIsAuthorized(false);
-                        navigate('/');
+                        navigate('/'); // Ana sayfaya yönlendir
                     }
-                } catch (error) {
-                    console.error("Yetki kontrolü hatası:", error);
-                    setIsAuthorized(false);
-                    navigate('/');
+                } else {
+                    // Kullanıcı giriş yapmamışsa
+                    navigate('/admin/login');
                 }
-            } else {
-                // Kullanıcı yoksa login sayfasına yönlendir
-                navigate('/admin/login');
+            } catch (error) {
+                console.error("Yetki kontrolü hatası:", error);
+                setIsAuthorized(false);
+                navigate('/'); // Hata durumunda da ana sayfaya yönlendir
+            } finally {
+                // Bu blok her durumda (başarılı, başarısız, yetkisiz) çalışır.
+                setLoading(false);
             }
-            setLoading(false);
         });
 
         return () => unsubscribe();
     }, [auth, db, navigate]);
+
 
     const handleLogout = async () => {
         try {
@@ -57,19 +60,17 @@ const AdminPanel = () => {
     if (loading) {
         return <div className="text-center py-8">Yönetici bilgileri yükleniyor...</div>;
     }
-
-    // Yetkili değilse hiçbir şey render etme, yönlendirme zaten yapılmış olur.
+    
+    // Yetkili değilse hiçbir şey render etme
     if (!isAuthorized) {
         return null;
     }
 
-    // ----- Sidebar İçeriği Başlangıç -----
     const navItems = [
         { to: "/admin", text: "Ana Sayfa", condition: location.pathname === '/admin' },
         { to: "/admin/events", text: "Etkinlik Yönetimi", condition: location.pathname.startsWith('/admin/events') },
         { to: "/admin/bulletins", text: "Bülten Yönetimi", condition: location.pathname.startsWith('/admin/bulletins') }
     ];
-    // ----- Sidebar İçeriği Bitiş -----
 
     return (
         <div className="flex min-h-screen bg-gray-100">
