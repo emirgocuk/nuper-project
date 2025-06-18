@@ -1,8 +1,9 @@
+// src/components/admin/AdminEventsList.js
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getFirestore, collection, getDocs, deleteDoc, doc, query, orderBy, getDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { app } from '../../firebaseConfig';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { withSwal } from 'react-sweetalert2';
 
 const AdminEventsList = (props) => {
@@ -10,36 +11,25 @@ const AdminEventsList = (props) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const db = getFirestore(app);
-    const auth = getAuth(app);
     const { swal } = props;
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                try {
-                    const userDocRef = doc(db, "users", user.uid);
-                    const userDocSnap = await getDoc(userDocRef);
-                    if (userDocSnap.exists() && userDocSnap.data().role === 'admin') {
-                        const q = query(collection(db, "events"), orderBy("createdAt", "desc"));
-                        const querySnapshot = await getDocs(q);
-                        const eventsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setEvents(eventsData);
-                    } else {
-                        setError("Bu sayfayı görüntüleme yetkiniz yok.");
-                    }
-                } catch (err) {
-                    setError("Yetki kontrolü sırasında bir hata oluştu.");
-                    console.error(err);
-                }
-            } else {
-                // AdminPanel zaten yönlendirme yapacağı için bu kısım genellikle çalışmaz
-                setError("Lütfen giriş yapın.");
+        const fetchEvents = async () => {
+            try {
+                const q = query(collection(db, "events"), orderBy("createdAt", "desc"));
+                const querySnapshot = await getDocs(q);
+                const eventsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setEvents(eventsData);
+            } catch (err) {
+                setError("Etkinlikler yüklenirken bir hata oluştu.");
+                console.error(err);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
-        });
+        };
 
-        return () => unsubscribe();
-    }, [auth, db]);
+        fetchEvents();
+    }, [db]);
 
     const handleDelete = async (eventId, eventTitle) => {
         const result = await swal.fire({

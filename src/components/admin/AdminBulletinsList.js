@@ -1,8 +1,9 @@
+// src/components/admin/AdminBulletinsList.js
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getFirestore, collection, getDocs, deleteDoc, doc, query, orderBy, getDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { app } from '../../firebaseConfig';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { withSwal } from 'react-sweetalert2';
 
 const AdminBulletinsList = (props) => {
@@ -10,35 +11,25 @@ const AdminBulletinsList = (props) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const db = getFirestore(app);
-    const auth = getAuth(app);
     const { swal } = props;
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                try {
-                    const userDocRef = doc(db, "users", user.uid);
-                    const userDocSnap = await getDoc(userDocRef);
-                    if (userDocSnap.exists() && userDocSnap.data().role === 'admin') {
-                        const q = query(collection(db, "bulletins"), orderBy("createdAt", "desc"));
-                        const querySnapshot = await getDocs(q);
-                        const bulletinsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setBulletins(bulletinsData);
-                    } else {
-                        setError("Bu sayfayı görüntüleme yetkiniz yok.");
-                    }
-                } catch (err) {
-                    setError("Yetki kontrolü sırasında bir hata oluştu.");
-                    console.error(err);
-                }
-            } else {
-                setError("Lütfen giriş yapın.");
+        const fetchBulletins = async () => {
+            try {
+                const q = query(collection(db, "bulletins"), orderBy("createdAt", "desc"));
+                const querySnapshot = await getDocs(q);
+                const bulletinsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setBulletins(bulletinsData);
+            } catch (err) {
+                setError("Bültenler yüklenirken bir hata oluştu.");
+                console.error(err);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
-        });
+        };
 
-        return () => unsubscribe();
-    }, [auth, db]);
+        fetchBulletins();
+    }, [db]);
 
     const handleDelete = async (bulletinId, bulletinTitle) => {
         const result = await swal.fire({
@@ -70,7 +61,7 @@ const AdminBulletinsList = (props) => {
     if (error) {
         return <div className="text-center py-8 text-red-600">{error}</div>;
     }
-    
+
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-6">

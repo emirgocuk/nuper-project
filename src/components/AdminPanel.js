@@ -1,20 +1,40 @@
+// src/components/AdminPanel.js
+
 import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore'; // getFirestore, doc, getDoc import edildi
 import { app } from '../firebaseConfig';
 
 const AdminPanel = () => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isAuthorized, setIsAuthorized] = useState(false); // Yetki durumu için yeni state
     const navigate = useNavigate();
     const location = useLocation();
     const auth = getAuth(app);
+    const db = getFirestore(app); // Firestore instance'ı
 
-    // Sadece kullanıcı oturumunu kontrol et, admin yetkisini değil.
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
-                setUser(currentUser);
+                try {
+                    const userDocRef = doc(db, "users", currentUser.uid);
+                    const userDocSnap = await getDoc(userDocRef);
+
+                    if (userDocSnap.exists() && userDocSnap.data().role === 'admin') {
+                        setUser(currentUser);
+                        setIsAuthorized(true); // Kullanıcı yetkili
+                    } else {
+                        // Yetkili değilse, anasayfaya yönlendir.
+                        setIsAuthorized(false);
+                        navigate('/');
+                    }
+                } catch (error) {
+                    console.error("Yetki kontrolü hatası:", error);
+                    setIsAuthorized(false);
+                    navigate('/');
+                }
             } else {
                 // Kullanıcı yoksa login sayfasına yönlendir
                 navigate('/admin/login');
@@ -23,7 +43,7 @@ const AdminPanel = () => {
         });
 
         return () => unsubscribe();
-    }, [auth, navigate]);
+    }, [auth, db, navigate]);
 
     const handleLogout = async () => {
         try {
@@ -37,11 +57,19 @@ const AdminPanel = () => {
     if (loading) {
         return <div className="text-center py-8">Yönetici bilgileri yükleniyor...</div>;
     }
-    
-    // user yoksa render etme, yönlendirme gerçekleşir.
-    if (!user) {
+
+    // Yetkili değilse hiçbir şey render etme, yönlendirme zaten yapılmış olur.
+    if (!isAuthorized) {
         return null;
     }
+
+    // ----- Sidebar İçeriği Başlangıç -----
+    const navItems = [
+        { to: "/admin", text: "Ana Sayfa", condition: location.pathname === '/admin' },
+        { to: "/admin/events", text: "Etkinlik Yönetimi", condition: location.pathname.startsWith('/admin/events') },
+        { to: "/admin/bulletins", text: "Bülten Yönetimi", condition: location.pathname.startsWith('/admin/bulletins') }
+    ];
+    // ----- Sidebar İçeriği Bitiş -----
 
     return (
         <div className="flex min-h-screen bg-gray-100">
@@ -49,34 +77,20 @@ const AdminPanel = () => {
                 <h1 className="text-2xl font-heading font-bold mb-8">Nuper Admin</h1>
                 <nav className="flex-grow">
                     <ul>
-                        <li className="mb-3">
-                            <Link 
-                                to="/admin" 
-                                className={`block px-4 py-2 rounded-lg transition-colors duration-200 ${location.pathname === '/admin' ? 'bg-nuper-blue' : 'hover:bg-nuper-blue'}`}
-                            >
-                                Ana Sayfa
-                            </Link>
-                        </li>
-                        <li className="mb-3">
-                            <Link 
-                                to="/admin/events" 
-                                className={`block px-4 py-2 rounded-lg transition-colors duration-200 ${location.pathname.startsWith('/admin/events') ? 'bg-nuper-blue' : 'hover:bg-nuper-blue'}`}
-                            >
-                                Etkinlik Yönetimi
-                            </Link>
-                        </li>
-                        <li className="mb-3">
-                            <Link 
-                                to="/admin/bulletins" 
-                                className={`block px-4 py-2 rounded-lg transition-colors duration-200 ${location.pathname.startsWith('/admin/bulletins') ? 'bg-nuper-blue' : 'hover:bg-nuper-blue'}`}
-                            >
-                                Bülten Yönetimi
-                            </Link>
-                        </li>
+                        {navItems.map(item => (
+                             <li className="mb-3" key={item.to}>
+                                <Link
+                                    to={item.to}
+                                    className={`block px-4 py-2 rounded-lg transition-colors duration-200 ${item.condition ? 'bg-nuper-blue' : 'hover:bg-nuper-blue'}`}
+                                >
+                                    {item.text}
+                                </Link>
+                            </li>
+                        ))}
                     </ul>
                 </nav>
                 <div className="mt-auto">
-                    <p className="text-sm text-gray-300 mb-2">Hoş Geldiniz, {user.email}</p>
+                    {user && <p className="text-sm text-gray-300 mb-2">Hoş Geldiniz, {user.email}</p>}
                     <button
                         onClick={handleLogout}
                         className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg"
@@ -86,7 +100,6 @@ const AdminPanel = () => {
                 </div>
             </aside>
             <main className="flex-1 p-8 overflow-auto">
-                {/* Alt route'lar (örn: AdminEventsList) burada render edilecek */}
                 <Outlet />
             </main>
         </div>
