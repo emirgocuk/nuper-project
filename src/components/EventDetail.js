@@ -1,14 +1,69 @@
+// src/components/EventDetail.js
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { collection, getDocs, getFirestore, query, where } from 'firebase/firestore';
-import { app } from '../firebaseConfig'; // Firebase uygulamanızın yapılandırması
+import { app } from '../firebaseConfig';
+
+const renderBlock = (block) => {
+    // block veya block.data null ise hiçbir şey render etme
+    if (!block || !block.data) return null;
+
+    switch (block.type) {
+        case 'header':
+            const Tag = `h${block.data.level}`;
+            return <Tag key={block.id} dangerouslySetInnerHTML={{ __html: block.data.text }} />;
+        
+        case 'paragraph':
+            return <p key={block.id} dangerouslySetInnerHTML={{ __html: block.data.text }} />;
+        
+        case 'list':
+            const ListTag = block.data.style === 'ordered' ? 'ol' : 'ul';
+            // items dizisinin var olduğundan emin ol
+            if (!block.data.items || !Array.isArray(block.data.items)) return null;
+            return (
+                <ListTag key={block.id}>
+                    {block.data.items.map((item, index) => (
+                        <li key={index} dangerouslySetInnerHTML={{ __html: item }}></li>
+                    ))}
+                </ListTag>
+            );
+        
+        case 'checklist':
+            // items dizisinin var olduğundan emin ol
+            if (!block.data.items || !Array.isArray(block.data.items)) return null;
+            return (
+                <div key={block.id} className="checklist-container ml-0 pl-0">
+                    {block.data.items.map((item, index) => (
+                        <div key={index} className="flex items-center not-prose my-1">
+                            <input type="checkbox" readOnly checked={item.checked} className="form-checkbox h-4 w-4 text-nuper-blue rounded mr-3 focus:ring-0 cursor-default" />
+                            <span className={item.checked ? 'line-through text-gray-500' : 'text-gray-800'}>{item.text}</span>
+                        </div>
+                    ))}
+                </div>
+            );
+            
+        case 'image':
+            const imageClasses = block.data.stretched 
+                ? 'w-full' 
+                : 'max-w-2xl mx-auto';
+            
+            return (
+                <figure key={block.id} className="not-prose my-6">
+                    <img src={block.data.file.url} alt={block.data.caption || 'İçerik görseli'} className={`${imageClasses} h-auto rounded-lg shadow-md`} />
+                    {block.data.caption && <figcaption className="text-center text-sm text-gray-500 mt-2">{block.data.caption}</figcaption>}
+                </figure>
+            );
+
+        default: 
+            return null;
+    }
+};
 
 const EventDetail = () => {
     const { slug } = useParams();
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
     const db = getFirestore(app);
 
     useEffect(() => {
@@ -16,101 +71,66 @@ const EventDetail = () => {
             setLoading(true);
             setError(null);
             try {
-                console.log(`EventDetail: Fetching event with slug: "${slug}"`);
-
                 const q = query(collection(db, "events"), where("slug", "==", slug));
                 const querySnapshot = await getDocs(q);
-
                 if (!querySnapshot.empty) {
-                    const docSnap = querySnapshot.docs[0];
-                    const data = { id: docSnap.id, ...docSnap.data() };
-                    setEvent(data);
+                    setEvent(querySnapshot.docs[0].data());
                 } else {
-                    console.log(`EventDetail: No event found with slug: "${slug}"`);
                     setError("Etkinlik bulunamadı.");
                 }
             } catch (err) {
-                console.error("EventDetail: Etkinlik çekilirken hata oluştu:", err);
+                console.error("Etkinlik çekilirken hata oluştu:", err);
                 setError("Etkinlik yüklenirken bir sorun oluştu.");
             } finally {
                 setLoading(false);
-                console.log("EventDetail: Loading finished.");
             }
         };
 
-        if (slug) {
-            fetchEvent();
-        } else {
-            setLoading(false);
-            setError("Geçersiz etkinlik URL'si.");
-        }
+        if (slug) fetchEvent();
+
     }, [slug, db]);
 
+    // --- Render öncesi kontrol ---
     if (loading) {
-        return (
-            <div className="pt-16 flex justify-center items-center h-screen">
-                <p className="text-xl text-nuper-blue">Yükleniyor...</p>
-            </div>
-        );
+        return <div className="pt-24 text-center">Yükleniyor...</div>;
     }
-
     if (error) {
-        return (
-            <div className="pt-16 flex justify-center items-center h-screen">
-                <p className="text-xl text-red-600">{error}</p>
-            </div>
-        );
+        return <div className="pt-24 text-center text-red-500">{error}</div>;
     }
-
     if (!event) {
-        return (
-            <div className="pt-16 flex justify-center items-center h-screen">
-                <p className="text-xl text-red-600">Etkinlik detayı görüntülenemiyor.</p>
-            </div>
-        );
+        return <div className="pt-24 text-center">İstenen etkinlik bulunamadı.</div>;
     }
+    // --- Kontrol sonu ---
 
     return (
-        <div className="pt-16 bg-nuper-gray min-h-screen">
-            <div className="max-w-4xl mx-auto px-4 py-8 bg-white rounded-lg shadow-md bulletin-detail-container"> {/* bulletin-detail-container sınıfı EventDetail için de aynı şekilde kullanılacak */}
-                {/* Başlık */}
-                <h1 className="text-4xl md:text-5xl font-heading font-bold text-nuper-blue mb-4 leading-tight bulletin-title">
-                    {event.title}
-                </h1>
+        <div className="pt-24 pb-16 bg-gray-50 min-h-screen">
+            <article className="prose lg:prose-lg xl:prose-xl mx-auto bg-white p-8 md:p-12 rounded-lg shadow-lg">
+                <div className="not-prose mb-4">
+                    <span className="inline-block bg-nuper-blue text-white px-3 py-1 rounded-full text-sm font-semibold">
+                        ETKİNLİK
+                    </span>
+                </div>
+                <h1 className="text-nuper-blue">{event.title}</h1>
+                <div className="lead text-gray-600">
+                    <p><strong>Tarih:</strong> {event.date || 'Belirtilmemiş'}</p>
+                    <p><strong>Konum:</strong> {event.location || 'Belirtilmemiş'}</p>
+                    <p><strong>Organizatör:</strong> {event.organizer || 'Belirtilmemiş'}</p>
+                </div>
+                
+                <hr className="my-8" />
 
-                {/* Tarih ve Yer */}
-                <p className="text-gray-500 text-sm font-sans mb-8">
-                    {event.date || (event.createdAt && new Date(event.createdAt.toDate()).toLocaleDateString('tr-TR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    })) || 'Tarih Bilgisi Yok'}
-                    {event.location && ` - ${event.location}`}
-                </p>
-
-                {/* Görsel Alanı - mainImage kullanıyoruz */}
-                {event.mainImage && (
-                    <div className="bulletin-image-wrapper">
-                        <img
-                            src={event.mainImage}
-                            alt={event.title}
-                            className="w-full h-auto max-h-96 object-cover object-position-top rounded-lg shadow-md mb-8 bulletin-main-image"
-                        />
-                    </div>
+                {event.content && event.content.blocks ? (
+                    event.content.blocks.map(block => renderBlock(block))
+                ) : (
+                    <div dangerouslySetInnerHTML={{ __html: event.content }} />
                 )}
 
-                {/* İçerik - Direkt HTML olarak gösteriyoruz */}
-                {event.content && (
-                    <div className="mb-8 text-gray-800 font-sans leading-relaxed ql-editor-display" dangerouslySetInnerHTML={{ __html: event.content }} />
-                )}
-
-                {/* Tüm Etkinliklere Geri Dön Linki */}
-                <div className="text-center mt-12">
-                    <Link to="/events" className="text-nuper-blue hover:underline font-semibold font-sans">
-                        Tüm Etkinlikleri Görüntüle
+                <div className="mt-12 text-center not-prose">
+                    <Link to="/events" className="text-nuper-blue hover:underline font-semibold">
+                        &larr; Tüm Etkinlikleri Görüntüle
                     </Link>
                 </div>
-            </div>
+            </article>
         </div>
     );
 };

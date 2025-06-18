@@ -6,11 +6,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        // Font isimlerini buraya, tam olarak Google Fonts'tan aldığınız gibi yazmalısınız.
-        // Tırnak işaretlerinin ('') içinde font adını yazın. Eğer font adında boşluk varsa,
-        // hem tek tırnak hem de çift tırnak kullanmalısınız (örn: ['"Playfair Display"', 'serif']).
-        heading: ['"Playfair Display"', 'serif'], // Başlık fontu için (örnek)
-        sans: ['Inter', 'sans-serif'],           // Metin fontu için (örnek)
+        heading: ['"Playfair Display"', 'serif'],
+        sans: ['Inter', 'sans-serif'],
       },
       colors: {
         'nuper-blue': '#1E3A8A',
@@ -20,6 +17,6 @@ module.exports = {
     },
   },
   plugins: [
-    require('@tailwindcss/typography'), // Eklenti burada doğru şekilde import ediliyor
+    require('@tailwindcss/typography'), // Bu satır en önemlisi!
   ],
 };

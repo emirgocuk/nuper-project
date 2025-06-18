@@ -21,9 +21,8 @@ import SpaceHero from './components/SpaceHero';
 import AdminLogin from './components/AdminLogin';
 import AdminPanel from './components/AdminPanel';
 import AdminEventsList from './components/admin/AdminEventsList';
-import AdminEventForm from './components/admin/AdminEventForm';
 import AdminBulletinsList from './components/admin/AdminBulletinsList';
-import AdminBulletinForm from './components/admin/AdminBulletinForm';
+import AdminContentForm from './components/admin/AdminContentForm'; // YENİ IMPORT
 
 
 // --- YARDIMCI VE LAYOUT BİLEŞENLERİ ---
@@ -415,11 +414,11 @@ const App = () => {
                     <Route path="/admin" element={<AdminPanel />}>
                         <Route index element={<div className="pt-8"><h2 className="text-3xl font-heading font-bold text-center text-nuper-dark-blue mb-4">Admin Paneline Hoş Geldiniz!</h2><p className="text-center text-gray-700">Lütfen yukarıdaki menüden bir yönetim seçeneği belirleyin.</p></div>} />
                         <Route path="events" element={<AdminEventsList />} />
-                        <Route path="events/new" element={<AdminEventForm />} />
-                        <Route path="events/edit/:slug" element={<AdminEventForm />} />
+                        <Route path="events/new" element={<AdminContentForm type="event" />} />
+                        <Route path="events/edit/:slug" element={<AdminContentForm type="event" />} />
                         <Route path="bulletins" element={<AdminBulletinsList />} />
-                        <Route path="bulletins/new" element={<AdminBulletinForm />} />
-                        <Route path="bulletins/edit/:slug" element={<AdminBulletinForm />} />
+                        <Route path="bulletins/new" element={<AdminContentForm type="bulletin" />} />
+                        <Route path="bulletins/edit/:slug" element={<AdminContentForm type="bulletin" />} />
                     </Route>
                     <Route path="/admin/login" element={<AdminLogin />} />
                     <Route path="*" element={<div className="pt-16 flex flex-col items-center justify-center min-h-screen bg-gray-100"><h1 className="text-5xl font-bold text-red-600">404</h1><p className="text-xl text-gray-700 mt-4">Sayfa Bulunamadı</p><Link to="/" className="mt-8 text-nuper-blue hover:underline">Ana Sayfaya Dön</Link></div>} />
