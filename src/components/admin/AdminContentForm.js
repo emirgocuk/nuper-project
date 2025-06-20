@@ -13,6 +13,11 @@ import Header from '@editorjs/header';
 import List from '@editorjs/list';
 import ImageTool from '@editorjs/image';
 import Checklist from '@editorjs/checklist';
+// Yeni eklenen araçlar:
+import Quote from '@editorjs/quote';
+import Delimiter from '@editorjs/delimiter';
+import Table from '@editorjs/table';
+import Marker from '@editorjs/marker';
 
 const AdminContentForm = ({ type }) => {
     const { slug } = useParams();
@@ -81,9 +86,46 @@ const AdminContentForm = ({ type }) => {
             const editor = new EditorJS({
                 holder: 'editorjs',
                 tools: {
-                    header: { class: Header, inlineToolbar: true },
-                    list: { class: List, inlineToolbar: true },
-                    checklist: { class: Checklist, inlineToolbar: true },
+                    header: {
+                        class: Header,
+                        inlineToolbar: true,
+                        config: {
+                            placeholder: 'Başlık Girin',
+                            levels: [1, 2, 3, 4],
+                            defaultLevel: 2
+                        }
+                    },
+                    list: { 
+                        class: List, 
+                        inlineToolbar: true 
+                    },
+                    // Sadece bir adet checklist aracı bırakıldı!
+                    checklist: { 
+                        class: Checklist, 
+                        inlineToolbar: true 
+                    },
+                    quote: {
+                        class: Quote,
+                        inlineToolbar: true,
+                        shortcut: 'CMD+SHIFT+O',
+                        config: {
+                            quotePlaceholder: 'Alıntı metnini girin',
+                            captionPlaceholder: 'Alıntıyı yapanı girin',
+                        },
+                    },
+                    table: {
+                        class: Table,
+                        inlineToolbar: true,
+                        config: {
+                            rows: 2,
+                            cols: 3,
+                        },
+                    },
+                    marker: {
+                        class: Marker,
+                        shortcut: 'CMD+SHIFT+M',
+                    },
+                    delimiter: Delimiter,
                     image: {
                         class: ImageTool,
                         config: { uploader: {

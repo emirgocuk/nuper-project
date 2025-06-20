@@ -4,22 +4,18 @@ import { useParams, Link } from 'react-router-dom';
 import { collection, getDocs, getFirestore, query, where } from 'firebase/firestore';
 import { app } from '../firebaseConfig';
 
-// Editor.js bloklarını render edecek fonksiyon
+// GÜNCELLENMİŞ RENDERBLOCK FONKSİYONU
 const renderBlock = (block) => {
-    // block veya block.data null ise hiçbir şey render etme
     if (!block || !block.data) return null;
 
     switch (block.type) {
         case 'header':
             const Tag = `h${block.data.level}`;
             return <Tag key={block.id} dangerouslySetInnerHTML={{ __html: block.data.text }} />;
-        
         case 'paragraph':
             return <p key={block.id} dangerouslySetInnerHTML={{ __html: block.data.text }} />;
-        
         case 'list':
             const ListTag = block.data.style === 'ordered' ? 'ol' : 'ul';
-            // items dizisinin var olduğundan emin ol
             if (!block.data.items || !Array.isArray(block.data.items)) return null;
             return (
                 <ListTag key={block.id}>
@@ -28,33 +24,52 @@ const renderBlock = (block) => {
                     ))}
                 </ListTag>
             );
-        
         case 'checklist':
-            // items dizisinin var olduğundan emin ol
             if (!block.data.items || !Array.isArray(block.data.items)) return null;
             return (
                 <div key={block.id} className="checklist-container ml-0 pl-0">
                     {block.data.items.map((item, index) => (
                         <div key={index} className="flex items-center not-prose my-1">
                             <input type="checkbox" readOnly checked={item.checked} className="form-checkbox h-4 w-4 text-nuper-blue rounded mr-3 focus:ring-0 cursor-default" />
-                            <span className={item.checked ? 'line-through text-gray-500' : 'text-gray-800'}>{item.text}</span>
+                            <span className={item.checked ? 'line-through text-gray-500' : 'text-gray-800'} dangerouslySetInnerHTML={{ __html: item.text }}></span>
                         </div>
                     ))}
                 </div>
             );
-            
         case 'image':
-            const imageClasses = block.data.stretched 
-                ? 'w-full' 
-                : 'max-w-2xl mx-auto';
-            
+            const imageClasses = block.data.stretched ? 'w-full' : 'max-w-2xl mx-auto';
             return (
                 <figure key={block.id} className="not-prose my-6">
-                    <img src={block.data.file.url} alt={block.data.caption || 'İçerik görseli'} className={`${imageClasses} h-auto rounded-lg shadow-md`} />
+                    <img src={block.data.file.url} alt={block.data.caption || 'İçerik görseli'} className={`${imageClasses} max-w-full h-auto rounded-lg shadow-md`} />
                     {block.data.caption && <figcaption className="text-center text-sm text-gray-500 mt-2">{block.data.caption}</figcaption>}
                 </figure>
             );
-
+        case 'quote':
+            return (
+                <blockquote key={block.id} className="not-prose border-l-4 border-nuper-blue pl-4 italic my-4">
+                    <p dangerouslySetInnerHTML={{ __html: block.data.text }}></p>
+                    {block.data.caption && <footer className="text-sm text-right mt-2">{block.data.caption}</footer>}
+                </blockquote>
+            );
+        case 'table':
+            if (!block.data.content || !Array.isArray(block.data.content)) return null;
+            return (
+                <div key={block.id} className="not-prose overflow-x-auto my-6">
+                    <table className="min-w-full border border-gray-300">
+                        <tbody>
+                            {block.data.content.map((row, rowIndex) => (
+                                <tr key={rowIndex} className="border-b">
+                                    {row.map((cell, cellIndex) => (
+                                        <td key={cellIndex} className="p-2 border-r" dangerouslySetInnerHTML={{ __html: cell }}></td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        case 'delimiter':
+            return <hr key={block.id} className="my-8 border-gray-300" />;
         default: 
             return null;
     }
@@ -80,18 +95,14 @@ const BulletinDetail = () => {
                     setError("Bülten bulunamadı.");
                 }
             } catch (err) {
-                console.error("Bülten çekilirken hata oluştu:", err);
                 setError("Bülten yüklenirken bir sorun oluştu.");
             } finally {
                 setLoading(false);
             }
         };
-
         if (slug) fetchBulletin();
-        
     }, [slug, db]);
-    
-    // --- Render öncesi kontrol ---
+
     if (loading) {
         return <div className="pt-24 text-center">Yükleniyor...</div>;
     }
@@ -101,23 +112,29 @@ const BulletinDetail = () => {
     if (!bulletin) {
         return <div className="pt-24 text-center">İstenen bülten bulunamadı.</div>;
     }
-    // --- Kontrol sonu ---
 
     return (
         <div className="pt-24 pb-16 bg-gray-50 min-h-screen">
             <article className="prose lg:prose-lg xl:prose-xl mx-auto bg-white p-8 md:p-12 rounded-lg shadow-lg">
-                <h1 className="text-nuper-blue">{bulletin.title}</h1>
-                <p className="lead text-gray-600">
-                    {bulletin.date} {bulletin.publisher && `- ${bulletin.publisher}`}
-                </p>
-
-                {/* İçerik render alanı */}
+                <div className="not-prose mb-4">
+                    <span className="inline-block bg-nuper-blue text-white px-2 py-1 rounded-full text-xs font-semibold">
+                        BÜLTEN
+                    </span>
+                </div>
+                <h1 className="font-heading text-4xl text-nuper-blue">{bulletin.title}</h1>
+                {/* Tarih ve yayınlayan kısmı etkinlikteki gibi küçültüldü */}
+                <div className="not-prose flex justify-between items-start my-6">
+                    <div>
+                        <p className="text-lg font-semibold text-gray-800">{bulletin.date || 'Tarih Belirtilmemiş'}</p>
+                        <p className="text-sm text-gray-500">{bulletin.publisher || 'Yayınlayan Belirtilmemiş'}</p>
+                    </div>
+                </div>
+                <hr className="my-8" />
                 {bulletin.content && bulletin.content.blocks ? (
                     bulletin.content.blocks.map(block => renderBlock(block))
                 ) : (
                     <div dangerouslySetInnerHTML={{ __html: bulletin.content }} />
                 )}
-
                 <div className="mt-12 text-center not-prose">
                     <Link to="/bulletins" className="text-nuper-blue hover:underline font-semibold">
                         &larr; Tüm Bültenleri Görüntüle

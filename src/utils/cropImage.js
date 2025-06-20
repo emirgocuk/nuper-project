@@ -37,11 +37,25 @@ export default async function getCroppedImg(
 ) {
     // Girdi kontrolleri
     if (!imageSrc || typeof imageSrc !== 'string') {
-        throw new Error('Geçersiz görsel URL\'si: imageSrc bir string olmalı.');
+        throw new Error("Geçersiz görsel URL'si: imageSrc bir string olmalı.");
     }
-    if (!pixelCrop || !pixelCrop.width || !pixelCrop.height || !pixelCrop.x || !pixelCrop.y) {
+
+    // --- DÜZELTİLMİŞ KONTROL BLOGU ---
+    if (
+        !pixelCrop ||
+        typeof pixelCrop.width !== 'number' ||
+        typeof pixelCrop.height !== 'number' ||
+        typeof pixelCrop.x !== 'number' ||
+        typeof pixelCrop.y !== 'number'
+    ) {
         throw new Error('Geçersiz kırpma alanı: pixelCrop nesnesi eksik veya hatalı.');
     }
+
+    // Kırpma alanının genişliği veya yüksekliği sıfır olamaz.
+    if (pixelCrop.width === 0 || pixelCrop.height === 0) {
+        throw new Error('Kırpma alanının genişliği ve yüksekliği sıfırdan büyük olmalıdır.');
+    }
+    // --- DÜZELTME SONU ---
 
     try {
         const image = await createImage(imageSrc);

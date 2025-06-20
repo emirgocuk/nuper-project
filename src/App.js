@@ -198,6 +198,76 @@ const MainLayout = ({ setExpandedEventId }) => {
 };
 
 
+const renderBlock = (block) => {
+    if (!block || !block.data) return null;
+
+    switch (block.type) {
+        case 'header':
+            const Tag = `h${block.data.level}`;
+            return <Tag key={block.id} dangerouslySetInnerHTML={{ __html: block.data.text }} />;
+        case 'paragraph':
+            return <p key={block.id} dangerouslySetInnerHTML={{ __html: block.data.text }} />;
+        case 'list':
+            const ListTag = block.data.style === 'ordered' ? 'ol' : 'ul';
+            if (!block.data.items || !Array.isArray(block.data.items)) return null;
+            return (
+                <ListTag key={block.id}>
+                    {block.data.items.map((item, index) => (
+                        <li key={index} dangerouslySetInnerHTML={{ __html: item }}></li>
+                    ))}
+                </ListTag>
+            );
+        case 'checklist':
+            if (!block.data.items || !Array.isArray(block.data.items)) return null;
+            return (
+                <div key={block.id} className="checklist-container ml-0 pl-0">
+                    {block.data.items.map((item, index) => (
+                        <div key={index} className="flex items-center not-prose my-1">
+                            <input type="checkbox" readOnly checked={item.checked} className="form-checkbox h-4 w-4 text-nuper-blue rounded mr-3 focus:ring-0 cursor-default" />
+                            <span className={item.checked ? 'line-through text-gray-500' : 'text-gray-800'} dangerouslySetInnerHTML={{ __html: item.text }}></span>
+                        </div>
+                    ))}
+                </div>
+            );
+        case 'image':
+            const imageClasses = block.data.stretched ? 'w-full' : 'max-w-2xl mx-auto';
+            return (
+                <figure key={block.id} className="not-prose my-6">
+                    <img src={block.data.file.url} alt={block.data.caption || 'İçerik görseli'} className={`${imageClasses} max-w-full h-auto rounded-lg shadow-md`} />
+                    {block.data.caption && <figcaption className="text-center text-sm text-gray-500 mt-2">{block.data.caption}</figcaption>}
+                </figure>
+            );
+        case 'quote':
+            return (
+                <blockquote key={block.id} className="not-prose border-l-4 border-nuper-blue pl-4 italic my-4">
+                    <p dangerouslySetInnerHTML={{ __html: block.data.text }}></p>
+                    {block.data.caption && <footer className="text-sm text-right mt-2">{block.data.caption}</footer>}
+                </blockquote>
+            );
+        case 'table':
+            if (!block.data.content || !Array.isArray(block.data.content)) return null;
+            return (
+                <div key={block.id} className="not-prose overflow-x-auto my-6">
+                    <table className="min-w-full border border-gray-300">
+                        <tbody>
+                            {block.data.content.map((row, rowIndex) => (
+                                <tr key={rowIndex} className="border-b">
+                                    {row.map((cell, cellIndex) => (
+                                        <td key={cellIndex} className="p-2 border-r" dangerouslySetInnerHTML={{ __html: cell }}></td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        case 'delimiter':
+            return <hr key={block.id} className="my-8 border-gray-300" />;
+        default: 
+            return null;
+    }
+};
+
 const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
     const navigate = useNavigate();
     const isDesktop = useMediaQuery('(min-width: 1024px)');
@@ -279,11 +349,29 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
                             </div>
                             <div className="p-6 flex flex-col flex-1 overflow-y-auto">
                                 <h3 className="text-2xl font-heading font-bold text-nuper-blue mb-2 leading-tight">{selectedEvent.title}</h3>
-                                <div className="mb-4 text-sm text-gray-500"><p>{selectedEvent.organizer}</p><p>{selectedEvent.date}</p></div>
-                                <p className="text-gray-800 text-base leading-relaxed mb-4">{selectedEvent.description}</p>
+                                <div className="mb-4 text-sm text-gray-500">
+                                    <p>{selectedEvent.organizer}</p>
+                                    <p>{selectedEvent.date}</p>
+                                </div>
+                                {/* --- YENİ KOD --- */}
+                                <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed mb-4">
+                                    {selectedEvent.content && selectedEvent.content.blocks ? (
+                                        selectedEvent.content.blocks.map(block => renderBlock(block))
+                                    ) : (
+                                        <p>{selectedEvent.description}</p>
+                                    )}
+                                </div>
+                                {/* --- YENİ KOD BİTİŞ --- */}
                                 <div className="mt-auto pt-4 border-t flex justify-between items-center text-sm">
                                     <Link to={`/event/${selectedEvent.slug}`} className="font-semibold text-nuper-blue hover:underline">Detaylı Görüntüle &rarr;</Link>
-                                    {selectedEvent.location && (<div className="flex items-center gap-1 text-teal-600"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg><span className="font-medium">{selectedEvent.location}</span></div>)}
+                                    {selectedEvent.location && (
+                                        <div className="flex items-center gap-1 text-teal-600">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                            </svg>
+                                            <span className="font-medium">{selectedEvent.location}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </motion.div>
@@ -298,8 +386,8 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
                     <div className="relative flex items-center justify-center min-h-[26rem] overflow-hidden">
                         {canCycle && (
                             <>
-                                <button onClick={() => paginate(-1)} className="absolute left-0 -translate-x-4 md:-translate-x-8 top-1/2 -translate-y-1/2 bg-white text-nuper-blue w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10 hover:bg-gray-100 transition-colors">&lt;</button>
-                                <button onClick={() => paginate(1)} className="absolute right-0 translate-x-4 md:translate-x-8 top-1/2 -translate-y-1/2 bg-white text-nuper-blue w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10 hover:bg-gray-100 transition-colors">&gt;</button>
+                                <button onClick={() => paginate(-1)} className="absolute left-0 -translate-x-0 md:-translate-x-0 top-1/2 -translate-y-1/2 bg-white text-nuper-blue w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10 hover:bg-gray-100 transition-colors">&lt;</button>
+                                <button onClick={() => paginate(1)} className="absolute right-0 translate-x-0 md:translate-x-0 top-1/2 -translate-y-1/2 bg-white text-nuper-blue w-10 h-10 rounded-full flex items-center justify-center shadow-md z-10 hover:bg-gray-100 transition-colors">&gt;</button>
                             </>
                         )}
                         <AnimatePresence initial={false} custom={direction}>
