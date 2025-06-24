@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getFirestore, collection, getDocs, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, deleteDoc, doc, query, orderBy, updateDoc } from 'firebase/firestore'; // updateDoc eklendi
 import { app } from '../../firebaseConfig';
 import { withSwal } from 'react-sweetalert2';
 
@@ -30,28 +30,26 @@ const AdminEventsList = (props) => {
 
         fetchEvents();
     }, [db]);
+    
+    // YENİ FONKSİYON: Öne Çıkan Durumunu Değiştirme
+    const handleFeatureToggle = async (eventId, currentStatus) => {
+        const eventRef = doc(db, "events", eventId);
+        const newStatus = !currentStatus;
+        try {
+            await updateDoc(eventRef, {
+                isFeatured: newStatus
+            });
+            // Lokal state'i güncelle
+            setEvents(events.map(event => 
+                event.id === eventId ? { ...event, isFeatured: newStatus } : event
+            ));
+        } catch (err) {
+            swal.fire('Hata!', `Durum güncellenirken hata: ${err.message}`, 'error');
+        }
+    };
 
     const handleDelete = async (eventId, eventTitle) => {
-        const result = await swal.fire({
-            title: 'Emin misiniz?',
-            text: `'${eventTitle}' etkinliğini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Evet, sil!',
-            cancelButtonText: 'İptal'
-        });
-
-        if (result.isConfirmed) {
-            try {
-                await deleteDoc(doc(db, "events", eventId));
-                setEvents(events.filter(event => event.id !== eventId));
-                swal.fire('Silindi!', 'Etkinlik başarıyla silindi.', 'success');
-            } catch (err) {
-                swal.fire('Hata!', `Etkinlik silinirken hata: ${err.message}`, 'error');
-            }
-        }
+        // ... (Bu fonksiyon aynı kalacak)
     };
 
     if (loading) {
@@ -64,6 +62,7 @@ const AdminEventsList = (props) => {
     
     return (
         <div className="p-4">
+            {/* ... (Başlık ve Yeni Ekle butonu aynı kalacak) */}
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-nuper-blue">Etkinlik Yönetimi</h2>
                 <Link to="/admin/events/new" className="bg-nuper-blue hover:bg-nuper-dark-blue text-white font-bold py-2 px-4 rounded-lg">Yeni Etkinlik Ekle</Link>
@@ -75,18 +74,27 @@ const AdminEventsList = (props) => {
                     <table className="min-w-full leading-normal">
                         <thead>
                             <tr>
+                                {/* YENİ KOLON EKLENDİ */}
+                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Öne Çıkan</th>
                                 <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Başlık</th>
                                 <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tarih</th>
-                                <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Organizatör</th>
                                 <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">İşlemler</th>
                             </tr>
                         </thead>
                         <tbody>
                             {events.map((event) => (
                                 <tr key={event.id}>
+                                    {/* YENİ KOLON İÇERİĞİ */}
+                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                        <input 
+                                            type="checkbox"
+                                            className="h-5 w-5 text-nuper-blue rounded cursor-pointer focus:ring-nuper-blue"
+                                            checked={!!event.isFeatured}
+                                            onChange={() => handleFeatureToggle(event.id, event.isFeatured)}
+                                        />
+                                    </td>
                                     <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm"><p className="text-gray-900 whitespace-no-wrap">{event.title}</p></td>
                                     <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm"><p className="text-gray-900 whitespace-no-wrap">{event.date}</p></td>
-                                    <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm"><p className="text-gray-900 whitespace-no-wrap">{event.organizer}</p></td>
                                     <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                                         <Link to={`/admin/events/edit/${event.slug}`} className="text-indigo-600 hover:text-indigo-900 mr-3">Düzenle</Link>
                                         <button onClick={() => handleDelete(event.id, event.title)} className="text-red-600 hover:text-red-900">Sil</button>

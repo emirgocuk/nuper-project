@@ -268,7 +268,7 @@ const renderBlock = (block) => {
     }
 };
 
-const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
+const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bulletins, loadingBulletins }) => {
     const navigate = useNavigate();
     const isDesktop = useMediaQuery('(min-width: 1024px)');
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -438,6 +438,45 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
                     </div>
                 </div>
             </section>
+
+            {/* === YENİ BÖLÜM: EN SON BÜLTENLER === */}
+            <section id="bulletins-home" className="bg-white py-16">
+                <div className="max-w-6xl mx-auto px-4">
+                    <h2 className="text-3xl font-heading font-bold text-center mb-4 text-nuper-blue">En Son Bültenler</h2>
+                    <p className="text-center text-lg text-gray-600 mb-12">Sektörlerden haberler, kariyer ipuçları ve ilham verici içerikler.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {loadingBulletins ? (
+                            <p className="text-center col-span-3">Yükleniyor...</p>
+                        ) : (
+                            bulletins.slice(0, 3).map((bulletin) => (
+                                <Link to={`/bulletin/${bulletin.slug}`} key={bulletin.id} className="block group">
+                                    <div className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col overflow-hidden h-full">
+                                        <div className="w-full h-40 bg-gray-200 overflow-hidden">
+                                            {bulletin.cardImage ? (
+                                                <img src={bulletin.cardImage} alt={bulletin.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                            ) : <div className="w-full h-full bg-gray-300"></div>}
+                                        </div>
+                                        <div className="p-4 flex flex-col flex-grow">
+                                            <h3 className="text-lg font-heading font-semibold text-nuper-dark-blue mb-1 group-hover:text-nuper-blue transition-colors line-clamp-2" title={bulletin.title}>
+                                                {bulletin.title}
+                                            </h3>
+                                            <p className="text-sm text-gray-500 mb-2">{bulletin.date}</p>
+                                            <p className="text-sm text-gray-700 flex-grow line-clamp-3">
+                                                {bulletin.description || bulletin.publisher}
+                                            </p>
+                                            <div className="mt-auto pt-2 text-right">
+                                                <span className="text-sm font-semibold text-nuper-blue opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    Devamını Oku &rarr;
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Link>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </section>
         </>
     );
 };
@@ -446,10 +485,13 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId }) => {
 const App = () => {
     const [expandedEventId, setExpandedEventId] = useState(null);
     const [events, setEvents] = useState([]);
+    const [bulletins, setBulletins] = useState([]); // <-- YENİ STATE
     const [loadingEvents, setLoadingEvents] = useState(true);
+    const [loadingBulletins, setLoadingBulletins] = useState(true); // <-- YENİ STATE
     const db = getFirestore(app);
 
     useEffect(() => {
+        // Öne çıkan etkinlikleri çekme
         const fetchEvents = async () => {
             try {
                 const q = query(collection(db, "events"), orderBy("createdAt", "desc"));
@@ -465,7 +507,26 @@ const App = () => {
                 setLoadingEvents(false);
             }
         };
+
+        // YENİ: Son bültenleri çekme
+        const fetchBulletins = async () => {
+            try {
+                const q = query(collection(db, "bulletins"), orderBy("createdAt", "desc"));
+                const querySnapshot = await getDocs(q);
+                const bulletinsData = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                setBulletins(bulletinsData);
+            } catch (error) {
+                console.error("Ana sayfadaki bültenler çekilirken hata oluştu:", error);
+            } finally {
+                setLoadingBulletins(false);
+            }
+        };
+
         fetchEvents();
+        fetchBulletins();
     }, [db]);
 
     return (
@@ -480,6 +541,8 @@ const App = () => {
                                 loading={loadingEvents}
                                 expandedEventId={expandedEventId}
                                 setExpandedEventId={setExpandedEventId}
+                                bulletins={bulletins} // <-- YENİ PROP
+                                loadingBulletins={loadingBulletins} // <-- YENİ PROP
                             />
                         } />
                         <Route path="/about" element={<About />} />
