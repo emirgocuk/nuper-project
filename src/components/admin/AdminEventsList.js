@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getFirestore, collection, getDocs, deleteDoc, doc, query, orderBy, updateDoc } from 'firebase/firestore'; // updateDoc eklendi
+import { getFirestore, collection, getDocs, doc, query, orderBy, updateDoc } from 'firebase/firestore'; // updateDoc eklendi
 import { app } from '../../firebaseConfig';
 import { withSwal } from 'react-sweetalert2';
 

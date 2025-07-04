@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, doc, updateDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { app } from '../../firebaseConfig';
 
 // Gerekli tüm araçları import ediyoruz
@@ -76,7 +76,8 @@ const AdminContentForm = ({ type }) => {
             setLoading(false);
         };
         fetchContent();
-    }, [slug, type, db]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [slug, type, db, collectionName, initialFormState, pageTitle]);
 
     // --- EditorJS Başlatma ve Sonlandırma Effect'i ---
     useEffect(() => {
@@ -99,7 +100,6 @@ const AdminContentForm = ({ type }) => {
                         class: List, 
                         inlineToolbar: true 
                     },
-                    // Sadece bir adet checklist aracı bırakıldı!
                     checklist: { 
                         class: Checklist, 
                         inlineToolbar: true 
@@ -155,7 +155,8 @@ const AdminContentForm = ({ type }) => {
                 editorInstanceRef.current = null;
             }
         };
-    }, [initialContent]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialContent, IMGBB_API_KEY]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;

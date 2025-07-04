@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation,
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 import { SpeedInsights } from "@vercel/speed-insights/react"
+import DOMPurify from 'dompurify';
 
 // Firebase importları
 import { app } from './firebaseConfig';
@@ -200,20 +201,21 @@ const MainLayout = ({ setExpandedEventId }) => {
 
 const renderBlock = (block) => {
     if (!block || !block.data) return null;
+    const sanitize = (html) => DOMPurify.sanitize(html);
 
     switch (block.type) {
         case 'header':
             const Tag = `h${block.data.level}`;
-            return <Tag key={block.id} dangerouslySetInnerHTML={{ __html: block.data.text }} />;
+            return <Tag key={block.id} dangerouslySetInnerHTML={{ __html: sanitize(block.data.text) }} />;
         case 'paragraph':
-            return <p key={block.id} dangerouslySetInnerHTML={{ __html: block.data.text }} />;
+            return <p key={block.id} dangerouslySetInnerHTML={{ __html: sanitize(block.data.text) }} />;
         case 'list':
             const ListTag = block.data.style === 'ordered' ? 'ol' : 'ul';
             if (!block.data.items || !Array.isArray(block.data.items)) return null;
             return (
                 <ListTag key={block.id}>
                     {block.data.items.map((item, index) => (
-                        <li key={index} dangerouslySetInnerHTML={{ __html: item }}></li>
+                        <li key={index} dangerouslySetInnerHTML={{ __html: sanitize(item) }}></li>
                     ))}
                 </ListTag>
             );
@@ -224,7 +226,7 @@ const renderBlock = (block) => {
                     {block.data.items.map((item, index) => (
                         <div key={index} className="flex items-center not-prose my-1">
                             <input type="checkbox" readOnly checked={item.checked} className="form-checkbox h-4 w-4 text-nuper-blue rounded mr-3 focus:ring-0 cursor-default" />
-                            <span className={item.checked ? 'line-through text-gray-500' : 'text-gray-800'} dangerouslySetInnerHTML={{ __html: item.text }}></span>
+                            <span className={item.checked ? 'line-through text-gray-500' : 'text-gray-800'} dangerouslySetInnerHTML={{ __html: sanitize(item.text) }}></span>
                         </div>
                     ))}
                 </div>
@@ -234,14 +236,14 @@ const renderBlock = (block) => {
             return (
                 <figure key={block.id} className="not-prose my-6">
                     <img src={block.data.file.url} alt={block.data.caption || 'İçerik görseli'} className={`${imageClasses} max-w-full h-auto rounded-lg shadow-md`} />
-                    {block.data.caption && <figcaption className="text-center text-sm text-gray-500 mt-2">{block.data.caption}</figcaption>}
+                    {block.data.caption && <figcaption className="text-center text-sm text-gray-500 mt-2" dangerouslySetInnerHTML={{ __html: sanitize(block.data.caption) }}></figcaption>}
                 </figure>
             );
         case 'quote':
             return (
                 <blockquote key={block.id} className="not-prose border-l-4 border-nuper-blue pl-4 italic my-4">
-                    <p dangerouslySetInnerHTML={{ __html: block.data.text }}></p>
-                    {block.data.caption && <footer className="text-sm text-right mt-2">{block.data.caption}</footer>}
+                    <p dangerouslySetInnerHTML={{ __html: sanitize(block.data.text) }}></p>
+                    {block.data.caption && <footer className="text-sm text-right mt-2" dangerouslySetInnerHTML={{ __html: sanitize(block.data.caption) }}></footer>}
                 </blockquote>
             );
         case 'table':
@@ -253,7 +255,7 @@ const renderBlock = (block) => {
                             {block.data.content.map((row, rowIndex) => (
                                 <tr key={rowIndex} className="border-b">
                                     {row.map((cell, cellIndex) => (
-                                        <td key={cellIndex} className="p-2 border-r" dangerouslySetInnerHTML={{ __html: cell }}></td>
+                                        <td key={cellIndex} className="p-2 border-r" dangerouslySetInnerHTML={{ __html: sanitize(cell) }}></td>
                                     ))}
                                 </tr>
                             ))}
