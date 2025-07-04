@@ -88,17 +88,15 @@ const SpaceHero = () => {
 
         // --- Scene, Camera, and Renderer Setup ---
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(45, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 15, 90);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
+        renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         currentMount.appendChild(renderer.domElement);
 
-        // Set scene background to black
-        // scene.background = new THREE.Color(0x000000); // Bunu kaldırın veya yorum satırı yapın
-        scene.background = null; // Şeffaf yapar
+        scene.background = null;
 
         // --- Lighting ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -106,11 +104,11 @@ const SpaceHero = () => {
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
         directionalLight.position.set(10, 20, 30);
         scene.add(directionalLight);
-        
+
         // --- Planet and Rings Group ---
         const planetGroup = new THREE.Group();
         scene.add(planetGroup);
-        
+
         // The Planet
         const planetGeometry = new THREE.SphereGeometry(15, 64, 64);
         const planetMaterial = new THREE.MeshStandardMaterial({
@@ -119,22 +117,24 @@ const SpaceHero = () => {
             roughness: 0.8
         });
         const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+
+        planetGroup.position.x = 30; // Tüm gezegen ve halkaları sağa kaydır
         planetGroup.add(planet);
 
         // --- Ring 1 (The original) ---
         const ring1Group = new THREE.Group();
         planetGroup.add(ring1Group);
-        const ring1Geometry = new THREE.RingGeometry(22, 23, 128); 
+        const ring1Geometry = new THREE.RingGeometry(22, 23, 128);
         const ring1Material = new THREE.MeshBasicMaterial({
             map: createRingTexture(), side: THREE.DoubleSide, transparent: true, blending: THREE.AdditiveBlending,
         });
         const ring1 = new THREE.Mesh(ring1Geometry, ring1Material);
         ring1.rotation.x = Math.PI * 0.5;
         ring1Group.add(ring1);
-        
+
         const stars1 = createStarField(22.5, 200);
         ring1Group.add(stars1);
-        
+
         // --- Ring 2 (New Inner Ring) ---
         const ring2Group = new THREE.Group();
         planetGroup.add(ring2Group);
@@ -143,10 +143,10 @@ const SpaceHero = () => {
         ring2.rotation.x = Math.PI * 0.5;
         ring2.rotation.z = Math.PI * 0.1;
         ring2Group.add(ring2);
-        
+
         const stars2 = createStarField(18.5, 150);
         ring2Group.add(stars2);
-        
+
         // --- Ring 3 (New Outer Ring) ---
         const ring3Group = new THREE.Group();
         planetGroup.add(ring3Group);
@@ -155,16 +155,24 @@ const SpaceHero = () => {
         ring3.rotation.x = Math.PI * 0.5;
         ring3.rotation.y = Math.PI * 0.2;
         ring3Group.add(ring3);
-        
+
         const stars3 = createStarField(26.5, 250);
         ring3Group.add(stars3);
 
-
         // --- Floating Particles (background nebula) ---
-        const particlesCount = 3000;
+        const particlesCount = 6000; // Daha fazla partikül
         const positions = new Float32Array(particlesCount * 3);
-        for(let i = 0; i < particlesCount * 3; i++) {
-            positions[i] = (Math.random() - 0.5) * 300;
+        for(let i = 0; i < particlesCount; i++) {
+            // Tüm sayfaya yaymak için büyük bir küreye dağıt
+            const phi = Math.acos(2 * Math.random() - 1);
+            const theta = 2 * Math.PI * Math.random();
+            const r = 200 + Math.random() * 400; // 200-600 arası uzaklık
+            const x = r * Math.sin(phi) * Math.cos(theta);
+            const y = r * Math.sin(phi) * Math.sin(theta);
+            const z = r * Math.cos(phi);
+            positions[i * 3] = x;
+            positions[i * 3 + 1] = y;
+            positions[i * 3 + 2] = z;
         }
         const particlesGeometry = new THREE.BufferGeometry();
         particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -181,28 +189,22 @@ const SpaceHero = () => {
             animationId = requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // Planet and base ring rotation
             planetGroup.rotation.x = elapsedTime * 0.05;
             planetGroup.rotation.y = elapsedTime * 0.1;
-            
-            // Faster, independent rotation for new rings
             ring2Group.rotation.y = elapsedTime * 0.15;
             ring3Group.rotation.y = elapsedTime * -0.12;
-
             particleSystem.rotation.y = elapsedTime * 0.02;
 
-            // Camera is now static, looking at the center
             camera.lookAt(scene.position);
-            
             renderer.render(scene, camera);
         };
         animate();
-        
+
         // --- Handle Window Resize ---
         const handleResize = () => {
             if (mountRef.current) {
-                const width = mountRef.current.clientWidth;
-                const height = mountRef.current.clientHeight;
+                const width = window.innerWidth;
+                const height = window.innerHeight;
                 camera.aspect = width / height;
                 camera.updateProjectionMatrix();
                 renderer.setSize(width, height);
@@ -213,15 +215,14 @@ const SpaceHero = () => {
         // --- Cleanup on Component Unmount ---
         return () => {
             cancelAnimationFrame(animationId);
-            // Removed mousemove event listener cleanup
             if (currentMount && renderer.domElement) currentMount.removeChild(renderer.domElement);
+            window.removeEventListener('resize', handleResize);
         };
     }, []);
 
     return (
-        <div className="relative h-screen w-full overflow-hidden"> {/* bg-black kaldırıldı */}
+        <div className="fixed inset-0 z-0 w-full h-full overflow-hidden pointer-events-none">
             <div ref={mountRef} className="absolute top-0 left-0 w-full h-full" />
-            {/* ...gerekirse diğer içerikler... */}
         </div>
     );
 };

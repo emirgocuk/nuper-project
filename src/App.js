@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 import { SpeedInsights } from "@vercel/speed-insights/react"
 import DOMPurify from 'dompurify';
+import * as THREE from 'three';
 
 // Firebase importları
 import { app } from './firebaseConfig';
@@ -23,8 +24,7 @@ import AdminLogin from './components/AdminLogin';
 import AdminPanel from './components/AdminPanel';
 import AdminEventsList from './components/admin/AdminEventsList';
 import AdminBulletinsList from './components/admin/AdminBulletinsList';
-import AdminContentForm from './components/admin/AdminContentForm'; // YENİ IMPORT
-
+import AdminContentForm from './components/admin/AdminContentForm';
 
 // --- YARDIMCI VE LAYOUT BİLEŞENLERİ ---
 
@@ -270,6 +270,65 @@ const renderBlock = (block) => {
     }
 };
 
+const Starfield = () => {
+    const mountRef = useRef(null);
+
+    useEffect(() => {
+        const currentMount = mountRef.current;
+        if (!currentMount) return;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+        camera.position.z = 1;
+        
+        const renderer = new THREE.WebGLRenderer({ alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        currentMount.appendChild(renderer.domElement);
+        
+        const particlesCount = 5000;
+        const positions = new Float32Array(particlesCount * 3);
+        for(let i = 0; i < particlesCount * 3; i++) {
+            positions[i] = (Math.random() - 0.5) * 800;
+        }
+        
+        const particlesGeometry = new THREE.BufferGeometry();
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const particlesMaterial = new THREE.PointsMaterial({
+            color: 0xffffff, size: 0.2, transparent: true, blending: THREE.AdditiveBlending, opacity: 0.5
+        });
+        const particleSystem = new THREE.Points(particlesGeometry, particlesMaterial);
+        scene.add(particleSystem);
+
+        let animationId;
+        const clock = new THREE.Clock();
+        const animate = () => {
+            animationId = requestAnimationFrame(animate);
+            const elapsedTime = clock.getElapsedTime();
+            particleSystem.rotation.y = elapsedTime * 0.02;
+            renderer.render(scene, camera);
+        };
+        animate();
+
+        const handleResize = () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        };
+        window.addEventListener('resize', handleResize);
+
+        return () => {
+            cancelAnimationFrame(animationId);
+            window.removeEventListener('resize', handleResize);
+            if (currentMount && renderer.domElement) {
+                currentMount.removeChild(renderer.domElement);
+            }
+        };
+    }, []);
+
+    return <div ref={mountRef} className="absolute inset-0 w-full h-full -z-10" />;
+}
+
 const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bulletins, loadingBulletins }) => {
     const navigate = useNavigate();
     const isDesktop = useMediaQuery('(min-width: 1024px)');
@@ -293,12 +352,11 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bullet
             return nextIndex;
         });
     }, [canCycle, totalEvents]);
-
-    // Görüntülenecek olayları hesaplayan mantık
+    
     const visibleEvents = [];
     if (!loading && totalEvents > 0) {
         for (let i = 0; i < cardsPerSet; i++) {
-            if (i >= totalEvents) break; // <-- Hatalıydı, şimdi düzeltildi (if parantez içinde)
+            if (i >= totalEvents) break;
             const eventIndex = (currentIndex + i) % totalEvents;
             visibleEvents.push(events[eventIndex]);
         }
@@ -307,8 +365,7 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bullet
     const handleCardClick = (event) => setExpandedEventId(event.slug);
     const handleCloseExpanded = (e) => { e.stopPropagation(); setExpandedEventId(null); };
     const selectedEvent = events.find(event => event.slug === expandedEventId);
-
-    // DÜZELTİLMİŞ ANİMASYON DEĞERLERİ
+    
     const variants = {
         enter: (direction) => ({
             x: direction > 0 ? 100 : -100,
@@ -328,14 +385,41 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bullet
 
     return (
         <>
-            <section id="home" className="relative bg-gradient-to-r from-nuper-blue to-nuper-dark-blue min-h-screen flex items-center justify-center text-center text-white overflow-hidden">
-                <div className="absolute inset-0 w-full h-full pointer-events-none z-0">
-                    <SpaceHero />
-                </div>
-                <div className="max-w-4xl mx-auto px-4 py-20 relative z-10">
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold leading-tight">Nuper ile Geleceğini Şekillendir!</h1>
-                    <p className="mt-4 text-lg md:text-xl font-sans">Öğrenciler için yarışmalar, etkinlikler ve fırsatlar tek platformda!</p>
-                    <Link to="/register" className="bg-white text-nuper-blue mt-6 inline-block px-6 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading transition-colors duration-300">Şimdi Kaydol</Link>
+            <section id="home" className="relative bg-nuper-dark-blue min-h-screen flex items-center overflow-hidden">
+                <Starfield />
+                <div className="max-w-6xl mx-auto px-4 w-full">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                        <div className="text-white text-center lg:text-left relative z-10">
+                            <motion.h1 
+                                className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold leading-tight"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.8, ease: "easeOut" }}
+                            >
+                                Nuper ile Geleceğini Şekillendir!
+                            </motion.h1>
+                            <motion.p 
+                                className="mt-4 text-lg md:text-xl font-sans"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+                            >
+                                Öğrenciler için yarışmalar, etkinlikler ve fırsatlar tek platformda!
+                            </motion.p>
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
+                            >
+                                <Link to="/register" className="bg-white text-nuper-blue mt-8 inline-block px-8 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading transition-colors duration-300 text-lg">
+                                    Şimdi Kaydol
+                                </Link>
+                            </motion.div>
+                        </div>
+                        <div className="relative h-96 lg:h-[600px] w-full">
+                            <SpaceHero />
+                        </div>
+                    </div>
                 </div>
             </section>
             
@@ -355,7 +439,6 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bullet
                                     <p>{selectedEvent.organizer}</p>
                                     <p>{selectedEvent.date}</p>
                                 </div>
-                                {/* --- YENİ KOD --- */}
                                 <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed mb-4">
                                     {selectedEvent.content && selectedEvent.content.blocks ? (
                                         selectedEvent.content.blocks.map(block => renderBlock(block))
@@ -363,7 +446,6 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bullet
                                         <p>{selectedEvent.description}</p>
                                     )}
                                 </div>
-                                {/* --- YENİ KOD BİTİŞ --- */}
                                 <div className="mt-auto pt-4 border-t flex justify-between items-center text-sm">
                                     <Link to={`/event/${selectedEvent.slug}`} className="font-semibold text-nuper-blue hover:underline">Detaylı Görüntüle &rarr;</Link>
                                     {selectedEvent.location && (
@@ -381,7 +463,6 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bullet
                 )}
             </AnimatePresence>
 
-            {/* === ÖNE ÇIKAN ETKİNLİKLER BÖLÜMÜ (Tasarım ve Animasyon Düzeltmeleriyle) === */}
             <section id="events-home" className="bg-nuper-gray py-16">
                 <div className="max-w-6xl mx-auto px-4">
                     <h2 className="text-3xl font-heading font-bold text-center mb-12 text-nuper-blue">Öne Çıkan Etkinlikler</h2>
@@ -440,8 +521,7 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bullet
                     </div>
                 </div>
             </section>
-
-            {/* === YENİ BÖLÜM: EN SON BÜLTENLER === */}
+            
             <section id="bulletins-home" className="bg-white py-16">
                 <div className="max-w-6xl mx-auto px-4">
                     <h2 className="text-3xl font-heading font-bold text-center mb-4 text-nuper-blue">En Son Bültenler</h2>
@@ -487,13 +567,12 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bullet
 const App = () => {
     const [expandedEventId, setExpandedEventId] = useState(null);
     const [events, setEvents] = useState([]);
-    const [bulletins, setBulletins] = useState([]); // <-- YENİ STATE
+    const [bulletins, setBulletins] = useState([]);
     const [loadingEvents, setLoadingEvents] = useState(true);
-    const [loadingBulletins, setLoadingBulletins] = useState(true); // <-- YENİ STATE
+    const [loadingBulletins, setLoadingBulletins] = useState(true);
     const db = getFirestore(app);
 
     useEffect(() => {
-        // Öne çıkan etkinlikleri çekme
         const fetchEvents = async () => {
             try {
                 const q = query(collection(db, "events"), orderBy("createdAt", "desc"));
@@ -510,7 +589,6 @@ const App = () => {
             }
         };
 
-        // YENİ: Son bültenleri çekme
         const fetchBulletins = async () => {
             try {
                 const q = query(collection(db, "bulletins"), orderBy("createdAt", "desc"));
@@ -543,8 +621,8 @@ const App = () => {
                                 loading={loadingEvents}
                                 expandedEventId={expandedEventId}
                                 setExpandedEventId={setExpandedEventId}
-                                bulletins={bulletins} // <-- YENİ PROP
-                                loadingBulletins={loadingBulletins} // <-- YENİ PROP
+                                bulletins={bulletins}
+                                loadingBulletins={loadingBulletins}
                             />
                         } />
                         <Route path="/about" element={<About />} />
