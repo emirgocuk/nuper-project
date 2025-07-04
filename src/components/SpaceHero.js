@@ -19,10 +19,10 @@ const createPlanetTexture = () => {
     for (let i = 0; i < 50; i++) {
         context.beginPath();
         context.arc(
-            Math.random() * canvas.width, 
-            Math.random() * canvas.height, 
-            Math.random() * 100, 
-            0, 
+            Math.random() * canvas.width,
+            Math.random() * canvas.height,
+            Math.random() * 100,
+            0,
             Math.PI * 2
         );
         context.fillStyle = `rgba(135, 206, 235, ${Math.random() * 0.08})`; // Light Sky Blue
@@ -117,10 +117,17 @@ const SpaceHero = () => {
             roughness: 0.8
         });
         const planet = new THREE.Mesh(planetGeometry, planetMaterial);
-
-        planetGroup.position.x = 30; // Tüm gezegen ve halkaları sağa kaydır
         planetGroup.add(planet);
 
+        // --- Function to update planet position based on screen size ---
+        const updatePlanetPosition = () => {
+            if (window.innerWidth < 1024) { // Tailwind's 'lg' breakpoint
+                planetGroup.position.x = 0; // Center for mobile
+            } else {
+                planetGroup.position.x = 30; // Shift to the right for desktop
+            }
+        };
+        
         // --- Ring 1 (The original) ---
         const ring1Group = new THREE.Group();
         planetGroup.add(ring1Group);
@@ -199,7 +206,7 @@ const SpaceHero = () => {
             renderer.render(scene, camera);
         };
         animate();
-
+        
         // --- Handle Window Resize ---
         const handleResize = () => {
             if (mountRef.current) {
@@ -208,8 +215,11 @@ const SpaceHero = () => {
                 camera.aspect = width / height;
                 camera.updateProjectionMatrix();
                 renderer.setSize(width, height);
+                updatePlanetPosition(); // Update planet position on resize
             }
         };
+        
+        updatePlanetPosition(); // Set initial position
         window.addEventListener('resize', handleResize);
 
         // --- Cleanup on Component Unmount ---
