@@ -270,67 +270,9 @@ const renderBlock = (block) => {
     }
 };
 
-const Starfield = () => {
-    const mountRef = useRef(null);
-
-    useEffect(() => {
-        const currentMount = mountRef.current;
-        if (!currentMount) return;
-
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
-        camera.position.z = 1;
-        
-        const renderer = new THREE.WebGLRenderer({ alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        currentMount.appendChild(renderer.domElement);
-        
-        const particlesCount = 5000;
-        const positions = new Float32Array(particlesCount * 3);
-        for(let i = 0; i < particlesCount * 3; i++) {
-            positions[i] = (Math.random() - 0.5) * 800;
-        }
-        
-        const particlesGeometry = new THREE.BufferGeometry();
-        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const particlesMaterial = new THREE.PointsMaterial({
-            color: 0xffffff, size: 0.2, transparent: true, blending: THREE.AdditiveBlending, opacity: 0.5
-        });
-        const particleSystem = new THREE.Points(particlesGeometry, particlesMaterial);
-        scene.add(particleSystem);
-
-        let animationId;
-        const clock = new THREE.Clock();
-        const animate = () => {
-            animationId = requestAnimationFrame(animate);
-            const elapsedTime = clock.getElapsedTime();
-            particleSystem.rotation.y = elapsedTime * 0.02;
-            renderer.render(scene, camera);
-        };
-        animate();
-
-        const handleResize = () => {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-        };
-        window.addEventListener('resize', handleResize);
-
-        return () => {
-            cancelAnimationFrame(animationId);
-            window.removeEventListener('resize', handleResize);
-            if (currentMount && renderer.domElement) {
-                currentMount.removeChild(renderer.domElement);
-            }
-        };
-    }, []);
-
-    return <div ref={mountRef} className="absolute inset-0 w-full h-full -z-10" />;
-}
 
 const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bulletins, loadingBulletins }) => {
-    const navigate = useNavigate();
+    // const navigate = useNavigate(); // KULLANILMIYOR, SİLİNDİ
     const isDesktop = useMediaQuery('(min-width: 1024px)');
     const [currentIndex, setCurrentIndex] = useState(0);
     const [direction, setDirection] = useState(0);
@@ -386,10 +328,13 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bullet
     return (
         <>
             <section id="home" className="relative bg-nuper-dark-blue min-h-screen flex items-center overflow-hidden">
-                <Starfield />
-                <div className="max-w-6xl mx-auto px-4 w-full">
+                {/* SpaceHero artık tüm bölümün arka planı olarak davranacak */}
+                <SpaceHero />
+
+                {/* İçerik, z-10 ile SpaceHero'nun önüne getiriliyor */}
+                <div className="relative z-10 max-w-6xl mx-auto px-4 w-full">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                        <div className="text-white text-center lg:text-left relative z-10">
+                        <div className="text-white text-center lg:text-left">
                             <motion.h1 
                                 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold leading-tight"
                                 initial={{ opacity: 0, y: 20 }}
@@ -416,9 +361,8 @@ const HomePage = ({ events, loading, expandedEventId, setExpandedEventId, bullet
                                 </Link>
                             </motion.div>
                         </div>
-                        <div className="relative h-96 lg:h-[600px] w-full">
-                            <SpaceHero />
-                        </div>
+                        {/* Bu boş div, grid yapısını korumak için var */}
+                        <div className="hidden lg:block"></div>
                     </div>
                 </div>
             </section>

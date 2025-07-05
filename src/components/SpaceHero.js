@@ -231,7 +231,7 @@ const SpaceHero = () => {
     }, []);
 
     return (
-        <div className="fixed inset-0 z-0 w-full h-full overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 z-0 w-full h-full overflow-hidden pointer-events-none">
             <div ref={mountRef} className="absolute top-0 left-0 w-full h-full" />
         </div>
     );
@@ -258,15 +258,4 @@ function createStarField(radius, count) {
     return new THREE.Points(starGeometry, starMaterial);
 }
 
-export default function App() {
-    return (
-        <main>
-            <style>{`
-                body {
-                    background-color: black;
-                }
-            `}</style>
-            <SpaceHero />
-        </main>
-    );
-}
+export default SpaceHero;
