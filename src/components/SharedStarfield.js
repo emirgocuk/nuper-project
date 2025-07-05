@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import './SharedStarfield.css';
 
+const NUM_STARS = 30;
 const SharedStarfield = () => {
     const mountRef = useRef(null);
 
@@ -63,7 +65,31 @@ const SharedStarfield = () => {
         };
     }, []);
 
-    return <div ref={mountRef} className="absolute inset-0 w-full h-full -z-10" />;
+    return (
+        <div ref={mountRef} className="absolute inset-0 w-full h-full -z-10">
+            {Array.from({ length: NUM_STARS }).map((_, i) => {
+                const top = Math.random() * 90;
+                const left = Math.random() * 100;
+                const size = Math.random() * 2 + 2;
+                const duration = Math.random() * 8 + 6;
+                const delay = Math.random() * 8;
+                return (
+                    <span
+                        key={i}
+                        className="starfield-star"
+                        style={{
+                            top: `${top}%`,
+                            left: `${left}%`,
+                            width: `${size}px`,
+                            height: `${size}px`,
+                            animationDuration: `${duration}s`,
+                            animationDelay: `${delay}s`
+                        }}
+                    />
+                );
+            })}
+        </div>
+    );
 }
 
 export default SharedStarfield;

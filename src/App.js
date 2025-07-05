@@ -217,7 +217,8 @@ const MainLayout = ({ setExpandedEventId, currentUser }) => {
 const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
     return (
         <>
-            <section id="home" className="relative bg-nuper-dark-blue min-h-screen flex items-center overflow-hidden">
+            {/* DEĞİŞİKLİK: hero-fade-out sınıfı eklendi */}
+            <section id="home" className="relative bg-nuper-dark-blue min-h-screen flex items-center overflow-hidden hero-fade-out">
                 <SpaceHero />
                 <div className="relative z-10 max-w-6xl mx-auto px-4 w-full">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
@@ -269,7 +270,7 @@ const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-16">
                             {/* Etkinlikler Sütunu */}
                             <div>
-                                <h3 className="text-3xl font-bold font-heading mb-8 text-nuper-blue">Öne Çıkan Etkinlikler</h3>
+                                <h3 className="text-3xl font-bold font-heading mb-8 featured-events-title">Öne Çıkan Etkinlikler</h3>
                                 <div className="space-y-6">
                                     {loadingEvents ? <p>Etkinlikler yükleniyor...</p> : events.slice(0, 3).map(event => (
                                         <Link to={`/event/${event.slug}`} key={event.id} className="block group bg-white/70 hover:bg-white p-4 rounded-lg transition-all duration-300 flex items-start space-x-4 shadow-sm hover:shadow-md backdrop-blur-sm">
@@ -285,7 +286,7 @@ const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
                             </div>
                             {/* Bültenler Sütunu */}
                             <div>
-                                 <h3 className="text-3xl font-bold font-heading mb-8 text-nuper-blue">En Son Bültenler</h3>
+                                 <h3 className="text-3xl font-bold font-heading mb-8 latest-news-title">En Son Bültenler</h3>
                                  <div className="space-y-6">
                                     {loadingBulletins ? <p>Bültenler yükleniyor...</p> : bulletins.slice(0, 3).map(bulletin => (
                                         <Link to={`/bulletin/${bulletin.slug}`} key={bulletin.id} className="block group bg-white/70 hover:bg-white p-4 rounded-lg transition-all duration-300 flex items-start space-x-4 shadow-sm hover:shadow-md backdrop-blur-sm">

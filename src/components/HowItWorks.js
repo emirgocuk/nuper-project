@@ -24,69 +24,90 @@ const SuccessIcon = () => (
     </svg>
 );
 
-const HowItWorks = () => {
-    const cardVariants = {
-        offscreen: { y: 100, opacity: 0 },
-        onscreen: {
-            y: 0,
-            opacity: 1,
-            transition: {
-                type: "spring",
-                bounce: 0.4,
-                duration: 1
-            }
+const steps = [
+    {
+        icon: <UploadIcon />,
+        title: "1. Hayalini Paylaş",
+        desc: "Geleceği şekillendirecek projenle ilk adımı at. Güvenli ortamımızda vizyonunu sergile, ilk ışık burada doğar."
+    },
+    {
+        icon: <ConnectIcon />,
+        title: "2. Doğru Bağlantılarla Güçlen",
+        desc: "Fikrinin potansiyeli fark edilir. Uygun yatırımcılarla buluşarak hikayen gerçek bir yolculuğa dönüşür."
+    },
+    {
+        icon: <SuccessIcon />,
+        title: "3. Hayalini Gerçeğe Dönüştür",
+        desc: "Yatırım, mentorluk ve destekle projen başarıya ulaşır. Bu artık sadece senin değil, herkesin ilham alacağı bir başarı hikayesi."
+    }
+];
+
+const cardVariants = {
+    offscreen: { y: 100, opacity: 0 },
+    onscreen: (custom) => ({
+        y: 0,
+        opacity: 1,
+        transition: {
+            type: "spring",
+            bounce: 0.4,
+            duration: 1,
+            delay: custom * 0.25
         }
-    };
+    })
+};
 
-    return (
-        <section className="how-it-works-section">
-            <SharedStarfield />
-            <div className="max-w-6xl mx-auto px-4 py-20 text-center">
-                <motion.h2 
-                    initial={{ opacity: 0, y: -30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, amount: 0.8 }}
-                    transition={{ duration: 0.7 }}
-                    className="text-4xl md:text-5xl font-heading font-bold text-white mb-4"
-                >
-                    Fikirden Başarıya: 3 Adımda Yatırım Yolculuğun
-                </motion.h2>
-                <motion.p 
-                    initial={{ opacity: 0, y: -20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, amount: 0.8 }}
-                    transition={{ duration: 0.7, delay: 0.2 }}
-                    className="text-lg md:text-xl text-gray-300 mb-16 max-w-3xl mx-auto"
-                >
-                    Nuper, parlak fikirleri doğru yatırımcılarla buluşturarak hayalleri gerçeğe dönüştürür. İşte başarıya giden yol haritan:
-                </motion.p>
+const HowItWorks = () => (
+    <section className="how-it-works-section relative overflow-hidden">
+        <SharedStarfield />
+        <div className="max-w-6xl mx-auto px-4 py-20 text-center relative z-10">
+            <motion.h2 
+                initial={{ opacity: 0, y: -30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.8 }}
+                transition={{ duration: 0.7 }}
+                // DEĞİŞİKLİK: Emoji kaldırıldı ve yazı rengi için class eklendi
+                className="text-4xl md:text-5xl font-heading font-bold text-white mb-4"
+            >
+                Fikirden Başarıya: <br className="md:hidden"/> 3 Adımda Yatırım Yolculuğun
+            </motion.h2>
+            <motion.p 
+                initial={{ opacity: 0, y: -20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                // DEĞİŞİKLİK: Animasyonun sadece bir kez çalışması için once: true eklendi
+                viewport={{ once: true, amount: 0.8 }}
+                transition={{ duration: 0.7, delay: 0.2 }}
+                className="text-lg md:text-xl text-gray-300 mb-16 max-w-3xl mx-auto"
+            >
+                Nuper, parlak fikirleri doğru yatırımcılarla buluşturarak hayalleri gerçeğe dönüştürür. İşte başarıya giden yol haritan:
+            </motion.p>
 
-                <div className="relative">
-                    <div className="timeline-line"></div>
-                    <div className="space-y-16 md:space-y-24">
-                        <motion.div initial="offscreen" whileInView="onscreen" viewport={{ once: true, amount: 0.5 }} variants={cardVariants} className="step-card">
-                            <div className="step-icon-wrapper"><UploadIcon /></div>
-                            <h3 className="step-title">1. Projeni Yükle</h3>
-                            <p className="step-description">Hayalini kurduğun projeyi, hedeflerini ve vizyonunu anlatan bir sunumla platformumuza yükle. Güvenli altyapımızla fikrin emin ellerde.</p>
+            <div className="relative">
+                <div className="timeline-line"></div>
+                <div className="flex flex-col space-y-24 items-center">
+                    {steps.map((step, i) => (
+                        <motion.div
+                            key={i}
+                            custom={i}
+                            initial="offscreen"
+                            whileInView="onscreen"
+                            // DEĞİŞİKLİK: Animasyonun sadece bir kez çalışması için once: true eklendi
+                            viewport={{ once: true, amount: 0.5 }}
+                            variants={cardVariants}
+                            className={`step-card ${i === 1 ? "step-card--connect" : ""} relative`}
+                        >
+                            <div className="step-icon-wrapper relative mx-auto mb-6">{step.icon}</div>
+                            <h3 className="step-title mb-2">
+                                {step.title}
+                            </h3>
+                            <p className="step-description">
+                                {step.desc}
+                            </p>
                         </motion.div>
-                        
-                        {/* GÜNCELLENDİ: Özel animasyon için yeni sınıf eklendi */}
-                        <motion.div initial="offscreen" whileInView="onscreen" viewport={{ once: true, amount: 0.5 }} variants={cardVariants} className="step-card step-card--connect">
-                            <div className="step-icon-wrapper"><ConnectIcon /></div>
-                            <h3 className="step-title">2. Yatırımcılarla Buluş</h3>
-                            <p className="step-description">Projen, sektörüne ve potansiyeline en uygun, doğrulanmış yatırımcı ağımız tarafından incelenir. Doğru eşleşmelerle ilk teması biz sağlarız.</p>
-                        </motion.div>
-
-                        <motion.div initial="offscreen" whileInView="onscreen" viewport={{ once: true, amount: 0.5 }} variants={cardVariants} className="step-card">
-                            <div className="step-icon-wrapper"><SuccessIcon /></div>
-                            <h3 className="step-title">3. Başarıyı Yakala</h3>
-                            <p className="step-description">Doğru yatırım ve mentorluk desteğiyle projenin hayata geçişini izle. Nuper, başarı yolculuğunun her anında yanında.</p>
-                        </motion.div>
-                    </div>
+                    ))}
                 </div>
             </div>
-        </section>
-    );
-};
+        </div>
+    </section>
+);
 
 export default HowItWorks;
