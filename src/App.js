@@ -75,21 +75,18 @@ const useHomeReset = (setExpandedEventId) => {
 };
 
 const HomeHeader = ({ setExpandedEventId, currentUser }) => {
-    const [isScrolled, setIsScrolled] = useState(false);
+    // DEĞİŞİKLİK: isScrolled state'i ve useEffect kaldırıldı.
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const handleHomeClick = useHomeReset(setExpandedEventId);
 
-    useEffect(() => {
-        const handleScroll = () => setIsScrolled(window.scrollY > 50);
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    const textColorClass = isScrolled ? 'text-nuper-blue' : 'text-white';
-    const linkHoverClass = isScrolled ? 'hover:text-nuper-dark-blue' : 'hover:text-nuper-gray';
+    // DEĞİŞİKLİK: Sabit stil sınıfları tanımlandı.
+    const navClasses = 'bg-nuper-dark-blue/50 backdrop-blur-sm'; // Yarı şeffaf ve bulanık arka plan
+    const textColorClass = 'text-white';
+    const linkHoverClass = 'hover:text-nuper-gray';
+    const mobileMenuBgClass = 'bg-nuper-dark-blue';
 
     return (
-        <nav className={`fixed w-full z-20 shadow-lg ${isScrolled ? 'bg-white/90 backdrop-blur-sm' : 'bg-transparent'}`}>
+        <nav className={`fixed w-full z-20 transition-colors duration-300 ${navClasses}`}>
             <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
                 <Link to="/" onClick={handleHomeClick}>
                     <h1 className={`text-2xl font-heading font-bold ${textColorClass} cursor-pointer`}>Nuper</h1>
@@ -103,7 +100,8 @@ const HomeHeader = ({ setExpandedEventId, currentUser }) => {
                         {currentUser ? (
                             <ProfileIcon user={currentUser} textColorClass={textColorClass} />
                         ) : (
-                            <Link to="/login" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Giriş Yap</Link>
+                             // DEĞİŞİKLİK: Giriş Yap butonu da arka plana uyumlu hale getirildi.
+                            <Link to="/login" className="px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white border border-white/50 font-sans">Giriş Yap</Link>
                         )}
                     </div>
                     <div className="md:hidden">
@@ -115,14 +113,14 @@ const HomeHeader = ({ setExpandedEventId, currentUser }) => {
             </div>
             <AnimatePresence>
                 {isMenuOpen && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className={`md:hidden ${isScrolled ? 'bg-white' : 'bg-nuper-dark-blue'} py-2 px-4 shadow-lg`}>
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className={`md:hidden ${mobileMenuBgClass} py-2 px-4 shadow-lg`}>
                         <nav className="flex flex-col space-y-2">
-                            <Link to="/" onClick={() => { handleHomeClick(); setIsMenuOpen(false); }} className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}>Ana Sayfa</Link>
-                            <Link to="/about" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}>Hakkımızda</Link>
-                            <Link to="/events" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}>Etkinlikler</Link>
-                            <Link to="/bulletins" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}>Bültenler</Link>
+                           <Link to="/" onClick={() => { handleHomeClick(); setIsMenuOpen(false); }} className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-nuper-blue`}>Ana Sayfa</Link>
+                           <Link to="/about" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-nuper-blue`}>Hakkımızda</Link>
+                           <Link to="/events" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-nuper-blue`}>Etkinlikler</Link>
+                           <Link to="/bulletins" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-nuper-blue`}>Bültenler</Link>
                             {currentUser ? (
-                                <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium ${isScrolled ? 'text-nuper-blue hover:bg-nuper-gray' : 'text-white hover:bg-nuper-blue'}`}>Projelerim</Link>
+                                <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-nuper-blue`}>Projelerim</Link>
                             ) : (
                                 <Link to="/login" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans text-left`}>Giriş Yap</Link>
                             )}
