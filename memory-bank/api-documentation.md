@@ -30,6 +30,34 @@
 - Subcollections:
   - `projects`: User's submitted projects
   - `settings`: User preferences
+  - `badges`: Verified skill badges
+  - `challenges`: Innovation challenge participations
+
+### Innovation Challenges Collection
+- Path: `/challenges`
+- Operations:
+  - GET: List all challenges
+  - POST: Create new challenge (corporate only)
+  - PUT: Update challenge
+  - DELETE: Remove challenge
+- Query Parameters:
+  - `status`: Filter by challenge status
+  - `companyId`: Filter by company
+  - `category`: Filter by challenge category
+  - `subscriptionTier`: Filter by tier level
+
+### Project Badges Collection
+- Path: `/badges`
+- Operations:
+  - GET: List all badges
+  - POST: Issue new badge
+  - PUT: Update badge status
+  - DELETE: Revoke badge
+- Query Parameters:
+  - `userId`: Filter by user
+  - `skills`: Filter by verified skills
+  - `status`: Filter by validation status
+  - `corporateEndorsement`: Filter by company endorsements
 - Operations:
   - GET: Get user profile
   - PUT: Update user profile

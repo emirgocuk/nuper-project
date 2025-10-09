@@ -1,10 +1,19 @@
 # Project Brief: Nuper Platform
 
 ## Core Purpose
-To build a sustainable digital platform connecting students with career and innovation opportunities, focused on events, news, and project incubation.
+To build a comprehensive digital ecosystem connecting students with career and innovation opportunities, focused on:
+- Industry-Validated Project Portfolio Development
+- Open Innovation Solutions
+- Career Advancement Opportunities
+- Knowledge Exchange and Project Incubation
 
 ## Primary Goal
-Achieve financial sustainability by covering all operational costs and generating a surplus to fund an advertising budget.
+Achieve sustainable growth through multiple revenue streams (B2B, B2C, B2V):
+- Corporate Innovation Challenge Subscriptions
+- Verified Digital Project Badges
+- Venture Success Fees
+- Premium Visibility Services
+- Educational Partnerships
 
 ## Core Constraint
 Operational costs must be kept at or near zero in the initial phase. This requires leveraging free tiers (Firebase, Vercel/Netlify) and cost-effective third-party services (ImgBB).
