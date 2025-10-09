@@ -53,64 +53,14 @@ interface Bulletin {
 interface User {
     uid: string;
     email: string;
-    role: 'user' | 'admin' | 'corporate';
+    role: 'user' | 'admin';
     profile: {
         name: string;
         avatar?: string;
-        organization?: string;
     };
     settings: {
         notifications: boolean;
     };
-    verifiedSkills: {
-        skillName: string;
-        projectId: string;
-        verifiedDate: Timestamp;
-        badgeUrl: string;
-    }[];
-    innovationParticipation?: {
-        challengesSubmitted: string[];
-        challengesWon: string[];
-    };
-}
-```
-
-### InnovationChallenge Model
-```typescript
-interface InnovationChallenge {
-    id: string;
-    companyId: string;
-    title: string;
-    description: string;
-    status: 'open' | 'review' | 'closed';
-    reward: string;
-    requirements: string[];
-    deadline: Timestamp;
-    submittedSolutions: number;
-    createdAt: Timestamp;
-    updatedAt: Timestamp;
-    visibility: 'public' | 'private';
-    category: string[];
-    subscriptionTier: 'basic' | 'premium' | 'enterprise';
-}
-```
-
-### ProjectBadge Model
-```typescript
-interface ProjectBadge {
-    id: string;
-    projectId: string;
-    userId: string;
-    skills: string[];
-    issueDate: Timestamp;
-    verificationHash: string;
-    blockchainTxId?: string;
-    validationStatus: 'pending' | 'verified' | 'rejected';
-    corporateEndorsements: {
-        companyId: string;
-        endorsementDate: Timestamp;
-        comments: string;
-    }[];
 }
 ```
 

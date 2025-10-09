@@ -4,18 +4,9 @@
 The foundational structure (Content CRUD, Auth, User Dashboard) is complete. The next critical step is integrating the core monetization feature.
 
 ## Active Decisions and Considerations
-- **Monetization Priority:** 
-  - Enable Featured Events functionality as initial revenue stream
-  - Plan and implement B2B/B2C Digital Badge system MVP
-  - Design Open Innovation Challenge platform structure
-- **Technology Decisions:**
-  - Implement blockchain integration for badge verification
-  - Develop secure corporate access portal
-  - Enhance image handling for project showcases
-- **Role Management:**
-  - Expand user roles to include corporate accounts
-  - Implement tiered access for innovation challenges
-  - Add badge verification permissions
+- **Monetization Priority:** The immediate priority is enabling the "Featured Events" functionality as a sellable advertising spot
+- **Image Strategy:** Stick with the ImgBB strategy for now due to cost-efficiency, but document the risk of API key exposure
+- **Admin Role:** The Admin role check is robust and does not require immediate changes
 
 ## Next Step
 **Task:** Fully implement and showcase the **"Featured Events"** functionality on the public-facing homepage (`App.js`) and ensure the logic in `AdminEventsList.js` is utilized to pull only these featured events.
@@ -24,9 +15,6 @@ The foundational structure (Content CRUD, Auth, User Dashboard) is complete. The
 1. Implement Featured Events display on homepage
 2. Add donation/sponsorship links
 3. Create admin analytics dashboard
-4. Design and implement Digital Project Badges data model
-5. Create Innovation Challenge MVP structure
-6. Develop corporate subscription workflow
 
 ## Recent Changes
 1. Completed user authentication system
