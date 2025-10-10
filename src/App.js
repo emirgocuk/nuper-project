@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 import { SpeedInsights } from "@vercel/speed-insights/react"
 // eslint-disable-next-line no-unused-vars
-import DOMPurify from 'dompurify'; // Temizlik mekanizması için tutuldu
+import DOMPurify from 'dompurify'; 
 // eslint-disable-next-line no-unused-vars
-import * as THREE from 'three'; // SpaceHero için tutuldu
+import * as THREE from 'three'; 
 
 // Firebase importları
 import { app } from './firebaseConfig';
@@ -38,6 +38,9 @@ import AdminBulletinsList from './components/admin/AdminBulletinsList';
 import AdminContentForm from './components/admin/AdminContentForm';
 import AdminContractsList from './components/admin/AdminContractsList';
 import AdminContractEditor from './components/admin/AdminContractEditor';
+// YENİ ADMIN İMPORTLARI
+import AdminProjectList from './components/admin/AdminProjectList'; 
+import AdminProjectReview from './components/admin/AdminProjectReview';
 
 
 // --- YARDIMCI VE LAYOUT BİLEŞENLERİ ---
@@ -137,24 +140,33 @@ const DefaultHeader = ({ currentUser }) => {
                         )}
                     </div>
                     <div className="md:hidden">
-                        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="focus:outline-none text-nuper-blue"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg></button>
+                        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="focus:outline-none text-nuper-blue">
+                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                            </svg>
+                        </button>
                     </div>
                 </div>
             </div>
             <AnimatePresence>
                 {isMenuOpen && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="px-4 py-2 bg-white shadow-lg md:hidden">
-                        <nav className="flex flex-col space-y-2">
-                            <Link to="/" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 text-base font-medium rounded-md text-nuper-blue hover:bg-nuper-gray">Ana Sayfa</Link>
-                            <Link to="/about" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 text-base font-medium rounded-md text-nuper-blue hover:bg-nuper-gray">Hakkımızda</Link>
-                            <Link to="/events" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 text-base font-medium rounded-md text-nuper-blue hover:bg-nuper-gray">Etkinlikler</Link>
-                            <Link to="/bulletins" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 text-base font-medium rounded-md text-nuper-blue hover:bg-nuper-gray">Bültenler</Link>
-                             {currentUser ? (
-                                <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray`}>Projelerim</Link>
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-white shadow-lg md:hidden"
+                    >
+                        <div className="px-4 py-2 space-y-2">
+                            <Link to="/" className="block px-3 py-2 rounded-md text-nuper-blue hover:bg-gray-100">Ana Sayfa</Link>
+                            <Link to="/about" className="block px-3 py-2 rounded-md text-nuper-blue hover:bg-gray-100">Hakkımızda</Link>
+                            <Link to="/events" className="block px-3 py-2 rounded-md text-nuper-blue hover:bg-gray-100">Etkinlikler</Link>
+                            <Link to="/bulletins" className="block px-3 py-2 rounded-md text-nuper-blue hover:bg-gray-100">Bültenler</Link>
+                            {currentUser ? (
+                                <Link to="/dashboard" className="block px-3 py-2 rounded-md text-nuper-blue hover:bg-gray-100">Projelerim</Link>
                             ) : (
-                                <Link to="/login" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans text-left`}>Giriş Yap</Link>
+                                <Link to="/login" className="block px-3 py-2 text-white rounded-lg bg-nuper-blue hover:bg-nuper-dark-blue">Giriş Yap</Link>
                             )}
-                        </nav>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -371,10 +383,11 @@ const App = () => {
                         <Route path="/login" element={<AuthPage />} />
                         <Route path="/profile" element={<ProfilePage />} />
                         <Route path="/settings/notifications" element={<NotificationSettings />} />
+                        {/* YENİ: ProjectUploadForm artık projectId parametresini alabilir */}
                         <Route path="/project-upload" element={<ProjectUploadForm />} />
+                        <Route path="/project-upload/:projectId" element={<ProjectUploadForm />} /> 
                         <Route path="/dashboard" element={<UserDashboard />} />
                         <Route path="/legal/:page" element={<LegalPage />} />
-                        {/* ProjectDetail artık UserDashboard içinde olduğu için bu route kaldırıldı. */}
                     </Route>
                     <Route path="/admin" element={<AdminPanel />}>
                         <Route index element={<div className="pt-8"><h2 className="mb-4 text-3xl font-bold text-center font-heading text-nuper-dark-blue">Admin Paneline Hoş Geldiniz!</h2><p className="text-center text-gray-700">Lütfen yukarıdaki menüden bir yönetim seçeneği belirleyin.</p></div>} />
@@ -386,6 +399,10 @@ const App = () => {
                         <Route path="bulletins/edit/:slug" element={<AdminContentForm type="bulletin" />} />
                         <Route path="contracts" element={<AdminContractsList />} />
                         <Route path="contracts/edit/:docId" element={<AdminContractEditor />} />
+                         {/* YENİ PROJECT ROUTELARI */}
+                        <Route path="projects" element={<AdminProjectList />} />
+                        <Route path="projects/:userId/review/:projectId" element={<AdminProjectReview />} />
+                        {/* AdminLogScreen kaldırıldı */}
                     </Route>
                     <Route path="/admin/login" element={<AdminLogin />} />
                     <Route path="*" element={<div className="flex flex-col items-center justify-center min-h-screen pt-16 bg-gray-100"><h1 className="text-5xl font-bold text-red-600">404</h1><p className="mt-4 text-xl text-gray-700">Sayfa Bulunamadı</p><Link to="/" className="mt-8 text-nuper-blue hover:underline">Ana Sayfaya Dön</Link></div>} />

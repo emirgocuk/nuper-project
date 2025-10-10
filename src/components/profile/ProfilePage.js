@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth, deleteUser } from 'firebase/auth';
-import { getFirestore, doc, deleteDoc, getDoc, updateDoc } from 'firebase/firestore'; // getDoc ve updateDoc eklendi
+import { getFirestore, doc, deleteDoc, getDoc, updateDoc } from 'firebase/firestore'; 
 import { app } from '../../firebaseConfig';
 
 const ProfilePage = () => {
@@ -10,15 +10,30 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
-  // YENİ: Profil state'leri
-  const [displayName, setDisplayName] = useState('');
-  const [initialDisplayName, setInitialDisplayName] = useState(''); 
-  const [userEmail, setUserEmail] = useState('');
+  // GÜNCELLENDİ: Daha fazla profil detayı eklendi
+  const [profileData, setProfileData] = useState({
+    displayName: '',
+    dateOfBirth: '',
+    city: '',
+    educationLevel: '',
+    linkedinUrl: '',
+    userEmail: '',
+  });
+  const [initialProfileData, setInitialProfileData] = useState({});
 
   const navigate = useNavigate();
   const auth = getAuth(app);
   const db = getFirestore(app);
   const user = auth.currentUser;
+  
+  // Eğitim Durumu Seçenekleri
+  const educationOptions = [
+    { value: '', label: 'Seçiniz' },
+    { value: 'student', label: 'Öğrenci' },
+    { value: 'graduate', label: 'Yeni Mezun' },
+    { value: 'professional', label: 'Profesyonel Çalışan' },
+    { value: 'other', label: 'Diğer' },
+  ];
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -26,16 +41,27 @@ const ProfilePage = () => {
             navigate('/login');
             return;
         }
-        setUserEmail(user.email);
+        
         try {
             const userDocRef = doc(db, "users", user.uid);
             const docSnap = await getDoc(userDocRef);
+            
+            let data = { displayName: '', dateOfBirth: '', city: '', educationLevel: '', linkedinUrl: '' };
+
             if (docSnap.exists()) {
-                const data = docSnap.data();
-                const currentName = data.profile?.name || '';
-                setDisplayName(currentName);
-                setInitialDisplayName(currentName);
+                const docData = docSnap.data();
+                data = {
+                    displayName: docData.profile?.name || '',
+                    dateOfBirth: docData.details?.dateOfBirth || '',
+                    city: docData.details?.city || '',
+                    educationLevel: docData.details?.educationLevel || '',
+                    linkedinUrl: docData.details?.linkedinUrl || '',
+                };
             }
+            
+            const fullData = { ...data, userEmail: user.email };
+            setProfileData(fullData);
+            setInitialProfileData(fullData);
         } catch (err) {
             console.error("Profil bilgisi çekme hatası:", err);
             setError('Profil bilgileri yüklenirken bir hata oluştu.');
@@ -44,21 +70,44 @@ const ProfilePage = () => {
         }
     };
     fetchProfile();
-  }, [user, db, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, db, navigate]); 
   
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setProfileData(prevState => ({ ...prevState, [name]: value }));
+  };
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    if (displayName === initialDisplayName) return; // Değişiklik yoksa kaydetme
+    
+    // Değişiklik kontrolü
+    const hasChanges = Object.keys(profileData).some(key => {
+        if (key === 'userEmail') return false; // E-posta değişmez
+        return profileData[key] !== initialProfileData[key];
+    });
+
+    if (!hasChanges) return; 
     
     setSaving(true);
     setError('');
 
     try {
         const userDocRef = doc(db, "users", user.uid);
+        
+        // Sadece değişen alanları göndermek için bir obje oluşturuluyor
         await updateDoc(userDocRef, {
-            'profile.name': displayName
+            'profile.name': profileData.displayName,
+            // YENİ: Ayrı bir 'details' alanı oluşturularak ek bilgiler kaydediliyor
+            details: {
+                dateOfBirth: profileData.dateOfBirth,
+                city: profileData.city,
+                educationLevel: profileData.educationLevel,
+                linkedinUrl: profileData.linkedinUrl,
+            }
         });
-        setInitialDisplayName(displayName); // Başarılı kayıttan sonra başlangıç değerini güncelle
+        
+        setInitialProfileData(profileData); // Başarılı kayıttan sonra başlangıç değerini güncelle
         alert('Profil başarıyla güncellendi!');
     } catch (err) {
         console.error("Profil güncelleme hatası:", err);
@@ -69,13 +118,12 @@ const ProfilePage = () => {
   };
 
   const handleDeleteAccount = async () => {
-    // Onay metni kontrolü
     if (confirmationText !== 'onaylıyorum') {
       setError('Lütfen devam etmek için onay metnini doğru bir şekilde yazın.');
       return;
     }
 
-    setSaving(true); // Yükleniyor durumunu kullan
+    setSaving(true);
     setError('');
 
     if (user) {
@@ -86,12 +134,10 @@ const ProfilePage = () => {
         // Ardından Firebase Authentication'daki kullanıcıyı siliyoruz.
         await deleteUser(user);
 
-        // Başarılı silme sonrası kullanıcıyı anasayfaya yönlendiriyoruz.
         navigate('/');
 
       } catch (error) {
         console.error("Hesap silinirken hata oluştu:", error);
-        // Yeniden kimlik doğrulama gerektiren hatalar için kullanıcıya bilgi verilir.
         if (error.code === 'auth/requires-recent-login') {
             setError('Bu işlem yüksek güvenlik gerektirir. Lütfen çıkış yapıp tekrar giriş yaptıktan sonra tekrar deneyin.');
         } else {
@@ -105,12 +151,15 @@ const ProfilePage = () => {
     }
   };
 
+  const hasUnsavedChanges = Object.keys(profileData).some(key => {
+        if (key === 'userEmail') return false;
+        return profileData[key] !== initialProfileData[key];
+    });
+
   if (loading) {
     return <div className="pt-32 text-center">Yükleniyor...</div>;
   }
   
-  const hasChanges = displayName !== initialDisplayName;
-
   return (
     <div className="min-h-screen pt-32 pb-16 bg-nuper-gray">
       <div className="max-w-4xl px-4 mx-auto space-y-8">
@@ -121,32 +170,92 @@ const ProfilePage = () => {
           {error && <p className="p-3 mb-4 text-sm text-red-700 bg-red-100 rounded-md">{error}</p>}
           
           <form onSubmit={handleSaveProfile} className="space-y-4">
+            
+            {/* E-posta (Okunamaz) */}
             <div>
                 <label className="block mb-1 text-sm font-medium text-gray-700">E-posta</label>
                 <input
                     type="email"
                     className="cursor-not-allowed form-input-std bg-gray-50"
-                    value={userEmail}
+                    value={profileData.userEmail}
                     disabled
                 />
-                <p className="mt-1 text-xs text-gray-500">E-posta adresi değiştirilemez.</p>
             </div>
+            
+            {/* Görünen Ad */}
             <div>
-                <label htmlFor="displayname" className="block mb-1 text-sm font-medium text-gray-700">Görünen Ad</label>
+                <label htmlFor="displayName" className="block mb-1 text-sm font-medium text-gray-700">Görünen Ad</label>
                 <input
                     type="text"
-                    id="displayname"
+                    name="displayName"
+                    id="displayName"
                     className="form-input-std"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
+                    value={profileData.displayName}
+                    onChange={handleInputChange}
                     required
+                />
+            </div>
+
+            {/* Doğum Tarihi */}
+            <div>
+                <label htmlFor="dateOfBirth" className="block mb-1 text-sm font-medium text-gray-700">Doğum Tarihi</label>
+                <input
+                    type="date"
+                    name="dateOfBirth"
+                    id="dateOfBirth"
+                    className="form-input-std"
+                    value={profileData.dateOfBirth}
+                    onChange={handleInputChange}
+                />
+            </div>
+
+            {/* Şehir */}
+            <div>
+                <label htmlFor="city" className="block mb-1 text-sm font-medium text-gray-700">Şehir</label>
+                <input
+                    type="text"
+                    name="city"
+                    id="city"
+                    className="form-input-std"
+                    value={profileData.city}
+                    onChange={handleInputChange}
+                />
+            </div>
+
+            {/* Eğitim Durumu */}
+            <div>
+                <label htmlFor="educationLevel" className="block mb-1 text-sm font-medium text-gray-700">Eğitim Durumu</label>
+                <select
+                    name="educationLevel"
+                    id="educationLevel"
+                    className="form-input-std"
+                    value={profileData.educationLevel}
+                    onChange={handleInputChange}
+                >
+                    {educationOptions.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                </select>
+            </div>
+            
+            {/* LinkedIn URL'si */}
+            <div>
+                <label htmlFor="linkedinUrl" className="block mb-1 text-sm font-medium text-gray-700">LinkedIn Profil URL</label>
+                <input
+                    type="url"
+                    name="linkedinUrl"
+                    id="linkedinUrl"
+                    className="form-input-std"
+                    value={profileData.linkedinUrl}
+                    onChange={handleInputChange}
+                    placeholder="https://linkedin.com/in/..."
                 />
             </div>
             
             <div className="flex justify-end pt-4">
                 <button
                     type="submit"
-                    disabled={!hasChanges || saving}
+                    disabled={!hasUnsavedChanges || saving}
                     className="px-6 py-2 font-bold text-white transition-colors duration-200 rounded-lg bg-nuper-blue hover:bg-nuper-dark-blue disabled:bg-gray-400"
                 >
                     {saving ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
