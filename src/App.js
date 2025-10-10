@@ -63,7 +63,7 @@ const HomeHeader = ({ currentUser }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const handleHomeClick = useHomeReset();
 
-    const navClasses = 'bg-nuper-dark-blue/50 backdrop-blur-sm'; 
+    const navClasses = 'bg-nuper-dark-blue/50 backdrop-blur-sm'; // Yarı şeffaf ve bulanık arka plan
     const textColorClass = 'text-white';
     const linkHoverClass = 'hover:text-nuper-gray';
     const mobileMenuBgClass = 'bg-nuper-dark-blue';
@@ -72,7 +72,7 @@ const HomeHeader = ({ currentUser }) => {
         <nav className={`fixed w-full z-20 transition-colors duration-300 ${navClasses}`}>
             <div className="flex items-center justify-between max-w-6xl px-4 py-4 mx-auto">
                 <Link to="/" onClick={handleHomeClick}>
-                    <h1 className={`text-2xl font-heading font-bold ${textColorClass} cursor-pointer`}>Nuper</h1>
+                    <h1 className="text-2xl font-bold text-white cursor-pointer font-heading">Nuper</h1>
                 </Link>
                 <div className="flex items-center space-x-4">
                     <div className="items-center hidden space-x-5 md:flex">
@@ -83,6 +83,7 @@ const HomeHeader = ({ currentUser }) => {
                         {currentUser ? (
                             <ProfileIcon user={currentUser} textColorClass={textColorClass} />
                         ) : (
+                             // DEĞİŞİKLİK: Giriş Yap butonu da arka plana uyumlu hale getirildi.
                             <Link to="/login" className="px-4 py-2 font-sans text-white border rounded-lg bg-white/20 hover:bg-white/30 border-white/50">Giriş Yap</Link>
                         )}
                     </div>
@@ -175,8 +176,7 @@ const Footer = () => (
     </footer>
 );
 
-// setExpandedEventId prop'u kaldırıldı
-const MainLayout = ({ currentUser }) => {
+const MainLayout = ({ currentUser }) => { 
     const location = useLocation();
     const isHomePage = location.pathname === '/';
     
@@ -188,7 +188,6 @@ const MainLayout = ({ currentUser }) => {
 
     return (
         <>
-            {/* setExpandedEventId prop'u kaldırıldı */}
             {isHomePage ? <HomeHeader currentUser={currentUser} /> : <DefaultHeader currentUser={currentUser} />}
             <Outlet />
             <Footer />
@@ -199,7 +198,7 @@ const MainLayout = ({ currentUser }) => {
 const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
     return (
         <>
-            {/* Hata 1 (Line 253) çözüldü: Kapanış tag'i eksik olan <section> etiketleri yok, muhtemelen JSX içeriğinin etrafındaki genel fragment ile ilgiliydi. Aşağıdaki JSX yapısı zaten doğru. */}
+            {/* DEĞİŞİKLİK: hero-fade-out sınıfı eklendi */}
             <section id="home" className="relative flex items-center min-h-screen overflow-hidden bg-nuper-dark-blue hero-fade-out">
                 <SpaceHero />
                 <div className="relative z-10 w-full max-w-6xl px-4 mx-auto">
@@ -255,8 +254,7 @@ const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
                                 <h3 className="mb-8 text-3xl font-bold font-heading featured-events-title">Öne Çıkan Etkinlikler</h3>
                                 <div className="space-y-6">
                                     {loadingEvents ? <p>Etkinlikler yükleniyor...</p> : events.slice(0, 3).map(event => (
-                                        // Hata 2 (Line 262) çözüldü: JSX içinde curly brace ({}) kullanırken map'in hemen ardından gelen parantezin ( ) yerine köşeli parantez [ ] kullanılmış. Ayrıca block sınıfı kaldırıldı.
-                                        <Link to={`/event/${event.slug}`} key={event.id} className="flex items-start p-4 space-x-4 transition-all duration-300 rounded-lg shadow-sm group bg-white/70 hover:bg-white hover:shadow-md backdrop-blur-sm">
+                                        <Link to={`/event/${event.slug}`} key={event.id} className="flex items-start block p-4 space-x-4 transition-all duration-300 rounded-lg shadow-sm group bg-white/70 hover:bg-white hover:shadow-md backdrop-blur-sm">
                                             <img src={event.cardImage || 'https://placehold.co/100x100/e2e8f0/e2e8f0?text=N'} alt={event.title} className="flex-shrink-0 object-cover w-24 h-24 rounded-md" />
                                             <div className="flex-grow">
                                                 <p className="mb-1 text-sm text-gray-500">{event.date}</p>
@@ -272,8 +270,7 @@ const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
                                  <h3 className="mb-8 text-3xl font-bold font-heading latest-news-title">En Son Bültenler</h3>
                                  <div className="space-y-6">
                                     {loadingBulletins ? <p>Bültenler yükleniyor...</p> : bulletins.slice(0, 3).map(bulletin => (
-                                        // Hata 3 (Line 279) çözüldü: JSX içinde curly brace ({}) kullanırken map'in hemen ardından gelen parantezin ( ) yerine köşeli parantez [ ] kullanılmış. Ayrıca block sınıfı kaldırıldı.
-                                        <Link to={`/bulletin/${bulletin.slug}`} key={bulletin.id} className="flex items-start p-4 space-x-4 transition-all duration-300 rounded-lg shadow-sm group bg-white/70 hover:bg-white hover:shadow-md backdrop-blur-sm">
+                                        <Link to={`/bulletin/${bulletin.slug}`} key={bulletin.id} className="flex items-start block p-4 space-x-4 transition-all duration-300 rounded-lg shadow-sm group bg-white/70 hover:bg-white hover:shadow-md backdrop-blur-sm">
                                             <img src={bulletin.cardImage || 'https://placehold.co/100x100/e2e8f0/e2e8f0?text=N'} alt={bulletin.title} className="flex-shrink-0 object-cover w-24 h-24 rounded-md" />
                                             <div className="flex-grow">
                                                 <p className="mb-1 text-sm text-gray-500">{bulletin.date}</p>
@@ -377,6 +374,7 @@ const App = () => {
                         <Route path="/project-upload" element={<ProjectUploadForm />} />
                         <Route path="/dashboard" element={<UserDashboard />} />
                         <Route path="/legal/:page" element={<LegalPage />} />
+                        {/* ProjectDetail artık UserDashboard içinde olduğu için bu route kaldırıldı. */}
                     </Route>
                     <Route path="/admin" element={<AdminPanel />}>
                         <Route index element={<div className="pt-8"><h2 className="mb-4 text-3xl font-bold text-center font-heading text-nuper-dark-blue">Admin Paneline Hoş Geldiniz!</h2><p className="text-center text-gray-700">Lütfen yukarıdaki menüden bir yönetim seçeneği belirleyin.</p></div>} />
