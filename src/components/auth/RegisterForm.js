@@ -8,6 +8,7 @@ import { app } from '../../firebaseConfig';
 const RegisterForm = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [displayName, setDisplayName] = useState(''); // YENİ: Görünen ad state'i
     const [error, setError] = useState('');
     const navigate = useNavigate();
     const auth = getAuth(app);
@@ -28,6 +29,13 @@ const RegisterForm = () => {
             await setDoc(doc(db, "users", user.uid), {
                 email: user.email,
                 role: 'user', // Varsayılan rol olarak 'user' atanıyor
+                profile: {
+                    name: displayName, // YENİ: Görünen adı kaydediyoruz
+                    avatar: null
+                },
+                settings: {
+                    notifications: true // Varsayılan bildirim ayarı
+                },
                 createdAt: serverTimestamp()
             });
 
@@ -45,9 +53,21 @@ const RegisterForm = () => {
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
             <h2 className="text-2xl font-bold text-center text-nuper-dark-blue">Yeni Hesap Oluştur</h2>
-            {error && <p className="bg-red-100 text-red-700 p-3 rounded-md text-sm">{error}</p>}
+            {error && <p className="p-3 text-sm text-red-700 bg-red-100 rounded-md">{error}</p>}
             <div>
-                <label htmlFor="register-email" className="block text-sm font-medium text-gray-700 mb-1">E-posta</label>
+                <label htmlFor="register-displayname" className="block mb-1 text-sm font-medium text-gray-700">Görünen Ad</label>
+                <input
+                    type="text"
+                    id="register-displayname"
+                    className="form-input-std"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Adınız Soyadınız veya Kullanıcı Adınız"
+                    required
+                />
+            </div>
+            <div>
+                <label htmlFor="register-email" className="block mb-1 text-sm font-medium text-gray-700">E-posta</label>
                 <input
                     type="email"
                     id="register-email"
@@ -58,7 +78,7 @@ const RegisterForm = () => {
                 />
             </div>
             <div>
-                <label htmlFor="register-password" className="block text-sm font-medium text-gray-700 mb-1">Şifre</label>
+                <label htmlFor="register-password" className="block mb-1 text-sm font-medium text-gray-700">Şifre</label>
                 <input
                     type="password"
                     id="register-password"
@@ -70,7 +90,7 @@ const RegisterForm = () => {
             </div>
             <button
                 type="submit"
-                className="w-full bg-nuper-blue hover:bg-nuper-dark-blue text-white font-bold py-3 px-4 rounded-lg transition-colors duration-200"
+                className="w-full px-4 py-3 font-bold text-white transition-colors duration-200 rounded-lg bg-nuper-blue hover:bg-nuper-dark-blue"
             >
                 Kaydol
             </button>

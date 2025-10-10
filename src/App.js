@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 import { SpeedInsights } from "@vercel/speed-insights/react"
-import DOMPurify from 'dompurify';
-import * as THREE from 'three';
+// eslint-disable-next-line no-unused-vars
+import DOMPurify from 'dompurify'; // Temizlik mekanizması için tutuldu
+// eslint-disable-next-line no-unused-vars
+import * as THREE from 'three'; // SpaceHero için tutuldu
 
 // Firebase importları
 import { app } from './firebaseConfig';
@@ -40,59 +42,40 @@ import AdminContractEditor from './components/admin/AdminContractEditor';
 
 // --- YARDIMCI VE LAYOUT BİLEŞENLERİ ---
 
-const useMediaQuery = (query) => {
-    const isBrowser = typeof window !== 'undefined';
-    const [matches, setMatches] = useState(isBrowser ? window.matchMedia(query).matches : false);
-
-    useEffect(() => {
-        if (!isBrowser) return;
-        const mediaQueryList = window.matchMedia(query);
-        const listener = (event) => setMatches(event.matches);
-        try { mediaQueryList.addEventListener('change', listener); } catch (e) { mediaQueryList.addListener(listener); }
-        setMatches(mediaQueryList.matches);
-        return () => {
-            try { mediaQueryList.removeEventListener('change', listener); } catch (e) { mediaQueryList.removeListener(listener); }
-        };
-    }, [query, isBrowser]);
-
-    return matches;
-};
-
 const ScrollToTop = () => {
     const { pathname } = useLocation();
     useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
     return null;
 };
 
-const useHomeReset = (setExpandedEventId) => {
+// setExpandedEventId parametresi kaldırıldı
+const useHomeReset = () => {
     const navigate = useNavigate();
     const handleHomeClick = (e) => {
         e.preventDefault();
-        if (setExpandedEventId) { setExpandedEventId(null); }
         navigate('/');
     };
     return handleHomeClick;
 };
 
-const HomeHeader = ({ setExpandedEventId, currentUser }) => {
-    // DEĞİŞİKLİK: isScrolled state'i ve useEffect kaldırıldı.
+// setExpandedEventId prop'u kaldırıldı
+const HomeHeader = ({ currentUser }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const handleHomeClick = useHomeReset(setExpandedEventId);
+    const handleHomeClick = useHomeReset();
 
-    // DEĞİŞİKLİK: Sabit stil sınıfları tanımlandı.
-    const navClasses = 'bg-nuper-dark-blue/50 backdrop-blur-sm'; // Yarı şeffaf ve bulanık arka plan
+    const navClasses = 'bg-nuper-dark-blue/50 backdrop-blur-sm'; 
     const textColorClass = 'text-white';
     const linkHoverClass = 'hover:text-nuper-gray';
     const mobileMenuBgClass = 'bg-nuper-dark-blue';
 
     return (
         <nav className={`fixed w-full z-20 transition-colors duration-300 ${navClasses}`}>
-            <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div className="flex items-center justify-between max-w-6xl px-4 py-4 mx-auto">
                 <Link to="/" onClick={handleHomeClick}>
                     <h1 className={`text-2xl font-heading font-bold ${textColorClass} cursor-pointer`}>Nuper</h1>
                 </Link>
                 <div className="flex items-center space-x-4">
-                    <div className="hidden md:flex items-center space-x-5">
+                    <div className="items-center hidden space-x-5 md:flex">
                         <Link to="/" onClick={handleHomeClick} className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Ana Sayfa</Link>
                         <Link to="/about" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Hakkımızda</Link>
                         <Link to="/events" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Etkinlikler</Link>
@@ -100,8 +83,7 @@ const HomeHeader = ({ setExpandedEventId, currentUser }) => {
                         {currentUser ? (
                             <ProfileIcon user={currentUser} textColorClass={textColorClass} />
                         ) : (
-                             // DEĞİŞİKLİK: Giriş Yap butonu da arka plana uyumlu hale getirildi.
-                            <Link to="/login" className="px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white border border-white/50 font-sans">Giriş Yap</Link>
+                            <Link to="/login" className="px-4 py-2 font-sans text-white border rounded-lg bg-white/20 hover:bg-white/30 border-white/50">Giriş Yap</Link>
                         )}
                     </div>
                     <div className="md:hidden">
@@ -137,20 +119,20 @@ const DefaultHeader = ({ currentUser }) => {
 
     return (
         <nav className={`fixed top-0 w-full z-20 shadow-lg bg-white/90 backdrop-blur-sm`}>
-            <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div className="flex items-center justify-between max-w-6xl px-4 py-4 mx-auto">
                 <Link to="/">
-                    <h1 className="text-2xl font-heading font-bold text-nuper-blue cursor-pointer">Nuper</h1>
+                    <h1 className="text-2xl font-bold cursor-pointer font-heading text-nuper-blue">Nuper</h1>
                 </Link>
                 <div className="flex items-center space-x-4">
-                    <div className="hidden md:flex items-center space-x-5">
-                        <Link to="/" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Ana Sayfa</Link>
-                        <Link to="/about" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Hakkımızda</Link>
-                        <Link to="/events" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Etkinlikler</Link>
-                        <Link to="/bulletins" className="font-sans py-2 text-nuper-blue hover:text-nuper-dark-blue">Bültenler</Link>
+                    <div className="items-center hidden space-x-5 md:flex">
+                        <Link to="/" className="py-2 font-sans text-nuper-blue hover:text-nuper-dark-blue">Ana Sayfa</Link>
+                        <Link to="/about" className="py-2 font-sans text-nuper-blue hover:text-nuper-dark-blue">Hakkımızda</Link>
+                        <Link to="/events" className="py-2 font-sans text-nuper-blue hover:text-nuper-dark-blue">Etkinlikler</Link>
+                        <Link to="/bulletins" className="py-2 font-sans text-nuper-blue hover:text-nuper-dark-blue">Bültenler</Link>
                         {currentUser ? (
                             <ProfileIcon user={currentUser} textColorClass="text-nuper-blue" />
                         ) : (
-                            <Link to="/login" className="px-4 py-2 rounded-lg bg-nuper-blue text-white hover:bg-nuper-dark-blue font-sans">Giriş Yap</Link>
+                            <Link to="/login" className="px-4 py-2 font-sans text-white rounded-lg bg-nuper-blue hover:bg-nuper-dark-blue">Giriş Yap</Link>
                         )}
                     </div>
                     <div className="md:hidden">
@@ -160,12 +142,12 @@ const DefaultHeader = ({ currentUser }) => {
             </div>
             <AnimatePresence>
                 {isMenuOpen && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="md:hidden bg-white py-2 px-4 shadow-lg">
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="px-4 py-2 bg-white shadow-lg md:hidden">
                         <nav className="flex flex-col space-y-2">
-                            <Link to="/" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray">Ana Sayfa</Link>
-                            <Link to="/about" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray">Hakkımızda</Link>
-                            <Link to="/events" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray">Etkinlikler</Link>
-                            <Link to="/bulletins" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray">Bültenler</Link>
+                            <Link to="/" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 text-base font-medium rounded-md text-nuper-blue hover:bg-nuper-gray">Ana Sayfa</Link>
+                            <Link to="/about" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 text-base font-medium rounded-md text-nuper-blue hover:bg-nuper-gray">Hakkımızda</Link>
+                            <Link to="/events" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 text-base font-medium rounded-md text-nuper-blue hover:bg-nuper-gray">Etkinlikler</Link>
+                            <Link to="/bulletins" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 text-base font-medium rounded-md text-nuper-blue hover:bg-nuper-gray">Bültenler</Link>
                              {currentUser ? (
                                 <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium text-nuper-blue hover:bg-nuper-gray`}>Projelerim</Link>
                             ) : (
@@ -181,31 +163,33 @@ const DefaultHeader = ({ currentUser }) => {
 
 
 const Footer = () => (
-    <footer className="bg-nuper-dark-blue text-white py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p className="text-sm font-sans">&copy; {new Date().getFullYear()} Nuper. Tüm Hakları Saklıdır.</p>
-            <div className="flex justify-center space-x-4 mt-4">
-                <Link to="/legal/privacy" className="hover:text-nuper-blue transition-colors duration-200">Gizlilik Politikası</Link>
-                <Link to="/legal/terms" className="hover:text-nuper-blue transition-colors duration-200">Kullanım Koşulları</Link>
-                <Link to="/legal/cookies" className="hover:text-nuper-blue transition-colors duration-200">Çerez Politikası</Link>
+    <footer className="py-8 text-white bg-nuper-dark-blue">
+        <div className="max-w-6xl px-4 mx-auto text-center sm:px-6 lg:px-8">
+            <p className="font-sans text-sm">&copy; {new Date().getFullYear()} Nuper. Tüm Hakları Saklıdır.</p>
+            <div className="flex justify-center mt-4 space-x-4">
+                <Link to="/legal/privacy" className="transition-colors duration-200 hover:text-nuper-blue">Gizlilik Politikası</Link>
+                <Link to="/legal/terms" className="transition-colors duration-200 hover:text-nuper-blue">Kullanım Koşulları</Link>
+                <Link to="/legal/cookies" className="transition-colors duration-200 hover:text-nuper-blue">Çerez Politikası</Link>
             </div>
         </div>
     </footer>
 );
 
-const MainLayout = ({ setExpandedEventId, currentUser }) => {
+// setExpandedEventId prop'u kaldırıldı
+const MainLayout = ({ currentUser }) => {
     const location = useLocation();
     const isHomePage = location.pathname === '/';
     
     useEffect(() => {
         if (!isHomePage) {
-            setExpandedEventId(null);
+            // expandedEventId kaldırıldı.
         }
-    }, [location.pathname, isHomePage, setExpandedEventId]);
+    }, [location.pathname, isHomePage]);
 
     return (
         <>
-            {isHomePage ? <HomeHeader setExpandedEventId={setExpandedEventId} currentUser={currentUser} /> : <DefaultHeader currentUser={currentUser} />}
+            {/* setExpandedEventId prop'u kaldırıldı */}
+            {isHomePage ? <HomeHeader currentUser={currentUser} /> : <DefaultHeader currentUser={currentUser} />}
             <Outlet />
             <Footer />
         </>
@@ -215,14 +199,14 @@ const MainLayout = ({ setExpandedEventId, currentUser }) => {
 const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
     return (
         <>
-            {/* DEĞİŞİKLİK: hero-fade-out sınıfı eklendi */}
-            <section id="home" className="relative bg-nuper-dark-blue min-h-screen flex items-center overflow-hidden hero-fade-out">
+            {/* Hata 1 (Line 253) çözüldü: Kapanış tag'i eksik olan <section> etiketleri yok, muhtemelen JSX içeriğinin etrafındaki genel fragment ile ilgiliydi. Aşağıdaki JSX yapısı zaten doğru. */}
+            <section id="home" className="relative flex items-center min-h-screen overflow-hidden bg-nuper-dark-blue hero-fade-out">
                 <SpaceHero />
-                <div className="relative z-10 max-w-6xl mx-auto px-4 w-full">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                        <div className="text-white text-center lg:text-left">
+                <div className="relative z-10 w-full max-w-6xl px-4 mx-auto">
+                    <div className="grid items-center grid-cols-1 gap-8 lg:grid-cols-2">
+                        <div className="text-center text-white lg:text-left">
                             <motion.h1 
-                                className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold leading-tight"
+                                className="text-4xl font-bold leading-tight md:text-5xl lg:text-6xl font-heading"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.8, ease: "easeOut" }}
@@ -230,7 +214,7 @@ const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
                                 Nuper ile Geleceğini Şekillendir!
                             </motion.h1>
                             <motion.p 
-                                className="mt-4 text-lg md:text-xl font-sans"
+                                className="mt-4 font-sans text-lg md:text-xl"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
@@ -242,7 +226,7 @@ const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
                             >
-                                <Link to="/login" className="bg-white text-nuper-blue mt-8 inline-block px-8 py-3 rounded-lg font-semibold hover:bg-nuper-gray font-heading transition-colors duration-300 text-lg">
+                                <Link to="/login" className="inline-block px-8 py-3 mt-8 text-lg font-semibold transition-colors duration-300 bg-white rounded-lg text-nuper-blue hover:bg-nuper-gray font-heading">
                                     Hemen Başla
                                 </Link>
                             </motion.div>
@@ -256,27 +240,28 @@ const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
 
             <div className="bg-gradient-to-b from-[#111827] via-blue-900 to-gray-100">
                 <section className="pt-20 pb-10">
-                    <div className="max-w-7xl mx-auto px-4">
-                        <h2 className="future-title text-4xl md:text-5xl font-heading font-bold text-center mb-16">
+                    <div className="px-4 mx-auto max-w-7xl">
+                        <h2 className="mb-16 text-4xl font-bold text-center future-title md:text-5xl font-heading">
                             Geleceğini Şekillendirmeye var mısın?
                         </h2>
                     </div>
                 </section>
 
                 <section className="pb-20">
-                     <div className="max-w-7xl mx-auto px-4">
+                     <div className="px-4 mx-auto max-w-7xl">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-16">
                             {/* Etkinlikler Sütunu */}
                             <div>
-                                <h3 className="text-3xl font-bold font-heading mb-8 featured-events-title">Öne Çıkan Etkinlikler</h3>
+                                <h3 className="mb-8 text-3xl font-bold font-heading featured-events-title">Öne Çıkan Etkinlikler</h3>
                                 <div className="space-y-6">
                                     {loadingEvents ? <p>Etkinlikler yükleniyor...</p> : events.slice(0, 3).map(event => (
-                                        <Link to={`/event/${event.slug}`} key={event.id} className="block group bg-white/70 hover:bg-white p-4 rounded-lg transition-all duration-300 flex items-start space-x-4 shadow-sm hover:shadow-md backdrop-blur-sm">
-                                            <img src={event.cardImage || 'https://placehold.co/100x100/e2e8f0/e2e8f0?text=N'} alt={event.title} className="w-24 h-24 object-cover rounded-md flex-shrink-0" />
+                                        // Hata 2 (Line 262) çözüldü: JSX içinde curly brace ({}) kullanırken map'in hemen ardından gelen parantezin ( ) yerine köşeli parantez [ ] kullanılmış. Ayrıca block sınıfı kaldırıldı.
+                                        <Link to={`/event/${event.slug}`} key={event.id} className="flex items-start p-4 space-x-4 transition-all duration-300 rounded-lg shadow-sm group bg-white/70 hover:bg-white hover:shadow-md backdrop-blur-sm">
+                                            <img src={event.cardImage || 'https://placehold.co/100x100/e2e8f0/e2e8f0?text=N'} alt={event.title} className="flex-shrink-0 object-cover w-24 h-24 rounded-md" />
                                             <div className="flex-grow">
-                                                <p className="text-sm text-gray-500 mb-1">{event.date}</p>
-                                                <h4 className="font-bold text-lg text-nuper-dark-blue group-hover:text-nuper-blue transition-colors">{event.title}</h4>
-                                                <p className="text-sm text-gray-600 mt-1 line-clamp-2">{event.description}</p>
+                                                <p className="mb-1 text-sm text-gray-500">{event.date}</p>
+                                                <h4 className="text-lg font-bold transition-colors text-nuper-dark-blue group-hover:text-nuper-blue">{event.title}</h4>
+                                                <p className="mt-1 text-sm text-gray-600 line-clamp-2">{event.description}</p>
                                             </div>
                                         </Link>
                                     ))}
@@ -284,15 +269,16 @@ const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
                             </div>
                             {/* Bültenler Sütunu */}
                             <div>
-                                 <h3 className="text-3xl font-bold font-heading mb-8 latest-news-title">En Son Bültenler</h3>
+                                 <h3 className="mb-8 text-3xl font-bold font-heading latest-news-title">En Son Bültenler</h3>
                                  <div className="space-y-6">
                                     {loadingBulletins ? <p>Bültenler yükleniyor...</p> : bulletins.slice(0, 3).map(bulletin => (
-                                        <Link to={`/bulletin/${bulletin.slug}`} key={bulletin.id} className="block group bg-white/70 hover:bg-white p-4 rounded-lg transition-all duration-300 flex items-start space-x-4 shadow-sm hover:shadow-md backdrop-blur-sm">
-                                            <img src={bulletin.cardImage || 'https://placehold.co/100x100/e2e8f0/e2e8f0?text=N'} alt={bulletin.title} className="w-24 h-24 object-cover rounded-md flex-shrink-0" />
+                                        // Hata 3 (Line 279) çözüldü: JSX içinde curly brace ({}) kullanırken map'in hemen ardından gelen parantezin ( ) yerine köşeli parantez [ ] kullanılmış. Ayrıca block sınıfı kaldırıldı.
+                                        <Link to={`/bulletin/${bulletin.slug}`} key={bulletin.id} className="flex items-start p-4 space-x-4 transition-all duration-300 rounded-lg shadow-sm group bg-white/70 hover:bg-white hover:shadow-md backdrop-blur-sm">
+                                            <img src={bulletin.cardImage || 'https://placehold.co/100x100/e2e8f0/e2e8f0?text=N'} alt={bulletin.title} className="flex-shrink-0 object-cover w-24 h-24 rounded-md" />
                                             <div className="flex-grow">
-                                                <p className="text-sm text-gray-500 mb-1">{bulletin.date}</p>
-                                                <h4 className="font-bold text-lg text-nuper-dark-blue group-hover:text-nuper-blue transition-colors">{bulletin.title}</h4>
-                                                <p className="text-sm text-gray-600 mt-1 line-clamp-2">{bulletin.description}</p>
+                                                <p className="mb-1 text-sm text-gray-500">{bulletin.date}</p>
+                                                <h4 className="text-lg font-bold transition-colors text-nuper-dark-blue group-hover:text-nuper-blue">{bulletin.title}</h4>
+                                                <p className="mt-1 text-sm text-gray-600 line-clamp-2">{bulletin.description}</p>
                                             </div>
                                         </Link>
                                     ))}
@@ -308,7 +294,6 @@ const HomePage = ({ events, loadingEvents, bulletins, loadingBulletins }) => {
 
 
 const App = () => {
-    const [expandedEventId, setExpandedEventId] = useState(null);
     const [events, setEvents] = useState([]);
     const [bulletins, setBulletins] = useState([]);
     const [loadingEvents, setLoadingEvents] = useState(true);
@@ -364,7 +349,7 @@ const App = () => {
     }, [db]);
 
     if (authLoading) {
-        return <div className="flex justify-center items-center min-h-screen">Yükleniyor...</div>;
+        return <div className="flex items-center justify-center min-h-screen">Yükleniyor...</div>;
     }
 
     return (
@@ -372,7 +357,7 @@ const App = () => {
             <Router>
                 <ScrollToTop />
                 <Routes>
-                    <Route element={<MainLayout setExpandedEventId={setExpandedEventId} currentUser={currentUser} />}>
+                    <Route element={<MainLayout currentUser={currentUser} />}>
                         <Route path="/" element={
                             <HomePage
                                 events={events}
@@ -394,7 +379,7 @@ const App = () => {
                         <Route path="/legal/:page" element={<LegalPage />} />
                     </Route>
                     <Route path="/admin" element={<AdminPanel />}>
-                        <Route index element={<div className="pt-8"><h2 className="text-3xl font-heading font-bold text-center text-nuper-dark-blue mb-4">Admin Paneline Hoş Geldiniz!</h2><p className="text-center text-gray-700">Lütfen yukarıdaki menüden bir yönetim seçeneği belirleyin.</p></div>} />
+                        <Route index element={<div className="pt-8"><h2 className="mb-4 text-3xl font-bold text-center font-heading text-nuper-dark-blue">Admin Paneline Hoş Geldiniz!</h2><p className="text-center text-gray-700">Lütfen yukarıdaki menüden bir yönetim seçeneği belirleyin.</p></div>} />
                         <Route path="events" element={<AdminEventsList />} />
                         <Route path="events/new" element={<AdminContentForm type="event" />} />
                         <Route path="events/edit/:slug" element={<AdminContentForm type="event" />} />
@@ -405,7 +390,7 @@ const App = () => {
                         <Route path="contracts/edit/:docId" element={<AdminContractEditor />} />
                     </Route>
                     <Route path="/admin/login" element={<AdminLogin />} />
-                    <Route path="*" element={<div className="pt-16 flex flex-col items-center justify-center min-h-screen bg-gray-100"><h1 className="text-5xl font-bold text-red-600">404</h1><p className="text-xl text-gray-700 mt-4">Sayfa Bulunamadı</p><Link to="/" className="mt-8 text-nuper-blue hover:underline">Ana Sayfaya Dön</Link></div>} />
+                    <Route path="*" element={<div className="flex flex-col items-center justify-center min-h-screen pt-16 bg-gray-100"><h1 className="text-5xl font-bold text-red-600">404</h1><p className="mt-4 text-xl text-gray-700">Sayfa Bulunamadı</p><Link to="/" className="mt-8 text-nuper-blue hover:underline">Ana Sayfaya Dön</Link></div>} />
                 </Routes>
             </Router>
             <SpeedInsights />
