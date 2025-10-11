@@ -30,6 +30,10 @@ import LegalPage from './components/LegalPage';
 import HowItWorks from './components/HowItWorks';
 import './components/HowItWorks.css';
 
+// YENİ: Projeler Vitrin ve Detay Sayfaları
+import Projects from './components/Projects';
+import ProjectDetail from './components/ProjectDetail';
+
 // Admin Bileşen importları
 import AdminLogin from './components/AdminLogin';
 import AdminPanel from './components/AdminPanel';
@@ -83,6 +87,7 @@ const HomeHeader = ({ currentUser }) => {
                         <Link to="/about" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Hakkımızda</Link>
                         <Link to="/events" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Etkinlikler</Link>
                         <Link to="/bulletins" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Bültenler</Link>
+                        <Link to="/projects" className={`font-sans py-2 ${textColorClass} ${linkHoverClass}`}>Projeler</Link>
                         {currentUser ? (
                             <ProfileIcon user={currentUser} textColorClass={textColorClass} />
                         ) : (
@@ -105,6 +110,7 @@ const HomeHeader = ({ currentUser }) => {
                            <Link to="/about" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-nuper-blue`}>Hakkımızda</Link>
                            <Link to="/events" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-nuper-blue`}>Etkinlikler</Link>
                            <Link to="/bulletins" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-nuper-blue`}>Bültenler</Link>
+                           <Link to="/projects" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-nuper-blue`}>Projeler</Link>
                             {currentUser ? (
                                 <Link to="/dashboard" onClick={() => setIsMenuOpen(false)} className={`block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-nuper-blue`}>Projelerim</Link>
                             ) : (
@@ -133,6 +139,7 @@ const DefaultHeader = ({ currentUser }) => {
                         <Link to="/about" className="py-2 font-sans text-nuper-blue hover:text-nuper-dark-blue">Hakkımızda</Link>
                         <Link to="/events" className="py-2 font-sans text-nuper-blue hover:text-nuper-dark-blue">Etkinlikler</Link>
                         <Link to="/bulletins" className="py-2 font-sans text-nuper-blue hover:text-nuper-dark-blue">Bültenler</Link>
+                        <Link to="/projects" className="py-2 font-sans text-nuper-blue hover:text-nuper-dark-blue">Projeler</Link>
                         {currentUser ? (
                             <ProfileIcon user={currentUser} textColorClass="text-nuper-blue" />
                         ) : (
@@ -388,6 +395,8 @@ const App = () => {
                         <Route path="/project-upload/:projectId" element={<ProjectUploadForm />} /> 
                         <Route path="/dashboard" element={<UserDashboard />} />
                         <Route path="/legal/:page" element={<LegalPage />} />
+                        <Route path="/projects" element={<Projects />} />
+                        <Route path="/projects/:projectId" element={<ProjectDetail />} />
                     </Route>
                     <Route path="/admin" element={<AdminPanel />}>
                         <Route index element={<div className="pt-8"><h2 className="mb-4 text-3xl font-bold text-center font-heading text-nuper-dark-blue">Admin Paneline Hoş Geldiniz!</h2><p className="text-center text-gray-700">Lütfen yukarıdaki menüden bir yönetim seçeneği belirleyin.</p></div>} />
