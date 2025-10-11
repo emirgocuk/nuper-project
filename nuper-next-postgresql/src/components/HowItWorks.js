@@ -1,3 +1,5 @@
+"use client";
+import './HowItWorks.css';
 import React from 'react';
 import { motion } from 'framer-motion';
 import './HowItWorks.css';
@@ -57,16 +59,16 @@ const cardVariants = {
 };
 
 const HowItWorks = () => (
-    <section className="how-it-works-section relative overflow-hidden">
+    <section className="relative overflow-hidden how-it-works-section">
         <SharedStarfield />
-        <div className="max-w-6xl mx-auto px-4 py-20 text-center relative z-10">
+        <div className="relative z-10 max-w-6xl px-4 py-20 mx-auto text-center">
             <motion.h2 
                 initial={{ opacity: 0, y: -30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.8 }}
                 transition={{ duration: 0.7 }}
                 // DEĞİŞİKLİK: Emoji kaldırıldı ve yazı rengi için class eklendi
-                className="text-4xl md:text-5xl font-heading font-bold text-white mb-4"
+                className="mb-4 text-4xl font-bold text-white md:text-5xl font-heading"
             >
                 Fikirden Başarıya: <br className="md:hidden"/> 3 Adımda Yatırım Yolculuğun
             </motion.h2>
@@ -76,14 +78,14 @@ const HowItWorks = () => (
                 // DEĞİŞİKLİK: Animasyonun sadece bir kez çalışması için once: true eklendi
                 viewport={{ once: true, amount: 0.8 }}
                 transition={{ duration: 0.7, delay: 0.2 }}
-                className="text-lg md:text-xl text-gray-300 mb-16 max-w-3xl mx-auto"
+                className="max-w-3xl mx-auto mb-16 text-lg text-gray-300 md:text-xl"
             >
                 Nuper, parlak fikirleri doğru yatırımcılarla buluşturarak hayalleri gerçeğe dönüştürür. İşte başarıya giden yol haritan:
             </motion.p>
 
             <div className="relative">
                 <div className="timeline-line"></div>
-                <div className="flex flex-col space-y-24 items-center">
+                <div className="flex flex-col items-center space-y-24">
                     {steps.map((step, i) => (
                         <motion.div
                             key={i}
@@ -95,8 +97,8 @@ const HowItWorks = () => (
                             variants={cardVariants}
                             className={`step-card ${i === 1 ? "step-card--connect" : ""} relative`}
                         >
-                            <div className="step-icon-wrapper relative mx-auto mb-6">{step.icon}</div>
-                            <h3 className="step-title mb-2">
+                            <div className="relative mx-auto mb-6 step-icon-wrapper">{step.icon}</div>
+                            <h3 className="mb-2 step-title">
                                 {step.title}
                             </h3>
                             <p className="step-description">
