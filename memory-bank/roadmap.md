@@ -23,14 +23,23 @@
 ## Phase 3: User Features (Completed ✅)
 - [x] User Registration & Login
 - [x] User Profile Management
-- [x] Project Submission Form
-- [x] User Dashboard
+- [x] Project Submission Form (Rich Text Editor Entegrasyonu dahil)
+- [x] User Dashboard (Revizyon Akışı ve Loglar dahil)
 - [x] Notification Preferences
 - [x] Email Notifications Integration
 - [x] User Activity History
 - [x] Profile Customization Options
+- [x] Proje Vitrini ve Detay Sayfaları (Yatırımcı Görünümü)
 
-## Phase 4: Monetization (Next Up 💰)
+## Phase 4: Architectural Transformation (In Progress 🚀)
+- [ ] PostgreSQL Veritabanı Kurulumu ve Şema Tasarımı
+- [ ] ORM (Prisma/Knex) Entegrasyonu
+- [ ] Firebase Authentication'ın NodeJS (JWT/NextAuth) ile Değiştirilmesi
+- [ ] Next.js API Rotası (Backend) Mantığının Oluşturulması
+- [ ] Tüm Firestore Okuma/Yazma İşlemlerinin PostgreSQL API'leri ile Değiştirilmesi
+- [ ] Mevcut React Bileşenlerinin Next.js Dosya Sistemine Adaptasyonu
+
+## Phase 5: Monetization (Next Up 💰)
 - [ ] Featured Events Implementation
   - [ ] Add 'Featured' flag to events
   - [ ] Design featured event showcase on homepage
@@ -104,9 +113,10 @@
 - Phase 1: 100% Complete
 - Phase 2: 100% Complete
 - Phase 3: 100% Complete
-- Phase 4: 0% Complete
-- Phase 5: Planning Stage
-- Phase 6: Not Started
-- Phase 7: Vision Phase
+- Phase 4: 0% Complete (Başlangıç)
+- Phase 5: 0% Complete
+- Phase 6: Planning Stage
+- Phase 7: Not Started
+- Phase 8: Vision Phase
 
-Last Updated: October 9, 2025
+Last Updated: October 11, 2025
