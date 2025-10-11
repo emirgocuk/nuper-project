@@ -4,7 +4,11 @@
   "private": true,
   "dependencies": {
     "@editorjs/checklist": "^1.6.0",
+    "@editorjs/code": "^2.9.3",
+    "@editorjs/embed": "^2.7.6",
     "@editorjs/image": "^2.10.2",
+    "@editorjs/raw": "^2.5.1",
+    "@editorjs/warning": "^1.4.1",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@react-three/drei": "^9.0.0",

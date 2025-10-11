@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, getFirestore, query, where, orderBy } from 'firebase/firestore';
+// collectionGroup eklendi
+import { collectionGroup, getDocs, getFirestore, query, where, orderBy } from 'firebase/firestore'; 
 import { app } from '../firebaseConfig';
 import { Link } from 'react-router-dom';
 
@@ -14,30 +15,41 @@ const Projects = () => {
             setLoading(true);
             setError(null);
             
-            // Proje Vitrini için mock veri
-            const exampleProjects = [
-                { id: 'p1', projectName: 'Gezgin Otonom Robot', projectSummary: 'Depo yönetimini optimize eden yapay zeka destekli robot filosu.', ownerEmail: 'user1@mail.com', status: 'published', submittedAt: new Date(2025, 8, 15) },
-                { id: 'p2', projectName: 'Yol Boyunca Şarj Projesi', projectSummary: 'Otoyollarda kablosuz elektrik şarj altyapısı konsepti. Sadece bir fikir olarak sunulmuştur.', ownerEmail: 'user2@mail.com', status: 'published', submittedAt: new Date(2025, 9, 20) },
-                { id: 'p3', projectName: 'Adaptif Eğitim Sistemi', projectSummary: 'Öğrenci performansına göre ders içeriklerini dinamik olarak değiştiren platform.', ownerEmail: 'user3@mail.com', status: 'published', submittedAt: new Date(2025, 7, 10) },
-                { id: 'p4', projectName: 'Güneş Enerjili Tarım Sensörleri', projectSummary: 'Sıfır enerji tüketimli, bulut tabanlı tarım sensör ağı.', ownerEmail: 'user4@mail.com', status: 'published', submittedAt: new Date(2025, 9, 5) },
-            ];
-            
-            // Projeleri submittedAt'e göre sırala (en yeniyi üste)
-            exampleProjects.sort((a, b) => b.submittedAt - a.submittedAt);
+            try {
+                // HATA DÜZELTİLDİ: Firestore'dan Collection Group Query ile sadece 'published' olanları çekiyoruz.
+                // Bu, users/UID/projects altındaki tüm projelere bakar.
+                const projectsCollectionGroupRef = collectionGroup(db, 'projects');
+                const q = query(
+                    projectsCollectionGroupRef,
+                    where('status', '==', 'published'),
+                    orderBy('submittedAt', 'desc')
+                );
+                
+                const querySnapshot = await getDocs(q);
+                
+                const publishedProjects = querySnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    // Proje ID'sini ve Veriyi doğrudan kullanıyoruz.
+                    return {
+                        id: doc.id,
+                        ...data,
+                        // Firestore Timestamp'i Date objesine çevirme
+                        submittedAt: data.submittedAt?.toDate() || new Date(), 
+                    };
+                });
+                
+                setProjects(publishedProjects);
 
-            // Gerçek Firestore Query burada Collection Group Query olarak çalışmalıdır.
-            
-            setProjects(exampleProjects.map(p => ({
-                ...p,
-                // Slug yerine ProjectId kullanacağız, bu nedenle mock datayı kullanıyoruz.
-                slug: p.id
-            })));
-
-
-            setLoading(false);
+            } catch (err) {
+                console.error("Projeler çekilirken hata oluştu:", err);
+                setError("Proje vitrini yüklenirken bir sorun oluştu. (Hata kodu: CGQ)");
+            } finally {
+                setLoading(false);
+            }
         };
         fetchPublishedProjects();
     }, [db]);
+
 
     if (loading) {
         return <div className="pt-24 text-center">Yatırımcı Projeleri Yükleniyor...</div>;
@@ -76,13 +88,13 @@ const Projects = () => {
                                             </span>
                                         </div>
                                         
-                                        {/* Özet Kartı */}
+                                        {/* Proje içeriğinin ilk paragrafını özet olarak kullanıyoruz */}
                                         <p className="mt-2 text-base text-gray-700 line-clamp-2">
-                                            {project.projectSummary}
+                                            {project.content?.blocks[0]?.data?.text || "Detaylı içerik bekleniyor..."}
                                         </p>
                                         
                                         <p className="mt-4 text-sm font-semibold text-gray-500">
-                                            Detayları Görüntüle &rarr;
+                                            Detaylı Tanıtım Sayfasına Git &rarr;
                                         </p>
                                     </div>
                                 </Link>

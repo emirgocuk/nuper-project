@@ -1,37 +1,59 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, collection, addDoc, doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { app } from '../../firebaseConfig';
 
+// EditorJS ve gerekli tool'ları import ediyoruz
+import EditorJS from '@editorjs/editorjs';
+import Header from '@editorjs/header';
+import List from '@editorjs/list';
+// import Checklist from '@editorjs/checklist'; // KALDIRILDI: Nested Array riskini azaltmak için
+import Quote from '@editorjs/quote';
+import Delimiter from '@editorjs/delimiter';
+// import Table from '@editorjs/table'; // KALDIRILDI: Nested Array riskini azaltmak için
+import Marker from '@editorjs/marker';
+import ImageTool from '@editorjs/image';
+import Embed from '@editorjs/embed';
+import CodeTool from '@editorjs/code';
+import Warning from '@editorjs/warning';
+import RawTool from '@editorjs/raw';
+
+
 const ProjectUploadForm = () => {
-    // URL'den projectId'yi alıyoruz. Eğer varsa, düzenleme modundayız.
     const { projectId } = useParams();
     const navigate = useNavigate();
     const auth = getAuth(app);
     const db = getFirestore(app);
     const user = auth.currentUser;
+    const editorInstanceRef = useRef(null); 
+
+    // IMGBB API Key'in .env dosyasında REACT_APP_IMGBB_API_KEY olarak tanımlandığı varsayılır.
+    const IMGBB_API_KEY = process.env.REACT_APP_IMGBB_API_KEY;
 
     const [formData, setFormData] = useState({
         projectName: '',
-        projectSummary: '',
-        // techStack ve fileLink kaldırıldı
+        content: { blocks: [] }, 
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [isEditMode, setIsEditMode] = useState(false);
     const [originalStatus, setOriginalStatus] = useState('');
-
+    const [agreed, setAgreed] = useState(false);
+    
+    // EditorJS başlatma ve veri çekme
     useEffect(() => {
         if (!user) {
             navigate('/login');
             return;
         }
 
-        if (projectId) {
-            setIsEditMode(true);
+        const fetchProject = async () => {
             setLoading(true);
-            const fetchProject = async () => {
+            let initialContent = { blocks: [] };
+            
+            if (projectId) {
+                setIsEditMode(true);
                 try {
                     const docRef = doc(db, "users", user.uid, "projects", projectId);
                     const docSnap = await getDoc(docRef);
@@ -39,35 +61,103 @@ const ProjectUploadForm = () => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         
-                        // Sadece revizyon istendiğinde düzenlemeye izin verilir.
                         if (data.status !== 'revision_requested') {
-                             setError('Bu projeyi şu anda düzenleyemezsiniz.');
+                             setError('Bu projeyi şu anda düzenleyemezsiniz. Revizyon talep edilmeli.');
                              setLoading(false);
                              return;
                         }
 
                         setFormData({
                             projectName: data.projectName || '',
-                            projectSummary: data.projectSummary || '',
-                            // techStack ve fileLink kaldırıldığı için burada da kaldırıldı
+                            content: data.content || { blocks: [] },
                         });
                         setOriginalStatus(data.status);
+                        initialContent = data.content || { blocks: [] };
 
                     } else {
                         setError("Düzenlenecek proje bulunamadı.");
                     }
                 } catch (err) {
-                    console.error("Projeyi çekerken hata:", err);
                     setError("Proje yüklenirken bir hata oluştu.");
-                } finally {
-                    setLoading(false);
                 }
-            };
-            fetchProject();
-        }
+            } else {
+                 setIsEditMode(false);
+            }
+            
+            // EditorJS'i başlat
+            if (!editorInstanceRef.current && user) {
+                editorInstanceRef.current = new EditorJS({
+                    holder: 'editorjs',
+                    minHeight: 500,
+                    placeholder: 'Proje tanıtımınızı, fikirlerinizi, iş planınızı burada oluşturun...',
+                    tools: {
+                        header: { class: Header, inlineToolbar: true, config: { placeholder: 'Başlık Girin', levels: [1, 2, 3, 4], defaultLevel: 2 }},
+                        list: { class: List, inlineToolbar: true },
+                        // checklist: { class: Checklist, inlineToolbar: true }, // KALDIRILDI
+                        quote: { class: Quote, inlineToolbar: true },
+                        // table: { class: Table, inlineToolbar: true }, // KALDIRILDI
+                        marker: { class: Marker },
+                        delimiter: Delimiter,
+                        embed: { class: Embed, config: { services: { youtube: true, codepen: true, vimeo: true }}},
+                        code: CodeTool,
+                        warning: Warning,
+                        raw: RawTool,
+                         image: {
+                            class: ImageTool,
+                            config: { 
+                                uploader: {
+                                    async uploadByFile(file) {
+                                        const body = new FormData();
+                                        body.append('image', file);
+                                        
+                                        if (!IMGBB_API_KEY) {
+                                            console.error("IMGBB API Key bulunamadı!");
+                                            return { success: 0, message: "API Anahtarı eksik." };
+                                        }
+
+                                        try {
+                                            const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { 
+                                                method: 'POST', 
+                                                body 
+                                            });
+                                            const result = await response.json();
+                                            
+                                            if (result.success) {
+                                                return {
+                                                    success: 1,
+                                                    file: {
+                                                        url: result.data.url, 
+                                                    }
+                                                };
+                                            }
+                                            throw new Error(result.error?.message || 'Görsel Yüklemesi Başarısız');
+                                        } catch (err) { 
+                                            console.error("Görsel yükleme hatası:", err); 
+                                            return { success: 0 }; 
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    data: initialContent,
+                });
+            }
+
+            setLoading(false);
+        };
+        fetchProject();
+
+        return () => {
+            // EditorJS instance'ını temizle
+            if (editorInstanceRef.current && typeof editorInstanceRef.current.destroy === 'function') {
+                editorInstanceRef.current.destroy();
+                editorInstanceRef.current = null;
+            }
+        };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, projectId, db, navigate]); 
-
+    
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -75,35 +165,44 @@ const ProjectUploadForm = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        if (!agreed) {
+            setError('Devam etmek için yasal koşulları kabul etmelisiniz.');
+            return;
+        }
+
         setError('');
         setLoading(true);
-
+        
+        const contentData = await editorInstanceRef.current.save();
+        
+        // Firestore Nested Array hatası almamak için temizlik yapılabilir (opsiyonel)
+        // Ancak tablo ve checklist kaldırıldığı için bu risk minimize edilmiştir.
+        
+        if (!formData.projectName || contentData.blocks.length === 0) {
+            setError('Lütfen Proje Adını girin ve Proje İçeriğini (en az bir blok) doldurun.');
+            setLoading(false);
+            return;
+        }
+        
         const projectData = {
             ownerEmail: user.email,
-            ...formData,
+            projectName: formData.projectName,
+            content: contentData, // Zengin içerik bloğu
         };
-        
-        // Yeni projelerde zorunlu alan kontrolü
-        if (!projectData.projectName || !projectData.projectSummary) {
-             setError('Lütfen tüm zorunlu alanları (Proje Adı ve Özeti) doldurun.');
-             setLoading(false);
-             return;
-        }
 
         try {
             if (isEditMode) {
-                // Revizyonu tekrar gönder (Durumu 'submitted' olarak değiştir)
                 const docRef = doc(db, "users", user.uid, "projects", projectId);
                 await updateDoc(docRef, {
                     ...projectData,
-                    status: 'submitted', // Tekrar incelemeye gönderildi
-                    'adminNotes.isNew': false, // Admin'e gönderilen uyarıyı sıfırla
+                    status: 'submitted', 
+                    'adminNotes.isNew': false, 
                     lastRevisionDate: serverTimestamp(),
                     updatedAt: serverTimestamp(),
                 });
                 alert('Projeniz revize edildi ve başarıyla tekrar incelemeye gönderildi!');
             } else {
-                // Yeni Proje Oluştur
                 const projectsCollectionRef = collection(db, "users", user.uid, "projects");
                 await addDoc(projectsCollectionRef, {
                     ...projectData,
@@ -113,10 +212,10 @@ const ProjectUploadForm = () => {
                 });
                 alert('Projeniz başarıyla yüklendi ve incelemeye gönderildi!');
             }
-            navigate('/dashboard'); // Dashboard'a geri dön
+            navigate('/dashboard'); 
         } catch (err) {
             console.error("Proje yüklenirken/güncellenirken hata:", err);
-            setError(`Hata oluştu: ${err.message}`);
+            setError(`Hata oluştu: ${err.message}. Lütfen içeriğinizdeki karmaşık listeleri kontrol edin.`);
         } finally {
             setLoading(false);
         }
@@ -124,7 +223,6 @@ const ProjectUploadForm = () => {
 
     if (loading) return <div className="pt-32 text-center">Proje yükleniyor...</div>;
     
-    // Revizyon modunda değilsek ve bir proje ID'si varsa (ki olmamalı) veya düzenlemeye izin verilmiyorsa
     if (isEditMode && originalStatus !== 'revision_requested' && !loading) {
          return <div className="pt-32 text-center text-red-600">Bu projeyi düzenleme yetkiniz bulunmamaktadır. Mevcut durumu: {originalStatus}.</div>;
     }
@@ -150,7 +248,7 @@ const ProjectUploadForm = () => {
                         
                         {/* Proje Adı */}
                         <div>
-                            <label htmlFor="projectName" className="block mb-1 text-sm font-medium text-gray-700">Proje Adı</label>
+                            <label htmlFor="projectName" className="block mb-1 text-sm font-medium text-gray-700">Proje Adı <span className="text-red-500">*</span></label>
                             <input
                                 type="text"
                                 id="projectName"
@@ -162,23 +260,24 @@ const ProjectUploadForm = () => {
                             />
                         </div>
 
-                        {/* Proje Özeti */}
+                        {/* Zengin Proje İçeriği */}
                         <div>
-                            <label htmlFor="projectSummary" className="block mb-1 text-sm font-medium text-gray-700">Proje Özeti (Maks. 500 kelime)</label>
-                            <textarea
-                                id="projectSummary"
-                                name="projectSummary"
-                                rows="5"
-                                className="form-input-std"
-                                value={formData.projectSummary}
-                                onChange={handleInputChange}
-                                required
-                            />
+                            <label className="block mb-2 text-sm font-medium text-gray-700">Proje İçeriği (Tanıtım)</label>
+                            <div id="editorjs" className="bg-white border rounded-md p-2 min-h-[500px] editor-container"></div>
                         </div>
-                        
-                        {/* Kullanılan Teknolojiler (KALDIRILDI) */}
 
-                        {/* Proje Dosya Linki (KALDIRILDI) */}
+                        <div className="p-4 bg-gray-100 rounded-lg">
+                            <h3 className="font-semibold text-gray-800">Yasal Bilgilendirme ve Onay</h3>
+                            <p className="mt-2 text-xs text-gray-600">
+                                Projenizi göndererek, fikrinizin platformumuzdaki kayıtlı yatırımcılarla paylaşılabileceğini kabul etmiş olursunuz. Platformumuz, fikirlerinizin gizliliğini korumak için yatırımcılardan Gizlilik Sözleşmesi (NDA) onayı alır ancak fikirlerinizin tam hukuki koruması için patent veya marka tescili gibi adımları atmanız sizin sorumluluğunuzdadır.
+                            </p>
+                            <div className="mt-4">
+                                <label className="flex items-center">
+                                    <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="w-4 h-4 rounded text-nuper-blue" />
+                                    <span className="ml-2 text-sm text-gray-700">Okudum, anladım ve kabul ediyorum. <span className="text-red-500">*</span></span>
+                                </label>
+                            </div>
+                        </div>
 
                         <button
                             type="submit"
