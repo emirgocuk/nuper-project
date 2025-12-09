@@ -8,16 +8,23 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  role          String    @default("USER")
-  projects      Project[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  name             String?
+  email            String    @unique
+  emailVerified    DateTime?
+  image            String?
+  password         String?
+  role             String    @default("USER")
+  userRole         String?   // "INVESTOR" | "ENTREPRENEUR"
+  profileImage     String?   // ImageBB URL
+  isVerified       Boolean   @default(false)
+  verificationData Json?     // Flexible field for verification details
+  profileData      Json?     // Role-specific profile information
+  socialLinks      Json?     // LinkedIn, Twitter, Instagram
+  phone            String?   // For verification only
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  projects         Project[]
 }
 
 model Event {

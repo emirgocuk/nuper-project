@@ -61,6 +61,31 @@ export default function RegisterPage() {
                             <Input name="email" type="email" required placeholder="ornek@email.com" />
                         </div>
                         <div className="space-y-2">
+                            <label className="text-sm font-medium">Kullanıcı Rolü *</label>
+                            <div className="flex gap-4">
+                                <label className="flex items-center space-x-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="userRole"
+                                        value="INVESTOR"
+                                        required
+                                        className="w-4 h-4 text-nuper-blue focus:ring-nuper-blue"
+                                    />
+                                    <span className="text-sm">Yatırımcı</span>
+                                </label>
+                                <label className="flex items-center space-x-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="userRole"
+                                        value="ENTREPRENEUR"
+                                        required
+                                        className="w-4 h-4 text-nuper-blue focus:ring-nuper-blue"
+                                    />
+                                    <span className="text-sm">Girişimci</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
                             <label className="text-sm font-medium">Şifre</label>
                             <Input name="password" type="password" required />
                         </div>

@@ -1,7 +1,4 @@
 import { NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
-import path from 'path';
-import fs from 'fs';
 
 export async function POST(request: Request) {
     try {
@@ -12,24 +9,36 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: 0, error: 'No file uploaded' }, { status: 400 });
         }
 
+        // Convert File to base64
         const buffer = Buffer.from(await file.arrayBuffer());
-        const filename = Date.now() + '_' + file.name.replaceAll(" ", "_");
-        const uploadDir = path.join(process.cwd(), 'public/uploads');
+        const base64 = buffer.toString('base64');
 
-        // Ensure directory exists
-        if (!fs.existsSync(uploadDir)) {
-            await fs.promises.mkdir(uploadDir, { recursive: true });
+        // Upload to ImageBB
+        const imgbbFormData = new FormData();
+        imgbbFormData.append('image', base64);
+
+        const response = await fetch(
+            `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
+            {
+                method: 'POST',
+                body: imgbbFormData,
+            }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Return EditorJS expected format
+            return NextResponse.json({
+                success: 1,
+                file: {
+                    url: data.data.url,
+                },
+            });
+        } else {
+            console.error('ImageBB upload failed:', data);
+            return NextResponse.json({ success: 0, error: 'Upload failed' }, { status: 500 });
         }
-
-        const filepath = path.join(uploadDir, filename);
-        await writeFile(filepath, buffer);
-
-        return NextResponse.json({
-            success: 1,
-            file: {
-                url: `/uploads/${filename}`,
-            },
-        });
     } catch (error) {
         console.error('Upload error:', error);
         return NextResponse.json({ success: 0, error: 'Upload failed' }, { status: 500 });
