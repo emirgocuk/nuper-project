@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ModeToggle } from '@/components/ModeToggle';
+
 
 export const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -36,10 +36,7 @@ export const Navbar = () => {
                         <Link href="/" className={cn("font-sans py-2", linkHoverClass)}>Ana Sayfa</Link>
                         <Link href="/about" className={cn("font-sans py-2", linkHoverClass)}>Hakkımızda</Link>
                         <Link href="/events" className={cn("font-sans py-2", linkHoverClass)}>Etkinlikler</Link>
-                        <Link href="/bulletins" className={cn("font-sans py-2", linkHoverClass)}>Bültenler</Link>
                         <Link href="/projects" className={cn("font-sans py-2", linkHoverClass)}>Projeler</Link>
-
-                        <ModeToggle />
 
                         {session ? (
                             <Link href="/dashboard" className={cn("px-4 py-2 font-sans border rounded-lg", isHomePage ? "border-white/50 bg-white/20 hover:bg-white/30" : "border-nuper-blue bg-nuper-blue text-white hover:bg-nuper-dark-blue")}>
