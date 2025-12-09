@@ -1,0 +1,80 @@
+{
+  "name": "nuper-project",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@editorjs/checklist": "^1.6.0",
+    "@editorjs/code": "^2.9.3",
+    "@editorjs/embed": "^2.7.6",
+    "@editorjs/image": "^2.10.2",
+    "@editorjs/raw": "^2.5.1",
+    "@editorjs/warning": "^1.4.1",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-fontawesome": "^0.2.2",
+    "@react-three/drei": "^9.0.0",
+    "@react-three/fiber": "^8.13.3",
+    "@tailwindcss/line-clamp": "^0.4.4",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@vercel/speed-insights": "^1.2.0",
+    "dompurify": "^3.2.6",
+    "firebase": "^11.8.0",
+    "framer-motion": "^12.12.1",
+    "lucide-react": "^0.545.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-easy-crop": "^5.4.2",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.6.0",
+    "react-scripts": "5.0.1",
+    "react-sweetalert2": "^0.6.0",
+    "sweetalert2": "^11.21.2",
+    "three": "^0.140.0",
+    "three-stdlib": "^2.36.0",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@editorjs/delimiter": "^1.4.2",
+    "@editorjs/editorjs": "^2.30.8",
+    "@editorjs/header": "^2.8.8",
+    "@editorjs/list": "^2.0.8",
+    "@editorjs/marker": "^1.4.0",
+    "@editorjs/quote": "^2.7.6",
+    "@editorjs/table": "^2.4.5",
+    "@tailwindcss/typography": "^0.5.16",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.4.31",
+    "react-editor-js": "^2.1.0",
+    "tailwindcss": "^3.4.17"
+  },
+  "overrides": {
+    "nth-check": ">=2.0.1",
+    "webpack-dev-server": ">=4.15.2"
+  }
+}

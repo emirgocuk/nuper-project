@@ -1,0 +1,117 @@
+/* "Nasıl Çalışır?" bölümü için arka plan */
+.how-it-works-section {
+    background: linear-gradient(180deg, #111827 0%, #172554 50%, #111827 100%);
+    overflow: hidden;
+    position: relative;
+}
+
+/* DEĞİŞİKLİK: Kartlar arasındaki çizgi daha belirgin hale getirildi */
+.timeline-line {
+    position: absolute;
+    left: 50%;
+    top: 5rem; /* Kartların üst rozetlerinin ortasına gelecek şekilde ayarlandı */
+    bottom: 5rem;
+    width: 3px; /* Kalınlık artırıldı */
+    background-color: rgba(59, 130, 246, 0.4); /* Opaklık artırıldı */
+    transform: translateX(-50%);
+    border-radius: 2px;
+}
+
+.step-card {
+    position: relative;
+    z-index: 1;
+    max-width: 500px; /* Kartların genişliği sabitlendi */
+    margin-left: auto;
+    margin-right: auto;
+    background: rgba(30, 41, 59, 0.3); /* Biraz daha koyu ve opak arkaplan */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1.5rem;
+    padding: 2.5rem;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.step-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 32px 0 rgba(37, 99, 235, 0.1);
+}
+
+
+.step-card--connect {
+    animation: pulse-glow 2.5s infinite alternate;
+}
+
+@keyframes pulse-glow {
+  from {
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.2), 0 0 30px rgba(59, 130, 246, 0.1);
+  }
+  to {
+    box-shadow: 0 0 30px rgba(96, 165, 250, 0.5), 0 0 50px rgba(96, 165, 250, 0.3);
+  }
+}
+
+.step-icon-wrapper {
+    width: 5rem;
+    height: 5rem;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(37, 99, 235, 0.5);
+    border-radius: 9999px;
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
+}
+
+.step-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #f1f5f9; 
+    margin-bottom: 0.75rem;
+}
+
+.step-description {
+    color: #d1d5db;
+    font-size: 1.125rem;
+    line-height: 1.75;
+}
+
+/* DEĞİŞİKLİK: Başlık gradyanı kaldırıldı, artık düz renk */
+.future-title {
+    background: linear-gradient(
+        90deg,
+        #e0f2fe 0%,
+        #b9e6ff 20%,
+        #7ab1f5 40%,
+        #5493f8 60%,
+        #3853ae 80%,
+        #ffffff 100%
+    );
+    background-size: 300% auto;
+    color: transparent;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: future-title-gradient-move 5s infinite;
+    font-weight: bold;
+    letter-spacing: 0.01em;
+
+}
+
+@keyframes future-title-gradient-move {
+    0% {
+        background-position: 0% center;
+    }
+    100% {
+        background-position: 300% center;
+    }
+}
+
+/* Öne Çıkan Etkinlikler ve En Son Bültenler başlıkları için beyaz renk */
+.featured-events-title,
+.latest-news-title {
+    color: #fff !important;
+}

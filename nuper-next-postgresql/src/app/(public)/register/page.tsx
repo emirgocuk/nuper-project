@@ -1,18 +1,15 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { registerUser } from '@/actions/register';
 
-export default function LoginPage() {
+export default function RegisterPage() {
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const registered = searchParams.get('registered');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -22,44 +19,43 @@ export default function LoginPage() {
         setError('');
 
         const formData = new FormData(e.target as HTMLFormElement);
-        const email = formData.get('email') as string;
         const password = formData.get('password') as string;
+        const confirmPassword = formData.get('confirmPassword') as string;
+
+        if (password !== confirmPassword) {
+            setError('Şifreler eşleşmiyor.');
+            setLoading(false);
+            return;
+        }
 
         try {
-            const res = await signIn('credentials', {
-                email,
-                password,
-                redirect: false,
-            });
+            const result = await registerUser(formData);
 
-            if (res?.error) {
-                setError('Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
+            if (result.error) {
+                setError(result.error);
             } else {
-                router.push('/dashboard'); // or /admin depending on role logic
-                router.refresh();
+                router.push('/login?registered=true');
             }
+
         } catch (err) {
-            setError('Bir hata oluştu.');
+            setError('Bir hata oluştu. Lütfen tekrar deneyin.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 py-12">
             <Card className="w-full max-w-md shadow-lg">
                 <CardHeader className="text-center">
-                    <CardTitle className="text-2xl font-bold font-heading text-nuper-dark-blue">Giriş Yap</CardTitle>
+                    <CardTitle className="text-2xl font-bold font-heading text-nuper-dark-blue">Kayıt Ol</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {/* Show success message if registered */}
-                    {registered && (
-                        <div className="mb-4 p-3 bg-green-50 text-green-600 border border-green-200 rounded text-sm">
-                            Kayıt başarılı! Lütfen giriş yapın.
-                        </div>
-                    )}
-
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Ad Soyad</label>
+                            <Input name="name" type="text" required placeholder="John Doe" />
+                        </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Email</label>
                             <Input name="email" type="email" required placeholder="ornek@email.com" />
@@ -68,19 +64,23 @@ export default function LoginPage() {
                             <label className="text-sm font-medium">Şifre</label>
                             <Input name="password" type="password" required />
                         </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Şifre Tekrar</label>
+                            <Input name="confirmPassword" type="password" required />
+                        </div>
 
                         {error && <p className="text-sm text-red-500">{error}</p>}
 
                         <Button className="w-full bg-nuper-blue hover:bg-nuper-dark-blue" disabled={loading}>
-                            {loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
+                            {loading ? 'Kayıt Yapılıyor...' : 'Kayıt Ol'}
                         </Button>
                     </form>
                 </CardContent>
-                <div className="p-6 pt-0 flex justify-center">
+                <CardFooter className="justify-center">
                     <p className="text-sm text-gray-600">
-                        Hesabın yok mu? <Link href="/register" className="text-nuper-blue hover:underline">Kayıt Ol</Link>
+                        Zaten hesabın var mı? <Link href="/login" className="text-nuper-blue hover:underline">Giriş Yap</Link>
                     </p>
-                </div>
+                </CardFooter>
             </Card>
         </div>
     );

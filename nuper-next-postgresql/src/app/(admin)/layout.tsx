@@ -10,9 +10,9 @@ export default async function AdminLayout({
     const session = await auth();
 
     // Basic role check - in a real app, check for "ADMIN" role
-    // if (!session?.user) {
-    //     redirect("/login");
-    // }
+    if (!session?.user) {
+        redirect("/login");
+    }
 
     return (
         <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900">
