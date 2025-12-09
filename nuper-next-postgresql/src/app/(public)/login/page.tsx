@@ -35,7 +35,7 @@ export default function LoginPage() {
             if (res?.error) {
                 setError('Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
             } else {
-                router.push('/dashboard'); // or /admin depending on role logic
+                router.push('/');
                 router.refresh();
             }
         } catch (err) {

@@ -9,22 +9,22 @@ export default async function AdminDashboard() {
     const stats = [
         {
             title: "Toplam Etkinlik",
-            value: "0" /* await prisma.event.count() */,
+            value: await prisma.event.count(),
             icon: <Calendar className="h-4 w-4 text-muted-foreground" />,
         },
         {
             title: "Toplam Bülten",
-            value: "0" /* await prisma.bulletin.count() */,
+            value: await prisma.bulletin.count(),
             icon: <FileText className="h-4 w-4 text-muted-foreground" />,
         },
         {
             title: "Bekleyen Projeler",
-            value: "0" /* await prisma.project.count({ where: { status: 'SUBMITTED' } }) */,
+            value: await prisma.project.count({ where: { status: 'SUBMITTED' } }),
             icon: <CheckSquare className="h-4 w-4 text-muted-foreground" />,
         },
         {
             title: "Kayıtlı Kullanıcılar",
-            value: "0",
+            value: await prisma.user.count(),
             icon: <Users className="h-4 w-4 text-muted-foreground" />,
         }
     ];

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus } from "lucide-react";
+import { Plus, Edit } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { deleteBulletin } from "@/actions/bulletins";
 
 export default async function AdminBulletinsPage() {
     const bulletins = await prisma.bulletin.findMany({
@@ -31,11 +32,28 @@ export default async function AdminBulletinsPage() {
                 ) : (
                     bulletins.map((bulletin: any) => (
                         <Card key={bulletin.id}>
-                            <CardHeader>
-                                <CardTitle>{bulletin.title}</CardTitle>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-lg font-bold">{bulletin.title}</CardTitle>
+                                <div className="flex items-center gap-2">
+                                    <Link href={`/admin/bulletins/${bulletin.id}/edit`}>
+                                        <Button variant="outline" size="sm">
+                                            <Edit className="w-4 h-4 mr-1" />
+                                            Düzenle
+                                        </Button>
+                                    </Link>
+                                    <form action={async () => {
+                                        'use server';
+                                        await deleteBulletin(bulletin.id);
+                                    }}>
+                                        <Button variant="destructive" size="sm" type="submit">Sil</Button>
+                                    </form>
+                                </div>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-sm text-gray-500">{new Date(bulletin.createdAt).toLocaleDateString("tr-TR")}</p>
+                                <p className="text-sm text-gray-500 mb-2">
+                                    {new Date(bulletin.createdAt).toLocaleDateString("tr-TR")} - {bulletin.published ? 'Yayında' : 'Taslak'}
+                                </p>
+                                <p className="text-sm text-gray-600">Yayıncı: {bulletin.publisher}</p>
                             </CardContent>
                         </Card>
                     ))

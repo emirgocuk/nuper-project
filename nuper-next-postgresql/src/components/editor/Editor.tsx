@@ -59,7 +59,7 @@ export default function Editor({ data, onChange, holder }: EditorProps) {
                         config: {
                             // Configure backend endpoint for image upload or use simple URL
                             endpoints: {
-                                // byFile: '/api/uploadFile', // Backend file uploader endpoint
+                                byFile: '/api/upload', // Backend file uploader endpoint
                                 // byUrl: '/api/fetchUrl', // Endpoint that provides uploading by Url
                             }
                         }

@@ -1,64 +1,46 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Editor from '@/components/editor/Editor';
+import { updateEvent } from '@/actions/events';
 
-import { createEvent } from '@/actions/events';
-import { useAdminSettings } from '@/context/AdminSettingsContext';
+interface EditEventPageProps {
+    params: Promise<{ id: string }>;
+}
 
-export default function NewEventPage() {
+export default function EditEventPage(props: EditEventPageProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [content, setContent] = useState<any>(null);
-    const { isDevMode } = useAdminSettings();
+    const [event, setEvent] = useState<any>(null);
+    const [id, setId] = useState<string>('');
 
-    const fillTestData = () => {
-        const titleInput = document.getElementById('title') as HTMLInputElement;
-        const slugInput = document.getElementById('slug') as HTMLInputElement;
-        const dateInput = document.getElementById('date') as HTMLInputElement;
-        const cardImageInput = document.getElementById('cardImage') as HTMLInputElement;
-        const descriptionInput = document.getElementById('description') as HTMLInputElement;
-
-        if (titleInput) titleInput.value = "Test Etkinlik " + new Date().toLocaleTimeString();
-        if (slugInput) slugInput.value = "test-etkinlik-" + Date.now();
-        if (dateInput) dateInput.value = "25 Aralık 2024";
-        if (cardImageInput) cardImageInput.value = "https://picsum.photos/seed/" + (Date.now() + 1) + "/800/600";
-        if (descriptionInput) descriptionInput.value = "Bu etkinlik test amaçlı otomatik oluşturulmuştur.";
-
-        const dummyContent = {
-            time: Date.now(),
-            blocks: [
-                {
-                    id: "eh1-" + Date.now(),
-                    type: "header",
-                    data: {
-                        text: "The standard Lorem Ipsum passage, used since the 1500s",
-                        level: 3
+    useEffect(() => {
+        props.params.then(p => {
+            setId(p.id);
+            // Fetch event data
+            fetch(`/api/events/${p.id}`)
+                .then(res => res.json())
+                .then(data => {
+                    setEvent(data);
+                    if (data.content) {
+                        try {
+                            const parsedContent = typeof data.content === 'string'
+                                ? JSON.parse(data.content)
+                                : data.content;
+                            setContent(parsedContent);
+                        } catch (e) {
+                            console.error('Failed to parse content:', e);
+                        }
                     }
-                },
-                {
-                    id: "ep1-" + Date.now(),
-                    type: "paragraph",
-                    data: {
-                        text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
-                    }
-                },
-                {
-                    id: "eh2-" + Date.now(),
-                    type: "paragraph",
-                    data: {
-                        text: "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium..."
-                    }
-                }
-            ],
-            version: "2.31.0"
-        };
-        setContent(dummyContent);
-    };
+                })
+                .catch(err => console.error('Failed to fetch event:', err));
+        });
+    }, [props.params]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -66,28 +48,24 @@ export default function NewEventPage() {
 
         const formData = new FormData(e.currentTarget);
         formData.append('content', JSON.stringify(content));
-        formData.append('published', 'on');
 
         try {
-            await createEvent(formData);
-            router.push('/admin/events'); // Navigate on success
+            await updateEvent(id, formData);
         } catch (error) {
             console.error(error);
-            alert("Etkinlik oluşturulurken bir hata oluştu.");
-        } finally {
+            alert("Etkinlik güncellenirken bir hata oluştu.");
             setLoading(false);
         }
     };
 
+    if (!event) {
+        return <div className="flex items-center justify-center h-screen">Yükleniyor...</div>;
+    }
+
     return (
         <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
-                <h1 className="text-3xl font-bold font-heading">Yeni Etkinlik Ekle</h1>
-                {isDevMode && (
-                    <Button type="button" variant="secondary" onClick={fillTestData} className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-300">
-                        🛠 Test Verisi Doldur
-                    </Button>
-                )}
+                <h1 className="text-3xl font-bold font-heading">Etkinliği Düzenle</h1>
             </div>
             <Card>
                 <CardHeader>
@@ -101,6 +79,7 @@ export default function NewEventPage() {
                                 id="title"
                                 name="title"
                                 required
+                                defaultValue={event.title}
                                 placeholder="Etkinlik Başlığı"
                             />
                         </div>
@@ -111,6 +90,7 @@ export default function NewEventPage() {
                                 id="slug"
                                 name="slug"
                                 required
+                                defaultValue={event.slug}
                                 placeholder="etkinlik-basligi-2024"
                             />
                         </div>
@@ -121,6 +101,7 @@ export default function NewEventPage() {
                                 <Input
                                     id="date"
                                     name="date"
+                                    defaultValue={event.date || ''}
                                     placeholder="20 Ekim 2024"
                                 />
                             </div>
@@ -129,6 +110,7 @@ export default function NewEventPage() {
                                 <Input
                                     id="cardImage"
                                     name="cardImage"
+                                    defaultValue={event.cardImage || ''}
                                     placeholder="https://..."
                                 />
                             </div>
@@ -140,6 +122,7 @@ export default function NewEventPage() {
                                 id="description"
                                 name="description"
                                 required
+                                defaultValue={event.description || ''}
                                 placeholder="Etkinlik hakkında kısa bir özet..."
                             />
                         </div>
@@ -149,6 +132,7 @@ export default function NewEventPage() {
                                 type="checkbox"
                                 id="isFeatured"
                                 name="isFeatured"
+                                defaultChecked={event.isFeatured}
                                 className="h-5 w-5 text-nuper-blue rounded border-gray-300 focus:ring-nuper-blue"
                             />
                             <label htmlFor="isFeatured" className="text-sm font-medium text-gray-700 select-none cursor-pointer">
@@ -160,17 +144,17 @@ export default function NewEventPage() {
                             <label className="text-sm font-medium block">İçerik</label>
                             <div className="min-h-[400px]">
                                 <Editor
-                                    holder="editorjs-container"
+                                    holder="editorjs-container-edit"
                                     onChange={(data) => setContent(data)}
+                                    initialData={content}
                                 />
-                                {content && isDevMode && <p className="text-xs text-green-600 mt-1">Test içeriği yüklendi (Editörde görünmeyebilir ama gönderilecek).</p>}
                             </div>
                         </div>
 
                         <div className="flex justify-end gap-4">
                             <Button type="button" variant="outline" onClick={() => router.back()}>İptal</Button>
                             <Button type="submit" disabled={loading}>
-                                {loading ? 'Kaydediliyor...' : 'Kaydet'}
+                                {loading ? 'Güncelleniyor...' : 'Güncelle'}
                             </Button>
                         </div>
                     </form>

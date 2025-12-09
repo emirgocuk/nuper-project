@@ -11,32 +11,40 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 password: { label: "Password", type: "password" },
             },
             authorize: async (credentials) => {
-                const email = credentials.email as string
-                const password = credentials.password as string
+                try {
+                    const email = credentials.email as string
+                    const password = credentials.password as string
 
-                if (!email || !password) {
-                    return null
-                }
+                    if (!email || !password) {
+                        console.log("Auth Error: Missing credentials");
+                        return null
+                    }
 
-                const user = await prisma.user.findUnique({
-                    where: { email },
-                })
+                    const user = await prisma.user.findUnique({
+                        where: { email },
+                    })
 
-                if (!user || !user.password) {
-                    return null
-                }
+                    if (!user || !user.password) {
+                        console.log("Auth Error: User not found or no password");
+                        return null
+                    }
 
-                const isPasswordValid = await compare(password, user.password)
+                    const isPasswordValid = await compare(password, user.password)
 
-                if (!isPasswordValid) {
-                    return null
-                }
+                    if (!isPasswordValid) {
+                        console.log("Auth Error: Invalid password");
+                        return null
+                    }
 
-                return {
-                    id: user.id,
-                    name: user.name,
-                    email: user.email,
-                    role: user.role,
+                    return {
+                        id: user.id,
+                        name: user.name,
+                        email: user.email,
+                        role: user.role,
+                    } as any
+                } catch (error) {
+                    console.error("Auth System Error:", error);
+                    return null;
                 }
             },
         }),

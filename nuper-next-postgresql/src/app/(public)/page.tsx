@@ -6,41 +6,37 @@ import { cn } from '@/lib/utils';
 import { ArrowRight, Calendar, Newspaper } from 'lucide-react';
 import { unstable_noStore as noStore } from 'next/cache';
 
-// async function getEvents() {
-//     noStore();
-//     try {
-//         // const events = await prisma.event.findMany({
-//         //     take: 3,
-//         //     orderBy: { createdAt: 'desc' }
-//         // });
-//         // return events;
-//         return [];
-//     } catch (e) {
-//         console.error("Failed to fetch events", e);
-//         return [];
-//     }
-// }
+async function getFeaturedEvent() {
+  noStore();
+  try {
+    // @ts-ignore - isFeatured might not be in generic client type yet
+    const event = await prisma.event.findFirst({
+      where: { isFeatured: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    return event;
+  } catch (e) {
+    console.error("Failed to fetch featured event", e);
+    return null;
+  }
+}
 
-// async function getBulletins() {
-//     noStore();
-//     try {
-//         // const bulletins = await prisma.bulletin.findMany({
-//         //     take: 3,
-//         //     orderBy: { createdAt: 'desc' }
-//         // });
-//         // return bulletins;
-//         return [];
-//     } catch (e) {
-//         console.error("Failed to fetch bulletins", e);
-//         return [];
-//     }
-// }
+async function getLatestBulletin() {
+  noStore();
+  try {
+    const bulletin = await prisma.bulletin.findFirst({
+      orderBy: { createdAt: 'desc' }
+    });
+    return bulletin;
+  } catch (e) {
+    console.error("Failed to fetch latest bulletin", e);
+    return null;
+  }
+}
 
 export default async function Home() {
-  // const events = await getEvents();
-  // const bulletins = await getBulletins();
-  const events: any[] = [];
-  const bulletins: any[] = [];
+  const featuredEvent = await getFeaturedEvent();
+  const latestBulletin = await getLatestBulletin();
 
   return (
     <main className="min-h-screen">
@@ -80,47 +76,89 @@ export default async function Home() {
 
         <section className="pb-20">
           <div className="px-4 mx-auto max-w-7xl">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-16">
-              {/* Etkinlikler Sütunu */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 text-white">
+              {/* Featured Event Column */}
               <div>
-                <h3 className="mb-8 text-3xl font-bold font-heading featured-events-title">Öne Çıkan Etkinlikler</h3>
-                <div className="space-y-6">
-                  {events.length === 0 ? (
-                    <div className="text-gray-400">Henüz etkinlik bulunmuyor.</div>
-                  ) : (
-                    events.map(event => (
-                      <Link href={`/event/${event.slug}`} key={event.id} className="flex items-start p-4 space-x-4 transition-all duration-300 rounded-lg shadow-sm group bg-white/70 hover:bg-white hover:shadow-md backdrop-blur-sm">
-                        <img src={event.cardImage || 'https://placehold.co/100x100/e2e8f0/e2e8f0?text=N'} alt={event.title} className="flex-shrink-0 object-cover w-24 h-24 rounded-md" />
-                        <div className="flex-grow">
-                          <p className="mb-1 text-sm text-gray-500 flex items-center gap-1"><Calendar size={12} /> {event.date}</p>
-                          <h4 className="text-lg font-bold transition-colors text-nuper-dark-blue group-hover:text-nuper-blue">{event.title}</h4>
-                          <p className="mt-1 text-sm text-gray-600 line-clamp-2">{event.description}</p>
-                        </div>
+                <h3 className="mb-8 text-3xl font-bold font-heading text-center lg:text-left">Öne Çıkan Etkinlik</h3>
+                {featuredEvent ? (
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl overflow-hidden border border-white/20 shadow-2xl hover:scale-[1.02] transition-transform duration-300">
+                    <div className="relative h-64 w-full">
+                      <img
+                        src={featuredEvent.cardImage || 'https://placehold.co/800x600/1e293b/ffffff?text=Etkinlik'}
+                        alt={featuredEvent.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                      <div className="absolute top-4 right-4 bg-nuper-blue text-white px-3 py-1 rounded-full text-sm font-semibold shadow-lg">
+                        Öne Çıkan
+                      </div>
+                    </div>
+                    <div className="p-8">
+                      <div className="flex items-center gap-2 text-blue-300 mb-4 text-sm font-medium">
+                        <Calendar size={16} />
+                        <span>{featuredEvent.date || 'Tarih Belirtilmemiş'}</span>
+                      </div>
+                      <h4 className="text-2xl font-bold mb-4 line-clamp-2 min-h-[3.5rem]">
+                        {featuredEvent.title}
+                      </h4>
+                      <p className="text-gray-300 mb-6 line-clamp-3 min-h-[4.5rem]">
+                        {featuredEvent.description}
+                      </p>
+                      <Link
+                        href={`/events/${featuredEvent.slug}`}
+                        className="inline-flex items-center gap-2 text-white font-semibold hover:text-nuper-blue transition-colors group"
+                      >
+                        Detayları İncele
+                        <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
                       </Link>
-                    ))
-                  )}
-                </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-[450px] flex items-center justify-center bg-white/5 rounded-2xl border border-white/10">
+                    <p className="text-gray-400">Öne çıkan etkinlik bulunmuyor.</p>
+                  </div>
+                )}
               </div>
-              {/* Bültenler Sütunu */}
+
+              {/* Latest Bulletin Column */}
               <div>
-                <h3 className="mb-8 text-3xl font-bold font-heading latest-news-title">En Son Bültenler</h3>
-                <div className="space-y-6">
-                  {bulletins.length === 0 ? (
-                    <div className="text-gray-400">Henüz bülten bulunmuyor.</div>
-                  ) : (
-                    bulletins.map(bulletin => (
-                      <Link href={`/bulletin/${bulletin.slug}`} key={bulletin.id} className="flex items-start p-4 space-x-4 transition-all duration-300 rounded-lg shadow-sm group bg-white/70 hover:bg-white hover:shadow-md backdrop-blur-sm">
-                        <img src={bulletin.cardImage || 'https://placehold.co/100x100/e2e8f0/e2e8f0?text=N'} alt={bulletin.title} className="flex-shrink-0 object-cover w-24 h-24 rounded-md" />
-                        <div className="flex-grow">
-                          <h4 className="text-lg font-bold transition-colors text-nuper-dark-blue group-hover:text-nuper-blue flex items-center gap-2"><Newspaper size={16} /> {bulletin.title}</h4>
-                          <p className="mt-1 text-sm text-gray-500">
-                            {new Date(bulletin.createdAt).toLocaleDateString('tr-TR')}
-                          </p>
-                        </div>
+                <h3 className="mb-8 text-3xl font-bold font-heading text-center lg:text-left">En Son Bülten</h3>
+                {latestBulletin ? (
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl overflow-hidden border border-white/20 shadow-2xl hover:scale-[1.02] transition-transform duration-300">
+                    <div className="relative h-64 w-full">
+                      <img
+                        src={latestBulletin.cardImage || 'https://placehold.co/800x600/1e293b/ffffff?text=Bülten'}
+                        alt={latestBulletin.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                      <div className="absolute top-4 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-lg">
+                        Yeni
+                      </div>
+                    </div>
+                    <div className="p-8">
+                      <div className="flex items-center gap-2 text-green-300 mb-4 text-sm font-medium">
+                        <Newspaper size={16} />
+                        <span>{new Date(latestBulletin.createdAt).toLocaleDateString('tr-TR')}</span>
+                      </div>
+                      <h4 className="text-2xl font-bold mb-4 line-clamp-2 min-h-[3.5rem]">
+                        {latestBulletin.title}
+                      </h4>
+                      <p className="text-gray-300 mb-6 line-clamp-3 min-h-[4.5rem]">
+                        {latestBulletin.description || "Nuper bültenlerinde haftanın öne çıkan gelişmeleri ve fırsatları seni bekliyor."}
+                      </p>
+                      <Link
+                        href={`/bulletins/${latestBulletin.slug}`}
+                        className="inline-flex items-center gap-2 text-white font-semibold hover:text-green-400 transition-colors group"
+                      >
+                        Bülteni Oku
+                        <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
                       </Link>
-                    ))
-                  )}
-                </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-[450px] flex items-center justify-center bg-white/5 rounded-2xl border border-white/10">
+                    <p className="text-gray-400">Henüz bülten yayınlanmadı.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
