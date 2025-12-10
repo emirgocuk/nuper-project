@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 
 interface EditorProps {
     data?: any;
+    initialData?: any; // Alias for data
     onChange: (data: any) => void;
     holder: string;
 }
 
-export default function Editor({ data, onChange, holder }: EditorProps) {
+export default function Editor({ data, initialData, onChange, holder }: EditorProps) {
     const editorRef = useRef<any>(null);
     const [isMounted, setIsMounted] = useState(false);
 
@@ -34,7 +35,7 @@ export default function Editor({ data, onChange, holder }: EditorProps) {
 
             const editor = new EditorJS({
                 holder: holder,
-                data: data,
+                data: data || initialData,
                 placeholder: 'İçeriğinizi buraya yazın...',
                 inlineToolbar: true,
                 tools: {
