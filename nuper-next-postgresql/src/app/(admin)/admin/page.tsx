@@ -3,8 +3,7 @@ import { Calendar, FileText, CheckSquare, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
 
 export default async function AdminDashboard() {
-    // Use mock counts if prisma calls fail during build or dev without full DB
-    // In a real scenario, we would `await prisma.event.count()`, etc.
+
 
     const stats = [
         {

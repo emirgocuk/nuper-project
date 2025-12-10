@@ -16,7 +16,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     const password = credentials.password as string
 
                     if (!email || !password) {
-                        console.log("Auth Error: Missing credentials");
                         return null
                     }
 
@@ -25,14 +24,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     })
 
                     if (!user || !user.password) {
-                        console.log("Auth Error: User not found or no password");
                         return null
                     }
 
+                    // Real password comparison
                     const isPasswordValid = await compare(password, user.password)
 
                     if (!isPasswordValid) {
-                        console.log("Auth Error: Invalid password");
                         return null
                     }
 

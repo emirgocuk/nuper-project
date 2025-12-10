@@ -26,7 +26,6 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
-    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^24.10.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -313,6 +312,7 @@
     "regexp-to-ast": "^0.5.0",
     "regexp.prototype.flags": "^1.5.4",
     "remeda": "^2.21.3",
+    "resend": "^6.6.0",
     "resolve": "^1.22.11",
     "resolve-from": "^4.0.0",
     "resolve-pkg-maps": "^1.0.0",
@@ -410,6 +410,7 @@
   "devDependencies": {
     "@prisma/client": "5.22.0",
     "@tailwindcss/postcss": "^4.1.17",
+    "@types/bcryptjs": "^2.4.6",
     "prisma": "5.22.0"
   }
 }
