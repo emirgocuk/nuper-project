@@ -231,7 +231,6 @@
     "language-tags": "^1.0.9",
     "levn": "^0.4.1",
     "lightningcss": "^1.30.2",
-    "lightningcss-win32-x64-msvc": "^1.30.2",
     "lilconfig": "^2.1.0",
     "locate-path": "^6.0.0",
     "lodash": "^4.17.21",
