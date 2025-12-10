@@ -11,7 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 
-export default function LoginPage() {
+import { Suspense } from 'react';
+
+function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const registered = searchParams.get('registered');
@@ -47,39 +49,50 @@ export default function LoginPage() {
     };
 
     return (
+        <Card className="w-full max-w-md shadow-lg">
+            <CardHeader className="text-center">
+                <CardTitle className="text-2xl font-bold font-heading text-nuper-dark-blue">Giriş Yap</CardTitle>
+            </CardHeader>
+            <CardContent>
+                {registered && (
+                    <div className="mb-4 p-3 bg-green-50 text-green-600 border border-green-200 rounded text-sm">
+                        Kayıt başarılı! Lütfen giriş yapın.
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input id="email" name="email" type="email" required placeholder="ornek@email.com" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="password">Şifre</Label>
+                        <Input id="password" name="password" type="password" required />
+                    </div>
+
+                    <Button className="w-full bg-nuper-blue hover:bg-nuper-dark-blue" disabled={loading}>
+                        {loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
+                    </Button>
+                </form>
+            </CardContent>
+            <div className="p-6 pt-0 flex justify-center">
+                <Link href="/forgot-password" className="text-sm text-gray-500 hover:text-nuper-blue mr-4">
+                    Şifremi Unuttum
+                </Link>
+                <p className="text-sm text-gray-600">
+                    Hesabın yok mu? <Link href="/register" className="text-nuper-blue hover:underline">Kayıt Ol</Link>
+                </p>
+            </div>
+        </Card>
+    );
+}
+
+export default function LoginPage() {
+    return (
         <div className="flex items-center justify-center min-h-screen bg-gray-50">
-            <Card className="w-full max-w-md shadow-lg">
-                <CardHeader className="text-center">
-                    <CardTitle className="text-2xl font-bold font-heading text-nuper-dark-blue">Giriş Yap</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {registered && (
-                        <div className="mb-4 p-3 bg-green-50 text-green-600 border border-green-200 rounded text-sm">
-                            Kayıt başarılı! Lütfen giriş yapın.
-                        </div>
-                    )}
-
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input id="email" name="email" type="email" required placeholder="ornek@email.com" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Şifre</Label>
-                            <Input id="password" name="password" type="password" required />
-                        </div>
-
-                        <Button className="w-full bg-nuper-blue hover:bg-nuper-dark-blue" disabled={loading}>
-                            {loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
-                        </Button>
-                    </form>
-                </CardContent>
-                <div className="p-6 pt-0 flex justify-center">
-                    <p className="text-sm text-gray-600">
-                        Hesabın yok mu? <Link href="/register" className="text-nuper-blue hover:underline">Kayıt Ol</Link>
-                    </p>
-                </div>
-            </Card>
+            <Suspense fallback={<div className="text-center">Yükleniyor...</div>}>
+                <LoginForm />
+            </Suspense>
         </div>
     );
 }
