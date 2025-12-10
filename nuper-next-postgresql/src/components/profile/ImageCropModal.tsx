@@ -20,7 +20,7 @@ export default function ImageCropModal({
 }: ImageCropModalProps) {
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
-    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 
     const onCropCompleteCallback = useCallback((croppedArea: any, croppedAreaPixels: any) => {
