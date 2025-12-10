@@ -29,7 +29,7 @@ export default function BlockRenderer({ content }: BlockRendererProps) {
             {data.blocks.map((block: any) => {
                 switch (block.type) {
                     case 'header':
-                        const Tag = `h${block.data.level}` as keyof JSX.IntrinsicElements;
+                        const Tag = `h${block.data.level}` as keyof React.JSX.IntrinsicElements;
                         return <Tag key={block.id} className="mt-8 mb-4 font-bold text-gray-900">{block.data.text}</Tag>;
 
                     case 'paragraph':
