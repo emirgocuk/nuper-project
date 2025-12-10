@@ -63,3 +63,44 @@ export async function removeProfilePhoto() {
         throw new Error('Failed to remove photo');
     }
 }
+
+export async function submitVerification(data: {
+    profileData: any;
+    socialLinks: any[];
+    presentation: any;
+}) {
+    const session = await auth();
+    if (!session?.user?.email) {
+        throw new Error('Unauthorized');
+    }
+
+    try {
+        // Merge presentation into verificationData (preserving existing if any, though likely null)
+        // Actually, let's just save it.
+        const verificationData = {
+            presentation: data.presentation,
+            submittedAt: new Date().toISOString(),
+            status: 'PENDING'
+        };
+
+        await prisma.user.update({
+            where: { email: session.user.email },
+            data: {
+                profileData: data.profileData,
+                socialLinks: data.socialLinks,
+                verificationData: verificationData,
+                // Optionally set isVerified to false if it requires admin approval?
+                // User said "dogrulama bekiyor" in screenshot implies pending.
+                // But schema has boolean isVerified.
+                // Let's assume validation happens offline/admin, so maybe don't toggle isVerified true yet.
+                // Or maybe set it to false if they re-submit?
+            },
+        });
+
+        revalidatePath('/profile');
+        return { success: true };
+    } catch (error) {
+        console.error('Submit verification error:', error);
+        throw new Error('Failed to submit verification');
+    }
+}

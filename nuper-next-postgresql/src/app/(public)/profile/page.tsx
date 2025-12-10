@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Calendar, Shield, Camera } from "lucide-react";
+import { User, Calendar, Shield, Camera, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import ProfileImageUpload from "@/components/profile/ProfileImageUpload";
 import ProfileInfoForm from "@/components/profile/ProfileInfoForm";
 import DeleteAccount from "@/components/profile/DeleteAccount";
@@ -62,26 +62,51 @@ export default async function ProfilePage() {
 
                 {/* Verification Section */}
                 {user.userRole && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Shield className="w-5 h-5" />
+                    <Card className="overflow-hidden border-none shadow-md">
+                        <CardHeader className="pb-3 bg-white">
+                            <CardTitle className="flex items-center gap-2 text-xl">
+                                <Shield className="w-6 h-6 text-nuper-blue" />
                                 {roleText} Doğrulaması
                             </CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <div className="p-4 bg-gray-50 rounded-lg">
-                                <p className="text-sm text-gray-600">
-                                    {user.isVerified ? (
-                                        <span className="text-green-600 font-semibold">✓ Doğrulandı</span>
-                                    ) : (
-                                        <span className="text-amber-600">Doğrulama bekliyor</span>
-                                    )}
-                                </p>
-                                <p className="mt-2 text-sm text-gray-500">
-                                    Doğrulama süreciyle ilgili detaylı bilgi yakında eklenecek.
-                                </p>
-                            </div>
+                        <CardContent className="bg-white">
+                            {user.isVerified ? (
+                                <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex gap-4 items-start">
+                                    <div className="p-2 bg-green-100 rounded-full shrink-0">
+                                        <CheckCircle className="w-6 h-6 text-green-600" />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-green-800">Hesabınız Doğrulandı</h4>
+                                        <p className="text-green-700 mt-1">
+                                            Tebrikler! Hesabınız başarıyla doğrulandı. {roleText} olarak platformun tüm özelliklerine erişebilirsiniz.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (user.verificationData && Object.keys(user.verificationData as object).length > 0) ? (
+                                <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg flex gap-4 items-start">
+                                    <div className="p-2 bg-orange-100 rounded-full shrink-0">
+                                        <Clock className="w-6 h-6 text-orange-600" />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-orange-800">Doğrulama İnceleniyor</h4>
+                                        <p className="text-orange-700 mt-1">
+                                            Başvurunuz alındı ve ekibimiz tarafından inceleniyor. Bu süreç genellikle 24-48 saat sürmektedir. Sonuçlandığında size bildirim gönderilecektir.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex gap-4 items-start">
+                                    <div className="p-2 bg-yellow-100 rounded-full shrink-0">
+                                        <AlertCircle className="w-6 h-6 text-yellow-600" />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-yellow-800">Doğrulama Gerekli</h4>
+                                        <p className="text-yellow-700 mt-1">
+                                            Henüz doğrulama işlemini tamamlamadınız. Profilinizi güvenilir kılmak ve öne çıkmak için lütfen aşağıdaki formu eksiksiz doldurarak onaya gönderin.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 )}

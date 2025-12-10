@@ -8,18 +8,18 @@ import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from 'sonner';
 
 export default function LoginPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const registered = searchParams.get('registered');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        setError('');
 
         const formData = new FormData(e.target as HTMLFormElement);
         const email = formData.get('email') as string;
@@ -33,13 +33,14 @@ export default function LoginPage() {
             });
 
             if (res?.error) {
-                setError('Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
+                toast.error('Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
             } else {
+                toast.success('Giriş başarılı!');
                 router.push('/');
                 router.refresh();
             }
         } catch (err) {
-            setError('Bir hata oluştu.');
+            toast.error('Bir hata oluştu.');
         } finally {
             setLoading(false);
         }
@@ -52,7 +53,6 @@ export default function LoginPage() {
                     <CardTitle className="text-2xl font-bold font-heading text-nuper-dark-blue">Giriş Yap</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {/* Show success message if registered */}
                     {registered && (
                         <div className="mb-4 p-3 bg-green-50 text-green-600 border border-green-200 rounded text-sm">
                             Kayıt başarılı! Lütfen giriş yapın.
@@ -61,15 +61,13 @@ export default function LoginPage() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Email</label>
-                            <Input name="email" type="email" required placeholder="ornek@email.com" />
+                            <Label htmlFor="email">Email</Label>
+                            <Input id="email" name="email" type="email" required placeholder="ornek@email.com" />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Şifre</label>
-                            <Input name="password" type="password" required />
+                            <Label htmlFor="password">Şifre</Label>
+                            <Input id="password" name="password" type="password" required />
                         </div>
-
-                        {error && <p className="text-sm text-red-500">{error}</p>}
 
                         <Button className="w-full bg-nuper-blue hover:bg-nuper-dark-blue" disabled={loading}>
                             {loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}

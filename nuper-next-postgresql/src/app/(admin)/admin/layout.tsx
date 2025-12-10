@@ -13,7 +13,7 @@ export default async function AdminLayout({
     // If you haven't set up roles yet, just checking session is a start, but user asked for "separate" entry.
     // Ideally: if (!session || session.user.role !== "ADMIN")
     if (!session?.user) {
-        redirect("/admin/login");
+        redirect("/adminlogin");
     }
     return (
         <div className="flex-1 overflow-y-auto bg-white">

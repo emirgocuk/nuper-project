@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Calendar, FileText, FolderOpen, FileSignature, LogOut, Settings } from 'lucide-react';
+import { LayoutDashboard, Calendar, FileText, FolderOpen, FileSignature, LogOut, Settings, Users } from 'lucide-react';
 import { logout } from '@/actions/auth';
 
 export function AdminSidebar({ user }: { user?: { name?: string | null, email?: string | null } }) {
@@ -11,6 +11,7 @@ export function AdminSidebar({ user }: { user?: { name?: string | null, email?: 
 
     const navItems = [
         { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/admin/users", label: "Kullanıcılar", icon: Users },
         { href: "/admin/events", label: "Etkinlik Yönetimi", icon: Calendar },
         { href: "/admin/bulletins", label: "Bülten Yönetimi", icon: FileText },
         { href: "/admin/projects", label: "Proje İnceleme", icon: FolderOpen },

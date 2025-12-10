@@ -38,7 +38,7 @@ export const Navbar = () => {
     const userRole = (session?.user as any)?.role;
 
     return (
-        <nav className={cn("fixed top-0 w-full z-50 transition-colors duration-300", navClasses)}>
+        <nav className={cn("fixed top-0 w-full z-50 transition-colors duration-300 pr-[var(--removed-body-scroll-bar-size)]", navClasses)}>
             <div className="flex items-center justify-between max-w-6xl px-4 py-4 mx-auto">
                 <Link href="/">
                     <h1 className={cn("text-2xl font-bold cursor-pointer font-heading")}>Nuper</h1>
@@ -53,11 +53,7 @@ export const Navbar = () => {
 
                         {session ? (
                             <div className="flex items-center gap-4">
-                                {userRole === 'ADMIN' && (
-                                    <Link href="/admin" className={cn("px-4 py-2 font-sans border rounded-lg transition-colors", isHomePage ? "border-white/50 bg-white/20 hover:bg-white/30" : "border-nuper-blue bg-nuper-blue text-white hover:bg-nuper-dark-blue")}>
-                                        Admin Paneli
-                                    </Link>
-                                )}
+
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 overflow-hidden border border-gray-200">
@@ -128,9 +124,7 @@ export const Navbar = () => {
                             <Link href="/projects" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-md text-base font-medium", mobileLinkClass)}>Projeler</Link>
                             {session ? (
                                 <>
-                                    {userRole === 'ADMIN' && (
-                                        <Link href="/admin" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-md text-base font-medium text-purple-600 font-bold", mobileLinkClass)}>Admin Paneli</Link>
-                                    )}
+
                                     <Link href="/profile" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-md text-base font-medium", mobileLinkClass)}>Profilim</Link>
                                     <Link href="/my-projects" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-md text-base font-medium", mobileLinkClass)}>Proje Başvurularım</Link>
                                     <button onClick={() => { logout(); setIsMenuOpen(false); }} className={cn("block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-500", mobileLinkClass)}>Çıkış Yap</button>

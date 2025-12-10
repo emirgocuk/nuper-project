@@ -36,6 +36,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         return null
                     }
 
+                    const isLoginAdminRequest = (credentials as any).isAdminLogin === 'true';
+
+                    // Strict Role Separation
+                    if (user.role === 'ADMIN') {
+                        if (!isLoginAdminRequest) {
+                            throw new Error("Lütfen Yönetici Paneli girişini (adminlogin) kullanın.");
+                        }
+                    } else {
+                        // User trying to login to Admin Panel
+                        if (isLoginAdminRequest) {
+                            throw new Error("Bu alana erişim yetkiniz yok.");
+                        }
+                    }
+
                     return {
                         id: user.id,
                         name: user.name,

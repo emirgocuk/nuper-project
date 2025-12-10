@@ -6,24 +6,24 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { registerUser } from '@/actions/register';
+import { toast } from 'sonner';
 
 export default function RegisterPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        setError('');
 
         const formData = new FormData(e.target as HTMLFormElement);
         const password = formData.get('password') as string;
         const confirmPassword = formData.get('confirmPassword') as string;
 
         if (password !== confirmPassword) {
-            setError('Şifreler eşleşmiyor.');
+            toast.error('Şifreler eşleşmiyor.');
             setLoading(false);
             return;
         }
@@ -32,13 +32,14 @@ export default function RegisterPage() {
             const result = await registerUser(formData);
 
             if (result.error) {
-                setError(result.error);
+                toast.error(result.error);
             } else {
+                toast.success('Kayıt başarılı! Giriş sayfasına yönlendiriliyorsunuz...');
                 router.push('/login?registered=true');
             }
 
         } catch (err) {
-            setError('Bir hata oluştu. Lütfen tekrar deneyin.');
+            toast.error('Bir hata oluştu. Lütfen tekrar deneyin.');
         } finally {
             setLoading(false);
         }
@@ -53,15 +54,15 @@ export default function RegisterPage() {
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Ad Soyad</label>
-                            <Input name="name" type="text" required placeholder="John Doe" />
+                            <Label htmlFor="name">Ad Soyad</Label>
+                            <Input id="name" name="name" type="text" required placeholder="John Doe" />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Email</label>
-                            <Input name="email" type="email" required placeholder="ornek@email.com" />
+                            <Label htmlFor="email">Email</Label>
+                            <Input id="email" name="email" type="email" required placeholder="ornek@email.com" />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Kullanıcı Rolü *</label>
+                            <Label>Kullanıcı Rolü *</Label>
                             <div className="flex gap-4">
                                 <label className="flex items-center space-x-2 cursor-pointer">
                                     <input
@@ -86,15 +87,13 @@ export default function RegisterPage() {
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Şifre</label>
-                            <Input name="password" type="password" required />
+                            <Label htmlFor="password">Şifre</Label>
+                            <Input id="password" name="password" type="password" required />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Şifre Tekrar</label>
-                            <Input name="confirmPassword" type="password" required />
+                            <Label htmlFor="confirmPassword">Şifre Tekrar</Label>
+                            <Input id="confirmPassword" name="confirmPassword" type="password" required />
                         </div>
-
-                        {error && <p className="text-sm text-red-500">{error}</p>}
 
                         <Button className="w-full bg-nuper-blue hover:bg-nuper-dark-blue" disabled={loading}>
                             {loading ? 'Kayıt Yapılıyor...' : 'Kayıt Ol'}

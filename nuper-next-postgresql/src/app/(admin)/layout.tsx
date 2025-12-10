@@ -9,9 +9,9 @@ export default async function AdminLayout({
 }) {
     const session = await auth();
 
-    // Basic role check - in a real app, check for "ADMIN" role
-    if (!session?.user) {
-        redirect("/login");
+    // Strict access control: Only admin@nuper.com allowed as per user request
+    if (!session?.user || session.user.email !== "admin@nuper.com") {
+        redirect("/adminlogin");
     }
 
     return (
