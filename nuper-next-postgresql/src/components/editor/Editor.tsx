@@ -14,6 +14,13 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
     const editorRef = useRef<any>(null);
     const [isMounted, setIsMounted] = useState(false);
 
+    const onChangeRef = useRef(onChange);
+
+    // Update ref when onChange prop changes
+    useEffect(() => {
+        onChangeRef.current = onChange;
+    }, [onChange]);
+
     useEffect(() => {
         setIsMounted(true);
     }, []);
@@ -39,7 +46,7 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
 
             const editor = new EditorJS({
                 holder: holderRef.current as HTMLElement, // Use ref element directly
-                data: data || initialData,
+                data: initialData || data, // Prefer initialData, fallback to data only on init
                 placeholder: 'İçeriğinizi buraya yazın...',
                 inlineToolbar: true,
                 tools: {
@@ -92,7 +99,10 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
                 },
                 onChange: async (api, event) => {
                     const content = await api.saver.save();
-                    onChange(content);
+                    // Call the latest onChange handler from ref
+                    if (onChangeRef.current) {
+                        onChangeRef.current(content);
+                    }
                 },
             });
             editorRef.current = editor;
@@ -102,11 +112,15 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
 
         return () => {
             if (editorRef.current && typeof editorRef.current.destroy === 'function') {
-                editorRef.current.destroy();
+                try {
+                    editorRef.current.destroy();
+                } catch (e) {
+                    console.error('Editor cleanup failed', e);
+                }
                 editorRef.current = null;
             }
         };
-    }, [isMounted, data, initialData, onChange]); // Removed holder from dependency since we use ref
+    }, [isMounted]); // Only re-run if mount state changes. DATA/ONCHANGE SHOULD NOT TRIGGER RE-INIT
 
     if (!isMounted) {
         return <div className="p-4 border rounded-lg bg-gray-50 text-gray-400">Editör yükleniyor...</div>;
