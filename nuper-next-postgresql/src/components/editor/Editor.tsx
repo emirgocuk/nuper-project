@@ -10,6 +10,7 @@ interface EditorProps {
 }
 
 export default function Editor({ data, initialData, onChange, holder }: EditorProps) {
+    const holderRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<any>(null);
     const [isMounted, setIsMounted] = useState(false);
 
@@ -23,6 +24,9 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
         const initEditor = async () => {
             if (editorRef.current) return;
 
+            // Wait a bit to ensure ref is attached if it wasn't immediately available (though it should be)
+            if (!holderRef.current) return;
+
             const EditorJS = (await import('@editorjs/editorjs')).default;
             const Header = (await import('@editorjs/header')).default;
             const List = (await import('@editorjs/list')).default;
@@ -34,7 +38,7 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
             const Marker = (await import('@editorjs/marker')).default;
 
             const editor = new EditorJS({
-                holder: holder,
+                holder: holderRef.current as HTMLElement, // Use ref element directly
                 data: data || initialData,
                 placeholder: 'İçeriğinizi buraya yazın...',
                 inlineToolbar: true,
@@ -102,7 +106,7 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
                 editorRef.current = null;
             }
         };
-    }, [isMounted, holder]);
+    }, [isMounted, data, initialData, onChange]); // Removed holder from dependency since we use ref
 
     if (!isMounted) {
         return <div className="p-4 border rounded-lg bg-gray-50 text-gray-400">Editör yükleniyor...</div>;
@@ -110,7 +114,7 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
 
     return (
         <div
-            id={holder}
+            ref={holderRef}
             className="prose max-w-none min-h-[400px] border border-gray-200 rounded-lg p-4 bg-white focus-within:ring-2 focus-within:ring-nuper-blue/20"
         />
     );

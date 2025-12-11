@@ -412,5 +412,8 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/three": "^0.182.0",
     "prisma": "5.22.0"
+  },
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   }
 }

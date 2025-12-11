@@ -70,8 +70,12 @@ export default function NewEventPage() {
 
         try {
             await createEvent(formData);
-            router.push('/admin/events'); // Navigate on success
-        } catch (error) {
+            // router.push('/admin/events'); // Removed creating manual push if server action redirects
+        } catch (error: any) {
+            if (error.message === 'NEXT_REDIRECT' || error.digest === 'NEXT_REDIRECT') {
+                // Redirect is expected
+                return;
+            }
             console.error(error);
             alert("Etkinlik oluşturulurken bir hata oluştu.");
         } finally {

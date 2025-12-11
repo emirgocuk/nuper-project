@@ -51,7 +51,10 @@ export default function EditEventPage(props: EditEventPageProps) {
 
         try {
             await updateEvent(id, formData);
-        } catch (error) {
+        } catch (error: any) {
+            if (error.message === 'NEXT_REDIRECT' || error.digest === 'NEXT_REDIRECT') {
+                return;
+            }
             console.error(error);
             alert("Etkinlik güncellenirken bir hata oluştu.");
             setLoading(false);
