@@ -29,7 +29,8 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { approveUser, rejectUser, cancelVerification, deleteUser } from '@/actions/verification';
+import { approveUser, rejectUser, cancelVerification } from '@/actions/verification';
+import { deleteUser } from '@/actions/admin-users';
 import { toast } from 'sonner';
 import { Check, X, ChevronDown, ChevronUp, FileText, Globe, Linkedin, Twitter, Instagram, AlertCircle, Trash2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -275,6 +276,14 @@ export default function UsersClient({ investors, entrepreneurs, admins }: UsersC
                                                                     <Button variant="outline" size="sm" disabled className="opacity-50 cursor-not-allowed">
                                                                         <Check className="w-4 h-4 mr-2" /> Onayla (Devre Dışı)
                                                                     </Button>
+                                                                    <Button
+                                                                        variant="destructive"
+                                                                        size="sm"
+                                                                        onClick={() => handleAction('delete', user.id)}
+                                                                        className="mt-2 bg-red-100 text-red-700 hover:bg-red-200 border border-red-200 shadow-sm"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4 mr-2" /> Kullanıcıyı Sil
+                                                                    </Button>
                                                                 </div>
                                                             ) : (
                                                                 /* Full Verification Data View */
@@ -433,6 +442,14 @@ export default function UsersClient({ investors, entrepreneurs, admins }: UsersC
                                                                                     </Button>
                                                                                 </>
                                                                             )}
+                                                                            <Button
+                                                                                variant="destructive"
+                                                                                size="sm"
+                                                                                onClick={() => handleAction('delete', user.id)}
+                                                                                className="ml-auto bg-red-100 text-red-700 hover:bg-red-200 border border-red-200 shadow-sm"
+                                                                            >
+                                                                                <Trash2 className="w-4 h-4 mr-2" /> Sil
+                                                                            </Button>
                                                                         </div>
                                                                     </div>
                                                                 </>

@@ -1,11 +1,9 @@
 'use server';
 
 import { prisma } from "@/lib/db";
-import { Resend } from "resend";
+import { sendEmail } from "@/lib/mail";
 import { hash } from "bcryptjs";
 import { randomBytes } from "crypto";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendPasswordResetEmail(email: string) {
     try {
@@ -36,8 +34,7 @@ export async function sendPasswordResetEmail(email: string) {
 
         const resetLink = `${process.env.NEXTAUTH_URL}/new-password?token=${token}`;
 
-        await resend.emails.send({
-            from: "Nuper <onboarding@resend.dev>", // Or verified domain
+        await sendEmail({
             to: email,
             subject: "Şifre Sıfırlama İsteği",
             html: `
@@ -54,6 +51,28 @@ export async function sendPasswordResetEmail(email: string) {
     } catch (error) {
         console.error("Reset email error:", error);
         return { error: "Bir hata oluştu." };
+    }
+}
+
+export async function validateResetToken(token: string) {
+    try {
+        const existingToken = await prisma.verificationToken.findUnique({
+            where: { token }
+        });
+
+        if (!existingToken) {
+            return { valid: false, error: "Token bulunamadı veya geçersiz." };
+        }
+
+        const hasExpired = new Date(existingToken.expires) < new Date();
+
+        if (hasExpired) {
+            return { valid: false, error: "Token süresi dolmuş." };
+        }
+
+        return { valid: true };
+    } catch (error) {
+        return { valid: false, error: "Doğrulama hatası." };
     }
 }
 
@@ -85,7 +104,11 @@ export async function resetPassword(token: string, newPassword: string) {
 
         await prisma.user.update({
             where: { id: existingUser.id },
-            data: { password: hashedPassword }
+            data: {
+                password: hashedPassword,
+                isVerified: true,
+                emailVerified: new Date()
+            }
         });
 
         await prisma.verificationToken.delete({

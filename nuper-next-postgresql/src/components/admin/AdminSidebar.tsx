@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { LayoutDashboard, Calendar, FileText, FolderOpen, FileSignature, LogOut, Settings, Users } from 'lucide-react';
-import { logout } from '@/actions/auth';
+import { signOut } from 'next-auth/react';
 
 export function AdminSidebar({ user }: { user?: { name?: string | null, email?: string | null } }) {
     const pathname = usePathname();
@@ -56,7 +56,7 @@ export function AdminSidebar({ user }: { user?: { name?: string | null, email?: 
                     </div>
                 )}
                 <button
-                    onClick={() => logout()}
+                    onClick={() => signOut({ callbackUrl: '/login' })}
                     className="flex items-center justify-center w-full gap-2 px-4 py-2.5 text-sm font-bold text-white transition-colors bg-red-600 rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900"
                 >
                     <LogOut className="w-4 h-4" />

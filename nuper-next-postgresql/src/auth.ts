@@ -2,9 +2,16 @@ import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import { compare } from "bcryptjs"
 import { prisma } from "@/lib/db"
+import { PrismaAdapter } from "@auth/prisma-adapter"
+import Google from "next-auth/providers/google"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+    adapter: PrismaAdapter(prisma),
+    session: { strategy: "jwt" },
     providers: [
+        Google({
+            allowDangerousEmailAccountLinking: true,
+        }),
         Credentials({
             credentials: {
                 email: { label: "Email", type: "email" },
@@ -25,6 +32,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                     if (!user || !user.password) {
                         return null
+                    }
+
+                    if (!user.isVerified) {
+                        throw new Error("Hesabınız doğrulanmamış. Lütfen email kutunuzu kontrol edin.");
                     }
 
                     // Real password comparison
@@ -61,6 +72,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             },
         }),
     ],
+    pages: {
+        signIn: '/login',
+    },
     callbacks: {
         async session({ session, token }) {
             if (token && session.user) {

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, User, LogOut, FileText, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { logout } from '@/actions/auth';
+
 import { Button } from "@/components/ui/button";
 
 export const Navbar = () => {
@@ -88,7 +88,7 @@ export const Navbar = () => {
                                             </Link>
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => logout()} className="text-red-600 focus:text-red-600 cursor-pointer">
+                                        <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/login' })} className="text-red-600 focus:text-red-600 cursor-pointer">
                                             <LogOut className="mr-2 h-4 w-4" />
                                             <span>Çıkış Yap</span>
                                         </DropdownMenuItem>
@@ -127,7 +127,7 @@ export const Navbar = () => {
 
                                     <Link href="/profile" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-md text-base font-medium", mobileLinkClass)}>Profilim</Link>
                                     <Link href="/my-projects" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-md text-base font-medium", mobileLinkClass)}>Proje Başvurularım</Link>
-                                    <button onClick={() => { logout(); setIsMenuOpen(false); }} className={cn("block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-500", mobileLinkClass)}>Çıkış Yap</button>
+                                    <button onClick={() => { signOut({ callbackUrl: '/login' }); setIsMenuOpen(false); }} className={cn("block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-500", mobileLinkClass)}>Çıkış Yap</button>
                                 </>
                             ) : (
                                 <Link href="/login" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 text-white rounded-lg bg-nuper-blue hover:bg-nuper-dark-blue font-sans text-left">Giriş Yap</Link>

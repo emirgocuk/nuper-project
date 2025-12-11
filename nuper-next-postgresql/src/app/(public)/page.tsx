@@ -49,10 +49,13 @@ export default async function Home() {
               <h1 className="text-4xl font-bold leading-tight md:text-5xl lg:text-6xl font-heading animate-in fade-in slide-in-from-bottom-5 duration-1000">
                 Nuper ile Geleceğini Şekillendir!
               </h1>
-              <p className="mt-4 font-sans text-lg md:text-xl animate-in fade-in slide-in-from-bottom-5 duration-1000 delay-200 fill-mode-forwards opacity-0" style={{ animationDelay: '200ms' }}>
+              <p className="mt-4 font-sans text-lg md:text-xl animate-in fade-in slide-in-from-bottom-5 duration-1000 delay-200" style={{ animationDelay: '200ms' }}>
                 Öğrenciler için yarışmalar, etkinlikler ve fırsatlar tek platformda!
               </p>
-              <div className="mt-8 animate-in fade-in slide-in-from-bottom-5 duration-1000 delay-500 fill-mode-forwards opacity-0" style={{ animationDelay: '500ms' }}>
+              <p className="mt-6 text-gray-100 font-sans text-base md:text-lg max-w-2xl animate-in fade-in slide-in-from-bottom-5 duration-1000 delay-300" style={{ animationDelay: '300ms' }}>
+                Girişimcilikten teknolojiye, sanattan inovasyona uzanan yolculuğunda sana en uygun fırsatları keşfet. Hayallerini gerçeğe dönüştürmek için ilk adımı at.
+              </p>
+              <div className="mt-8 animate-in fade-in slide-in-from-bottom-5 duration-1000 delay-500" style={{ animationDelay: '500ms' }}>
                 <Link href="/login" className="inline-block px-8 py-3 text-lg font-semibold transition-colors duration-300 bg-white rounded-lg text-nuper-blue hover:bg-nuper-gray font-heading">
                   Hemen Başla
                 </Link>

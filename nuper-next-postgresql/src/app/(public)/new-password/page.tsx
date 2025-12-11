@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { resetPassword } from '@/actions/auth-reset';
+import { resetPassword, validateResetToken } from '@/actions/auth-reset';
 import { toast } from 'sonner';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { useEffect } from 'react';
+import Link from 'next/link';
 
 function NewPasswordForm() {
     const searchParams = useSearchParams();
@@ -19,9 +21,49 @@ function NewPasswordForm() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [tokenStatus, setTokenStatus] = useState<'loading' | 'valid' | 'invalid'>('loading');
 
-    if (!token) {
-        return <div className="text-red-500 text-center">Geçersiz veya eksik token.</div>;
+    useEffect(() => {
+        const checkToken = async () => {
+            if (!token) {
+                setTokenStatus('invalid');
+                return;
+            }
+            const res = await validateResetToken(token);
+            if (res.valid) {
+                setTokenStatus('valid');
+            } else {
+                setTokenStatus('invalid');
+            }
+        };
+        checkToken();
+    }, [token]);
+
+    if (!token || tokenStatus === 'invalid') {
+        return (
+            <Card className="w-full max-w-md mx-auto border-red-100 shadow-lg">
+                <CardContent className="flex flex-col items-center justify-center p-8 space-y-4 text-center">
+                    <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center animate-in zoom-in duration-300">
+                        <AlertCircle className="w-8 h-8" />
+                    </div>
+                    <CardTitle className="text-xl font-bold text-gray-900">Geçersiz Bağlantı</CardTitle>
+                    <CardDescription className="text-base">
+                        Bu şifre sıfırlama bağlantısının süresi dolmuş veya daha önce kullanılmış.
+                    </CardDescription>
+                    <Button asChild className="w-full mt-4 bg-nuper-blue hover:bg-nuper-dark-blue">
+                        <Link href="/forgot-password">Yeni Link İste</Link>
+                    </Button>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (tokenStatus === 'loading') {
+        return (
+            <div className="flex items-center justify-center min-h-[300px]">
+                <Loader2 className="h-8 w-8 animate-spin text-nuper-blue" />
+            </div>
+        );
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
