@@ -6,7 +6,7 @@ interface EditorProps {
     data?: any;
     initialData?: any; // Alias for data
     onChange: (data: any) => void;
-    holder: string;
+    holder?: string;
 }
 
 export default function Editor({ data, initialData, onChange, holder }: EditorProps) {
@@ -27,6 +27,7 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
 
     useEffect(() => {
         if (!isMounted) return;
+        let isCanceled = false;
 
         const initEditor = async () => {
             if (editorRef.current) return;
@@ -35,6 +36,8 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
             if (!holderRef.current) return;
 
             const EditorJS = (await import('@editorjs/editorjs')).default;
+            if (isCanceled) return; // Component unmounted during import
+
             const Header = (await import('@editorjs/header')).default;
             const List = (await import('@editorjs/list')).default;
             const Paragraph = (await import('@editorjs/paragraph')).default;
@@ -43,6 +46,8 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
             const Embed = (await import('@editorjs/embed')).default;
             const LinkTool = (await import('@editorjs/link')).default;
             const Marker = (await import('@editorjs/marker')).default;
+
+            if (isCanceled || !holderRef.current) return; // Final check before init
 
             const editor = new EditorJS({
                 holder: holderRef.current as HTMLElement, // Use ref element directly
@@ -111,6 +116,7 @@ export default function Editor({ data, initialData, onChange, holder }: EditorPr
         initEditor();
 
         return () => {
+            isCanceled = true;
             if (editorRef.current && typeof editorRef.current.destroy === 'function') {
                 try {
                     editorRef.current.destroy();

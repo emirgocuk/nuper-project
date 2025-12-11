@@ -130,7 +130,10 @@ export default function NewBulletinPage() {
 
         try {
             await createBulletin(formData);
-        } catch (error) {
+        } catch (error: any) {
+            if (error.message === 'NEXT_REDIRECT' || error.digest === 'NEXT_REDIRECT') {
+                return;
+            }
             console.error(error);
             alert("Bülten oluşturulurken bir hata oluştu.");
             setLoading(false);
