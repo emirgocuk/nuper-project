@@ -14,8 +14,6 @@ export const metadata: Metadata = {
   description: 'Öğrenciler için yarışmalar, etkinlikler ve fırsatlar tek platformda!',
 }
 
-import { SpeedInsights } from "@vercel/speed-insights/next"
-
 export default function RootLayout({
   children,
 }: {
