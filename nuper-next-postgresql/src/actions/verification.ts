@@ -3,21 +3,31 @@
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
+import { sendAccountApprovedEmail } from '@/lib/mail';
 
 export async function approveUser(userId: string) {
     try {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw new Error("User not found");
+
+        const currentData = (user.verificationData as any) || {};
+
         await prisma.user.update({
             where: { id: userId },
             data: {
                 isVerified: true,
                 verificationData: {
-                    update: {
-                        status: 'APPROVED',
-                        approvedAt: new Date().toISOString()
-                    }
+                    ...currentData,
+                    status: 'APPROVED',
+                    approvedAt: new Date().toISOString()
                 }
             }
         });
+
+        if (user.email && user.name) {
+            await sendAccountApprovedEmail(user.email, user.name);
+        }
+
         revalidatePath('/admin/users');
         return { success: true };
     } catch (error) {
@@ -28,16 +38,20 @@ export async function approveUser(userId: string) {
 
 export async function rejectUser(userId: string, reason?: string) {
     try {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw new Error("User not found");
+
+        const currentData = (user.verificationData as any) || {};
+
         await prisma.user.update({
             where: { id: userId },
             data: {
                 isVerified: false,
                 verificationData: {
-                    update: {
-                        status: 'REJECTED',
-                        rejectedAt: new Date().toISOString(),
-                        rejectionReason: reason || "Belirtilmedi"
-                    }
+                    ...currentData,
+                    status: 'REJECTED',
+                    rejectedAt: new Date().toISOString(),
+                    rejectionReason: reason || "Belirtilmedi"
                 }
             }
         });
@@ -51,15 +65,19 @@ export async function rejectUser(userId: string, reason?: string) {
 
 export async function cancelVerification(userId: string) {
     try {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw new Error("User not found");
+
+        const currentData = (user.verificationData as any) || {};
+
         await prisma.user.update({
             where: { id: userId },
             data: {
                 isVerified: false,
                 verificationData: {
-                    update: {
-                        status: 'CANCELLED',
-                        cancelledAt: new Date().toISOString()
-                    }
+                    ...currentData,
+                    status: 'CANCELLED',
+                    cancelledAt: new Date().toISOString()
                 }
             }
         });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, Suspense } from 'react';
 import { verifyEmail } from '@/actions/auth-verify';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
@@ -9,6 +9,18 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
 export default function VerifyEmailPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-screen bg-gray-50">
+                <Loader2 className="h-12 w-12 animate-spin text-nuper-blue" />
+            </div>
+        }>
+            <VerifyEmailContent />
+        </Suspense>
+    );
+}
+
+function VerifyEmailContent() {
     const searchParams = useSearchParams();
     const token = searchParams.get('token');
     const [error, setError] = useState<string | undefined>();
