@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { logger } from './logger';
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -18,16 +19,19 @@ export async function sendEmail({
     html: string;
 }) {
     try {
+        logger.info("Sending email", { to, subject });
+        
         const info = await transporter.sendMail({
             from: `"Nuper" <${process.env.GMAIL_USER}>`,
             to,
             subject,
             html,
         });
-        console.log("Message sent: %s", info.messageId);
+        
+        logger.info("Email sent successfully", { to, messageId: info.messageId });
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error("Error sending email:", error);
+        logger.error("Failed to send email", error as Error, { to, subject });
         return { error: "Email could not be sent." };
     }
 }
@@ -35,7 +39,9 @@ export async function sendEmail({
 export async function sendAccountApprovedEmail(email: string, name: string) {
     const loginLink = `${process.env.NEXTAUTH_URL}/login`;
 
-    return await sendEmail({
+    logger.info("Sending approval email", { email });
+
+    const result = await sendEmail({
         to: email,
         subject: "Hesabınız Onaylandı! 🎉",
         html: `
@@ -52,10 +58,18 @@ export async function sendAccountApprovedEmail(email: string, name: string) {
             </div>
         `
     });
+
+    if ('success' in result && result.success) {
+        logger.info("Approval email sent", { email });
+    } else {
+        logger.error("Failed to send approval email", undefined, { email });
+    }
+
+    return result;
 }
 
 export async function sendVerificationEmail(email: string, name: string, verifyLink: string) {
-    console.log('Sending verification email', { email });
+    logger.info("Sending verification email", { email });
 
     return await sendEmail({
         to: email,
