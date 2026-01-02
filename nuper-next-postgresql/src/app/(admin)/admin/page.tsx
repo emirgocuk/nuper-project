@@ -3,27 +3,56 @@ import { Calendar, FileText, CheckSquare, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
 
 export default async function AdminDashboard() {
+    let eventCount = 0;
+    let bulletinCount = 0;
+    let projectCount = 0;
+    let userCount = 0;
+    let hasError = false;
 
+    try {
+        [eventCount, bulletinCount, projectCount, userCount] = await Promise.all([
+            prisma.event.count(),
+            prisma.bulletin.count(),
+            prisma.project.count({ where: { status: 'SUBMITTED' } }),
+            prisma.user.count(),
+        ]);
+    } catch (error) {
+        console.error("Failed to fetch admin stats", error);
+        hasError = true;
+    }
+
+    if (hasError) {
+        return (
+            <div className="space-y-8">
+                <h1 className="text-3xl font-bold font-heading">Dashboard</h1>
+                <Card>
+                    <CardContent className="py-10 text-center text-destructive">
+                        İstatistikler yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     const stats = [
         {
             title: "Toplam Etkinlik",
-            value: await prisma.event.count(),
+            value: eventCount,
             icon: <Calendar className="h-4 w-4 text-muted-foreground" />,
         },
         {
             title: "Toplam Bülten",
-            value: await prisma.bulletin.count(),
+            value: bulletinCount,
             icon: <FileText className="h-4 w-4 text-muted-foreground" />,
         },
         {
             title: "Bekleyen Projeler",
-            value: await prisma.project.count({ where: { status: 'SUBMITTED' } }),
+            value: projectCount,
             icon: <CheckSquare className="h-4 w-4 text-muted-foreground" />,
         },
         {
             title: "Kayıtlı Kullanıcılar",
-            value: await prisma.user.count(),
+            value: userCount,
             icon: <Users className="h-4 w-4 text-muted-foreground" />,
         }
     ];
