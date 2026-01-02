@@ -3,10 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FolderGit2 } from "lucide-react";
 
+interface ProjectWithUser {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    user: { name: string | null } | null;
+}
+
 export default async function IdeasPage() {
-    // In a real scenario, fetch ideas from DB. Assuming 'Idea' model exists.
-    // If not seeded, this might be empty.
-    const ideas = await prisma.idea.findMany({
+    const ideas = await prisma.project.findMany({
         orderBy: { createdAt: 'desc' },
         include: { user: { select: { name: true } } }
     });
@@ -22,7 +28,7 @@ export default async function IdeasPage() {
                             <p className="text-xl text-gray-500">Henüz listelenen fikir bulunmuyor.</p>
                         </div>
                     ) : (
-                        ideas.map((idea: any) => (
+                        ideas.map((idea: ProjectWithUser) => (
                             <Card key={idea.id} className="h-full overflow-hidden border-none shadow-md hover:shadow-xl transition-all hover:-translate-y-1">
                                 <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4">
                                     <div className="flex justify-between items-start">

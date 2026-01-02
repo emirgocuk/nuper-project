@@ -15,18 +15,20 @@ model User {
   image            String?
   password         String?
   role             String    @default("USER")
-  userRole         String?   // "INVESTOR" | "ENTREPRENEUR"
-  profileImage     String?   // ImageBB URL
+  userRole         String? // "INVESTOR" | "ENTREPRENEUR"
+  profileImage     String? // ImageBB URL
   isVerified       Boolean   @default(false)
-  verificationData Json?     // Flexible field for verification details
-  profileData      Json?     // Role-specific profile information
-  socialLinks      Json?     // LinkedIn, Twitter, Instagram
-  phone            String?   // For verification only
+  verificationData Json? // Flexible field for verification details
+  profileData      Json? // Role-specific profile information
+  socialLinks      Json? // LinkedIn, Twitter, Instagram
+  phone            String? // For verification only
   accounts         Account[]
   sessions         Session[]
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   projects         Project[]
+
+  @@index([email])
 }
 
 model Account {
@@ -68,6 +70,10 @@ model Event {
   isFeatured  Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([published])
+  @@index([isFeatured])
+  @@index([createdAt])
 }
 
 model Bulletin {
@@ -81,6 +87,8 @@ model Bulletin {
   published   Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([published])
 }
 
 model Project {
@@ -92,6 +100,9 @@ model Project {
   user        User?    @relation(fields: [userId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([userId])
 }
 
 model VerificationToken {

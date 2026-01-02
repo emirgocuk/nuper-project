@@ -1,0 +1,10 @@
+# Symlinks to subdirectory for tooling
+/eslint.config.mjs
+/next.config.ts
+/node_modules
+/package.json
+/public
+/src
+/tsconfig.json
+/tsconfig.tsbuildinfo
+/.env
