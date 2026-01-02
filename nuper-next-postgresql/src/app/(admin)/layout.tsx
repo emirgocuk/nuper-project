@@ -9,9 +9,13 @@ export default async function AdminLayout({
 }) {
     const session = await auth();
 
-    // Strict access control: Only admin@nuper.com allowed as per user request
-    if (!session?.user || session.user.email !== "admin@nuper.com") {
-        redirect("/adminlogin");
+    // Role-based access control
+    if (!session?.user) {
+        redirect("/login");
+    }
+    
+    if (session.user.role !== "ADMIN") {
+        redirect("/login?error=unauthorized");
     }
 
     return (

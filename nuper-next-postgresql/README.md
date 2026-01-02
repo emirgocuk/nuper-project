@@ -34,3 +34,13 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Setup Instructions
+
+1. Clone the repository
+2. Install dependencies: npm install
+3. Copy environment file: cp .env.example .env.local
+4. Fill in your values in .env.local
+5. Run migrations: npx prisma migrate dev
+6. Start dev server: npm run dev
+7. Open http://localhost:3000
