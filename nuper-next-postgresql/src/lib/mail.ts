@@ -22,7 +22,7 @@ export async function sendEmail({
         logger.info("Sending email", { to, subject });
         
         const info = await transporter.sendMail({
-            from: `"Nuper" <${process.env.GMAIL_USER}>`,
+            from: `"Nuper" <${process.env.GMAIL_USER}>`, 
             to,
             subject,
             html,
