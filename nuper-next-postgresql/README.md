@@ -1,37 +1,125 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nuper - Girişimciler ve Yatırımcılar İçin Platform
 
-## Getting Started
+Türkçe dilinde geliştirilmiş, girişimciler ve yatırımcıları buluşturan modern bir platform.
 
-First, run the development server:
+## Özellikler
+
+- 👤 Kullanıcı Kaydı ve Girişi (Email + Google OAuth)
+- 📧 Email Doğrulama Sistemi
+- 🎫 Etkinlik Yönetimi
+- 📢 Duyuru/Bülten Sistemi
+- 💼 Proje Paylaşımı
+- 👨‍💼 Admin Yönetim Paneli
+
+## Tech Stack
+
+- **Framework:** Next.js 16 (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS + shadcn/ui
+- **Database:** PostgreSQL + Prisma 5
+- **Auth:** NextAuth.js (Google + Credentials)
+- **Email:** Nodemailer (Gmail)
+- **Notifications:** Sonner
+- **Animations:** Framer Motion
+- **Rich Text:** EditorJS
+
+## Kurulum Talimatları
+
+### 1. Reposu Klonlayın
+
+```bash
+git clone <repository-url>
+cd nuper-next-postgresql
+```
+
+### 2. Bağımlılıkları Yükleyin
+
+```bash
+npm install
+```
+
+### 3. Ortam Değişkenlerini Ayarlayın
+
+```bash
+cp .env.example .env.local
+```
+
+`.env.local` dosyasını düzenleyerek aşağıdaki bilgileri doldurun:
+
+| Değişken | Açıklama |
+|----------|----------|
+| `DATABASE_URL` | PostgreSQL bağlantı stringi |
+| `NEXTAUTH_SECRET` | `openssl rand -base64 32` komutu ile oluşturun |
+| `GOOGLE_ID` | Google Cloud Console'dan alın |
+| `GOOGLE_SECRET` | Google Cloud Console'dan alın |
+| `GMAIL_USER` | Gmail adresiniz |
+| `GMAIL_PASS` | Gmail App Password |
+| `IMGBB_API_KEY` | IMGBB API Key |
+
+### 4. Veritabanı Migrasyonlarını Çalıştırın
+
+```bash
+npx prisma migrate dev
+```
+
+### 5. Geliştirme Sunucusunu Başlatın
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 6. Tarayıcıda Açın
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+[http://localhost:3000](http://localhost:3000) adresine gidin.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Admin Paneli
 
-## Learn More
+Admin paneline erişmek için:
 
-To learn more about Next.js, take a look at the following resources:
+1. Normal kullanıcı olarak kayıt olun
+2. Admin hesabına rol ataması yapın (veritabanından)
+3. [http://localhost:3000/admin/login](http://localhost:3000/admin/login) adresinden giriş yapın
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Proje Yapısı
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+src/
+├── app/
+│   ├── (public)/        # Kullanıcı sayfaları
+│   ├── (admin)/         # Admin sayfaları
+│   ├── api/             # API rotaları
+│   └── layout.tsx       # Root layout
+├── actions/             # Server Actions
+├── components/
+│   ├── ui/              # shadcn/ui bileşenleri
+│   └── admin/           # Admin bileşenleri
+├── lib/                 # Yardımcı fonksiyonlar
+├── context/             # React Context'ler
+└── types/               # TypeScript tipleri
+```
 
-## Deploy on Vercel
+## Ortam Değişkenleri Referansı
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Database
+- `DATABASE_URL` - Prisma PostgreSQL bağlantı stringi
+- `DIRECT_URL` - Direct connection string (opsyonel)
+
+### NextAuth
+- `NEXTAUTH_URL` - Uygulama URL'si
+- `NEXTAUTH_SECRET` - Oturum şifreleme anahtarı
+
+### Google OAuth
+- `GOOGLE_ID` - Google OAuth Client ID
+- `GOOGLE_SECRET` - Google OAuth Client Secret
+
+### Email (Gmail)
+- `GMAIL_USER` - Gönderen email adresi
+- `GMAIL_PASS` - App Password
+
+### Image Upload
+- `IMGBB_API_KEY` - IMGBB API Key
+
+## Lisans
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
