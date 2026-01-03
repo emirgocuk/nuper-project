@@ -121,4 +121,14 @@ src/
 
 ## Lisans
 
-MIT
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Setup Instructions
+
+1. Clone the repository
+2. Install dependencies: npm install
+3. Copy environment file: cp .env.example .env.local
+4. Fill in your values in .env.local
+5. Run migrations: npx prisma migrate dev
+6. Start dev server: npm run dev
+7. Open http://localhost:3000

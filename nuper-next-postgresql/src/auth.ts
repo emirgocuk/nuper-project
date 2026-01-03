@@ -50,7 +50,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     // Strict Role Separation
                     if (user.role === 'ADMIN') {
                         if (!isLoginAdminRequest) {
-                            throw new Error("Lütfen Yönetici Paneli girişini (adminlogin) kullanın.");
+                            throw new Error("Lütfen Yönetici Paneli girişini kullanın.");
                         }
                     } else {
                         // User trying to login to Admin Panel

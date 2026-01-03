@@ -9,10 +9,11 @@ export default async function AdminLayout({
 }) {
     const session = await auth();
 
+    // Role-based access control
     if (!session?.user) {
         redirect("/login");
     }
-
+    
     if (session.user.role !== "ADMIN") {
         redirect("/login?error=unauthorized");
     }

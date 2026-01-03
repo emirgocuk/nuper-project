@@ -1,4 +1,4 @@
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+type LogLevel = "debug" | "info" | "warn" | "error";
 
 interface LogContext {
     context?: string;
@@ -7,60 +7,60 @@ interface LogContext {
 }
 
 class Logger {
-    private getColor(level: LogLevel): string {
-        switch (level) {
-            case 'debug': return '\x1b[36m'; // Cyan
-            case 'info': return '\x1b[32m';  // Green
-            case 'warn': return '\x1b[33m';  // Yellow
-            case 'error': return '\x1b[31m'; // Red
-        }
-    }
-
-    private getResetColor(): string {
-        return '\x1b[0m';
-    }
-
-    private log(level: LogLevel, message: string, data?: Record<string, any>): void {
+    private log(level: LogLevel, message: string, data?: any) {
         const timestamp = new Date().toISOString();
-        const color = this.getColor(level);
-        const reset = this.getResetColor();
         
-        const levelStr = level.toUpperCase().padEnd(5);
-        const formattedMessage = `[${levelStr}] ${timestamp} - ${message}`;
+        // ANSI color codes
+        const colors = {
+            reset: '\x1b[0m',
+            debug: '\x1b[36m', // cyan
+            info: '\x1b[32m',  // green
+            warn: '\x1b[33m',  // yellow
+            error: '\x1b[31m', // red
+        };
+        
+        const color = colors[level] || colors.reset;
+        const levelText = level.toUpperCase().padEnd(5);
+        
+        let logMessage = `${color}[${levelText}] ${timestamp} - ${message}${colors.reset}`;
         
         if (data) {
-            console.log(`${color}${formattedMessage}${reset}`, JSON.stringify(data, null, 2));
-        } else {
-            console.log(`${color}${formattedMessage}${reset}`);
+            logMessage += ` ${JSON.stringify(data, null, 2)}`;
         }
         
-        // TODO: Integrate with error tracking services like Sentry or DataDog
-        // if (level === 'error') {
-        //     Sentry.captureException(data?.error);
-        // }
+        console.log(logMessage);
+        
+        // TODO: Integrate with Sentry/DataDog for production logging
     }
-
-    debug(message: string, data?: Record<string, any>): void {
-        this.log('debug', message, data);
+    
+    debug(message: string, data?: any) {
+        this.log("debug", message, data);
     }
-
-    info(message: string, data?: Record<string, any>): void {
-        this.log('info', message, data);
+    
+    info(message: string, data?: any) {
+        this.log("info", message, data);
     }
-
-    warn(message: string, data?: Record<string, any>): void {
-        this.log('warn', message, data);
+    
+    warn(message: string, data?: any) {
+        this.log("warn", message, data);
     }
-
-    error(message: string, error?: Error, data?: Record<string, any>): void {
-        const errorData: Record<string, any> = data || {};
+    
+    error(message: string, error?: Error, data?: any) {
+        let errorData = {};
         
         if (error) {
-            errorData.errorMessage = error.message;
-            errorData.errorStack = error.stack;
+            errorData = {
+                message: error.message,
+                stack: error.stack,
+                ...errorData
+            };
         }
         
-        this.log('error', message, errorData);
+        if (data) {
+            errorData = { ...errorData, ...data };
+        }
+        
+        this.log("error", message, errorData);
     }
 }
 
