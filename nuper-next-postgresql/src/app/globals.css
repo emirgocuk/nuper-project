@@ -275,3 +275,24 @@
 .latest-news-title {
   color: #fff !important;
 }
+
+/* Nuper Elite Global Utilities */
+.bg-glass {
+  background: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+}
+
+.bg-glass-hover:hover {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 12px 40px 0 rgba(37, 99, 235, 0.2);
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+}
+
+.hero-overlay {
+  background: radial-gradient(circle at center, transparent 0%, rgba(17, 24, 39, 0.8) 100%);
+}

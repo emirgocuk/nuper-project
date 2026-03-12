@@ -16,19 +16,24 @@ export async function createBulletin(formData: FormData) {
         throw new Error("Missing required fields");
     }
 
+    let parsedContent = {};
+    if (content) {
+        try {
+            parsedContent = JSON.parse(content);
+        } catch (e) {
+            console.error("Failed to parse content JSON", e);
+        }
+    }
+
     try {
         await prisma.bulletin.create({
-            // @ts-ignore - Prisma types might be stale
             data: {
                 title,
                 slug,
                 description: formData.get('description') as string,
                 publisher,
-                // Prisma Client runtime seems to expect String for Json field in this environment, 
-                // possibly due to stale client generation. Passing stringified JSON directly.
-                content: content || "{}",
+                content: parsedContent,
                 cardImage,
-                // published: true, // Default to true via schema
             }
         });
     } catch (error: any) {
@@ -66,16 +71,24 @@ export async function updateBulletin(id: string, formData: FormData) {
         throw new Error("Missing required fields");
     }
 
+    let parsedContent = {};
+    if (content) {
+        try {
+            parsedContent = JSON.parse(content);
+        } catch (e) {
+            console.error("Failed to parse content JSON", e);
+        }
+    }
+
     try {
         await prisma.bulletin.update({
-            // @ts-ignore - Prisma types might be stale
             where: { id },
             data: {
                 title,
                 slug,
                 description,
                 publisher,
-                content: content || "{}",
+                content: parsedContent,
                 cardImage,
             }
         });

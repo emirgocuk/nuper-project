@@ -122,11 +122,11 @@ const SpaceHero = () => {
         const planetGroup = new THREE.Group();
         scene.add(planetGroup);
 
-        const planetGeometry = new THREE.SphereGeometry(15, 64, 64);
+        const planetGeometry = new THREE.SphereGeometry(15, 48, 48); // Optimized polycount
         const planetMaterial = new THREE.MeshStandardMaterial({
             map: createPlanetTexture(),
-            metalness: 0.1,
-            roughness: 0.8
+            metalness: 0.2, // deeper reflection
+            roughness: 0.7
         });
         const planet = new THREE.Mesh(planetGeometry, planetMaterial);
         planetGroup.add(planet);
@@ -174,7 +174,7 @@ const SpaceHero = () => {
         const stars3 = createStarField(26.5, 250);
         ring3Group.add(stars3);
 
-        const particlesCount = 6000;
+        const particlesCount = 2500; // Optimized from 6000
         const positions = new Float32Array(particlesCount * 3);
         for (let i = 0; i < particlesCount; i++) {
             const phi = Math.acos(2 * Math.random() - 1);
@@ -230,6 +230,19 @@ const SpaceHero = () => {
             cancelAnimationFrame(animationId);
             if (currentMount && renderer.domElement) currentMount.removeChild(renderer.domElement);
             window.removeEventListener('resize', handleResize);
+            
+            // Memory optimization: Dispose Three.js objects
+            planetGeometry.dispose();
+            planetMaterial.map?.dispose();
+            planetMaterial.dispose();
+            ring1Geometry.dispose();
+            ring1Material.map?.dispose();
+            ring1Material.dispose();
+            ring2Geometry.dispose();
+            ring3Geometry.dispose();
+            particlesGeometry.dispose();
+            particlesMaterial.dispose();
+            renderer.dispose();
         };
     }, []);
 

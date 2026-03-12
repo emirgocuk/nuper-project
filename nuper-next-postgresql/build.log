@@ -1,0 +1,32 @@
+
+> nuper-next-postgresql@1.0.0 build
+> prisma generate && next build
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+
+✔ Generated Prisma Client (v5.22.0) to .\node_modules\@prisma\client in 60ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Easily identify and fix slow SQL queries in your app. Optimize helps you enhance your visibility: https://pris.ly/--optimize
+
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Environments: .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 4.8s
+   Running TypeScript ...
+Failed to compile.
+
+./src/app/(admin)/admin/layout.tsx:16:22
+Type error: Property 'role' does not exist on type 'User'.
+
+[0m [90m 14 |[39m     }
+ [90m 15 |[39m
+[31m[1m>[22m[39m[90m 16 |[39m     [36mif[39m (session[33m.[39muser[33m.[39mrole [33m!==[39m [32m"ADMIN"[39m) {
+ [90m    |[39m                      [31m[1m^[22m[39m
+ [90m 17 |[39m         redirect([32m"/admin/login?error=unauthorized"[39m)[33m;[39m
+ [90m 18 |[39m     }
+ [90m 19 |[39m[0m
+Next.js build worker exited with code: 1 and signal: null

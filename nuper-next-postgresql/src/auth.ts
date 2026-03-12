@@ -4,9 +4,11 @@ import { compare } from "bcryptjs"
 import { prisma } from "@/lib/db"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import Google from "next-auth/providers/google"
+import type { Adapter } from "next-auth/adapters"
+import { logger } from "@/lib/logger"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-    adapter: PrismaAdapter(prisma),
+    adapter: PrismaAdapter(prisma) as Adapter,
     session: { strategy: "jwt" },
     providers: [
         Google({
@@ -16,11 +18,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             credentials: {
                 email: { label: "Email", type: "email" },
                 password: { label: "Password", type: "password" },
+                isAdminLogin: { label: "Is Admin Login", type: "text" },
             },
             authorize: async (credentials) => {
                 try {
                     const email = credentials.email as string
                     const password = credentials.password as string
+                    const isAdminLogin = credentials.isAdminLogin === 'true'
 
                     if (!email || !password) {
                         return null
@@ -38,23 +42,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         throw new Error("Hesabınız doğrulanmamış. Lütfen email kutunuzu kontrol edin.");
                     }
 
-                    // Real password comparison
                     const isPasswordValid = await compare(password, user.password)
 
                     if (!isPasswordValid) {
                         return null
                     }
 
-                    const isLoginAdminRequest = (credentials as any).isAdminLogin === 'true';
-
                     // Strict Role Separation
                     if (user.role === 'ADMIN') {
-                        if (!isLoginAdminRequest) {
+                        if (!isAdminLogin) {
                             throw new Error("Lütfen Yönetici Paneli girişini kullanın.");
                         }
                     } else {
-                        // User trying to login to Admin Panel
-                        if (isLoginAdminRequest) {
+                        if (isAdminLogin) {
                             throw new Error("Bu alana erişim yetkiniz yok.");
                         }
                     }
@@ -64,10 +64,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         name: user.name,
                         email: user.email,
                         role: user.role,
-                    } as any
+                        userRole: user.userRole ?? undefined,
+                        isVerified: user.isVerified,
+                    }
                 } catch (error) {
-                    console.error("Auth System Error:", error);
-                    return null;
+                    logger.error('Auth credential error', error, {
+                        email: credentials?.email as string,
+                    })
+                    throw error;
                 }
             },
         }),
@@ -78,16 +82,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     callbacks: {
         async session({ session, token }) {
             if (token && session.user) {
-                // @ts-ignore
-                session.user.id = token.sub
-                // @ts-ignore
-                session.user.role = token.role
+                session.user.id = token.sub as string;
+                session.user.role = token.role as string;
+                session.user.userRole = token.userRole as string | undefined;
+                session.user.isVerified = token.isVerified as boolean | undefined;
             }
             return session
         },
         async jwt({ token, user }) {
             if (user) {
-                token.role = (user as any).role
+                token.role = user.role
+                token.userRole = user.userRole
+                token.isVerified = user.isVerified
             }
             return token
         }

@@ -44,7 +44,7 @@ export default async function EventDetailPage(props: PageProps) {
                             {event.date && (
                                 <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full">
                                     <Calendar className="w-4 h-4" />
-                                    <span>{event.date}</span>
+                                    <span>{new Date(event.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                                 </div>
                             )}
                             <div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">

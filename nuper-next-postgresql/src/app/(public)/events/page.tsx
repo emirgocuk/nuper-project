@@ -19,7 +19,7 @@ export default async function EventsPage() {
                             <p className="text-xl text-gray-500">Şu an planlanan etkinlik bulunmuyor.</p>
                         </div>
                     ) : (
-                        events.map((event: any) => (
+                        events.map((event) => (
                             <Link href={`/events/${event.slug}`} key={event.id} className="block transition-transform duration-300 hover:-translate-y-1">
                                 <Card className="h-full overflow-hidden border-none shadow-md hover:shadow-xl">
                                     <div className="h-48 overflow-hidden bg-gray-200">
@@ -32,7 +32,7 @@ export default async function EventsPage() {
                                     <CardHeader>
                                         <div className="flex items-center gap-2 mb-2 text-sm text-nuper-blue font-medium">
                                             <Calendar className="w-4 h-4" />
-                                            <span>{event.date || 'Tarih Belirlenmedi'}</span>
+                                            <span>{event.date ? new Date(event.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Tarih Belirlenmedi'}</span>
                                         </div>
                                         <CardTitle className="text-xl leading-tight text-nuper-dark-blue line-clamp-2">{event.title}</CardTitle>
                                     </CardHeader>

@@ -8,24 +8,30 @@ export async function createEvent(formData: FormData) {
     const title = formData.get('title') as string;
     const slug = formData.get('slug') as string;
     const description = formData.get('description') as string;
-    const content = formData.get('content') as string;
+    const contentString = formData.get('content') as string;
     const date = formData.get('date') as string;
     const cardImage = formData.get('cardImage') as string;
-    const published = formData.get('published') === 'on';
+    // const published = formData.get('published') === 'on'; // Currently unused, defaults to true
+
+    let content = {};
+    if (contentString) {
+        try {
+            content = JSON.parse(contentString);
+        } catch (e) {
+            console.error("Failed to parse content JSON", e);
+        }
+    }
 
     try {
         await prisma.event.create({
-            // @ts-ignore - Prisma types might be stale
             data: {
                 title,
                 slug,
                 description,
-                // Prisma Client runtime seems to expect String for Json field in this environment.
-                content: content || "{}",
+                content: content,
                 date,
                 cardImage,
                 isFeatured: formData.get('isFeatured') === 'on',
-                // published: true, // Auto-publish via schema
             }
         });
     } catch (error: any) {
@@ -55,20 +61,28 @@ export async function updateEvent(id: string, formData: FormData) {
     const title = formData.get('title') as string;
     const slug = formData.get('slug') as string;
     const description = formData.get('description') as string;
-    const content = formData.get('content') as string;
+    const contentString = formData.get('content') as string;
     const date = formData.get('date') as string;
     const cardImage = formData.get('cardImage') as string;
     const isFeatured = formData.get('isFeatured') === 'on';
 
+    let content = {};
+    if (contentString) {
+        try {
+            content = JSON.parse(contentString);
+        } catch (e) {
+            console.error("Failed to parse content JSON", e);
+        }
+    }
+
     try {
         await prisma.event.update({
-            // @ts-ignore - Prisma types might be stale
             where: { id },
             data: {
                 title,
                 slug,
                 description,
-                content: content || "{}",
+                content: content,
                 date,
                 cardImage,
                 isFeatured,
@@ -88,7 +102,6 @@ export async function updateEvent(id: string, formData: FormData) {
 export async function toggleEventFeatured(id: string, currentStatus: boolean) {
     try {
         await prisma.event.update({
-            // @ts-ignore - Prisma types might be stale
             where: { id },
             data: {
                 isFeatured: !currentStatus

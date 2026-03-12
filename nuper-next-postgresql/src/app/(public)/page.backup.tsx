@@ -98,7 +98,7 @@ export default async function Home() {
                     <div className="p-8">
                       <div className="flex items-center gap-2 text-blue-300 mb-4 text-sm font-medium">
                         <Calendar size={16} />
-                        <span>{featuredEvent.date || 'Tarih Belirtilmemiş'}</span>
+                        <span>{featuredEvent.date ? new Date(featuredEvent.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Tarih Belirtilmemiş'}</span>
                       </div>
                       <h4 className="text-2xl font-bold mb-4 line-clamp-2 min-h-[3.5rem]">
                         {featuredEvent.title}
