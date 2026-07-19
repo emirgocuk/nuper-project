@@ -58,63 +58,6 @@ export async function triggerFetchTrends() {
       }
     }
 
-    // 2. Automatically analyze top 1 oldest unprocessed trend in this run
-    const unprocessed = await prisma.trendFeed.findMany({
-      where: {
-        aiScore: 0,
-        aiSummary: null
-      },
-      orderBy: { createdAt: "asc" },
-      take: 1
-    });
-
-    for (const item of unprocessed) {
-      let aiAnalysis = { summary: "", feasibility: "", score: 50 };
-      
-      if (process.env.OPENROUTER_API_KEY) {
-        aiAnalysis = await analyzeTrendViability(item.title, item.content || "");
-      } else {
-        aiAnalysis = {
-          summary: item.content ? item.content.substring(0, 150) + "..." : "İçerik yok.",
-          feasibility: "OpenRouter API anahtarı girilmediği için otomatik AI analizi yapılamadı.",
-          score: 50
-        };
-      }
-
-      await prisma.trendFeed.update({
-        where: { id: item.id },
-        data: {
-          aiScore: aiAnalysis.score || 50,
-          aiSummary: aiAnalysis.summary,
-          aiFeasibility: aiAnalysis.feasibility
-        }
-      });
-
-      // Extract entities on this automatic run too
-      if (process.env.OPENROUTER_API_KEY) {
-        const entityResults = await extractEntitiesFromTrend(item.title, item.content || "");
-        if (entityResults.entities && entityResults.entities.length > 0) {
-          for (const ent of entityResults.entities) {
-            const exists = await prisma.discoveredSource.findFirst({
-              where: { name: ent.name }
-            });
-
-            if (!exists) {
-              await prisma.discoveredSource.create({
-                data: {
-                  name: ent.name,
-                  type: ent.type,
-                  url: ent.url,
-                  reason: `"${item.title}" başlıklı haber bağlamında: ${ent.reason}`,
-                  status: "PENDING"
-                }
-              });
-            }
-          }
-        }
-      }
-    }
-
     revalidatePath("/admin/trends");
     return { success: true, count: newlyFetchedCount };
   } catch (error: any) {

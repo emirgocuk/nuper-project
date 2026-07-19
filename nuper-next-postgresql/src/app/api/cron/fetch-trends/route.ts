@@ -80,79 +80,9 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3. Batch AI Analysis: Fetch top 1 unprocessed item (aiScore = 0)
-    // We restrict to 1 item per run to ensure we run under 5-6s and safely avoid Vercel's 10s timeout
-    const unprocessedItems = await prisma.trendFeed.findMany({
-      where: {
-        aiScore: 0,
-        aiSummary: null
-      },
-      orderBy: { createdAt: "asc" }, // Process oldest first
-      take: 1 
-    });
-
-    let analyzedCount = 0;
-
-    for (const item of unprocessedItems) {
-      try {
-        let aiAnalysis = { summary: "", feasibility: "", score: 50 };
-        
-        if (process.env.OPENROUTER_API_KEY) {
-          aiAnalysis = await analyzeTrendViability(item.title, item.content || "");
-        } else {
-          aiAnalysis = {
-            summary: item.content ? item.content.substring(0, 150) + "..." : "İçerik yok.",
-            feasibility: "OpenRouter API anahtarı girilmediği için otomatik AI analizi yapılamadı.",
-            score: 50
-          };
-        }
-
-        // Update the item with AI analysis results
-        await prisma.trendFeed.update({
-          where: { id: item.id },
-          data: {
-            aiScore: aiAnalysis.score || 50,
-            aiSummary: aiAnalysis.summary,
-            aiFeasibility: aiAnalysis.feasibility
-          }
-        });
-
-        // 4. Entity Extraction (Discover people, states, and sources mentioned)
-        if (process.env.OPENROUTER_API_KEY) {
-          const entityResults = await extractEntitiesFromTrend(item.title, item.content || "");
-          if (entityResults.entities && entityResults.entities.length > 0) {
-            for (const ent of entityResults.entities) {
-              // Deduplicate discovered sources/people by name
-              const exists = await prisma.discoveredSource.findFirst({
-                where: { name: ent.name }
-              });
-
-              if (!exists) {
-                await prisma.discoveredSource.create({
-                  data: {
-                    name: ent.name,
-                    type: ent.type,
-                    url: ent.url,
-                    reason: `"${item.title}" başlıklı haber bağlamında: ${ent.reason}`,
-                    status: "PENDING"
-                  }
-                });
-              }
-            }
-          }
-        }
-
-        analyzedCount++;
-      } catch (aiError: any) {
-        console.error(`Failed to analyze item ${item.title}:`, aiError);
-        errors.push(`AI Analysis - ${item.title}: ${aiError.message}`);
-      }
-    }
-
     return NextResponse.json({
       success: true,
       newFeedsFetched: newlyFetchedCount,
-      aiAnalyzedInThisRun: analyzedCount,
       errors: errors.length > 0 ? errors : null,
       timestamp: new Date().toISOString()
     });

@@ -99,14 +99,14 @@ Respond ONLY with a valid JSON object matching this structure, with no markdown 
  * Analyzes a technology news article or trend to see if it is viable for Nuper Industries.
  */
 export async function analyzeTrendViability(title: string, content: string): Promise<TrendAnalysisResult> {
-  const systemPrompt = `You are the Nuper Industries Trend Intelligence AI.
-Your job is to analyze the given technology news article and evaluate its viability/feasibility for Nuper Industries (a boutique tech R&D and incubation start-up in Turkey).
-Analyze if this trend/technology can be imported or implemented locally.
-Respond ONLY with a valid JSON object in Turkish matching this structure, with no markdown wrappers:
+  const systemPrompt = `You are the Nuper Industries Tech Intelligence & Literature Agent.
+Your job is to analyze the given technology news or project idea and evaluate its technical viability/feasibility for Nuper Industries (a boutique tech R&D and incubation start-up).
+Specifically focus on mapping the academic literature, whitepapers, official technical documentations, and code repositories (technical bibliography) that one should study to understand or implement this technology.
+Respond ONLY with a valid JSON object in Turkish matching this structure, with no markdown wrappers or backticks:
 {
-  "summary": "Teknoloji haberinin/gelişmesinin Türkçe kısa özeti.",
-  "feasibility": "Nuper bünyesinde bu fikrin uygulanabilirliği ve pazar potansiyeli analizi.",
-  "score": 85 // 1-100 arası önem/fizibilite skoru
+  "summary": "Teknoloji gelişmesinin Türkçe kısa teknik özeti.",
+  "feasibility": "Teknik uygulanabilirlik ve pazar potansiyeli analizi. Ardından, mutlaka '### 📚 Önerilen Literatür & Kaynakça' başlığı ekleyerek okunması gereken arXiv makaleleri, resmi teknik dökümanlar ve referans GitHub depolarına ait spesifik bağlantılar/öneriler (Markdown formatında).",
+  "score": 85 // 1-100 arası teknik fizibilite skoru
 }`;
 
   const prompt = `Title: ${title}\nContent Summary: ${content}`;
