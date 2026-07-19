@@ -41,35 +41,22 @@ export async function GET(request: Request) {
     let newlyFetchedCount = 0;
     const errors: string[] = [];
 
-    // 2. Fetch and analyze feeds
+    // 2. Fetch and store new RSS items (instantly, without AI)
     for (const source of sources) {
       try {
         const feedItems = await fetchRSSFeed(source.url);
         
-        // Only process the latest 5 items per source to save API costs & prevent timeout limits
+        // Take latest 5 items from the feed
         const latestItems = feedItems.slice(0, 5);
 
         for (const item of latestItems) {
-          // Check if already fetched
+          // Check if already in database
           const exists = await prisma.trendFeed.findUnique({
             where: { link: item.link }
           });
 
           if (!exists) {
-            let aiAnalysis = { summary: "", feasibility: "", score: 50 };
-            
-            // Check if OpenRouter API is configured before calling AI
-            if (process.env.OPENROUTER_API_KEY) {
-              aiAnalysis = await analyzeTrendViability(item.title, item.contentSnippet);
-            } else {
-              aiAnalysis = {
-                summary: item.contentSnippet.substring(0, 150) + "...",
-                feasibility: "OpenRouter API anahtarı girilmediği için AI analizi yapılamadı.",
-                score: 50
-              };
-            }
-
-            // Save feed item
+            // Save item immediately as PENDING analysis (aiScore: 0, aiSummary: null)
             await prisma.trendFeed.create({
               data: {
                 sourceId: source.id,
@@ -77,9 +64,9 @@ export async function GET(request: Request) {
                 link: item.link,
                 content: item.contentSnippet,
                 publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
-                aiScore: aiAnalysis.score,
-                aiSummary: aiAnalysis.summary,
-                aiFeasibility: aiAnalysis.feasibility,
+                aiScore: 0, // 0 signifies pending/unprocessed
+                aiSummary: null,
+                aiFeasibility: null,
                 isImported: false
               }
             });
@@ -93,9 +80,53 @@ export async function GET(request: Request) {
       }
     }
 
+    // 3. Batch AI Analysis: Fetch top 2 unprocessed items (aiScore = 0)
+    const unprocessedItems = await prisma.trendFeed.findMany({
+      where: {
+        aiScore: 0,
+        aiSummary: null
+      },
+      orderBy: { createdAt: "asc" }, // Process oldest first
+      take: 2 // Process maximum 2 items per run to stay well within 10-second timeout limit
+    });
+
+    let analyzedCount = 0;
+
+    for (const item of unprocessedItems) {
+      try {
+        let aiAnalysis = { summary: "", feasibility: "", score: 50 };
+        
+        if (process.env.OPENROUTER_API_KEY) {
+          aiAnalysis = await analyzeTrendViability(item.title, item.content || "");
+        } else {
+          aiAnalysis = {
+            summary: item.content ? item.content.substring(0, 150) + "..." : "İçerik yok.",
+            feasibility: "OpenRouter API anahtarı girilmediği için otomatik AI analizi yapılamadı.",
+            score: 50
+          };
+        }
+
+        // Update the item with AI analysis results
+        await prisma.trendFeed.update({
+          where: { id: item.id },
+          data: {
+            aiScore: aiAnalysis.score || 50,
+            aiSummary: aiAnalysis.summary,
+            aiFeasibility: aiAnalysis.feasibility
+          }
+        });
+
+        analyzedCount++;
+      } catch (aiError: any) {
+        console.error(`Failed to analyze item ${item.title}:`, aiError);
+        errors.push(`AI Analysis - ${item.title}: ${aiError.message}`);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       newFeedsFetched: newlyFetchedCount,
+      aiAnalyzedInThisRun: analyzedCount,
       errors: errors.length > 0 ? errors : null,
       timestamp: new Date().toISOString()
     });
