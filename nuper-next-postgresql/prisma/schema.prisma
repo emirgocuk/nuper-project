@@ -91,14 +91,21 @@ model Bulletin {
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  status      String   @default("SUBMITTED")
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  title               String
+  description         String?
+  status              String   @default("SUBMITTED")
+  visibility          String   @default("PUBLIC") // "PUBLIC" | "SEMI_PUBLIC" | "PRIVATE"
+  accessPassword      String?
+  aiBudgetEstimate    String?
+  aiTimeEstimate      String?
+  aiRolesNeeded       Json?
+  aiDifficultyScore   Int?
+  aiFeasibilityReport String?
+  userId              String?
+  user                User?    @relation(fields: [userId], references: [id])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   @@index([status])
   @@index([userId])
@@ -111,3 +118,34 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
+
+model TrendSource {
+  id        String      @id @default(cuid())
+  name      String      // e.g. "TechCrunch"
+  url       String      @unique // RSS Feed URL
+  active    Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  feeds     TrendFeed[]
+}
+
+model TrendFeed {
+  id                 String      @id @default(cuid())
+  sourceId           String
+  source             TrendSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  title              String
+  link               String      @unique
+  content            String?     @db.Text
+  publishedAt        DateTime?
+  aiScore            Int         @default(0) // Feasibility/Importance score (1-100)
+  aiSummary          String?     @db.Text    // Short summary
+  aiFeasibility      String?     @db.Text    // Feasibility analysis
+  isImported         Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@index([sourceId])
+  @@index([aiScore])
+  @@index([isImported])
+}
+

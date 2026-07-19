@@ -1,14 +1,15 @@
 import { prisma } from "@/lib/db";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { FolderGit2, Cpu, Rocket } from "lucide-react";
+import { ProjectCard } from "@/components/ProjectCard";
 
 export default async function ProjectsPage() {
-    // Fetch only actual projects (status is NOT 'IDEA')
+    // Fetch only actual projects (status is NOT 'IDEA') that are public or semi-public
     const projects = await prisma.project.findMany({
         where: {
             NOT: {
                 status: 'IDEA'
+            },
+            visibility: {
+                in: ['PUBLIC', 'SEMI_PUBLIC']
             }
         },
         orderBy: { createdAt: 'desc' },
@@ -35,32 +36,7 @@ export default async function ProjectsPage() {
                         </div>
                     ) : (
                         projects.map((project: any) => (
-                            <Card key={project.id} className="h-full bg-glass border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all duration-300 flex flex-col justify-between">
-                                <CardHeader className="pb-4">
-                                    <div className="flex justify-between items-start">
-                                        <div className="p-2.5 bg-blue-500/10 border border-blue-400/20 rounded-xl text-blue-300">
-                                            <Cpu className="w-6 h-6" />
-                                        </div>
-                                        <Badge className={
-                                            project.status === 'COMPLETED' 
-                                                ? 'bg-green-500/20 text-green-300 border-green-500/30' 
-                                                : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                                        } variant="outline">
-                                            {project.status === 'COMPLETED' ? 'Tamamlandı' : 'Devam Ediyor'}
-                                        </Badge>
-                                    </div>
-                                    <CardTitle className="text-xl mt-5 text-white font-heading font-bold">{project.title}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="pt-0 flex-1 flex flex-col justify-between">
-                                    <p className="text-gray-300 text-sm leading-relaxed mb-6 flex-1 line-clamp-4">{project.description}</p>
-                                    {project.user && (
-                                        <div className="text-xs text-gray-500 border-t border-white/5 pt-4 flex justify-between items-center">
-                                            <span>Geliştirici</span>
-                                            <span className="font-semibold text-gray-300">{project.user.name || 'Nuper Industries'}</span>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                            <ProjectCard key={project.id} project={project} />
                         ))
                     )}
                 </div>
@@ -68,3 +44,4 @@ export default async function ProjectsPage() {
         </div>
     );
 }
+

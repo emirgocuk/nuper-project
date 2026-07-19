@@ -1,21 +1,28 @@
 import { prisma } from "@/lib/db";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Lightbulb } from "lucide-react";
+import { ProjectCard } from "@/components/ProjectCard";
 
 interface ProjectWithUser {
     id: string;
     title: string;
     description: string | null;
     status: string;
+    visibility: string;
+    accessPassword?: string | null;
+    aiBudgetEstimate?: string | null;
+    aiTimeEstimate?: string | null;
+    aiDifficultyScore?: number | null;
+    aiFeasibilityReport?: string | null;
     user: { name: string | null } | null;
 }
 
 export default async function IdeasPage() {
-    // Fetch only ideas (status is 'IDEA')
+    // Fetch only ideas (status is 'IDEA') that are public or semi-public
     const ideas = await prisma.project.findMany({
         where: {
-            status: 'IDEA'
+            status: 'IDEA',
+            visibility: {
+                in: ['PUBLIC', 'SEMI_PUBLIC']
+            }
         },
         orderBy: { createdAt: 'desc' },
         include: { user: { select: { name: true } } }
@@ -41,28 +48,7 @@ export default async function IdeasPage() {
                         </div>
                     ) : (
                         ideas.map((idea: ProjectWithUser) => (
-                            <Card key={idea.id} className="h-full bg-glass border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all duration-300 flex flex-col justify-between">
-                                <CardHeader className="pb-4">
-                                    <div className="flex justify-between items-start">
-                                        <div className="p-2.5 bg-yellow-500/10 border border-yellow-400/20 rounded-xl text-yellow-300">
-                                            <Lightbulb className="w-6 h-6" />
-                                        </div>
-                                        <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30" variant="outline">
-                                            Fikir/Konsept
-                                        </Badge>
-                                    </div>
-                                    <CardTitle className="text-xl mt-5 text-white font-heading font-bold">{idea.title}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="pt-0 flex-1 flex flex-col justify-between">
-                                    <p className="text-gray-300 text-sm leading-relaxed mb-6 flex-1 line-clamp-4">{idea.description}</p>
-                                    {idea.user && (
-                                        <div className="text-xs text-gray-500 border-t border-white/5 pt-4 flex justify-between items-center">
-                                            <span>Müellif</span>
-                                            <span className="font-semibold text-gray-300">{idea.user.name || 'Nuper Industries'}</span>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                            <ProjectCard key={idea.id} project={idea} isIdea={true} />
                         ))
                     )}
                 </div>
@@ -70,3 +56,4 @@ export default async function IdeasPage() {
         </div>
     );
 }
+

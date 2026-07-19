@@ -323,6 +323,7 @@
     "resolve-pkg-maps": "^1.0.0",
     "retry": "^0.12.0",
     "reusify": "^1.1.0",
+    "rss-parser": "^3.13.0",
     "run-parallel": "^1.2.0",
     "safe-array-concat": "^1.1.3",
     "safe-push-apply": "^1.0.0",
