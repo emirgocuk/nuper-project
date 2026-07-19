@@ -244,3 +244,30 @@ export async function ignoreDiscovery(discoveryId: string) {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Server Action: Updates the Human-in-the-Loop feedback (score override, notes, status) for a specific trend.
+ */
+export async function updateTrendFeedback(
+  trendId: string,
+  userScore: number | null,
+  userNotes: string | null,
+  status: string
+) {
+  try {
+    await prisma.trendFeed.update({
+      where: { id: trendId },
+      data: {
+        userScore,
+        userNotes,
+        status
+      }
+    });
+
+    revalidatePath("/admin/trends");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to update trend feedback:", error);
+    return { success: false, error: error.message };
+  }
+}

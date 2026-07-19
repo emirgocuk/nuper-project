@@ -141,12 +141,16 @@ model TrendFeed {
   aiSummary          String?     @db.Text    // Short summary
   aiFeasibility      String?     @db.Text    // Feasibility analysis
   isImported         Boolean     @default(false)
+  userScore          Int?        // Founder overridden score (1-100)
+  userNotes          String?     @db.Text    // Founder R&D/vision notes
+  status             String      @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
   @@index([sourceId])
   @@index([aiScore])
   @@index([isImported])
+  @@index([status])
 }
 
 model DiscoveredSource {
