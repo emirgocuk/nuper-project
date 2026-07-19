@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Calendar, FileText, FolderOpen, FileSignature, LogOut, Settings, Users, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Calendar, FileText, FolderOpen, FileSignature, LogOut, Settings, Users, TrendingUp, Compass } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
 export function AdminSidebar({ user }: { user?: { name?: string | null, email?: string | null } }) {
@@ -16,6 +16,7 @@ export function AdminSidebar({ user }: { user?: { name?: string | null, email?: 
         { href: "/admin/bulletins", label: "Bülten Yönetimi", icon: FileText },
         { href: "/admin/projects", label: "Proje İnceleme", icon: FolderOpen },
         { href: "/admin/trends", label: "İstihbarat & Trendler", icon: TrendingUp },
+        { href: "/admin/trends/discoveries", label: "Keşifler & Kaynaklar", icon: Compass },
         { href: "/admin/settings", label: "Ayarlar", icon: Settings },
     ];
 

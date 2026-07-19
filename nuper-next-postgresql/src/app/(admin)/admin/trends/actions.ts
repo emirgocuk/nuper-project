@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { fetchRSSFeed } from "@/lib/rssParser";
-import { analyzeTrendViability } from "@/lib/openrouter";
+import { analyzeTrendViability, extractEntitiesFromTrend } from "@/lib/openrouter";
 import { revalidatePath } from "next/cache";
 
 const DEFAULT_SOURCES = [
@@ -13,7 +13,7 @@ const DEFAULT_SOURCES = [
 
 /**
  * Server Action: Manually triggers RSS fetching and stores them,
- * then analyzes the top 3 unprocessed trends to keep response times fast.
+ * then analyzes the top 1 unprocessed trend in this run to keep response times fast.
  */
 export async function triggerFetchTrends() {
   try {
@@ -58,14 +58,14 @@ export async function triggerFetchTrends() {
       }
     }
 
-    // 2. Automatically analyze top 3 oldest unprocessed trends in this run
+    // 2. Automatically analyze top 1 oldest unprocessed trend in this run
     const unprocessed = await prisma.trendFeed.findMany({
       where: {
         aiScore: 0,
         aiSummary: null
       },
       orderBy: { createdAt: "asc" },
-      take: 3
+      take: 1
     });
 
     for (const item of unprocessed) {
@@ -89,6 +89,30 @@ export async function triggerFetchTrends() {
           aiFeasibility: aiAnalysis.feasibility
         }
       });
+
+      // Extract entities on this automatic run too
+      if (process.env.OPENROUTER_API_KEY) {
+        const entityResults = await extractEntitiesFromTrend(item.title, item.content || "");
+        if (entityResults.entities && entityResults.entities.length > 0) {
+          for (const ent of entityResults.entities) {
+            const exists = await prisma.discoveredSource.findFirst({
+              where: { name: ent.name }
+            });
+
+            if (!exists) {
+              await prisma.discoveredSource.create({
+                data: {
+                  name: ent.name,
+                  type: ent.type,
+                  url: ent.url,
+                  reason: `"${item.title}" başlıklı haber bağlamında: ${ent.reason}`,
+                  status: "PENDING"
+                }
+              });
+            }
+          }
+        }
+      }
     }
 
     revalidatePath("/admin/trends");
@@ -100,7 +124,8 @@ export async function triggerFetchTrends() {
 }
 
 /**
- * Server Action: Manually triggers AI analysis for a single specific trend item (on-demand)
+ * Server Action: Manually triggers AI analysis for a single specific trend item (on-demand),
+ * extracting both feasibility metrics and discovered entities.
  */
 export async function analyzeSingleTrend(trendId: string) {
   try {
@@ -124,6 +149,7 @@ export async function analyzeSingleTrend(trendId: string) {
       };
     }
 
+    // Update trend analysis
     await prisma.trendFeed.update({
       where: { id: trendId },
       data: {
@@ -132,6 +158,30 @@ export async function analyzeSingleTrend(trendId: string) {
         aiFeasibility: aiAnalysis.feasibility
       }
     });
+
+    // Run Entity extraction
+    if (process.env.OPENROUTER_API_KEY) {
+      const entityResults = await extractEntitiesFromTrend(trend.title, trend.content || "");
+      if (entityResults.entities && entityResults.entities.length > 0) {
+        for (const ent of entityResults.entities) {
+          const exists = await prisma.discoveredSource.findFirst({
+            where: { name: ent.name }
+          });
+
+          if (!exists) {
+            await prisma.discoveredSource.create({
+              data: {
+                name: ent.name,
+                type: ent.type,
+                url: ent.url,
+                reason: `"${trend.title}" başlıklı haber bağlamında: ${ent.reason}`,
+                status: "PENDING"
+              }
+            });
+          }
+        }
+      }
+    }
 
     revalidatePath("/admin/trends");
     return { success: true };
@@ -182,6 +232,72 @@ export async function importTrendToProject(trendId: string) {
     return { success: true };
   } catch (error: any) {
     console.error("Import trend failed:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Server Action: Approves a discovered source and adds it to our active monitored TrendSource list (if it has a URL)
+ */
+export async function approveDiscovery(discoveryId: string) {
+  try {
+    const discovery = await prisma.discoveredSource.findUnique({
+      where: { id: discoveryId }
+    });
+
+    if (!discovery) {
+      return { success: false, error: "Keşif bulunamadı." };
+    }
+
+    if (discovery.status !== "PENDING") {
+      return { success: false, error: "Bu keşif zaten karara bağlandı." };
+    }
+
+    // If it's a website or has a URL, add it to our TrendSource list to start crawling!
+    if (discovery.url && (discovery.type === "WEBSITE" || discovery.type === "ORGANIZATION")) {
+      const exists = await prisma.trendSource.findFirst({
+        where: { url: discovery.url }
+      });
+
+      if (!exists) {
+        await prisma.trendSource.create({
+          data: {
+            name: discovery.name,
+            url: discovery.url,
+            active: true
+          }
+        });
+      }
+    }
+
+    // Update status to APPROVED
+    await prisma.discoveredSource.update({
+      where: { id: discoveryId },
+      data: { status: "APPROVED" }
+    });
+
+    revalidatePath("/admin/trends/discoveries");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Approve discovery failed:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Server Action: Ignores a discovered source/person
+ */
+export async function ignoreDiscovery(discoveryId: string) {
+  try {
+    await prisma.discoveredSource.update({
+      where: { id: discoveryId },
+      data: { status: "IGNORED" }
+    });
+
+    revalidatePath("/admin/trends/discoveries");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Ignore discovery failed:", error);
     return { success: false, error: error.message };
   }
 }

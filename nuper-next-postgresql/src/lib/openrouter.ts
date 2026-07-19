@@ -124,3 +124,46 @@ Respond ONLY with a valid JSON object in Turkish matching this structure, with n
     };
   }
 }
+
+export interface ExtractedEntity {
+  name: string;
+  type: "PERSON" | "ORGANIZATION" | "WEBSITE" | "STATE";
+  url: string | null;
+  reason: string;
+}
+
+export interface EntityExtractionResult {
+  entities: ExtractedEntity[];
+}
+
+/**
+ * Extracts key entities (people, organizations, states, websites) and their associated URLs from a news trend.
+ */
+export async function extractEntitiesFromTrend(title: string, content: string): Promise<EntityExtractionResult> {
+  const systemPrompt = `You are the Nuper Industries Entity Extraction Agent.
+Analyze the given news article title and content. Extract any notable people (thought leaders, researchers), organizations, states, or specific websites/URLs mentioned.
+For each entity found, try to determine their official URL or homepage (use your knowledge base if not present in text).
+Return ONLY a valid JSON object matching this structure, with no markdown formatting or code blocks:
+{
+  "entities": [
+    {
+      "name": "Entity Name (e.g. İlber Ortaylı, arXiv)",
+      "type": "PERSON | ORGANIZATION | WEBSITE | STATE",
+      "url": "https://example.com (Official homepage URL or null if completely unknown)",
+      "reason": "Haberde geçme nedeni ve neden önemli olduğu (Türkçe kısa açıklama)"
+    }
+  ]
+}`;
+
+  const prompt = `Title: ${title}\nContent: ${content}`;
+
+  try {
+    const responseText = await callOpenRouter(prompt, systemPrompt);
+    const cleanText = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(cleanText) as EntityExtractionResult;
+  } catch (error: any) {
+    console.error("AI Entity Extraction failed:", error);
+    return { entities: [] };
+  }
+}
+

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fetchRSSFeed } from "@/lib/rssParser";
-import { analyzeTrendViability } from "@/lib/openrouter";
+import { analyzeTrendViability, extractEntitiesFromTrend } from "@/lib/openrouter";
 
 export const dynamic = "force-dynamic";
 
@@ -80,14 +80,15 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3. Batch AI Analysis: Fetch top 2 unprocessed items (aiScore = 0)
+    // 3. Batch AI Analysis: Fetch top 1 unprocessed item (aiScore = 0)
+    // We restrict to 1 item per run to ensure we run under 5-6s and safely avoid Vercel's 10s timeout
     const unprocessedItems = await prisma.trendFeed.findMany({
       where: {
         aiScore: 0,
         aiSummary: null
       },
       orderBy: { createdAt: "asc" }, // Process oldest first
-      take: 2 // Process maximum 2 items per run to stay well within 10-second timeout limit
+      take: 1 
     });
 
     let analyzedCount = 0;
@@ -115,6 +116,31 @@ export async function GET(request: Request) {
             aiFeasibility: aiAnalysis.feasibility
           }
         });
+
+        // 4. Entity Extraction (Discover people, states, and sources mentioned)
+        if (process.env.OPENROUTER_API_KEY) {
+          const entityResults = await extractEntitiesFromTrend(item.title, item.content || "");
+          if (entityResults.entities && entityResults.entities.length > 0) {
+            for (const ent of entityResults.entities) {
+              // Deduplicate discovered sources/people by name
+              const exists = await prisma.discoveredSource.findFirst({
+                where: { name: ent.name }
+              });
+
+              if (!exists) {
+                await prisma.discoveredSource.create({
+                  data: {
+                    name: ent.name,
+                    type: ent.type,
+                    url: ent.url,
+                    reason: `"${item.title}" başlıklı haber bağlamında: ${ent.reason}`,
+                    status: "PENDING"
+                  }
+                });
+              }
+            }
+          }
+        }
 
         analyzedCount++;
       } catch (aiError: any) {
