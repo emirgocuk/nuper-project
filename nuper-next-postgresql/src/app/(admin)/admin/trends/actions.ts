@@ -80,7 +80,7 @@ export async function analyzeSingleTrend(trendId: string) {
       return { success: false, error: "Gelişme bulunamadı." };
     }
 
-    let aiAnalysis = { summary: "", feasibility: "", score: 50 };
+    let aiAnalysis = { summary: "", feasibility: "", score: 50, category: "Yazılım & Yapay Zeka" };
 
     if (process.env.OPENROUTER_API_KEY) {
       aiAnalysis = await analyzeTrendViability(trend.title, trend.content || "");
@@ -88,7 +88,8 @@ export async function analyzeSingleTrend(trendId: string) {
       aiAnalysis = {
         summary: trend.content ? trend.content.substring(0, 150) + "..." : "İçerik yok.",
         feasibility: "OpenRouter API anahtarı girilmediği için AI analizi yapılamadı.",
-        score: 50
+        score: 50,
+        category: "Yazılım & Yapay Zeka"
       };
     }
 
@@ -98,7 +99,8 @@ export async function analyzeSingleTrend(trendId: string) {
       data: {
         aiScore: aiAnalysis.score || 50,
         aiSummary: aiAnalysis.summary,
-        aiFeasibility: aiAnalysis.feasibility
+        aiFeasibility: aiAnalysis.feasibility,
+        category: aiAnalysis.category || "Yazılım & Yapay Zeka"
       }
     });
 

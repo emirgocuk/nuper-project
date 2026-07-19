@@ -10,6 +10,7 @@ export interface TrendAnalysisResult {
   summary: string;
   feasibility: string;
   score: number;
+  category: string;
 }
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -24,8 +25,8 @@ async function callOpenRouter(prompt: string, systemPrompt: string): Promise<str
     throw new Error("OPENROUTER_API_KEY is not defined in environment variables.");
   }
 
-  // Use a reliable free model from OpenRouter as default
-  const model = process.env.OPENROUTER_MODEL || "meta-llama/llama-3-8b-instruct:free";
+  // Use a reliable free model from OpenRouter as default (Llama 3.1 8B Free)
+  const model = process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct:free";
 
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
@@ -102,11 +103,13 @@ export async function analyzeTrendViability(title: string, content: string): Pro
   const systemPrompt = `You are the Nuper Industries Tech Intelligence & Literature Agent.
 Your job is to analyze the given technology news or project idea and evaluate its technical viability/feasibility for Nuper Industries (a boutique tech R&D and incubation start-up).
 Specifically focus on mapping the academic literature, whitepapers, official technical documentations, and code repositories (technical bibliography) that one should study to understand or implement this technology.
+Also, assign the technology/development to exactly one of the following MDPI-style technical subjects: "Sağlık & Tıp", "Yazılım & Yapay Zeka", "Enerji & Çevre", "Biyoteknoloji & Yaşam Bilimleri", "Malzeme Bilimi & Fizik", "Elektronik & Donanım", "Uzay & Havacılık", "Ekonomi & İş Modelleri".
 Respond ONLY with a valid JSON object in Turkish matching this structure, with no markdown wrappers or backticks:
 {
   "summary": "Teknoloji gelişmesinin Türkçe kısa teknik özeti.",
   "feasibility": "Teknik uygulanabilirlik ve pazar potansiyeli analizi. Ardından, mutlaka '### 📚 Önerilen Literatür & Kaynakça' başlığı ekleyerek okunması gereken arXiv makaleleri, resmi teknik dökümanlar ve referans GitHub depolarına ait spesifik bağlantılar/öneriler (Markdown formatında).",
-  "score": 85 // 1-100 arası teknik fizibilite skoru
+  "score": 85, // 1-100 arası teknik fizibilite skoru
+  "category": "Sağlık & Tıp" // Must be exactly one of the values listed above
 }`;
 
   const prompt = `Title: ${title}\nContent Summary: ${content}`;
@@ -120,7 +123,8 @@ Respond ONLY with a valid JSON object in Turkish matching this structure, with n
     return {
       summary: "Özet oluşturulamadı.",
       feasibility: `Haber analizi sırasında hata oluştu: ${error.message}`,
-      score: 0
+      score: 0,
+      category: "Yazılım & Yapay Zeka"
     };
   }
 }

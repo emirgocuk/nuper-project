@@ -144,6 +144,7 @@ model TrendFeed {
   userScore          Int?        // Founder overridden score (1-100)
   userNotes          String?     @db.Text    // Founder R&D/vision notes
   status             String      @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  category           String?     // MDPI-style technical category
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 

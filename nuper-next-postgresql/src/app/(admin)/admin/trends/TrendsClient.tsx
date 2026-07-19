@@ -19,14 +19,28 @@ interface TrendItem {
   userScore: number | null;
   userNotes: string | null;
   status: string;
+  category: string | null;
   source: {
     name: string;
   };
 }
 
+const CATEGORIES = [
+  "Tümü",
+  "Sağlık & Tıp",
+  "Yazılım & Yapay Zeka",
+  "Enerji & Çevre",
+  "Biyoteknoloji & Yaşam Bilimleri",
+  "Malzeme Bilimi & Fizik",
+  "Elektronik & Donanım",
+  "Uzay & Havacılık",
+  "Ekonomi & İş Modelleri"
+];
+
 export default function TrendsClient({ initialTrends }: { initialTrends: TrendItem[] }) {
   const [trends, setTrends] = useState<TrendItem[]>(initialTrends);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string>("Tümü");
   const [isFetching, startFetching] = useTransition();
   const [isAnalyzing, startAnalyzing] = useTransition();
   const [isImporting, startImporting] = useTransition();
@@ -76,10 +90,38 @@ export default function TrendsClient({ initialTrends }: { initialTrends: TrendIt
     setExpandedIds(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const getCategoryBadgeClass = (category: string | null) => {
+    switch (category) {
+      case "Sağlık & Tıp":
+        return "bg-rose-50 text-rose-700 border-rose-200";
+      case "Yazılım & Yapay Zeka":
+        return "bg-blue-50 text-blue-700 border-blue-200";
+      case "Enerji & Çevre":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "Biyoteknoloji & Yaşam Bilimleri":
+        return "bg-teal-50 text-teal-700 border-teal-200";
+      case "Malzeme Bilimi & Fizik":
+        return "bg-amber-50 text-amber-700 border-amber-200";
+      case "Elektronik & Donanım":
+        return "bg-indigo-50 text-indigo-700 border-indigo-200";
+      case "Uzay & Havacılık":
+        return "bg-cyan-50 text-cyan-700 border-cyan-200";
+      case "Ekonomi & İş Modelleri":
+        return "bg-purple-50 text-purple-700 border-purple-200";
+      default:
+        return "bg-slate-50 text-slate-600 border-slate-200";
+    }
+  };
+
+  // Filter trends by selected category
+  const filteredTrends = selectedCategory === "Tümü"
+    ? trends
+    : trends.filter(t => t.category === selectedCategory);
+
   return (
     <div className="space-y-4 max-w-7xl mx-auto text-xs">
       {/* Compact Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-3 gap-3">
         <div className="flex items-center gap-2">
           <BrainCircuit className="w-5 h-5 text-blue-600 shrink-0" />
           <div>
@@ -91,14 +133,30 @@ export default function TrendsClient({ initialTrends }: { initialTrends: TrendIt
             </p>
           </div>
         </div>
-        <button
-          onClick={handleFetchTrends}
-          disabled={isFetching}
-          className="flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm shrink-0"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
-          {isFetching ? "Taranıyor..." : "Haberleri Güncelle"}
-        </button>
+
+        <div className="flex items-center gap-2 self-end md:self-auto">
+          {/* Category Filter Dropdown */}
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          >
+            {CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat === "Tümü" ? "Tüm Kategoriler" : cat}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={handleFetchTrends}
+            disabled={isFetching}
+            className="flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm shrink-0"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
+            {isFetching ? "Taranıyor..." : "Haberleri Güncelle"}
+          </button>
+        </div>
       </div>
 
       {/* High Density Table */}
@@ -115,14 +173,14 @@ export default function TrendsClient({ initialTrends }: { initialTrends: TrendIt
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {trends.length === 0 ? (
+              {filteredTrends.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-8 text-center text-slate-400">
-                    Kayıtlı haber bulunmuyor. Lütfen güncelleyin.
+                    Kayıtlı haber bulunmuyor veya bu kategoride filtreleme sonucu boş.
                   </td>
                 </tr>
               ) : (
-                trends.map((trend) => {
+                filteredTrends.map((trend) => {
                   const isExpanded = !!expandedIds[trend.id];
                   const hasUserOverride = trend.userScore !== null;
                   const displayScore = hasUserOverride ? trend.userScore : trend.aiScore;
@@ -183,12 +241,20 @@ export default function TrendsClient({ initialTrends }: { initialTrends: TrendIt
                               href={trend.link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-slate-400 hover:text-blue-600 inline-block"
+                              className="text-slate-400 hover:text-blue-600 inline-block shrink-0"
                             >
                               <ExternalLink className="w-3 h-3" />
                             </a>
+                            
+                            {/* Category Badge */}
+                            {trend.category && (
+                              <span className={`inline-flex items-center px-1.5 py-0.2 rounded border text-[8px] font-bold uppercase tracking-wider scale-90 shrink-0 ${getCategoryBadgeClass(trend.category)}`}>
+                                {trend.category}
+                              </span>
+                            )}
+
                             {trend.status === "APPROVED" && (
-                              <span className="bg-emerald-100 text-emerald-800 text-[8px] font-bold px-1.5 rounded-full uppercase tracking-wider scale-90">
+                              <span className="bg-emerald-100 text-emerald-800 text-[8px] font-bold px-1.5 rounded-full uppercase tracking-wider scale-90 shrink-0">
                                 Sinyal
                               </span>
                             )}
@@ -296,7 +362,6 @@ function FeedbackForm({ trend }: { trend: TrendItem }) {
       if (res.success) {
         setStatus(newStatus);
         toast.success(`Geri bildirim başarıyla kaydedildi!`);
-        // We delay reload slightly to allow the toast to show and the state to update
         setTimeout(() => {
           window.location.reload();
         }, 800);
@@ -332,7 +397,7 @@ function FeedbackForm({ trend }: { trend: TrendItem }) {
             value={score}
             onChange={(e) => setScore(e.target.value === "" ? "" : Number(e.target.value))}
             className="w-full px-2 py-0.5 border border-slate-300 rounded font-mono font-bold text-xs"
-            placeholder="AI skorunu ez"
+            placeholder="AI puanını ez"
           />
         </div>
         <div className="space-y-0.5 md:col-span-3">
