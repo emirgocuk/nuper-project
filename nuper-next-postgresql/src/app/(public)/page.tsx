@@ -2,19 +2,27 @@ import Link from 'next/link';
 import SpaceHero from '@/components/SpaceHero';
 import HowItWorks from '@/components/HowItWorks';
 import { prisma } from '@/lib/db';
-import { ArrowRight, Calendar, Newspaper, Star, Sparkles } from 'lucide-react';
+import { ArrowRight, Newspaper, Sparkles, BrainCircuit, TrendingUp } from 'lucide-react';
 import { unstable_noStore as noStore } from 'next/cache';
 
-async function getFeaturedEvent() {
+async function getTopTrend() {
   noStore();
   try {
-    const event = await prisma.event.findFirst({
-      where: { isFeatured: true },
-      orderBy: { createdAt: 'desc' }
+    // En yüksek puanlı APPROVED trendi getir, yoksa herhangi bir analiz edilmişi
+    const trend = await prisma.trendFeed.findFirst({
+      where: {
+        aiScore: { gt: 0 },
+        aiSummary: { not: null },
+      },
+      orderBy: [
+        { status: 'desc' }, // APPROVED önce
+        { aiScore: 'desc' },
+      ],
+      include: { source: { select: { name: true } } },
     });
-    return event;
+    return trend;
   } catch (e) {
-    console.error("Failed to fetch featured event", e);
+    console.error("Failed to fetch top trend", e);
     return null;
   }
 }
@@ -33,8 +41,9 @@ async function getLatestBulletin() {
 }
 
 export default async function Home() {
-  const featuredEvent = await getFeaturedEvent();
+  const topTrend = await getTopTrend();
   const latestBulletin = await getLatestBulletin();
+
 
   return (
     <main className="min-h-screen bg-[#0b1120] text-white selection:bg-blue-500/30">
@@ -94,48 +103,66 @@ export default async function Home() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 text-white">
-              {/* Featured Event Column */}
+              {/* Top Trend Column */}
               <div className="flex flex-col">
                 <div className="flex items-center gap-3 mb-8">
-                  <Star className="text-blue-400 w-6 h-6" />
-                  <h3 className="text-2xl font-bold font-heading">Öne Çıkan Etkinlik</h3>
+                  <BrainCircuit className="text-blue-400 w-6 h-6" />
+                  <h3 className="text-2xl font-bold font-heading">İstihbarat Özeti</h3>
                 </div>
-                {featuredEvent ? (
-                  <div className="bg-glass hover:bg-[rgba(30,41,59,0.5)] transition-all duration-500 rounded-3xl overflow-hidden border-white/10 group flex-1 flex flex-col">
-                    <div className="relative h-72 w-full overflow-hidden">
-                      <img
-                        src={featuredEvent.cardImage || 'https://placehold.co/800x600/0f172a/ffffff?text=Etkinlik'}
-                        alt={featuredEvent.title}
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] via-transparent to-transparent opacity-80"></div>
-                      <div className="absolute top-4 right-4 bg-blue-500/20 backdrop-blur-md border border-blue-400/30 text-blue-100 px-4 py-1.5 rounded-full text-sm font-semibold shadow-[0_0_15px_rgba(59,130,246,0.3)]">
-                        Öne Çıkan
+                {topTrend ? (
+                  <div className="bg-glass hover:bg-[rgba(30,41,59,0.5)] transition-all duration-500 rounded-3xl overflow-hidden border border-white/10 group flex-1 flex flex-col p-8">
+                    {/* Score + Category */}
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className={`flex items-center justify-center w-12 h-12 rounded-2xl font-bold text-xl shrink-0 ${
+                        topTrend.aiScore >= 80 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                        topTrend.aiScore >= 50 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                        'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                      }`}>
+                        {topTrend.userScore ?? topTrend.aiScore}
                       </div>
+                      <div>
+                        <p className="text-xs text-blue-300 font-semibold tracking-wider uppercase">{topTrend.source.name}</p>
+                        {topTrend.category && (
+                          <span className="text-[10px] font-bold text-blue-200/60 uppercase tracking-widest">{topTrend.category}</span>
+                        )}
+                      </div>
+                      {topTrend.status === 'APPROVED' && (
+                        <span className="ml-auto px-2.5 py-1 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded-full border border-emerald-500/30 uppercase tracking-wider">
+                          Sinyal
+                        </span>
+                      )}
                     </div>
-                    <div className="p-8 flex flex-col flex-1">
-                      <div className="flex items-center gap-2 text-blue-300 mb-4 text-sm font-medium tracking-wide">
-                        <Calendar size={18} />
-                        <span>{featuredEvent.date ? new Date(String(featuredEvent.date)).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Tarih Belirtilmemiş'}</span>
-                      </div>
-                      <h4 className="text-3xl font-bold mb-4 line-clamp-2 text-white font-heading group-hover:text-blue-200 transition-colors">
-                        {featuredEvent.title}
-                      </h4>
-                      <p className="text-gray-400 mb-8 line-clamp-3 leading-relaxed flex-1">
-                        {featuredEvent.description}
+
+                    <h4 className="text-xl font-bold mb-4 text-white font-heading group-hover:text-blue-200 transition-colors leading-snug line-clamp-3">
+                      {topTrend.title}
+                    </h4>
+
+                    {topTrend.aiSummary && (
+                      <p className="text-gray-400 leading-relaxed text-sm line-clamp-4 flex-1 mb-6">
+                        {topTrend.aiSummary}
                       </p>
-                      <Link
-                        href={`/events/${featuredEvent.slug}`}
-                        className="inline-flex items-center gap-2 text-blue-400 font-semibold hover:text-blue-300 transition-colors"
+                    )}
+
+                    <div className="flex items-center justify-between border-t border-white/10 pt-5 mt-auto">
+                      <a
+                        href={topTrend.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-blue-400 font-semibold hover:text-blue-300 transition-colors text-sm"
                       >
-                        Detayları İncele
-                        <ArrowRight size={18} className="transition-transform group-hover:translate-x-2" />
-                      </Link>
+                        Kaynağa Git
+                        <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                      </a>
+                      <span className="text-xs text-gray-600 font-medium">
+                        {topTrend.publishedAt ? new Date(topTrend.publishedAt).toLocaleDateString('tr-TR') : ''}
+                      </span>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-full min-h-[450px] flex items-center justify-center bg-glass rounded-3xl border border-white/5">
-                    <p className="text-gray-500 font-medium">Öne çıkan etkinlik bulunmuyor.</p>
+                  <div className="h-full min-h-[450px] flex flex-col items-center justify-center bg-glass rounded-3xl border border-white/5 gap-3">
+                    <TrendingUp className="w-10 h-10 text-gray-600" />
+                    <p className="text-gray-500 font-medium text-sm">Henüz analiz edilmiş trend yok.</p>
+                    <p className="text-gray-600 text-xs">Admin panelinden haber çekin ve AI analizi başlatın.</p>
                   </div>
                 )}
               </div>
