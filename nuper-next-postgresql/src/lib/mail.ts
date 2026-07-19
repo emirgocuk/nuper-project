@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { logger } from './logger';
+import { getBaseUrl } from './utils';
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -37,7 +38,7 @@ export async function sendEmail({
 }
 
 export async function sendAccountApprovedEmail(email: string, name: string) {
-    const loginLink = `${process.env.NEXTAUTH_URL}/login`;
+    const loginLink = `${getBaseUrl()}/login`;
     
     logger.info("Sending approval email", { email });
     

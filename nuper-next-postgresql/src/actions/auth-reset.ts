@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/mail";
 import { hash } from "bcryptjs";
 import { randomBytes } from "crypto";
+import { getBaseUrl } from "@/lib/utils";
 
 export async function sendPasswordResetEmail(email: string) {
     try {
@@ -32,7 +33,7 @@ export async function sendPasswordResetEmail(email: string) {
             }
         });
 
-        const resetLink = `${process.env.NEXTAUTH_URL}/new-password?token=${token}`;
+        const resetLink = `${getBaseUrl()}/new-password?token=${token}`;
 
         await sendEmail({
             to: email,

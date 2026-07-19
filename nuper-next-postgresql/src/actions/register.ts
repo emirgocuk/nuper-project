@@ -4,6 +4,7 @@ import { hash } from 'bcryptjs'
 import { prisma } from '@/lib/db'
 import { randomBytes } from "crypto";
 import { sendVerificationEmail } from "@/lib/mail";
+import { getBaseUrl } from "@/lib/utils";
 
 export async function registerUser(formData: FormData) {
     try {
@@ -51,7 +52,7 @@ export async function registerUser(formData: FormData) {
         });
 
         // Construct verification link
-        const verifyLink = `${process.env.NEXTAUTH_URL}/verify-email?token=${verificationToken}`;
+        const verifyLink = `${getBaseUrl()}/verify-email?token=${verificationToken}`;
 
         // Send verification email
         await sendVerificationEmail(email, name, verifyLink);
