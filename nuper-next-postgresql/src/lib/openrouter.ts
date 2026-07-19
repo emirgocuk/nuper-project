@@ -25,8 +25,8 @@ async function callOpenRouter(prompt: string, systemPrompt: string): Promise<str
     throw new Error("OPENROUTER_API_KEY is not defined in environment variables.");
   }
 
-  // Use a reliable free model from OpenRouter as default (Llama 3.1 8B Free)
-  const model = process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct:free";
+  // Use a reliable free model from OpenRouter as default (Auto-routed Free Model)
+  const model = process.env.OPENROUTER_MODEL || "openrouter/free";
 
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
