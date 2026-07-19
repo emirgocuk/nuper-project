@@ -1,67 +1,53 @@
-# Nuper Industries İnovasyon Fabrikası & İstihbarat Motoru Planı
+# Nuper Industries İnovasyon Fabrikası & "İkinci Beyin" (Second Brain) Mimarisi
 
-Nuper Industries portalının sadece dış dünyaya hitap eden prestijli bir vitrin olmaktan öteye geçerek; kurucunun yeni girişim fikirleri bulmasını, bunları yapay zeka ile analiz etmesini, dış dünyadaki teknolojik gelişmeleri ithal etmesini ve akredite yatırımcılarla buluşturmasını sağlayan bir **"İnovasyon İstasyonu"**na dönüştürülmesi planıdır.
-
----
-
-## 1. Fikri Mülkiyet (IP) Koruma ve Kademeli Açıklama Modeli
-
-Kullanıcının sorduğu *"Web sitesinde yayınlayınca fikri mülkiyetleri bana ait olur mu?"* sorusu doğrultusunda, fikirlerin çalınmasını önleyen ve kurucunun haklarını koruyan **Kademeli Açıklama (Vectored Disclosure)** modeli uygulanacaktır:
-
-### Hukuki Durum
-- **Telif Hakkı (Copyright):** Sitede yayınladığınız kodlar, tasarımlar ve metinler yazıldığı andan itibaren otomatik olarak telif hakkı ile korunur (Fikri Sanat Eserleri Kanunu).
-- **Patentler / Fikir Hakları:** Ham fikirler (örn: "yapay fotosentez duvarı") sadece fikir düzeyindeyken patentlenemez. Patentlenebilmesi için teknik bir çözüm, prototip veya detaylı bir algoritma şeması (reduction to practice) gerekir. Fikri tamamen açık bir şekilde yayınlamak, başkalarının bunu kopyalamasına yasal zemin hazırlayabilir.
-
-### Çözümümüz: Kademeli Erişim Katmanları
-Veritabanında projeler ve fikirler için 3 farklı gizlilik düzeyi tanımlanacaktır:
-
-1.  **Özel (Private - Konsept):** 
-    - Sadece Admin panelinde görünür.
-    - AI fizibilite raporları, pazar analizleri, kod mimarisi ve bütçe tahminleri bu katmanda tutulur.
-2.  **Kısıtlı (Semi-Public - Pitch Deck):** 
-    - Sitede listelenir ancak detaylar şifrelidir. 
-    - Sadece kurucunun manuel olarak yetki verdiği (arka planda yüz yüze görüştüğü) akredite yatırımcılar şifre ile girip detaylı iş planını görebilir.
-3.  **Açık (Public - Tanıtım):**
-    - Ziyaretçilere açık olan kısımdır. Fikrin teknik detayları veya kaynak kodları yerine; çözdüğü problem, yarattığı vizyon ve yüksek seviyeli işlevsel özellikleri sergilenir. Fikri mülkiyet koruması için kurucu, buradaki teknik detayları manuel olarak kırpar veya çok güvendiği projeler için önce gerçek hayatta patent başvurusunu yapar, ardından burada yayınlar.
+Bu belge, Nuper Industries portalının kurucunun zihinsel süzgecini dijitalleştiren yarı-otonom bir **"İkinci Beyin" (Second Brain)** ve Ar-Ge/İnovasyon takip merkezine dönüştürülmesi planıdır.
 
 ---
 
-## 2. Sistem A: Yapay Zeka Fizibilite Analizörü (OpenRouter Entegrasyonu)
+## 1. Mimari Felsefe: İnsan-Makine Geri Besleme Döngüsü (Human-in-the-Loop)
 
-Admin panelinde yeni bir proje veya fikir girildiğinde, OpenRouter üzerindeki ücretsiz ve güçlü yapay zeka modelleri (örn: Llama 3, Qwen 2.5 veya Mistral) kullanılarak otomatik bir analiz motoru çalışacaktır.
-
-### Çalışma Akışı
-1.  Admin proje özetini ve hedeflerini yazar.
-2.  **"Fizibilite Analizi Yap"** butonuna basılır.
-3.  Sistem OpenRouter API'sine özel tasarlanmış bir prompt gönderir.
-4.  AI şu çıktıları JSON formatında üretir ve veritabanına kaydeder:
-    - **Tahmini Bütçe Gereksinimi ($):** Projenin hayata geçirilmesi için gereken sunucu, API, lisans ve operasyon bütçesi.
-    - **Tahmini Süre & Zaman Planı:** MVP (Minimum Uygulanabilir Ürün) ve lansman süreleri.
-    - **Gereken Ekip Rolleri:** (Örn: 1 Cloud Engineer, 1 AI/Data Scientist, 1 UI Designer).
-    - **Teknik Zorluk & Risk Skoru:** 1-100 arası zorluk puanı ve teknik risk analizi.
-    - **Benzer Pazar Örnekleri:** Dünyadaki mevcut rakipler veya benzer modeller.
-
----
-
-## 3. Sistem B: Admin Haber & RSS İthalat Akışı (Trend Intelligence)
-
-Dış dünyadaki teknoloji trendlerini, yeni ürün lansmanlarını ve Ar-Ge gelişmelerini takip etmek amacıyla admin panelinde gizli bir **Haber İthalat Merkezi (RSS Reader)** kurulacaktır.
-
-### Mimari Yapı
-- **Veri Toplama (RSS & Scraper):** Belirlenen teknoloji portallarından (TechCrunch, Hacker News, Product Hunt, Wired vb.) gelen RSS akışları veya API verileri arka planda taranır.
-- **Yapay Zeka Yorumlama ve Filtreleme:**
-  - Gelen haberler AI tarafından taranır: *"Bu gelişme Türkiye pazarında veya Nuper Industries bünyesinde yeni bir projeye dönüştürülebilir mi?"* sorusuna cevap aranır.
-  - AI haberleri önem sırasına göre puanlar (1-100).
-- **Uygulanabilirlik Skoru (Feasibility Score):** AI, yurtdışındaki fikrin Nuper bünyesinde uygulanabilirliğini (mümkün olabilirliğini) ve pazar boşluğunu raporlar.
-- **"Projeye Dönüştür" Arayüzü:** Admin, beğendiği bir teknoloji haberini tek tıklamayla kendi **Özel Fikirler (Private Ideas)** veritabanına aktararak üzerinde çalışmaya başlayabilir.
-
----
-
-## 4. Uzun Vadeli Yol Haritası (İnovasyon Fabrikası Geliştirme Fazları)
+İnternetteki ham teknolojik gürültüyü süzmek ve doğrudan Nuper Industries Ar-Ge vizyonuna hizmet edecek yapılandırılmış bilgiyi biriktirmek amacıyla sistem **bir fabrikanın üretim ve kalite kontrol hattı** gibi kurgulanmıştır:
 
 ```mermaid
-graph TD
-    Phase1[Faz 1: Veritabanı Modeli & Kademeli Erişim Rotaları] --> Phase2[Faz 2: OpenRouter Entegrasyonu & AI Fizibilite Tahminleri]
-    Phase2 --> Phase3[Faz 3: Admin RSS Okuyucu & AI Haber Filtreleme]
-    Phase3 --> Phase4[Faz 4: Zaman Damgası & Yatırımcı Erişim Şifreleme Altyapısı]
+flowchart TD
+    Sources[Katman C: RSS Kaynakları] -->|1. Haber Çekme - Süre: <1sn| Ingestion[Veritabanına Kayıt: aiScore = 0 / Sırada]
+    Ingestion -->|2. Kurucu Merak Ederse| OnDemand[Talep Üzerine AI Analiz İstasyonu]
+    OnDemand -->|3. OpenRouter / Llama 3| Analysis[Özet + Fizibilite + Teknik Kaynakça Analizi]
+    Analysis -->|4. Entity Extraction| Entities[Kişi, Kurum, Site Keşfi]
+    Entities -->|5. Onay Ekranı| Approvals[Yeni Akış Keşifleri & Akredite Yazarlar]
+    Analysis -->|6. Kurucu Onay Masası| HITL[İnsan Düzeltme Arayüzü: userScore & userNotes]
+    HITL -->|7. Altın Dataset| Training[İleride Özel Model Eğitimi Fine-Tuning/RAG]
 ```
+
+---
+
+## 2. Sıfır Maliyetli Haber Eleme ve Otomasyon
+
+Vercel Hobby planındaki 10 saniyelik zaman aşımı (timeout) sınırını aşmamak ve gereksiz yapay zeka token harcamalarını önlemek amacıyla şu kurallar uygulanır:
+- **Otomatik Cron AI Tüketimi Sıfırdır:** Arka planda çalışan zamanlanmış cron görevi sadece RSS kaynaklarını tarayıp yeni başlıkları veritabanına kaydeder. Yapay zeka bu aşamada tetiklenmez.
+- **On-Demand (Talep Üzerine) Tetikleme:** AI analizleri sadece kurucu Admin panelinde merak ettiği bir habere veya fikre tıklayıp "Şimdi AI ile Analiz Et" butonuna bastığında çalışır. Bu sayede token harcaması %100 kontrol altındadır.
+
+---
+
+## 3. Yapılandırılmış Çıktı ve "Teknik Kaynakça" Odağı
+
+AI analizi yüzeysel pazar analizleri yapmak yerine doğrudan **Ar-Ge dökümantasyonu ve akademik literatür araştırması** üzerine odaklanır:
+- **Structured Output (Yapılandırılmış JSON):** AI'dan dönen veriler doğrudan veritabanı şemamıza yazılır.
+- **Literatür & Referans Haritalama:** AI, projenin hayata geçirilmesi için kesinlikle okunması gereken **arXiv akademik makalelerini, resmi teknik dökümanları (RFC, API referansları vb.) ve referans GitHub depolarını** bulup rapor içerisine `### 📚 Önerilen Literatür & Kaynakça` başlığı altında ekler.
+
+---
+
+## 4. İnsan Düzeltme Katmanı (Human-in-the-Loop Dataset)
+
+Yapay zekanın kararlarının sizin zihinsel çerçevenize uyması için sistemde bir düzeltme mekanizması bulunur:
+- **`userScore` ve `userNotes`:** AI'ın atadığı puanı ezebilir ve kendi vizyon/Ar-Ge notlarınızı ekleyebilirsiniz.
+- **`status` (APPROVED | REJECTED):** Haberleri "Sinyal" (Approved) veya "Gürültü" (Rejected) olarak etiketleyebilirsiniz.
+- **Model Eğitimi:** Zamanla biriken bu `(Haber -> AI Analizi -> Kurucu Düzeltmesi & Onayı)` çiftleri, ileride kendi açık kaynaklı modelinizi eğittiğinizde (Fine-Tuning/RLHF) kullanılacak olan **altın veri kümesini (gold dataset)** oluşturur.
+
+---
+
+## 5. Vektörel Hafıza (pgvector) ve RAG Yol Haritası
+
+Veri setimiz belirli bir boyuta ulaştığında RAG (Retrieval-Augmented Generation) sistemini aktif etmek için:
+- **pgvector:** Supabase PostgreSQL veritabanımız üzerinde pgvector eklentisi aktif edilecek.
+- **Embedding Kaydı:** Temiz döküman metinleri sayısal vektörlere çevrilerek kaydedilecek. Böylece kurucu olarak kendi İkinci Beyniniz içinde *"Dünyada yapay zeka ajanları ile ilgili çıkan makalelerden bizim Ar-Ge hedeflerimize en yakın 5 tanesini dökümanlarıyla getir"* şeklinde anlamsal aramalar yapabileceksiniz.
