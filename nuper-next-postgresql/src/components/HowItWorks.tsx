@@ -2,24 +2,24 @@
 
 import React from 'react';
 import { motion, Variants } from 'framer-motion';
-import { Sparkles, Network, Rocket } from 'lucide-react';
+import { Lightbulb, Cpu, Rocket } from 'lucide-react';
 import SharedStarfield from './SharedStarfield';
 
 const steps = [
     {
-        icon: <Sparkles className="w-8 h-8 text-blue-300" />,
-        title: "1. Vizyonunu Paylaş",
-        desc: "Geleceği şekillendirecek projenle ilk adımı at. Güvenli ekosistemimizde fikrin parlamaya başlasın."
+        icon: <Lightbulb className="w-8 h-8 text-blue-300" />,
+        title: "1. İleri Araştırma & Ar-Ge",
+        desc: "Geleceğe yön veren yeni nesil teknolojileri ve yenilikçi fikirleri bilimsel ve teknik yaklaşımlarla derinlemesine araştırıyoruz."
     },
     {
-        icon: <Network className="w-8 h-8 text-blue-300" />,
-        title: "2. Doğru Ağlara Katıl",
-        desc: "Nuper Match ile potansiyelin keşfedilsin. Mentorlar ve doğru yatırımcılarla eşleşerek hikayeni güçlendir."
+        icon: <Cpu className="w-8 h-8 text-blue-300" />,
+        title: "2. Prototipleme & Geliştirme",
+        desc: "Konsept fikirlerimizi çalışan prototiplere ve MVP yazılımlara dönüştürüyor, laboratuvar ortamında test ederek optimize ediyoruz."
     },
     {
         icon: <Rocket className="w-8 h-8 text-blue-300" />,
-        title: "3. Zirveye Ulaş",
-        desc: "Yatırım, strateji ve doğru adımlarla projen gerçeğe dönüşsün. İşte bu senin başarı hikayen."
+        title: "3. Üretim & Lansman",
+        desc: "Başarılı prototipleri endüstriyel standartlarda hayata geçiriyor, stabil ve ölçeklenebilir ürünler olarak kullanıma sunuyoruz."
     }
 ];
 
@@ -52,16 +52,16 @@ const HowItWorks = () => (
                 className="mb-20"
             >
                 <div className="inline-flex items-center justify-center px-4 py-1.5 mb-6 text-sm font-semibold text-blue-300 bg-blue-900/30 border border-blue-500/20 rounded-full">
-                    Süreç Nasıl İşler?
+                    Üretim Felsefemiz
                 </div>
                 <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-6">
-                    Fikirden Başarıya: <br className="md:hidden" />
+                    Fikirden Ürüne: <br className="md:hidden" />
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-blue-500">
-                        3 Adımda Yatırım Yolculuğun
+                        3 Aşamalı İnovasyon Döngüsü
                     </span>
                 </h2>
                 <p className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto">
-                    Nuper, parlak fikirleri sadece desteklemekle kalmaz; onları doğru ekosistem, yatırımcı ve stratejiyle buluşturarak hayalleri gerçeğe dönüştürür.
+                    Nuper Industries, parlak fikirleri sadece teoride bırakmaz; Ar-Ge, prototipleme ve üretim süreçlerini uçtan uca işleterek yüksek teknoloji ürünlerine dönüştürür.
                 </p>
             </motion.div>
 
@@ -78,7 +78,7 @@ const HowItWorks = () => (
                             whileInView="onscreen"
                             viewport={{ once: true, amount: 0.5 }}
                             variants={cardVariants}
-                            className="bg-glass hover:bg-glass-hover w-full max-w-lg rounded-3xl p-8 md:p-10 relative group z-10"
+                            className="bg-glass hover:bg-glass-hover w-full max-w-lg rounded-3xl p-8 md:p-10 relative group z-10 animate-fade-in"
                         >
                             {/* Animated Background Glow on Hover */}
                             <div className="absolute inset-0 bg-gradient-to-b from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none"></div>
@@ -89,7 +89,7 @@ const HowItWorks = () => (
                             <h3 className="font-heading text-2xl md:text-3xl font-bold text-white mb-4">
                                 {step.title}
                             </h3>
-                            <p className="text-gray-400 text-lg leading-relaxed">
+                            <p className="text-gray-400 text-lg leading-relaxed font-sans">
                                 {step.desc}
                             </p>
                         </motion.div>

@@ -3,17 +3,15 @@ import Credentials from "next-auth/providers/credentials"
 import { compare } from "bcryptjs"
 import { prisma } from "@/lib/db"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import Google from "next-auth/providers/google"
 import type { Adapter } from "next-auth/adapters"
 import { logger } from "@/lib/logger"
+import { authConfig } from "./auth.config"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+    ...authConfig,
     adapter: PrismaAdapter(prisma) as Adapter,
-    session: { strategy: "jwt" },
     providers: [
-        Google({
-            allowDangerousEmailAccountLinking: true,
-        }),
+        ...authConfig.providers,
         Credentials({
             credentials: {
                 email: { label: "Email", type: "email" },
@@ -76,26 +74,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             },
         }),
     ],
-    pages: {
-        signIn: '/login',
-    },
-    callbacks: {
-        async session({ session, token }) {
-            if (token && session.user) {
-                session.user.id = token.sub as string;
-                session.user.role = token.role as string;
-                session.user.userRole = token.userRole as string | undefined;
-                session.user.isVerified = token.isVerified as boolean | undefined;
-            }
-            return session
-        },
-        async jwt({ token, user }) {
-            if (user) {
-                token.role = user.role
-                token.userRole = user.userRole
-                token.isVerified = user.isVerified
-            }
-            return token
-        }
-    }
 })

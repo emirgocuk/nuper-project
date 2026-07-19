@@ -37,7 +37,7 @@ export default async function Home() {
   const latestBulletin = await getLatestBulletin();
 
   return (
-    <main className="min-h-screen bg-nuper-dark-blue text-white selection:bg-blue-500/30">
+    <main className="min-h-screen bg-[#0b1120] text-white selection:bg-blue-500/30">
       {/* Hero Section */}
       <section id="home" className="relative flex items-center min-h-screen overflow-hidden">
         <SpaceHero />
@@ -47,21 +47,21 @@ export default async function Home() {
             <div className="text-center text-white lg:text-left">
               <div className="inline-flex items-center gap-2 px-4 py-2 mb-8 text-sm font-medium border rounded-full border-blue-500/30 bg-blue-500/10 text-blue-200 backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-1000">
                 <Sparkles className="w-4 h-4 text-blue-400" />
-                <span className="font-heading">Geleceğin Girişimcilik Ekosistemi</span>
+                <span className="font-heading">NUPER INDUSTRIES // İNOVASYON & AR-GE MERKEZİ</span>
               </div>
               <h1 className="text-5xl font-bold leading-tight md:text-6xl lg:text-7xl font-heading animate-in fade-in slide-in-from-bottom-5 duration-1000 delay-150" style={{ animationDelay: '150ms' }}>
-                Nuper ile <br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-200 to-white">Geleceğini Şekillendir</span>
+                Geleceğin <br/>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-200 to-white">Teknolojilerini Üretiyoruz</span>
               </h1>
               <p className="mt-6 font-sans text-lg md:text-xl text-gray-300 max-w-2xl animate-in fade-in slide-in-from-bottom-5 duration-1000 delay-300" style={{ animationDelay: '300ms' }}>
-                Öğrenciler için fırsatlar, teknoloji ve inovasyon vizyonu. Fikrini gerçeğe dönüştürmek ve doğru yatırımcılarla eşleşmek için elit ekosisteme adım at.
+                Kendi vizyonumuzdan ve fikirlerimizden beslenen; derin teknoloji, inovasyon ve mühendislik odaklı yenilikçi projeleri hayata geçirdiğimiz dijital üretim üssümüz.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start animate-in fade-in slide-in-from-bottom-5 duration-1000 delay-500" style={{ animationDelay: '500ms' }}>
-                <Link href="/login" className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold transition-all duration-300 bg-white rounded-xl text-nuper-dark-blue hover:bg-transparent hover:text-white hover:border-white border-2 border-transparent font-heading shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]">
-                  Elit Ağa Katıl
+                <Link href="/projects" className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold transition-all duration-300 bg-white rounded-xl text-nuper-dark-blue hover:bg-transparent hover:text-white hover:border-white border-2 border-transparent font-heading shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]">
+                  Projelerimizi İncele
                 </Link>
-                <Link href="#explore" className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold transition-all duration-300 bg-glass text-white rounded-xl hover:bg-[rgba(30,41,59,0.7)] hover:border-white/30 font-heading group">
-                  Keşfet <ArrowRight className="ml-2 w-5 h-5 transition-transform group-hover:translate-x-1" />
+                <Link href="/ideas" className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold transition-all duration-300 bg-glass text-white rounded-xl hover:bg-[rgba(30,41,59,0.7)] hover:border-white/30 font-heading group">
+                  Fikirler & Ar-Ge <ArrowRight className="ml-2 w-5 h-5 transition-transform group-hover:translate-x-1" />
                 </Link>
               </div>
             </div>
@@ -86,10 +86,10 @@ export default async function Home() {
           <div className="px-4 mx-auto max-w-7xl relative z-10">
             <div className="text-center mb-20 animate-in fade-in slide-in-from-bottom-8 duration-1000">
               <h2 className="text-4xl font-bold md:text-5xl font-heading mb-6 tracking-tight">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-100 to-blue-400">Vizyoner</span> Fırsatlar
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-100 to-blue-400">Vizyoner</span> Gelişmeler
               </h2>
               <p className="text-gray-400 max-w-2xl mx-auto text-lg leading-relaxed">
-                Özel etkinliklere katıl, yatırımcılarla buluş ve Nuper ekosisteminin prestijli dünyasında yerini al.
+                Nuper Industries bünyesinde yürütülen en güncel lansmanlar, teknoloji bültenleri ve Ar-Ge etkinlikleri.
               </p>
             </div>
 

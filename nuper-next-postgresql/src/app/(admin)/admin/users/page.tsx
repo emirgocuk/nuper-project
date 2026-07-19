@@ -42,7 +42,7 @@ export default async function AdminUsersPage() {
             <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight text-gray-900">Kullanıcı Yönetimi</h2>
-                    <p className="text-muted-foreground mt-1">Sistemdeki tüm yatırımcı ve girişimcileri yönetin.</p>
+                    <p className="text-muted-foreground mt-1">Sistemdeki tüm kayıtlı kullanıcıları ve rolleri yönetin.</p>
                 </div>
             </div>
 
@@ -55,7 +55,7 @@ export default async function AdminUsersPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{totalUsers}</div>
-                        <p className="text-xs text-muted-foreground">Aktif sisteme kayıtlı</p>
+                        <p className="text-xs text-muted-foreground">Sisteme kayıtlı toplam hesap</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -70,22 +70,22 @@ export default async function AdminUsersPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Yatırımcılar</CardTitle>
+                        <CardTitle className="text-sm font-medium">Yatırımcı Rolü</CardTitle>
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{investors.length}</div>
-                        <p className="text-xs text-muted-foreground">Sermaye sağlayanlar</p>
+                        <p className="text-xs text-muted-foreground">Yüz yüze network üyeleri</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Girişimciler</CardTitle>
+                        <CardTitle className="text-sm font-medium">Girişimci Rolü</CardTitle>
                         <Building2 className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{entrepreneurs.length}</div>
-                        <p className="text-xs text-muted-foreground">Proje sahipleri</p>
+                        <p className="text-xs text-muted-foreground">İç proje yöneticileri</p>
                     </CardContent>
                 </Card>
             </div>

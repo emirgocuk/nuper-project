@@ -9,9 +9,11 @@ import { Toaster } from '@/components/ui/sonner'
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-heading' })
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
-  title: 'Nuper - Geleceğini Şekillendir',
-  description: 'Öğrenciler için yarışmalar, etkinlikler ve fırsatlar tek platformda!',
+  title: 'Nuper Industries - Geleceğin Teknolojileri',
+  description: 'Nuper Industries bünyesinde geliştirilen inovasyonlar, Ar-Ge projeleri, teknoloji bültenleri ve etkinlikler.',
 }
 
 export default function RootLayout({

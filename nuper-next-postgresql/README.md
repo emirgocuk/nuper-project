@@ -1,134 +1,87 @@
-# Nuper - Girişimciler ve Yatırımcılar İçin Platform
+# Nuper Industries — Dijital Vitrin & Ar-Ge Arşivi
 
-Türkçe dilinde geliştirilmiş, girişimciler ve yatırımcıları buluşturan modern bir platform.
+# Nuper Industries - İnovasyon & Ar-Ge Portalı
+
+Nuper Industries bünyesinde geliştirilen konsept fikirlerin, Ar-Ge çalışmalarının, aktif projelerin ve teknoloji bültenlerinin sergilendiği, kurumsal vitrin ve inovasyon portalı.
 
 ## Özellikler
 
-- 👤 Kullanıcı Kaydı ve Girişi (Email + Google OAuth)
-- 📧 Email Doğrulama Sistemi
-- 🎫 Etkinlik Yönetimi
-- 📢 Duyuru/Bülten Sistemi
-- 💼 Proje Paylaşımı
-- 👨‍💼 Admin Yönetim Paneli
+- 💡 **Fikir Vitrini:** Ar-Ge aşamasındaki yenilikçi fikirler ve konsept tasarımlar
+- 📂 **Proje Vitrini:** Nuper Industries tarafından geliştirilen aktif veya tamamlanmış yüksek teknoloji projeleri
+- 📢 **Teknoloji Bültenleri:** Lansman duyuruları, bilimsel/teknik loglar ve makaleler
+- 🎫 **Lansman & Etkinlikler:** Proje sunumları ve Ar-Ge etkinliklerinin takvimi
+- 🔐 **Yönetim Paneli:** Projeleri, fikirleri ve bültenleri yönetmek için kapsamlı admin arayüzü
+- ✉️ **Bülten Aboneliği (Yakında):** Yeni teknoloji duyurularından anında haberdar olma sistemi
 
 ## Tech Stack
 
-- **Framework:** Next.js 16 (App Router)
+- **Framework:** Next.js 16 (App Router - Dynamic Render)
 - **Language:** TypeScript
-- **Styling:** Tailwind CSS + shadcn/ui
-- **Database:** PostgreSQL + Prisma 5
-- **Auth:** NextAuth.js (Google + Credentials)
-- **Email:** Nodemailer (Gmail)
-- **Notifications:** Sonner
+- **Styling:** Tailwind CSS + shadcn/ui (Premium Dark Space & Glassmorphic theme)
+- **Database:** PostgreSQL + Prisma 5 (Supabase Cloud hosting)
+- **Auth:** NextAuth.js (Admin Girişi için)
+- **Email:** Nodemailer (Gmail SMTP)
 - **Animations:** Framer Motion
-- **Rich Text:** EditorJS
+- **Rich Text:** EditorJS (Admin İçerik Editörü)
 
-## Kurulum Talimatları
-
-### 1. Reposu Klonlayın
+## Kurulum
 
 ```bash
 git clone <repository-url>
 cd nuper-next-postgresql
-```
-
-### 2. Bağımlılıkları Yükleyin
-
-```bash
 npm install
-```
-
-### 3. Ortam Değişkenlerini Ayarlayın
-
-```bash
 cp .env.example .env.local
-```
-
-`.env.local` dosyasını düzenleyerek aşağıdaki bilgileri doldurun:
-
-| Değişken | Açıklama |
-|----------|----------|
-| `DATABASE_URL` | PostgreSQL bağlantı stringi |
-| `NEXTAUTH_SECRET` | `openssl rand -base64 32` komutu ile oluşturun |
-| `GOOGLE_ID` | Google Cloud Console'dan alın |
-| `GOOGLE_SECRET` | Google Cloud Console'dan alın |
-| `GMAIL_USER` | Gmail adresiniz |
-| `GMAIL_PASS` | Gmail App Password |
-| `IMGBB_API_KEY` | IMGBB API Key |
-
-### 4. Veritabanı Migrasyonlarını Çalıştırın
-
-```bash
-npx prisma migrate dev
-```
-
-### 5. Geliştirme Sunucusunu Başlatın
-
-```bash
+# .env.local dosyasını doldurun
+npx prisma generate
+npx prisma db push
 npm run dev
 ```
 
-### 6. Tarayıcıda Açın
+Tarayıcıda [http://localhost:3000](http://localhost:3000) adresini açın.
 
-[http://localhost:3000](http://localhost:3000) adresine gidin.
+## Ortam Değişkenleri
 
-## Admin Paneli
-
-Admin paneline erişmek için:
-
-1. Normal kullanıcı olarak kayıt olun
-2. Admin hesabına rol ataması yapın (veritabanından)
-3. [http://localhost:3000/admin/login](http://localhost:3000/admin/login) adresinden giriş yapın
+| Değişken | Açıklama |
+|---|---|
+| `DATABASE_URL` | Supabase pooled connection (port 6543) |
+| `DIRECT_URL` | Supabase direct connection (port 5432) — migration için |
+| `AUTH_SECRET` | `openssl rand -base64 32` ile oluşturun |
+| `NEXTAUTH_URL` | Uygulama URL'si |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Google OAuth |
+| `GMAIL_USER` / `GMAIL_PASS` | E-posta gönderimi (App Password) |
+| `IMGBB_API_KEY` | Görsel yükleme |
 
 ## Proje Yapısı
 
 ```
 src/
 ├── app/
-│   ├── (public)/        # Kullanıcı sayfaları
-│   ├── (admin)/         # Admin sayfaları
-│   ├── api/             # API rotaları
-│   └── layout.tsx       # Root layout
-├── actions/             # Server Actions
-├── components/
-│   ├── ui/              # shadcn/ui bileşenleri
-│   └── admin/           # Admin bileşenleri
-├── lib/                 # Yardımcı fonksiyonlar
-├── context/             # React Context'ler
-└── types/               # TypeScript tipleri
+│   ├── (public)/     # Herkese açık vitrin sayfaları
+│   ├── (admin)/      # Admin paneli (middleware korumalı)
+│   └── api/          # API rotaları
+├── actions/          # Server Actions
+├── components/       # UI bileşenleri
+├── lib/              # Yardımcı fonksiyonlar
+└── types/            # TypeScript tipleri
 ```
 
-## Ortam Değişkenleri Referansı
+## Sayfa Haritası
 
-### Database
-- `DATABASE_URL` - Prisma PostgreSQL bağlantı stringi
-- `DIRECT_URL` - Direct connection string (opsyonel)
+| Rota | Açıklama |
+|---|---|
+| `/` | Ana sayfa — hero, nasıl çalışır, öne çıkan içerik |
+| `/about` | Hakkımızda |
+| `/ideas` | Ar-Ge fikirleri (status=IDEA) |
+| `/projects` | Aktif/tamamlanan projeler |
+| `/bulletins` | Teknoloji bültenleri |
+| `/events` | Etkinlikler |
+| `/admin` | Yönetim paneli (ADMIN rolü gerekli) |
 
-### NextAuth
-- `NEXTAUTH_URL` - Uygulama URL'si
-- `NEXTAUTH_SECRET` - Oturum şifreleme anahtarı
+## Admin Paneli
 
-### Google OAuth
-- `GOOGLE_ID` - Google OAuth Client ID
-- `GOOGLE_SECRET` - Google OAuth Client Secret
+1. Admin hesabına veritabanından `role: ADMIN` atayın
+2. [http://localhost:3000/admin/login](http://localhost:3000/admin/login) adresinden giriş yapın
 
-### Email (Gmail)
-- `GMAIL_USER` - Gönderen email adresi
-- `GMAIL_PASS` - App Password
+## Dokümantasyon
 
-### Image Upload
-- `IMGBB_API_KEY` - IMGBB API Key
-
-## Lisans
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Setup Instructions
-
-1. Clone the repository
-2. Install dependencies: npm install
-3. Copy environment file: cp .env.example .env.local
-4. Fill in your values in .env.local
-5. Run migrations: npx prisma migrate dev
-6. Start dev server: npm run dev
-7. Open http://localhost:3000
+Detaylı plan ve proje vizyonu için `antigravity-toolkit/memory-worker-bank/memory/` dizinine bakın.
