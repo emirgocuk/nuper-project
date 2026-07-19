@@ -16,49 +16,90 @@ export interface TrendAnalysisResult {
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 /**
- * Helper to call OpenRouter API with a prompt
+ * Aktif, ücretsiz OpenRouter modelleri (öncelik sırasıyla).
+ * Bir model 404 veya rate-limit verirse otomatik bir sonrakine geçilir.
+ */
+const FREE_MODEL_FALLBACKS = [
+  "tencent/hy3:free",           // 295B MoE - Güçlü genel amaçlı model
+  "poolside/laguna-xs-2.1:free", // 33B coding odaklı - kalıcı ücretsiz
+  "cohere/north-mini-code:free", // Cohere 30B - kalıcı ücretsiz
+  "nex-agi/nex-n2-mini",        // 7B agentic model - çok ucuz ($0.025/1M)
+];
+
+/**
+ * Helper to call OpenRouter API with a prompt.
+ * Birden fazla modeli sırayla dener (fallback zinciri).
  */
 async function callOpenRouter(prompt: string, systemPrompt: string): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  
+
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is not defined in environment variables.");
   }
 
-  // Use a reliable free model from OpenRouter as default (Auto-routed Free Model)
-  const model = process.env.OPENROUTER_MODEL || "openrouter/free";
+  // Ortam değişkeni varsa onu kullan, yoksa fallback zincirini dene
+  const modelsToTry = process.env.OPENROUTER_MODEL
+    ? [process.env.OPENROUTER_MODEL, ...FREE_MODEL_FALLBACKS]
+    : FREE_MODEL_FALLBACKS;
 
-  const response = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-      "HTTP-Referer": "https://nuper-industries.vercel.app",
-      "X-Title": "Nuper Industries",
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.2,
-    }),
-  });
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
+  for (const model of modelsToTry) {
+    try {
+      const response = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          "HTTP-Referer": "https://nuper.vercel.app",
+          "X-Title": "Nuper",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.2,
+          max_tokens: 2048,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = errorText;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData?.error?.message || errorText;
+        } catch { /* errorText is not JSON */ }
+
+        // 404 (model bulunamadı) veya 429 (rate limit) → sonraki modeli dene
+        if (response.status === 404 || response.status === 429) {
+          console.warn(`[OpenRouter] Model "${model}" başarısız (${response.status}), sonraki deneniyor...`);
+          lastError = new Error(`OpenRouter API error: ${response.status} - ${errorMessage}`);
+          continue;
+        }
+        throw new Error(`OpenRouter API error: ${response.status} - ${errorMessage}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+
+      if (!content) {
+        console.warn(`[OpenRouter] Model "${model}" boş yanıt döndürdü, sonraki deneniyor...`);
+        lastError = new Error("OpenRouter returned an empty response.");
+        continue;
+      }
+
+      return content.trim();
+    } catch (err: any) {
+      // Fetch hatası (network vs.) → devam et
+      lastError = err;
+      console.warn(`[OpenRouter] Model "${model}" hata verdi:`, err.message);
+    }
   }
 
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-
-  if (!content) {
-    throw new Error("OpenRouter returned an empty response.");
-  }
-
-  return content.trim();
+  throw lastError || new Error("Tüm OpenRouter modelleri başarısız oldu.");
 }
 
 /**
