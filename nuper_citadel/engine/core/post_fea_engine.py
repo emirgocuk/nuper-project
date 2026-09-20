@@ -134,3 +134,101 @@ class PostFEAEngine:
             "notch_frequency_band_hz": notch_band,
             "recommended_actions": recommended_actions
         }
+
+    @classmethod
+    def parse_solver_log(cls, content: str, filename: str = "") -> Dict[str, Any]:
+        """
+        Parses raw text from FEA solver outputs (NASTRAN .f06, ANSYS modal report, generic solver log)
+        and deterministically extracts natural frequencies (Hz) and peak von Mises stress (MPa).
+        """
+        import re
+
+        filename_lower = filename.lower()
+        frequencies: List[float] = []
+        peak_stress: Optional[float] = None
+        solver_type = "GENERIC_SOLVER"
+
+        # 1. NASTRAN .f06 EIGENVALUE Extraction
+        # Format: MODE NO. | EXTRACTION ORDER | EIGENVALUE | RADIANS | CYCLES (Hz) | GEN MASS | GEN STIFFNESS
+        is_f06 = ".f06" in filename_lower or "NASTRAN" in content.upper() or "EIGENVALUE" in content.upper()
+        if is_f06:
+            solver_type = "NASTRAN_F06"
+            # Pattern: 1 to 3 digits (mode), 1 to 3 digits, float, float, float (CYCLES/Hz)
+            # Example: 1    1    2.348E+06    1.532E+03    243.88    1.000E+00
+            nastran_pattern = re.compile(
+                r"^\s*(\d+)\s+\d+\s+[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?\s+[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?\s+([-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)"
+            )
+            for line in content.splitlines():
+                m = nastran_pattern.match(line)
+                if m:
+                    try:
+                        freq_hz = float(m.group(2))
+                        if 1.0 <= freq_hz <= 50000.0 and freq_hz not in frequencies:
+                            frequencies.append(round(freq_hz, 2))
+                    except ValueError:
+                        pass
+
+        # 2. ANSYS Modal Summary Extraction
+        # Format: SET  TIME/FREQ  LOAD STEP  SUBSTEP
+        is_ansys = "ANSYS" in content.upper() or "SUBSTEP" in content.upper() or "SET   TIME/FREQ" in content.upper()
+        if is_ansys or not frequencies:
+            if is_ansys:
+                solver_type = "ANSYS_LOG"
+            ansys_pattern = re.compile(
+                r"^\s*(\d+)\s+([-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)\s+\d+\s+\d+"
+            )
+            for line in content.splitlines():
+                m = ansys_pattern.match(line)
+                if m:
+                    try:
+                        freq_hz = float(m.group(2))
+                        if 1.0 <= freq_hz <= 50000.0 and freq_hz not in frequencies:
+                            frequencies.append(round(freq_hz, 2))
+                    except ValueError:
+                        pass
+
+        # 3. Direct Key-Value Regex Matchers (e.g. "Mode 1: 245.5 Hz", "Frequency = 312.4 Hz")
+        if not frequencies:
+            kv_pattern = re.compile(
+                r"(?:mode\s*\d+|freq(?:uency)?|f\d+)\s*[:=]\s*([-+]?[0-9]*\.?[0-9]+)\s*(?:hz)?",
+                re.IGNORECASE,
+            )
+            for line in content.splitlines():
+                m = kv_pattern.search(line)
+                if m:
+                    try:
+                        val = float(m.group(1))
+                        if 1.0 <= val <= 50000.0 and val not in frequencies:
+                            frequencies.append(round(val, 2))
+                    except ValueError:
+                        pass
+
+        # 4. Stress Extraction (von Mises / Max Stress)
+        stress_pattern = re.compile(
+            r"(?:(?:maximum|max|peak|eqv)?\s*(?:von\s*mises)?\s*stress|von\s*mises(?:\s*stress)?)\s*[:=]?\s*([-+]?[0-9]*\.?[0-9]+)",
+            re.IGNORECASE,
+        )
+        for line in content.splitlines():
+            m = stress_pattern.search(line)
+            if m:
+                try:
+                    val = float(m.group(1))
+                    if 0.1 <= val <= 5000.0:
+                        if peak_stress is None or val > peak_stress:
+                            peak_stress = round(val, 2)
+                except ValueError:
+                    pass
+
+        frequencies.sort()
+
+        return {
+            "solver_type": solver_type,
+            "filename": filename,
+            "extracted_modes_count": len(frequencies),
+            "resonant_frequencies_hz": frequencies,
+            "peak_von_mises_stress_mpa": peak_stress,
+            "first_mode_hz": frequencies[0] if frequencies else None,
+            "second_mode_hz": frequencies[1] if len(frequencies) > 1 else None,
+            "third_mode_hz": frequencies[2] if len(frequencies) > 2 else None,
+        }
+

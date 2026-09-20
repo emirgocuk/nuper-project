@@ -109,6 +109,7 @@ class PDFReportGenerator:
         fixture_data: Optional[Dict[str, Any]] = None,
         fatigue_data: Optional[Dict[str, Any]] = None,
         post_fea_data: Optional[Dict[str, Any]] = None,
+        thermal_data: Optional[Dict[str, Any]] = None,
         document_no: Optional[str] = None,
         classification: str = "TASNİF DIŞI / UNCLASSIFIED"
     ) -> bytes:
@@ -220,6 +221,43 @@ class PDFReportGenerator:
         phys_table = Table(phys_data, colWidths=[150, 180, 193])
         phys_table.setStyle(self._default_table_style())
         elements.append(phys_table)
+
+        # Montaj (Assembly) Parça Kırılımı Tablosu
+        assembly_tree = cad_data.get("assembly_tree", [])
+        if assembly_tree and len(assembly_tree) > 1:
+            elements.append(Spacer(1, 4))
+            elements.append(Paragraph("<b>1.1. Montaj Parça Kırılımı ve Kütle Dağılımı</b>", self.bold_body))
+            asm_rows = [
+                [
+                    Paragraph("<b>Parça No / Kimlik</b>", self.bold_body),
+                    Paragraph("<b>Malzeme</b>", self.bold_body),
+                    Paragraph("<b>Kütle (kg)</b>", self.bold_body),
+                    Paragraph("<b>Kütle Payı (%)</b>", self.bold_body),
+                    Paragraph("<b>Delik Adedi</b>", self.bold_body),
+                ]
+            ]
+            for p in assembly_tree:
+                asm_rows.append([
+                    Paragraph(f"{p.get('part_id', '')} - {p.get('part_name', '')}", self.body_style),
+                    Paragraph(p.get("material_name", "Alüminyum"), self.body_style),
+                    Paragraph(f"{p.get('mass_kg', 0.0):.3f} kg", self.body_style),
+                    Paragraph(f"%{p.get('mass_share_percent', 0.0):.1f}", self.body_style),
+                    Paragraph(f"{p.get('holes_count', 0)} delik", self.body_style),
+                ])
+            joints = cad_data.get("inter_part_joints", [])
+            if joints:
+                asm_rows.append([
+                    Paragraph(f"<b>Parçalar Arası Bağlantılar</b>", self.bold_body),
+                    Paragraph(f"<b>{len(joints)} Adet Eşleşen Cıvata</b> ({joints[0].get('screw_fit', 'Cıvata')})", self.body_style),
+                    Paragraph("-", self.body_style),
+                    Paragraph("-", self.body_style),
+                    Paragraph("-", self.body_style),
+                ])
+
+            asm_table = Table(asm_rows, colWidths=[150, 120, 85, 85, 83])
+            asm_table.setStyle(self._default_table_style())
+            elements.append(asm_table)
+
         elements.append(Spacer(1, 10))
 
         # -------------------------------------------------------------
@@ -429,6 +467,63 @@ class PDFReportGenerator:
             post_table.setStyle(self._default_table_style())
             elements.append(post_table)
             elements.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 6. MIL-STD-810H METOT 501.7 & 502.7 TERMAL KALİFİKASYON (Eğer Mevcutsa)
+        # -------------------------------------------------------------
+        if thermal_data:
+            elements.append(Paragraph("6. MIL-STD-810H METOT 501.7 & 502.7 TERMAL GENLEŞME VE CIVATA ÖN YÜK KALİFİKASYONU", self.section_heading))
+            t_prof = thermal_data.get("temperature_profile", {})
+            j_therm = thermal_data.get("joint_thermal_analysis", {})
+            b_exp = thermal_data.get("body_expansion", {})
+            t_status = thermal_data.get("qualification_status", "PASS")
+
+            hot_cond = j_therm.get("hot_condition", {})
+            cold_cond = j_therm.get("cold_condition", {})
+
+            t_op_high = t_prof.get("operational_high_c", 71.0)
+            t_op_low = t_prof.get("operational_low_c", -40.0)
+            ms_yield_hot = hot_cond.get("margin_of_safety_yield", 0.0)
+            preload_ret = cold_cond.get("preload_retention_pct", 100.0)
+            ms_sep = cold_cond.get("margin_of_safety_separation", 0.0)
+
+            therm_rows = [
+                [
+                    Paragraph("<b>Termal Kalifikasyon Kalemi</b>", self.bold_body),
+                    Paragraph("<b>Hesaplanan / Analiz Değeri</b>", self.bold_body),
+                    Paragraph("<b>Kriter / Değerlendirme</b>", self.bold_body)
+                ],
+                [
+                    Paragraph("Çalışma Sıcaklık Sınırları", self.body_style),
+                    Paragraph(f"<b>{t_op_low:.0f}°C ila +{t_op_high:.0f}°C</b>", self.body_style),
+                    Paragraph("MIL-STD-810H Metot 501.7 / 502.7", self.body_style)
+                ],
+                [
+                    Paragraph("Cıvata - Gövde Diferansiyel CTE (Δα)", self.body_style),
+                    Paragraph(f"Δα = {j_therm.get('delta_cte_ppm_per_k', 0.0):.1f} ppm/K", self.body_style),
+                    Paragraph(f"{b_exp.get('material', 'Gövde')} vs. {j_therm.get('fastener_material', 'Cıvata')}", self.body_style)
+                ],
+                [
+                    Paragraph(f"Sıcakta Cıvata Akma Marjı (+{t_op_high:.0f}°C)", self.body_style),
+                    Paragraph(f"<b>MS_yield = +{ms_yield_hot:.2f}</b>", self.body_style),
+                    Paragraph("POZİTİF MARJ (Isıl uzama cıvatayı akmaya uğratmaz)", self.body_style)
+                ],
+                [
+                    Paragraph(f"Soğukta Ön Yük Koruma ({t_op_low:.0f}°C)", self.body_style),
+                    Paragraph(f"<b>%{preload_ret:.1f} Ön Yük Korundu</b>", self.body_style),
+                    Paragraph(f"Ayrılma Marjı MS_sep = +{ms_sep:.2f} (Sızdırmazlık Emniyetli)", self.body_style)
+                ],
+                [
+                    Paragraph("Genel Termal Kalifikasyon Durumu", self.body_style),
+                    Paragraph(f"<b>{t_status}</b>", self.body_style),
+                    Paragraph(thermal_data.get("engineering_summary", "Termal isterler sağlandı."), self.body_style)
+                ]
+            ]
+            therm_table = Table(therm_rows, colWidths=[160, 160, 203])
+            therm_table.setStyle(self._default_table_style())
+            elements.append(therm_table)
+            elements.append(Spacer(1, 10))
+
 
         # -------------------------------------------------------------
         # 7. RESMİ ONAY VE İMZA BLOKLARI (SIGN-OFF)

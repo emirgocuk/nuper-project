@@ -9,3 +9,18 @@
 /tsconfig.tsbuildinfo
 /.env
 /antigravity-toolkit/
+
+# Nuper Citadel Large Binaries & Generated Artifacts
+nuper_citadel/cad_models/
+nuper_citadel/.citadel_desktop_profile/
+nuper_citadel/.venv/
+nuper_citadel/src-tauri/target/
+nuper_citadel/engine/data/telemetry.db
+nuper_citadel/engine/data/telemetry.db-*
+*.stp
+*.step
+*.iges
+*.igs
+__pycache__/
+*.py[cod]
+.pytest_cache/

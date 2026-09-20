@@ -11,6 +11,7 @@ from OCP.GProp import GProp_GProps
 from OCP.Bnd import Bnd_Box
 from OCP.BRepBndLib import BRepBndLib
 from OCP.BRep import BRep_Tool
+from OCP.BRepTools import BRepTools
 from OCP.GeomAdaptor import GeomAdaptor_Surface
 from OCP.GeomAbs import GeomAbs_SurfaceType
 from OCP.BRepCheck import BRepCheck_Analyzer
@@ -48,11 +49,164 @@ class CADParser:
                 return f"{screw['name']} Sıkı/Tam Çap"
         return f"{round(diameter_mm, 2)} mm Özel Delik Çapı"
 
+    @staticmethod
+    def _compute_angular_coverage(intervals: List[Tuple[float, float]]) -> float:
+        """Dairesel yay aralıklarının çember üzerindeki net toplam açısal kapalılığını (derece) hesaplar."""
+        bins = [False] * 360
+        two_pi = 2.0 * math.pi
+        for u_min, u_max in intervals:
+            span = u_max - u_min
+            if span <= 0:
+                continue
+            if span >= two_pi:
+                return 360.0
+            start_deg = int(math.floor(math.degrees(u_min % two_pi)))
+            span_deg = int(math.ceil(math.degrees(span)))
+            for i in range(span_deg):
+                bins[(start_deg + i) % 360] = True
+        return float(sum(bins))
+
+    def extract_holes_from_solid(self, solid) -> List[Dict[str, Any]]:
+        """
+        Katı gövdedeki silindirik iç montaj deliklerini deterministik olarak tespit eder.
+        
+        Kritik Geometrik Filtreleme (Fillet / Radyüs Ayrımı):
+        - Delik ve köşe kavislerinin her ikisi de içe bakan normallere (TopAbs_REVERSED) sahiptir.
+        - Ancak köşe kavisleri (pocket fillet / transition radius) açık geometridir ve açısal yay uzunluğu
+          (U-span) tipik olarak 90° (en fazla <= 120°) civarındadır.
+        - Gerçek montaj delikleri ise tam dairesel kapalılığa sahiptir (tek yüzeyde 360° veya
+          aynı ekseni paylaşan iki 180° yarım silindir).
+        - Bu nedenle aynı 3D silindir eksen çizgisi, yarıçap ve eksenel konuma sahip silindirik yüzeyler kümelenir.
+        - Açısal kapalılığı >= 270° (4.71 rad) olanlar gerçek montaj deliği kabul edilir;
+          köşe kavisleri (fillet'lar) deterministik olarak elenir.
+        - Delik merkezi, yüzeylerin eksen üzerindeki izdüşüm ağırlık merkezi olarak analitik hesaplanır.
+        """
+        cyl_faces = []
+        face_exp = TopExp_Explorer(solid, TopAbs_FACE)
+
+        while face_exp.More():
+            face = TopoDS.Face_s(face_exp.Current())
+            surf = BRep_Tool.Surface_s(face)
+            adaptor = GeomAdaptor_Surface(surf)
+
+            if adaptor.GetType() == GeomAbs_SurfaceType.GeomAbs_Cylinder and face.Orientation() == TopAbs_REVERSED:
+                cyl = adaptor.Cylinder()
+                radius = cyl.Radius()
+                diameter = 2.0 * radius
+
+                # Standart montaj deliği çap aralığı (2.0 mm ile 32.0 mm arası)
+                if 2.0 <= diameter <= 32.0:
+                    ax = cyl.Axis()
+                    d_vec = ax.Direction()
+                    loc = ax.Location()
+
+                    dx, dy, dz = d_vec.X(), d_vec.Y(), d_vec.Z()
+                    # Kanonik eksen yönü (zıt yön belirsizliğini önlemek için)
+                    if dz < -1e-5 or (abs(dz) <= 1e-5 and dy < -1e-5) or (abs(dz) <= 1e-5 and abs(dy) <= 1e-5 and dx < -1e-5):
+                        dx, dy, dz = -dx, -dy, -dz
+
+                    # Orijinin eksen doğrusu üzerindeki izdüşümü: P_proj = loc - (loc . d) * d
+                    dot = loc.X() * dx + loc.Y() * dy + loc.Z() * dz
+                    px = loc.X() - dot * dx
+                    py = loc.Y() - dot * dy
+                    pz = loc.Z() - dot * dz
+
+                    bounds = BRepTools.UVBounds_s(face)
+                    u_min, u_max = bounds[0], bounds[1]
+                    u_span = min(max(0.0, u_max - u_min), 2.0 * math.pi)
+
+                    gp = GProp_GProps()
+                    BRepGProp.SurfaceProperties_s(face, gp)
+                    cm = gp.CentreOfMass()
+                    cx, cy, cz = cm.X(), cm.Y(), cm.Z()
+                    t = (cx - px) * dx + (cy - py) * dy + (cz - pz) * dz
+
+                    cyl_faces.append({
+                        "radius": radius,
+                        "dir": (dx, dy, dz),
+                        "proj": (px, py, pz),
+                        "t": t,
+                        "cm": (cx, cy, cz),
+                        "u_min": u_min,
+                        "u_max": u_max,
+                        "u_span": u_span
+                    })
+
+            face_exp.Next()
+
+        # Eksen çizgisi, yarıçap ve eksenel konuma (t mesafesi) göre yüzeyleri grupla
+        groups = []
+        for cf in cyl_faces:
+            matched = False
+            for g in groups:
+                if abs(g["radius"] - cf["radius"]) < 0.08:
+                    dir_dot = abs(cf["dir"][0] * g["dir"][0] + cf["dir"][1] * g["dir"][1] + cf["dir"][2] * g["dir"][2])
+                    if dir_dot > 0.99:
+                        dist_proj = math.sqrt(
+                            (cf["proj"][0] - g["proj"][0]) ** 2 +
+                            (cf["proj"][1] - g["proj"][1]) ** 2 +
+                            (cf["proj"][2] - g["proj"][2]) ** 2
+                        )
+                        if dist_proj < 0.15:
+                            t_avg = sum(f["t"] for f in g["faces"]) / len(g["faces"])
+                            if abs(cf["t"] - t_avg) < 8.0:
+                                g["faces"].append(cf)
+                                g["intervals"].append((cf["u_min"], cf["u_max"]))
+                                g["total_span_rad"] += cf["u_span"]
+                                matched = True
+                                break
+            if not matched:
+                groups.append({
+                    "dir": cf["dir"],
+                    "proj": cf["proj"],
+                    "radius": cf["radius"],
+                    "total_span_rad": cf["u_span"],
+                    "intervals": [(cf["u_min"], cf["u_max"])],
+                    "faces": [cf]
+                })
+
+        detected_holes = []
+        seen_centers = []
+
+        for g in groups:
+            cov_deg = self._compute_angular_coverage(g["intervals"])
+            # 270 derece kapalılık eşiği (fillet'lar genelde 90 derece olup bu eşiği asla aşamaz)
+            if cov_deg >= 270.0 or (g["total_span_rad"] * 180.0 / math.pi) >= 270.0:
+                dx, dy, dz = g["dir"]
+                px, py, pz = g["proj"]
+                diameter = 2.0 * g["radius"]
+
+                t_avg = sum(f["t"] for f in g["faces"]) / len(g["faces"])
+                center_pos = (
+                    round(px + t_avg * dx, 2),
+                    round(py + t_avg * dy, 2),
+                    round(pz + t_avg * dz, 2)
+                )
+                axis_dir = (round(dx, 3), round(dy, 3), round(dz, 3))
+
+                is_duplicate = False
+                for sc in seen_centers:
+                    if math.dist(center_pos, sc) < 1.0:
+                        is_duplicate = True
+                        break
+
+                if not is_duplicate:
+                    seen_centers.append(center_pos)
+                    detected_holes.append({
+                        "diameter_mm": round(diameter, 2),
+                        "center": {"x": center_pos[0], "y": center_pos[1], "z": center_pos[2]},
+                        "direction": {"x": axis_dir[0], "y": axis_dir[1], "z": axis_dir[2]},
+                        "screw_fit": self.match_screw_fit(diameter)
+                    })
+
+        return detected_holes
+
     def parse_step(
         self,
         file_path: str,
         density_kg_m3: Optional[float] = None,
-        material_name: Optional[str] = None
+        material_name: Optional[str] = None,
+        assembly_mode: bool = True
     ) -> Dict[str, Any]:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"STEP dosyası bulunamadı: {file_path}")
@@ -98,7 +252,15 @@ class CADParser:
             else:
                 raise ValueError("Model içinde katı gövde veya kabuk yüzey bulunamadı.")
 
-        # Çoklu montaj (Assembly) yönetimi: En büyük kütleli parçayı seç
+        # Çoklu montaj (Assembly) yönetimi:
+        if len(solids) > 1 and assembly_mode:
+            from engine.core.assembly_engine import AssemblyEngine
+            return AssemblyEngine(default_density_kg_m3=self.default_density).parse_compound_step(
+                file_path=file_path,
+                default_density_kg_m3=density,
+                default_material_name=material_name
+            )
+
         primary_solid = solids[0]
         assembly_info = {
             "is_assembly": len(solids) > 1,
@@ -144,57 +306,8 @@ class CADParser:
         # Taban yüzeyini Z_min kabul ederek devrilme moment kolu (h_cg)
         h_cg = abs(cog.Z() - zmin)
 
-        # 5. Montaj Deliklerinin Taranması (TopExp_Explorer)
-        detected_holes = []
-        face_exp = TopExp_Explorer(primary_solid, TopAbs_FACE)
-
-        seen_centers = []
-
-        while face_exp.More():
-            face = TopoDS.Face_s(face_exp.Current())
-            surf = BRep_Tool.Surface_s(face)
-            adaptor = GeomAdaptor_Surface(surf)
-
-            if adaptor.GetType() == GeomAbs_SurfaceType.GeomAbs_Cylinder:
-                # OpenCASCADE Katı Model Montaj Deliği Doğrulaması:
-                # Delik iç silindirik boşluk olduğu için yüzey normali silindir eksenine doğrudur (TopAbs_REVERSED).
-                # Dış köşe kavisleri / radyüsler (fillet) ise TopAbs_FORWARD'dur ve montaj deliği değildir.
-                if face.Orientation() != TopAbs_REVERSED:
-                    face_exp.Next()
-                    continue
-
-                cyl = adaptor.Cylinder()
-                radius = cyl.Radius()
-                diameter = 2.0 * radius
-
-                # Standart montaj deliği çap aralığı (2.0 mm ile 25.0 mm arası)
-                if 2.0 <= diameter <= 25.0:
-                    gp = GProp_GProps()
-                    BRepGProp.SurfaceProperties_s(face, gp)
-                    cm = gp.CentreOfMass()
-                    center_pos = (round(cm.X(), 2), round(cm.Y(), 2), round(cm.Z(), 2))
-
-                    axis = cyl.Axis().Direction()
-                    axis_dir = (round(axis.X(), 3), round(axis.Y(), 3), round(axis.Z(), 3))
-
-                    # Duplicate delik yüzeylerini filtrele (aynı delik silindiri parçaları)
-                    is_duplicate = False
-                    for sc in seen_centers:
-                        dist = math.dist(center_pos, sc)
-                        if dist < 3.0:  # 3 mm'den yakınsa aynı delik merkezi
-                            is_duplicate = True
-                            break
-
-                    if not is_duplicate:
-                        seen_centers.append(center_pos)
-                        detected_holes.append({
-                            "diameter_mm": round(diameter, 2),
-                            "center": {"x": center_pos[0], "y": center_pos[1], "z": center_pos[2]},
-                            "direction": {"x": axis_dir[0], "y": axis_dir[1], "z": axis_dir[2]},
-                            "screw_fit": self.match_screw_fit(diameter)
-                        })
-
-            face_exp.Next()
+        # 5. Montaj Deliklerinin Taranması (Fillet / Radyüs Ayrımı ile Deterministik Analiz)
+        detected_holes = self.extract_holes_from_solid(primary_solid)
 
         # Montaj Açıklığı (Span) Hesabı
         span_x = 0.0

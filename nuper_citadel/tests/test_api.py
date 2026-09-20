@@ -199,3 +199,53 @@ def test_export_etp_pdf_endpoint():
     assert resp.content.startswith(b"%PDF-1.")
 
 
+def test_thermal_qualification_endpoint():
+    resp = client.post(
+        "/api/qualification/thermal-check",
+        json={
+            "body_material_name": "Aluminium 6061-T6",
+            "body_cte_per_k": 23.0e-6,
+            "body_elastic_modulus_gpa": 68.9,
+            "body_yield_strength_mpa": 275.0,
+            "dimensions_mm": {"length": 110.0, "width": 75.0, "height": 25.0},
+            "operational_high_c": 71.0,
+            "operational_low_c": -40.0,
+            "fastener_material_key": "Steel Grade 8.8",
+            "fastener_size": "M4",
+            "dynamic_load_per_bolt_n": 200.0,
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "MIL-STD-810H Method 501.7" in data["standards"]
+    assert data["qualification_status"] == "PASS"
+    assert data["joint_thermal_analysis"]["hot_condition"]["passed"] is True
+    assert data["joint_thermal_analysis"]["cold_condition"]["passed"] is True
+
+
+def test_upload_solver_log_endpoint():
+    f06_content = b"""
+                R E A L   E I G E N V A L U E S
+ MODE    EXTRACTION      EIGENVALUE            RADIANS             CYCLES            GENERALIZED         GENERALIZED
+  NO.       ORDER                                                                       MASS              STIFFNESS
+    1         1        2.348123E+06        1.532359E+03        2.438827E+02        1.000000E+00        2.348123E+06
+    2         2        1.294829E+07        3.598373E+03        5.727005E+02        1.000000E+00        1.294829E+07
+
+    MAXIMUM VON MISES STRESS = 42.0 MPA
+    """
+    resp = client.post(
+        "/api/fea/upload-solver-log",
+        files={"file": ("modal_run.f06", f06_content, "text/plain")},
+        data={"yield_strength_mpa": 275.0, "damping_ratio": 0.02, "safety_factor": 1.25},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["solver_type"] == "NASTRAN_F06"
+    assert data["extracted_modes_count"] == 2
+    assert data["first_mode_hz"] == 243.88
+    assert data["evaluation"] is not None
+    assert data["evaluation"]["resonance_status"] == "SAFE"
+    assert data["evaluation"]["is_yield_safe"] is True
+
+
+

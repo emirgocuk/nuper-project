@@ -102,3 +102,44 @@ def test_pdf_report_generator_with_post_fea():
 
     assert len(pdf_bytes) > 40000
     assert pdf_bytes.startswith(b"%PDF-1.")
+
+
+def test_pdf_report_generator_with_thermal():
+    generator = PDFReportGenerator()
+    cad_data = {
+        "metadata": {"part_name": "İHA Elektro-Optik Pod"},
+        "physical_properties": {
+            "mass_kg": 1.1,
+            "volume_mm3": 350000.0,
+            "material_name": "Aluminium 6061-T6",
+            "yield_strength_mpa": 275.0,
+        },
+        "bounding_box_mm": {"length_x": 100.0, "width_y": 80.0, "height_z": 30.0},
+        "mounting_interface": {"mounting_holes_count": 4, "hole_diameters_mm": [4.5]}
+    }
+    mission_profile = {
+        "platform_name": "Taktik İHA Kanat Altı",
+        "standard_code": "MIL-STD-810H",
+        "vibration": {"effective_grms": 7.7, "breakpoints": []}
+    }
+    thermal_data = {
+        "temperature_profile": {"operational_high_c": 71.0, "operational_low_c": -40.0},
+        "joint_thermal_analysis": {
+            "delta_cte_ppm_per_k": 10.7,
+            "fastener_material": "Steel Grade 8.8",
+            "hot_condition": {"margin_of_safety_yield": 1.45},
+            "cold_condition": {"preload_retention_pct": 78.4, "margin_of_safety_separation": 0.85},
+        },
+        "body_expansion": {"material": "Aluminium 6061-T6"},
+        "qualification_status": "PASS",
+        "engineering_summary": "MIL-STD-810H Metot 501.7 / 502.7 isterleri tam sağlandı."
+    }
+
+    pdf_bytes = generator.generate_etp_pdf(
+        cad_data=cad_data,
+        mission_profile=mission_profile,
+        thermal_data=thermal_data
+    )
+    assert len(pdf_bytes) > 40000
+    assert pdf_bytes.startswith(b"%PDF-1.")
+

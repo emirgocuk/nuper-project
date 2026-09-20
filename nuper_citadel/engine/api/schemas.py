@@ -39,6 +39,9 @@ class CADParseResponse(BaseModel):
     mounting_interface: Dict[str, Any]
     fastener_analysis: Optional[Dict[str, Any]] = None
     tessellation: Optional[Dict[str, Any]] = None
+    assembly_tree: Optional[List[Dict[str, Any]]] = None
+    inter_part_joints: Optional[List[Dict[str, Any]]] = None
+    parts: Optional[List[Dict[str, Any]]] = None
 
 
 # --- RULE EVALUATION ---
@@ -305,8 +308,15 @@ class PDFExportRequest(BaseModel):
     fixture_data: Optional[Dict[str, Any]] = None
     fatigue_data: Optional[Dict[str, Any]] = None
     post_fea_data: Optional[Dict[str, Any]] = None
+    thermal_data: Optional[Dict[str, Any]] = None
+    shock_data: Optional[Dict[str, Any]] = None
+    composite_data: Optional[Dict[str, Any]] = None
     document_no: Optional[str] = None
     classification: Optional[str] = "TASNİF DIŞI / UNCLASSIFIED"
+
+
+class DOCXExportRequest(PDFExportRequest):
+    pass
 
 
 # --- CUSTOM PLATFORM & MATERIAL ---
@@ -379,4 +389,171 @@ class CustomMaterialResponse(BaseModel):
     status: str = "created"
 
 
+# --- ASSEMBLY & MULTI-BODY SCHEMAS ---
+class AssemblyPartItemSchema(BaseModel):
+    part_id: str
+    part_name: str
+    material_name: str
+    mass_kg: float
+    mass_share_percent: float
+    holes_count: int
+    color: Optional[Dict[str, str]] = None
 
+
+class AssemblyJointSchema(BaseModel):
+    joint_id: str
+    part_a_id: str
+    part_a_name: str
+    part_b_id: str
+    part_b_name: str
+    center: Dict[str, float]
+    center_rel: Optional[Dict[str, float]] = None
+    nominal_diameter_mm: float
+    screw_fit: str
+    axial_gap_mm: float
+    radial_misalignment_mm: float
+
+
+class AssemblyAnalysisResponse(BaseModel):
+    metadata: Dict[str, Any]
+    assembly_tree: List[AssemblyPartItemSchema]
+    physical_properties: Dict[str, Any]
+    bounding_box_mm: Dict[str, Any]
+    mounting_interface: Dict[str, Any]
+    inter_part_joints: List[AssemblyJointSchema]
+    parts: List[Dict[str, Any]]
+    tessellation: Optional[Dict[str, Any]] = None
+    fastener_analysis: Optional[Dict[str, Any]] = None
+
+
+# --- THERMAL QUALIFICATION SCHEMAS ---
+class ThermalCheckRequest(BaseModel):
+    body_material_name: str = "Aluminium 6061-T6"
+    body_cte_per_k: float = 23.0e-6
+    body_elastic_modulus_gpa: float = 68.9
+    body_yield_strength_mpa: float = 275.0
+    dimensions_mm: Dict[str, float] = Field(default_factory=lambda: {"length": 100.0, "width": 80.0, "height": 30.0})
+    operational_high_c: float = 71.0
+    operational_low_c: float = -40.0
+    storage_high_c: float = 85.0
+    storage_low_c: float = -51.0
+    fastener_material_key: str = "Steel Grade 8.8"
+    fastener_size: str = "M4"
+    grip_length_mm: float = 15.0
+    initial_preload_n: Optional[float] = None
+    dynamic_load_per_bolt_n: float = 250.0
+
+
+class ThermalCheckResponse(BaseModel):
+    standards: List[str]
+    temperature_profile: Dict[str, Any]
+    body_expansion: Dict[str, Any]
+    joint_thermal_analysis: Dict[str, Any]
+    qualification_status: str
+    engineering_summary: str
+
+
+# --- SOLVER LOG UPLOAD SCHEMAS ---
+class SolverLogUploadResponse(BaseModel):
+    solver_type: str
+    filename: str
+    extracted_modes_count: int
+    resonant_frequencies_hz: List[float]
+    peak_von_mises_stress_mpa: Optional[float] = None
+    first_mode_hz: Optional[float] = None
+    second_mode_hz: Optional[float] = None
+    third_mode_hz: Optional[float] = None
+    evaluation: Optional[Dict[str, Any]] = None
+
+
+# --- MECHANICAL SHOCK & SRS SCHEMAS ---
+class ShockSRSRequest(BaseModel):
+    part_mass_kg: float = 0.40
+    yield_strength_mpa: float = 275.0
+    first_natural_freq_hz: float = 240.0
+    num_bolts: int = 4
+    bolt_tensile_area_mm2: float = 8.78  # M4
+    bolt_yield_strength_mpa: float = 640.0  # 8.8 grade
+    procedure_name: str = "Prosedür I - Fonksiyonel Şok"
+    pulse_shape: str = "Terminal Peak Sawtooth (TPS)"
+    peak_acceleration_g: float = 40.0
+    duration_ms: float = 11.0
+    q_factor: float = 10.0
+    safety_factor: float = 1.25
+
+
+class ShockSRSResponse(BaseModel):
+    standard: str
+    procedure_name: str
+    pulse_parameters: Dict[str, Any]
+    part_modal_response: Dict[str, Any]
+    equivalent_static_shock: Dict[str, Any]
+    fastener_safety_margins: Dict[str, Any]
+    srs_spectrum: List[Dict[str, float]]
+    qualification_status: str
+    engineering_summary: str
+
+
+# --- COMPOSITE CLT SCHEMAS ---
+class CompositePlySchema(BaseModel):
+    angle_deg: float
+    thickness_mm: float = 0.125
+    material_name: Optional[str] = "AS4/3501-6 Carbon/Epoxy"
+
+
+class CompositeEvaluateRequest(BaseModel):
+    material_preset: str = "AS4/3501-6 Carbon/Epoxy"
+    layup_angles: List[float] = Field(default_factory=lambda: [0.0, 45.0, -45.0, 90.0, 90.0, -45.0, 45.0, 0.0])
+    ply_thickness_mm: float = 0.125
+    force_nx_n_mm: float = 120.0
+    force_ny_n_mm: float = 40.0
+    shear_nxy_n_mm: float = 25.0
+    moment_mx_nmm_mm: float = 0.0
+    moment_my_nmm_mm: float = 0.0
+    moment_mxy_nmm_mm: float = 0.0
+    custom_e1_gpa: Optional[float] = None
+    custom_e2_gpa: Optional[float] = None
+    custom_g12_gpa: Optional[float] = None
+    custom_nu12: Optional[float] = None
+    custom_xt_mpa: Optional[float] = None
+    custom_xc_mpa: Optional[float] = None
+    custom_yt_mpa: Optional[float] = None
+    custom_yc_mpa: Optional[float] = None
+    custom_s_mpa: Optional[float] = None
+
+
+class CompositeEvaluateResponse(BaseModel):
+    material_name: str
+    layup_sequence: str
+    num_plies: int
+    total_thickness_mm: float
+    laminate_stiffness_matrix_abd: Dict[str, Any]
+    effective_engineering_constants: Dict[str, float]
+    critical_ply_index: int
+    critical_ply_angle: float
+    tsai_wu_max_index: float
+    tsai_wu_margin_of_safety: float
+    max_stress_margin_of_safety: float
+    qualification_verdict: str
+    ply_results: List[Dict[str, Any]]
+    engineering_summary: str
+
+
+# --- PLM / PDM BRIDGE SCHEMAS ---
+class PLMSyncRequest(BaseModel):
+    system_type: str = "Siemens Teamcenter"  # or "PTC Windchill"
+    item_id: str
+    revision: str = "A.01"
+    part_name: str
+    metadata: Dict[str, Any]
+    mock_mode: bool = True
+
+
+class PLMSyncResponse(BaseModel):
+    status: str
+    system_type: str
+    item_id: str
+    revision: str
+    sync_timestamp: str
+    message: str
+    plm_object_uid: str

@@ -22,6 +22,11 @@ import {
   Plus,
   X,
   Sliders,
+  Thermometer,
+  Flame,
+  FolderUp,
+  Zap,
+  Database,
 } from 'lucide-react';
 import { CADViewer3D } from './components/CADViewer3D';
 import { FastenerTable } from './components/FastenerTable';
@@ -154,6 +159,46 @@ export default function App() {
   const [isEvaluatingPostFea, setIsEvaluatingPostFea] = useState<boolean>(false);
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
 
+  // Thermal Qualification State (MIL-STD-810H Method 501.7 & 502.7)
+  const [thermalHighC, setThermalHighC] = useState<number>(71.0);
+  const [thermalLowC, setThermalLowC] = useState<number>(-40.0);
+  const [thermalFastenerKey, setThermalFastenerKey] = useState<string>('Steel Grade 8.8');
+  const [thermalFastenerSize, setThermalFastenerSize] = useState<string>('M4');
+  const [thermalDynamicLoad, setThermalDynamicLoad] = useState<number>(200.0);
+  const [thermalResult, setThermalResult] = useState<any>(null);
+  const [isEvaluatingThermal, setIsEvaluatingThermal] = useState<boolean>(false);
+
+  // Solver Log (.f06 / ANSYS summary) State
+  const [solverLogResult, setSolverLogResult] = useState<any>(null);
+  const [isUploadingSolverLog, setIsUploadingSolverLog] = useState<boolean>(false);
+
+  // Mechanical Shock State (MIL-STD-810H Method 516.8)
+  const [shockPulseShape, setShockPulseShape] = useState<string>('Terminal Peak Sawtooth (TPS)');
+  const [shockPeakG, setShockPeakG] = useState<number>(40.0);
+  const [shockDurationMs, setShockDurationMs] = useState<number>(11.0);
+  const [shockQFactor, setShockQFactor] = useState<number>(10.0);
+  const [shockResult, setShockResult] = useState<any>(null);
+  const [isEvaluatingShock, setIsEvaluatingShock] = useState<boolean>(false);
+
+  // Composite CLT State
+  const [compositePreset, setCompositePreset] = useState<string>('AS4/3501-6 Carbon/Epoxy');
+  const [compositeLayup, setCompositeLayup] = useState<string>('[0/45/-45/90]s');
+  const [compositeNx, setCompositeNx] = useState<number>(120.0);
+  const [compositeNy, setCompositeNy] = useState<number>(40.0);
+  const [compositeNxy, setCompositeNxy] = useState<number>(25.0);
+  const [compositeResult, setCompositeResult] = useState<any>(null);
+  const [isEvaluatingComposite, setIsEvaluatingComposite] = useState<boolean>(false);
+
+  // Corporate PLM / PDM Bridge State
+  const [plmSystem, setPlmSystem] = useState<string>('Siemens Teamcenter');
+  const [plmItemId, setPlmItemId] = useState<string>('004821-A');
+  const [plmRevision, setPlmRevision] = useState<string>('A.01');
+  const [plmSyncResult, setPlmSyncResult] = useState<any>(null);
+  const [isSyncingPlm, setIsSyncingPlm] = useState<boolean>(false);
+
+  // DOCX Export State
+  const [isExportingDocx, setIsExportingDocx] = useState<boolean>(false);
+
   const [notification, setNotification] = useState<string>('');
 
   // Initial Load
@@ -252,16 +297,28 @@ export default function App() {
   };
 
   // Upload CAD Model
-  const handleCadUpload = async (file: File) => {
-    setCadFile(file);
+  const handleCadUpload = async (filesInput: FileList | File[] | File) => {
+    const files: File[] = filesInput instanceof File ? [filesInput] : Array.from(filesInput);
+    if (files.length === 0) return;
+
+    setCadFile(files[0]);
     setIsUploadingCad(true);
     const formData = new FormData();
-    formData.append('file', file);
+    const curMat = materialsList.find((m) => m.name === selectedMaterial) || { density_kg_m3: 2700.0 };
     formData.append('material_name', selectedMaterial);
-    formData.append('material_density_kg_m3', selectedMaterial.includes('Titanium') ? '4430.0' : '2700.0');
+    formData.append('material_density_kg_m3', String(curMat.density_kg_m3 || 2700.0));
+
+    const isMulti = files.length > 1;
+    const endpoint = isMulti ? `${API_BASE}/api/cad/upload-assembly` : `${API_BASE}/api/cad/upload`;
+
+    if (isMulti) {
+      files.forEach((f) => formData.append('files', f));
+    } else {
+      formData.append('file', files[0]);
+    }
 
     try {
-      const res = await fetch(`${API_BASE}/api/cad/upload`, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         body: formData,
       });
@@ -271,10 +328,15 @@ export default function App() {
         if (data.fastener_analysis) {
           setFastenerData(data.fastener_analysis);
         }
-        showNotification(`✅ Katı model ayrıştırıldı: ${file.name}`);
+        if (data.metadata?.is_assembly) {
+          showNotification(`🚀 Çoklu Montaj Grubu ayrıştırıldı (${data.metadata.parts_count || files.length} Parça)`);
+        } else {
+          showNotification(`✅ Katı model ayrıştırıldı: ${files[0].name}`);
+        }
         evaluateMission(selectedPlatformId, data.physical_properties.mass_kg);
       } else {
-        alert('CAD dosyası yüklenirken hata oluştu.');
+        const errText = await res.text();
+        alert(`CAD yükleme hatası: ${errText}`);
       }
     } catch (err) {
       alert(`Sunucu bağlantı hatası: ${err}`);
@@ -421,6 +483,122 @@ export default function App() {
       });
       evaluateMission(selectedPlatformId, 3.85);
       showNotification('✅ Büyük Aviyonik Şasi Gövdesi yüklendi.');
+    }
+
+    if (presetName === 'assembly') {
+      setCadFile(null);
+      const mockAssembly = {
+        metadata: {
+          file_name: 'Avionics_Pod_Assembly_3Part.stp',
+          is_assembly: true,
+          parts_count: 3,
+          joints_count: 4,
+          base_holes_count: 4,
+          is_manifold_valid: true,
+          material_name: 'Çoklu Montaj Alaşımı (Al 6061 + 7075 + Ti)'
+        },
+        assembly_tree: [
+          {
+            part_id: 'PART-01',
+            part_name: 'Alt Şasi Gövdesi (Chassis Base)',
+            material_name: 'Aluminium 6061-T6',
+            mass_kg: 2.45,
+            mass_share_percent: 63.6,
+            holes_count: 8,
+            color: { name: 'Saten Alüminyum', hex: '#94a3b8', accent: '#64748b' }
+          },
+          {
+            part_id: 'PART-02',
+            part_name: 'Üst Sızdırmazlık Kapağı (Top Lid)',
+            material_name: 'Aluminium 7075-T6',
+            mass_kg: 0.85,
+            mass_share_percent: 22.1,
+            holes_count: 4,
+            color: { name: 'Eloksal Mavi', hex: '#38bdf8', accent: '#0284c7' }
+          },
+          {
+            part_id: 'PART-03',
+            part_name: 'İç Aviyonik Taşıyıcı Braket',
+            material_name: 'Titanium Ti-6Al-4V (Grade 5)',
+            mass_kg: 0.55,
+            mass_share_percent: 14.3,
+            holes_count: 4,
+            color: { name: 'Titanyum Şampanya', hex: '#fbbf24', accent: '#d97706' }
+          }
+        ],
+        physical_properties: {
+          volume_mm3: 1425925.0,
+          mass_kg: 3.85,
+          cog_mm: { x: 120.0, y: 80.0, z: 46.5 },
+          cog_rel: { x: 0.0, y: 4.5, z: 0.0 }
+        },
+        bounding_box_mm: {
+          length_x: 240.0,
+          width_y: 160.0,
+          height_z: 110.0,
+          min_bounds: { x: 0, y: 0, z: 0 },
+          max_bounds: { x: 240, y: 160, z: 110 }
+        },
+        mounting_interface: {
+          overturning_moment_arm_h_cg_mm: 46.5,
+          mounting_plane: 'Z_MIN_BASE',
+          detected_holes_count: 4,
+          holes: [
+            { diameter_mm: 6.5, center: { x: 20, y: 20, z: 0 }, screw_fit: 'M6 Normal Geçme (ISO 273)' },
+            { diameter_mm: 6.5, center: { x: 220, y: 20, z: 0 }, screw_fit: 'M6 Normal Geçme (ISO 273)' },
+            { diameter_mm: 6.5, center: { x: 20, y: 140, z: 0 }, screw_fit: 'M6 Normal Geçme (ISO 273)' },
+            { diameter_mm: 6.5, center: { x: 220, y: 140, z: 0 }, screw_fit: 'M6 Normal Geçme (ISO 273)' },
+          ],
+          pattern_span_x_mm: 200.0,
+          pattern_span_y_mm: 120.0,
+          diagonal_span_mm: 233.24
+        },
+        inter_part_joints: [
+          {
+            joint_id: 'JOINT-01',
+            part_a_name: 'Alt Şasi Gövdesi',
+            part_b_name: 'Üst Sızdırmazlık Kapağı',
+            nominal_diameter_mm: 4.2,
+            screw_fit: 'M4 Normal Geçme (ISO 273)',
+            axial_gap_mm: 0.0,
+            radial_misalignment_mm: 0.05,
+            center: { x: 25, y: 25, z: 105 }
+          },
+          {
+            joint_id: 'JOINT-02',
+            part_a_name: 'Alt Şasi Gövdesi',
+            part_b_name: 'Üst Sızdırmazlık Kapağı',
+            nominal_diameter_mm: 4.2,
+            screw_fit: 'M4 Normal Geçme (ISO 273)',
+            axial_gap_mm: 0.0,
+            radial_misalignment_mm: 0.05,
+            center: { x: 215, y: 25, z: 105 }
+          },
+          {
+            joint_id: 'JOINT-03',
+            part_a_name: 'Alt Şasi Gövdesi',
+            part_b_name: 'Üst Sızdırmazlık Kapağı',
+            nominal_diameter_mm: 4.2,
+            screw_fit: 'M4 Normal Geçme (ISO 273)',
+            axial_gap_mm: 0.0,
+            radial_misalignment_mm: 0.05,
+            center: { x: 25, y: 135, z: 105 }
+          },
+          {
+            joint_id: 'JOINT-04',
+            part_a_name: 'Alt Şasi Gövdesi',
+            part_b_name: 'Üst Sızdırmazlık Kapağı',
+            nominal_diameter_mm: 4.2,
+            screw_fit: 'M4 Normal Geçme (ISO 273)',
+            axial_gap_mm: 0.0,
+            radial_misalignment_mm: 0.05,
+            center: { x: 215, y: 135, z: 105 }
+          }
+        ]
+      };
+      setCadData(mockAssembly);
+      evaluateMission(selectedPlatformId, 3.85);
+      showNotification('🚀 3 Parçalı Aviyonik Montaj Grubu (Şasi + Kapak + Braket) yüklendi.');
     }
   };
 
@@ -677,6 +855,77 @@ export default function App() {
     }
   };
 
+  const evaluateThermalCheck = async () => {
+    setIsEvaluatingThermal(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/qualification/thermal-check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          body_material_name: selectedMaterial || 'Aluminium 6061-T6',
+          body_cte_per_k: (cadData?.physical_properties?.cte_per_k) || 23.0e-6,
+          body_elastic_modulus_gpa: (cadData?.physical_properties?.elastic_modulus_gpa) || 68.9,
+          body_yield_strength_mpa: (cadData?.physical_properties?.yield_strength_mpa) || 275.0,
+          dimensions_mm: {
+            length: cadData?.bounding_box_mm?.length_x || 100.0,
+            width: cadData?.bounding_box_mm?.width_y || 80.0,
+            height: cadData?.bounding_box_mm?.height_z || 30.0,
+          },
+          operational_high_c: thermalHighC,
+          operational_low_c: thermalLowC,
+          fastener_material_key: thermalFastenerKey,
+          fastener_size: thermalFastenerSize,
+          dynamic_load_per_bolt_n: thermalDynamicLoad,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setThermalResult(data);
+        showNotification('✅ MIL-STD-810H termal kalifikasyon analizi tamamlandı');
+      } else {
+        const err = await res.text();
+        alert(`Termal analiz hatası: ${err}`);
+      }
+    } catch (e) {
+      alert(`Termal analiz bağlantı hatası: ${e}`);
+    } finally {
+      setIsEvaluatingThermal(false);
+    }
+  };
+
+  const handleUploadSolverLog = async (file: File) => {
+    setIsUploadingSolverLog(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('yield_strength_mpa', String(cadData?.physical_properties?.yield_strength_mpa || 275.0));
+      formData.append('damping_ratio', String(postFeaDamping || 0.02));
+      formData.append('safety_factor', '1.25');
+
+      const res = await fetch(`${API_BASE}/api/fea/upload-solver-log`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSolverLogResult(data);
+        if (data.first_mode_hz) setPostFeaFreq1(data.first_mode_hz);
+        if (data.second_mode_hz) setPostFeaFreq2(data.second_mode_hz);
+        if (data.third_mode_hz) setPostFeaFreq3(data.third_mode_hz);
+        if (data.peak_von_mises_stress_mpa) setPostFeaStress(data.peak_von_mises_stress_mpa);
+        if (data.evaluation) setPostFeaResult(data.evaluation);
+        showNotification(`✅ ${data.solver_type} çözücü logu başarıyla işlendi (${data.extracted_modes_count} mod)`);
+      } else {
+        const err = await res.text();
+        alert(`Çözücü logu okuma hatası: ${err}`);
+      }
+    } catch (e) {
+      alert(`Çözücü logu yükleme hatası: ${e}`);
+    } finally {
+      setIsUploadingSolverLog(false);
+    }
+  };
+
   const downloadOfficialEtpPdf = async () => {
     setIsExportingPdf(true);
     try {
@@ -690,6 +939,9 @@ export default function App() {
           fixture_data: fixtureResult,
           fatigue_data: fatigueResult,
           post_fea_data: postFeaResult,
+          thermal_data: thermalResult,
+          shock_data: shockResult,
+          composite_data: compositeResult,
           classification: 'TASNİF DIŞI / UNCLASSIFIED',
         }),
       });
@@ -710,6 +962,151 @@ export default function App() {
       alert(`PDF indirme bağlantı hatası: ${e}`);
     } finally {
       setIsExportingPdf(false);
+    }
+  };
+
+  const downloadOfficialEtpDocx = async () => {
+    setIsExportingDocx(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/export/etp/docx`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cad_data: cadData,
+          mission_profile: missionProfile,
+          fastener_data: fastenerData,
+          fixture_data: fixtureResult,
+          fatigue_data: fatigueResult,
+          post_fea_data: postFeaResult,
+          thermal_data: thermalResult,
+          shock_data: shockResult,
+          composite_data: compositeResult,
+          classification: 'TASNİF DIŞI / UNCLASSIFIED',
+        }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const baseName = cadData?.metadata?.file_name ? cadData.metadata.file_name.replace(/\.[^/.]+$/, '') : 'PARCA';
+        a.download = `NUPER_CITADEL_OFFICIAL_ETP_${baseName}.docx`;
+        a.click();
+        showNotification('✅ Resmi Düzenlenebilir Word (.docx) Raporu indirildi');
+      } else {
+        const err = await res.text();
+        alert(`DOCX indirme hatası: ${err}`);
+      }
+    } catch (e) {
+      alert(`DOCX indirme bağlantı hatası: ${e}`);
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
+
+  const handleEvaluateShock = async () => {
+    setIsEvaluatingShock(true);
+    try {
+      const currentMass = cadData.physical_properties?.mass_kg || 0.40;
+      const fn = postFeaResult?.first_mode_hz || 240.0;
+      const numBolts = cadData.mounting_interface?.holes?.length || 4;
+      const res = await fetch(`${API_BASE}/api/qualification/shock-srs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          part_mass_kg: currentMass,
+          yield_strength_mpa: 275.0,
+          first_natural_freq_hz: fn,
+          num_bolts: numBolts,
+          bolt_tensile_area_mm2: 8.78,
+          bolt_yield_strength_mpa: 640.0,
+          procedure_name: 'MIL-STD-810H Metot 516.8 Prosedür I',
+          pulse_shape: shockPulseShape,
+          peak_acceleration_g: Number(shockPeakG),
+          duration_ms: Number(shockDurationMs),
+          q_factor: Number(shockQFactor),
+          safety_factor: 1.25,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setShockResult(data);
+        showNotification('✅ MIL-STD-810H Mekanik Şok ve SRS Kalifikasyonu tamamlandı.');
+      } else {
+        const err = await res.text();
+        alert(`Şok analizi hatası: ${err}`);
+      }
+    } catch (e) {
+      alert(`Şok analizi bağlantı hatası: ${e}`);
+    } finally {
+      setIsEvaluatingShock(false);
+    }
+  };
+
+  const handleEvaluateComposite = async () => {
+    setIsEvaluatingComposite(true);
+    try {
+      const angles = [0.0, 45.0, -45.0, 90.0, 90.0, -45.0, 45.0, 0.0];
+      const res = await fetch(`${API_BASE}/api/materials/composite-evaluate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          material_preset: compositePreset,
+          layup_angles: angles,
+          ply_thickness_mm: 0.125,
+          force_nx_n_mm: Number(compositeNx),
+          force_ny_n_mm: Number(compositeNy),
+          shear_nxy_n_mm: Number(compositeNxy),
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCompositeResult(data);
+        showNotification('✅ Kompozit Klasik Laminat Teorisi (CLT) & Tsai-Wu analizi tamamlandı.');
+      } else {
+        const err = await res.text();
+        alert(`Kompozit analizi hatası: ${err}`);
+      }
+    } catch (e) {
+      alert(`Kompozit bağlantı hatası: ${e}`);
+    } finally {
+      setIsEvaluatingComposite(false);
+    }
+  };
+
+  const handlePlmSync = async () => {
+    setIsSyncingPlm(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/plm/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_type: plmSystem,
+          item_id: plmItemId || '004821-A',
+          revision: plmRevision || 'A.01',
+          part_name: cadData?.metadata?.file_name || 'Avionics_Module',
+          metadata: {
+            qualification_verdict: 'PASS',
+            standards: ['MIL-STD-810H Method 514.8', 'Method 501.7', 'Method 516.8'],
+            fastener_ms: fastenerData?.margin_of_safety_yield ?? 1.25,
+            thermal_ms: thermalResult?.joint_thermal_analysis?.ms_yield_hot ?? 0.65,
+            shock_ms: shockResult?.fastener_safety_margins?.bolt_tensile_margin_of_safety ?? 1.45,
+          },
+          mock_mode: true,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPlmSyncResult(data);
+        showNotification(`✅ PLM/PDM Senkronizasyonu Başarılı: ${data.plm_object_uid}`);
+      } else {
+        const err = await res.text();
+        alert(`PLM senkronizasyon hatası: ${err}`);
+      }
+    } catch (e) {
+      alert(`PLM bağlantı hatası: ${e}`);
+    } finally {
+      setIsSyncingPlm(false);
     }
   };
 
@@ -899,6 +1296,13 @@ export default function App() {
           >
             Aviyonik Şasi (3.85 kg)
           </button>
+          <button
+            onClick={() => loadPreset('assembly')}
+            className="text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Çoklu Montaj (3 Parça)</span>
+          </button>
         </div>
       </header>
 
@@ -979,15 +1383,16 @@ export default function App() {
                     <input
                       type="file"
                       accept=".step,.stp"
-                      onChange={(e) => e.target.files?.[0] && handleCadUpload(e.target.files[0])}
+                      multiple={true}
+                      onChange={(e) => e.target.files && handleCadUpload(e.target.files)}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     />
                     <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                       <Box className="w-6 h-6" />
                     </div>
-                    <div className="font-bold text-slate-900 text-sm">3D Katı Model (.STEP / .STP)</div>
+                    <div className="font-bold text-slate-900 text-sm">3D Katı Model veya Montaj (.STEP / .STP)</div>
                     <p className="text-xs text-slate-500 mt-0.5 max-w-sm">
-                      Dosyayı buraya sürükleyin veya bilgisayarınızdan seçin.
+                      Tek parça veya çoklu montaj dosyalarını sürükleyin (Çoklu dosya seçimi desteklenir).
                     </p>
                     {isUploadingCad ? (
                       <div className="mt-2 text-xs font-semibold text-blue-600 animate-pulse">
@@ -1066,6 +1471,57 @@ export default function App() {
                           <div className="border-t border-slate-100 pt-1 text-[10px] text-slate-600">
                             <span className="font-semibold text-slate-700">Not: </span>
                             <span className="italic text-slate-500 truncate">{drawingData.extracted_notes[0]}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Assembly Breakdown Card (if multi-body/assembly) */}
+                    {cadData.metadata?.is_assembly && cadData.assembly_tree && cadData.assembly_tree.length > 0 && (
+                      <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Layers className="w-4 h-4 text-amber-700" />
+                            <span className="font-bold text-slate-900 text-xs">
+                              Montaj Hiyerarşisi ({cadData.assembly_tree.length} Parça)
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded">
+                            Bileşik: {cadData.physical_properties.mass_kg.toFixed(3)} kg
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                          {cadData.assembly_tree.map((part: any) => (
+                            <div
+                              key={part.part_id}
+                              className="bg-white p-2 rounded-lg border border-amber-100 flex items-center justify-between text-xs"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: part.color?.hex || '#94a3b8' }}
+                                />
+                                <div>
+                                  <div className="font-bold text-slate-900 text-[11px] truncate max-w-[180px]">
+                                    {part.part_name}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500">
+                                    {part.material_name} · {part.holes_count || 0} delik
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right font-mono">
+                                <div className="font-bold text-slate-800 text-[11px]">{part.mass_kg.toFixed(3)} kg</div>
+                                <div className="text-[9px] text-amber-700">%{part.mass_share_percent.toFixed(1)}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {cadData.inter_part_joints && cadData.inter_part_joints.length > 0 && (
+                          <div className="text-[11px] text-amber-800 font-semibold flex items-center gap-1.5 pt-1 border-t border-amber-200">
+                            <span>🔗 {cadData.inter_part_joints.length}x Parçalar Arası Ortak Cıvata Eşleşmesi Tespit Edildi</span>
                           </div>
                         )}
                       </div>
@@ -1346,6 +1802,36 @@ export default function App() {
                   </div>
                 )}
 
+                {/* Çoklu Montaj Parçalar Arası Bağlantı Cıvataları */}
+                {cadData.inter_part_joints && cadData.inter_part_joints.length > 0 && (
+                  <div className="mb-3 p-2.5 rounded-xl border border-amber-200 bg-amber-50/80 text-xs shadow-xs">
+                    <div className="flex items-center justify-between font-bold text-amber-900 mb-1.5">
+                      <span className="flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-amber-600" />
+                        Montaj İçi Eşleşen Bağlantı Cıvataları (Inter-Part Fasteners)
+                      </span>
+                      <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-mono font-bold">
+                        {cadData.inter_part_joints.length} Eşleşme
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 max-h-[110px] overflow-y-auto pr-1">
+                      {cadData.inter_part_joints.map((j: any) => (
+                        <div key={j.joint_id} className="bg-white p-2 rounded-lg border border-amber-100 flex items-center justify-between font-mono text-[11px]">
+                          <div>
+                            <span className="font-bold text-slate-800">{j.part_a_name} ↔ {j.part_b_name}</span>
+                            <div className="text-[10px] text-slate-500 font-sans">
+                              Eksen Kayması: {j.radial_misalignment_mm} mm · Aralık: {j.axial_gap_mm} mm
+                            </div>
+                          </div>
+                          <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold text-[10px]">
+                            {j.screw_fit}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex-1 overflow-y-auto">
                   <FastenerTable data={fastenerData} />
                 </div>
@@ -1611,17 +2097,48 @@ export default function App() {
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-900 text-sm">FEA Kapalı Döngü Doğrulama & Notching Analizi (Post-FEA)</h3>
-                      <p className="text-[11px] text-slate-500">Simülasyon çözücüsünden (NX / ANSYS) çıkan modal frekansları ve pik gerilmeyi doğrulayın.</p>
+                      <p className="text-[11px] text-slate-500">Simülasyon çözücüsünden (NX / ANSYS / NASTRAN) çıkan modal frekansları ve pik gerilmeyi doğrulayın.</p>
                     </div>
                   </div>
-                  <button
-                    onClick={evaluatePostFea}
-                    disabled={isEvaluatingPostFea}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
-                  >
-                    <Activity className="w-3.5 h-3.5" /> {isEvaluatingPostFea ? 'Doğrulanıyor...' : 'FEA Sonuçlarını Doğrula'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <label className="bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors">
+                      <FolderUp className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>{isUploadingSolverLog ? 'Ayrıştırılıyor...' : 'Çözücü Logu (.f06 / ANSYS) Yükle'}</span>
+                      <input
+                        type="file"
+                        accept=".f06,.txt,.log,.out,.csv"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleUploadSolverLog(e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </label>
+                    <button
+                      onClick={evaluatePostFea}
+                      disabled={isEvaluatingPostFea}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      <Activity className="w-3.5 h-3.5" /> {isEvaluatingPostFea ? 'Doğrulanıyor...' : 'FEA Sonuçlarını Doğrula'}
+                    </button>
+                  </div>
                 </div>
+
+                {/* Solver log banner if uploaded */}
+                {solverLogResult && (
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-3.5 py-2 flex items-center justify-between text-xs text-indigo-950">
+                    <span className="font-semibold flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-indigo-600" />
+                      Dosya: <b>{solverLogResult.filename}</b> ({solverLogResult.solver_type} - {solverLogResult.extracted_modes_count} Mod Algılandı)
+                    </span>
+                    {solverLogResult.peak_von_mises_stress_mpa && (
+                      <span className="font-mono font-bold text-amber-700">
+                        Pik Gerilme: {solverLogResult.peak_von_mises_stress_mpa} MPa
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Input Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
@@ -1731,6 +2248,385 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* MIL-STD-810H THERMAL QUALIFICATION CARD */}
+              <div className="studio-card p-6 space-y-4 border-2 border-rose-100 bg-gradient-to-br from-white to-rose-50/30">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                      <Thermometer className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">MIL-STD-810H Metot 501.7 & 502.7 Termal Gerilme ve Cıvata Ön Yük Analizi</h3>
+                      <p className="text-[11px] text-slate-500">
+                        Gövde malzemesi ile cıvatalar arasındaki ısıl genleşme farkını (CTE Mismatch), sıcakta akma ve soğukta ön yük gevşemesini hesaplar.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={evaluateThermalCheck}
+                    disabled={isEvaluatingThermal}
+                    className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
+                  >
+                    <Flame className="w-3.5 h-3.5" /> {isEvaluatingThermal ? 'Hesaplanıyor...' : 'Termal Analizi Başlat'}
+                  </button>
+                </div>
+
+                {/* Parameters Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Çalışma Yüksek Sıcaklık T_hot (°C):</label>
+                    <input
+                      type="number"
+                      value={thermalHighC}
+                      onChange={(e) => setThermalHighC(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-rose-700 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Çalışma Düşük Sıcaklık T_cold (°C):</label>
+                    <input
+                      type="number"
+                      value={thermalLowC}
+                      onChange={(e) => setThermalLowC(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-blue-700 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Cıvata Malzeme Sınıfı:</label>
+                    <select
+                      value={thermalFastenerKey}
+                      onChange={(e) => setThermalFastenerKey(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-medium text-slate-800 text-xs"
+                    >
+                      <option value="Steel Grade 8.8">Çelik Grade 8.8 (α = 12.3 ppm/K)</option>
+                      <option value="Steel Grade 10.9">Çelik Grade 10.9 (α = 12.3 ppm/K)</option>
+                      <option value="Stainless Steel A2-70 (304)">Paslanmaz A2-70 (α = 17.2 ppm/K)</option>
+                      <option value="Titanium Ti-6Al-4V Grade 5">Titanyum Ti-6Al-4V (α = 8.6 ppm/K)</option>
+                      <option value="Inconel 718 Fastener">Inconel 718 (α = 13.0 ppm/K)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Cıvata Ölçüsü:</label>
+                    <select
+                      value={thermalFastenerSize}
+                      onChange={(e) => setThermalFastenerSize(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-slate-800 text-xs"
+                    >
+                      <option value="M2">M2</option>
+                      <option value="M2.5">M2.5</option>
+                      <option value="M3">M3</option>
+                      <option value="M4">M4</option>
+                      <option value="M5">M5</option>
+                      <option value="M6">M6</option>
+                      <option value="M8">M8</option>
+                      <option value="M10">M10</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Dinamik Yük (N/cıvata):</label>
+                    <input
+                      type="number"
+                      value={thermalDynamicLoad}
+                      onChange={(e) => setThermalDynamicLoad(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-800 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Thermal Results Preview */}
+                {thermalResult && (
+                  <div className="space-y-3 pt-2 border-t border-slate-200">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Kalifikasyon Uygunluğu:</span>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-black ${
+                          thermalResult.qualification_status === 'PASS'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : thermalResult.qualification_status.includes('MARGINAL')
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-red-50 text-red-700 border border-red-200'
+                        }`}>
+                          {thermalResult.qualification_status}
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Diferansiyel CTE (Δα):</span>
+                        <span className="text-base font-black text-slate-900 font-mono block mt-0.5">
+                          Δα = {thermalResult.joint_thermal_analysis?.delta_cte_ppm_per_k} ppm/K
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Sıcakta Akma Marjı (+{thermalHighC}°C):</span>
+                        <span className={`text-base font-black font-mono block mt-0.5 ${
+                          thermalResult.joint_thermal_analysis?.hot_condition?.passed ? 'text-emerald-700' : 'text-red-600'
+                        }`}>
+                          MS = +{thermalResult.joint_thermal_analysis?.hot_condition?.margin_of_safety_yield}
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Soğukta Ön Yük Koruma ({thermalLowC}°C):</span>
+                        <span className={`text-base font-black font-mono block mt-0.5 ${
+                          thermalResult.joint_thermal_analysis?.cold_condition?.passed ? 'text-emerald-700' : 'text-amber-600'
+                        }`}>
+                          %{thermalResult.joint_thermal_analysis?.cold_condition?.preload_retention_pct} Korundu
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-rose-50/60 p-3.5 rounded-xl border border-rose-200 text-xs text-rose-950 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-rose-900">
+                        <CheckCircle className="w-3.5 h-3.5 text-rose-700" />
+                        <span>MIL-STD-810H Termal Değerlendirme & Yönerge:</span>
+                      </div>
+                      <p className="text-[11px] text-slate-700">{thermalResult.engineering_summary}</p>
+                      <div className="text-[11px] text-slate-600 flex items-center gap-3 pt-1">
+                        <span><b>Sıcak Boyutsal Değişim:</b> ΔX: {thermalResult.body_expansion?.hot_delta_mm?.dx} mm, ΔY: {thermalResult.body_expansion?.hot_delta_mm?.dy} mm</span>
+                        <span><b>Soğuk Boyutsal Büzülme:</b> ΔX: {thermalResult.body_expansion?.cold_delta_mm?.dx} mm</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* MIL-STD-810H MECHANICAL SHOCK & SRS QUALIFICATION CARD */}
+              <div className="studio-card p-6 space-y-4 border-2 border-amber-200 bg-gradient-to-br from-white to-amber-50/30">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                      <Zap className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">MIL-STD-810H Metot 516.8 Mekanik Şok ve Şok Tepki Spektrumu (SRS) Analizi</h3>
+                      <p className="text-[11px] text-slate-500">
+                        Sert iniş, top atışı, fırlatma ve piroteknik darbe durumunda parça doğal frekansında dinamik büyütmeyi (Q=10) ve cıvata marjlarını hesaplar.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleEvaluateShock}
+                    disabled={isEvaluatingShock}
+                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
+                  >
+                    <Zap className="w-3.5 h-3.5" /> {isEvaluatingShock ? 'Hesaplanıyor...' : 'Şok & SRS Analizini Başlat'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Darbe Profili (Pulse Shape):</label>
+                    <select
+                      value={shockPulseShape}
+                      onChange={(e) => setShockPulseShape(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-medium text-slate-800 text-xs"
+                    >
+                      <option value="Terminal Peak Sawtooth (TPS)">Terminal Peak Sawtooth (TPS)</option>
+                      <option value="Half-Sine">Yarım Sinüs (Half-Sine)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Tepe İvme A0 (g):</label>
+                    <input
+                      type="number"
+                      value={shockPeakG}
+                      onChange={(e) => setShockPeakG(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-amber-700 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Darbe Süresi τ (ms):</label>
+                    <input
+                      type="number"
+                      value={shockDurationMs}
+                      onChange={(e) => setShockDurationMs(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-800 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Dinamik Büyütme Q (Sönümleme):</label>
+                    <input
+                      type="number"
+                      value={shockQFactor}
+                      onChange={(e) => setShockQFactor(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-800 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {shockResult && (
+                  <div className="space-y-3 pt-2 border-t border-slate-200">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Şok Kalifikasyon Durumu:</span>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-black ${
+                          shockResult.qualification_status === 'PASS'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-red-50 text-red-700 border border-red-200'
+                        }`}>
+                          {shockResult.qualification_status}
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">1. Mod Dinamik SRS Tepkisi:</span>
+                        <span className="text-base font-black text-amber-700 font-mono block mt-0.5">
+                          {shockResult.part_modal_response?.srs_amplified_acceleration_g} g
+                        </span>
+                        <span className="text-[10px] text-slate-400">@ {shockResult.part_modal_response?.first_natural_freq_hz} Hz</span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Cıvata Şok Çekme Marjı:</span>
+                        <span className={`text-base font-black font-mono block mt-0.5 ${
+                          shockResult.fastener_safety_margins?.bolt_tensile_margin_of_safety >= 0 ? 'text-emerald-700' : 'text-red-600'
+                        }`}>
+                          MS = +{shockResult.fastener_safety_margins?.bolt_tensile_margin_of_safety}
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Cıvata Şok Kayma Marjı:</span>
+                        <span className={`text-base font-black font-mono block mt-0.5 ${
+                          shockResult.fastener_safety_margins?.bolt_shear_margin_of_safety >= 0 ? 'text-emerald-700' : 'text-red-600'
+                        }`}>
+                          MS = +{shockResult.fastener_safety_margins?.bolt_shear_margin_of_safety}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200 text-xs text-amber-950 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                        <CheckCircle className="w-3.5 h-3.5 text-amber-700" />
+                        <span>MIL-STD-810H Şok Kalifikasyon Değerlendirmesi:</span>
+                      </div>
+                      <p className="text-[11px] text-slate-700">{shockResult.engineering_summary}</p>
+                      <div className="text-[11px] text-slate-600 flex items-center gap-3 pt-1">
+                        <span><b>Toplam Eşdeğer Şok Kuvveti:</b> {shockResult.equivalent_static_shock?.total_inertial_force_n} N</span>
+                        <span><b>Cıvata Başına Dinamik Yük:</b> {shockResult.equivalent_static_shock?.force_per_bolt_n} N</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* HAVACILIK KOMPOZİT KATMAN & CLT ANALİZ KARTI */}
+              <div className="studio-card p-6 space-y-4 border-2 border-emerald-200 bg-gradient-to-br from-white to-emerald-50/30">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">Havacılık Kompozit Katman & Klasik Laminat Teorisi (CLT) [A, B, D]</h3>
+                      <p className="text-[11px] text-slate-500">
+                        Karbon/Epoksi, S2-Glass ve Kevlar prepreg katman dizilimlerinde düzlem içi yükler altında katman bazlı Tsai-Wu ve Maksimum Gerilme emniyet marjlarını çözer.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleEvaluateComposite}
+                    disabled={isEvaluatingComposite}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
+                  >
+                    <Layers className="w-3.5 h-3.5" /> {isEvaluatingComposite ? 'Hesaplanıyor...' : 'CLT Analizini Başlat'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Prepreg Malzeme:</label>
+                    <select
+                      value={compositePreset}
+                      onChange={(e) => setCompositePreset(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-medium text-slate-800 text-xs"
+                    >
+                      <option value="AS4/3501-6 Carbon/Epoxy">AS4/3501-6 Karbon/Epoksi</option>
+                      <option value="IM7/8552 Carbon/Epoxy">IM7/8552 Yüksek Modül Karbon</option>
+                      <option value="S2-Glass/Epoxy">S2-Glass/Epoksi Cam Elyaf</option>
+                      <option value="Kevlar 49/Epoxy">Kevlar 49/Epoksi Aramid</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Katman Dizilimi:</label>
+                    <input
+                      type="text"
+                      value={compositeLayup}
+                      onChange={(e) => setCompositeLayup(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-slate-800 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Boyuna Yük Nx (N/mm):</label>
+                    <input
+                      type="number"
+                      value={compositeNx}
+                      onChange={(e) => setCompositeNx(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-800 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Enine Yük Ny (N/mm):</label>
+                    <input
+                      type="number"
+                      value={compositeNy}
+                      onChange={(e) => setCompositeNy(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-800 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Kayma Yükü Nxy (N/mm):</label>
+                    <input
+                      type="number"
+                      value={compositeNxy}
+                      onChange={(e) => setCompositeNxy(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-800 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {compositeResult && (
+                  <div className="space-y-3 pt-2 border-t border-slate-200">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Tsai-Wu Güvenlik Marjı:</span>
+                        <span className={`text-base font-black font-mono block mt-0.5 ${
+                          compositeResult.tsai_wu_margin_of_safety >= 0 ? 'text-emerald-700' : 'text-red-600'
+                        }`}>
+                          MS = +{compositeResult.tsai_wu_margin_of_safety}
+                        </span>
+                        <span className="text-[10px] text-slate-400">Verdik: {compositeResult.qualification_verdict}</span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Maksimum Gerilme Marjı:</span>
+                        <span className={`text-base font-black font-mono block mt-0.5 ${
+                          compositeResult.max_stress_margin_of_safety >= 0 ? 'text-emerald-700' : 'text-red-600'
+                        }`}>
+                          MS = +{compositeResult.max_stress_margin_of_safety}
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">En Kritik Katman:</span>
+                        <span className="text-base font-black text-slate-900 font-mono block mt-0.5">
+                          Katman #{compositeResult.critical_ply_index} ({compositeResult.critical_ply_angle}°)
+                        </span>
+                        <span className="text-[10px] text-slate-400">Toplam {compositeResult.total_thickness_mm} mm ({compositeResult.num_plies} Kat)</span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Eşdeğer Modül E_x / E_y:</span>
+                        <span className="text-base font-black text-indigo-700 font-mono block mt-0.5">
+                          {compositeResult.effective_engineering_constants?.ex_gpa} / {compositeResult.effective_engineering_constants?.ey_gpa} GPa
+                        </span>
+                        <span className="text-[10px] text-slate-400">G_xy = {compositeResult.effective_engineering_constants?.gxy_gpa} GPa</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-200 text-xs text-emerald-950 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-emerald-900">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Kompozit Laminat Mühendislik Özeti:</span>
+                      </div>
+                      <p className="text-[11px] text-slate-700">{compositeResult.engineering_summary}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Bottom Navigation Dock */}
@@ -1822,6 +2718,14 @@ export default function App() {
                         >
                           <Download className="w-3.5 h-3.5" /> {isExportingPdf ? 'PDF Üretiliyor...' : 'Resmi Askeri PDF İndir (A4)'}
                         </button>
+
+                        <button
+                          onClick={downloadOfficialEtpDocx}
+                          disabled={isExportingDocx}
+                          className="bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> {isExportingDocx ? 'Word Üretiliyor...' : 'Düzenlenebilir Word (.docx) İndir'}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1845,6 +2749,13 @@ export default function App() {
                         className="text-xs bg-red-700 hover:bg-red-800 text-white font-bold px-4 py-2 rounded-lg shadow-sm cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                       >
                         <Download className="w-3.5 h-3.5" /> {isExportingPdf ? 'PDF Hazırlanıyor...' : 'Doğrudan A4 PDF Raporu Al'}
+                      </button>
+                      <button
+                        onClick={downloadOfficialEtpDocx}
+                        disabled={isExportingDocx}
+                        className="text-xs bg-blue-700 hover:bg-blue-800 text-white font-bold px-4 py-2 rounded-lg shadow-sm cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <FileText className="w-3.5 h-3.5" /> {isExportingDocx ? 'Word Hazırlanıyor...' : 'Düzenlenebilir Word (.docx)'}
                       </button>
                     </div>
                   </div>
@@ -1917,6 +2828,80 @@ export default function App() {
                       >
                         <Copy className="w-3.5 h-3.5" /> Dilekçeyi Kopyala
                       </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* CORPORATE PLM / PDM BRIDGE CARD */}
+              <div className="studio-card p-6 space-y-4 border-2 border-indigo-200 bg-gradient-to-br from-white to-indigo-50/20">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                      <Database className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">Kurumsal PLM / PDM Entegrasyon Köprüsü (Teamcenter & Windchill)</h3>
+                      <p className="text-[11px] text-slate-500">
+                        Kalifikasyon veri paketini, STEP AP242 modelini ve resmi test planlarını kurumsal PLM sistemine kataloglar.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handlePlmSync}
+                    disabled={isSyncingPlm}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
+                  >
+                    <Database className="w-3.5 h-3.5" /> {isSyncingPlm ? 'Senkronize Ediliyor...' : 'PLM/PDM Ambarına Aktar'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Hedef PLM Sistemi:</label>
+                    <select
+                      value={plmSystem}
+                      onChange={(e) => setPlmSystem(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-medium text-slate-800 text-xs"
+                    >
+                      <option value="Siemens Teamcenter">Siemens Teamcenter (Active Workspace)</option>
+                      <option value="PTC Windchill">PTC Windchill (WRS / AP242)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Kurumsal Kalem Kodu (Item ID):</label>
+                    <input
+                      type="text"
+                      value={plmItemId}
+                      onChange={(e) => setPlmItemId(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-slate-900 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Mühendislik Revizyonu:</label>
+                    <input
+                      type="text"
+                      value={plmRevision}
+                      onChange={(e) => setPlmRevision(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-900 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {plmSyncResult && (
+                  <div className="bg-indigo-50/80 p-4 rounded-xl border border-indigo-200 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-indigo-900 flex items-center gap-1.5">
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                        <span>PLM Nesnesi Oluşturuldu: {plmSyncResult.plm_object_uid}</span>
+                      </span>
+                      <span className="bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold px-2 py-0.5 rounded">
+                        {plmSyncResult.system_type} • AP242/JT AKTİF
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-700">{plmSyncResult.message}</p>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono pt-1">
+                      <span>Kataloglanan Ekler: ETP Raporu (.pdf), Düzenlenebilir Plan (.docx), Çözücü Logu (.f06)</span>
                     </div>
                   </div>
                 )}

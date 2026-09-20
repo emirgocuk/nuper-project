@@ -1,35 +1,150 @@
-# CAD Models & Engineering Drawings (Air-gap / Confidentiality / Large Binaries)
+# ==============================================================================
+# Nuper Citadel - Git Ignore Configuration
+# Savunma Sanayii / Air-Gapped Kalifikasyon İstasyonu
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. CAD Modelleri, Çizimler ve Büyük İkili Veriler (Gizlilik & Kota Koruması)
+# ------------------------------------------------------------------------------
 cad_models/
 *.stp
 *.step
 *.iges
 *.igs
+*.brep
+*.x_t
+*.x_b
+*.sat
+*.sldprt
+*.sldasm
+*.ipt
+*.iam
+*.catpart
+*.catproduct
+*.prt
+*.dwg
+*.dxf
+# Test fikstür modellerini koru:
+!tests/fixtures/**
 
-# Python Virtual Environments & Caches
+# ------------------------------------------------------------------------------
+# 2. Desktop Shell & Tarayıcı Çalışma Profilleri (Binlerce Gereksiz Dosya)
+# ------------------------------------------------------------------------------
+.citadel_desktop_profile/
+*.bdic
+*.pma
+
+# ------------------------------------------------------------------------------
+# 3. Python Sanal Ortamları, Bytecode ve Test Önbellekleri
+# ------------------------------------------------------------------------------
 __pycache__/
+*/__pycache__/
+*/**/__pycache__/
 *.py[cod]
 *$py.class
 .venv/
 venv/
 env/
+ENV/
 .pytest_cache/
-*.egg-info/
+.mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
+*.egg-info/
+.eggs/
+build/
+dist/
 
-# Node & Frontend Build
+# ------------------------------------------------------------------------------
+# 4. Node, Frontend & Web Derleme Çıktıları
+# ------------------------------------------------------------------------------
+node_modules/
+*/node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
+frontend/.vite/
+.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# IDE & OS Artifacts
+# ------------------------------------------------------------------------------
+# 5. Rust / Tauri Masaüstü Derleme Çıktıları (Yüzlerce MB/GB Hedef Dosyaları)
+# ------------------------------------------------------------------------------
+src-tauri/target/
+target/
+src-tauri/Wix_bin/
+*.pdb
+
+# ------------------------------------------------------------------------------
+# 6. Üretilen Raporlar, Test Planları ve Çıktı Dokümanları
+# ------------------------------------------------------------------------------
+Nuper_Citadel_ETP_*
+*.pdf
+*.docx
+output/
+exports/
+reports/
+
+# ------------------------------------------------------------------------------
+# 7. FEA / Çözücü Logları ve Geçici Dosyaları
+# ------------------------------------------------------------------------------
+*.f06
+*.op2
+*.out
+*.pch
+*.rst
+*.bdf
+*.dat
+
+# ------------------------------------------------------------------------------
+# 8. Yerel Telemetri & SQLite Çalışma Dosyaları (DPO Veritabanı)
+# ------------------------------------------------------------------------------
+engine/data/telemetry.db
+engine/data/telemetry.db-*
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ------------------------------------------------------------------------------
+# 9. Yerel Yapay Zeka / LoRA Eğitimi ve Veri Seti Çıktıları
+# ------------------------------------------------------------------------------
+engine/training/
+dpo_preference_dataset.jsonl
+lora_dpo_config.json
+*.safetensors
+*.pt
+*.pth
+*.bin
+checkpoints/
+wandb/
+
+# ------------------------------------------------------------------------------
+# 10. Geçici Dosyalar, Loglar ve Scratch Alanları
+# ------------------------------------------------------------------------------
+*.log
+logs/
+temp_cad_*
+tmp/
+temp/
+scratch/
+*.tmp
+*.temp
+*.bak
+
+# ------------------------------------------------------------------------------
+# 11. IDE, Editör ve İşletim Sistemi Kalıntıları
+# ------------------------------------------------------------------------------
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+ehthumbs.db
+desktop.ini
 *.swp
 *.swo
-
-# Logs & Temporary Files
-*.log
-temp_cad_*
+*~

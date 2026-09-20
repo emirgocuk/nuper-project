@@ -53,3 +53,64 @@ def test_cad_parser_file_not_found():
     parser = CADParser()
     with pytest.raises(FileNotFoundError):
         parser.parse_step("non_existent_file.step")
+
+
+def test_compute_angular_coverage_fillet_rejection():
+    import math
+    # 90° köşe kavisi (fillet) -> 90° (< 270°) elenmeli
+    cov_fillet = CADParser._compute_angular_coverage([(0.0, math.pi / 2.0)])
+    assert cov_fillet < 270.0
+    assert abs(cov_fillet - 90.0) <= 1.0
+
+    # Aynı eksende üst üste binmiş 4 adet 90° köşe kavisi -> Net kapalılık 90° kalmalı (< 270°)
+    cov_stacked = CADParser._compute_angular_coverage([
+        (0.0, math.pi / 2.0),
+        (0.0, math.pi / 2.0),
+        (0.0, math.pi / 2.0),
+        (0.0, math.pi / 2.0)
+    ])
+    assert cov_stacked < 270.0
+    assert abs(cov_stacked - 90.0) <= 1.0
+
+    # Tek parçada 360° tam silindir -> 360° (>= 270°) kabul edilmeli
+    cov_full = CADParser._compute_angular_coverage([(0.0, 2.0 * math.pi)])
+    assert cov_full >= 270.0
+    assert cov_full == 360.0
+
+    # 180°'lik iki yarı silindirden oluşan delik -> 360° (>= 270°) kabul edilmeli
+    cov_split = CADParser._compute_angular_coverage([
+        (0.0, math.pi),
+        (math.pi, 2.0 * math.pi)
+    ])
+    assert cov_split >= 270.0
+    assert cov_split == 360.0
+
+
+def test_cad_fillet_rejection_on_real_models():
+    """cad_models dizini mevcutsa gerçek modeller üzerinde köşe radyüsü elemesini doğrular."""
+    parser = CADParser()
+    cad_dir = os.path.join(os.path.dirname(TESTS_DIR), "cad_models")
+    if not os.path.isdir(cad_dir):
+        pytest.skip("cad_models dizini bulunamadı.")
+
+    # 1. ROLE BAGLANTI PARCA: Teknik resme göre tam 4 delik (2x M4, 2x M3)
+    role_step = os.path.join(cad_dir, "ROLE BAGLANTI PARCA_AA (1).stp")
+    if os.path.exists(role_step):
+        res = parser.parse_step(role_step)
+        assert res["mounting_interface"]["detected_holes_count"] == 4
+
+    # 2. Anten Kapak TM: 2 montaj deliği
+    anten_step = os.path.join(cad_dir, "Anten Kapak TM.stp")
+    if os.path.exists(anten_step):
+        res = parser.parse_step(anten_step)
+        assert res["mounting_interface"]["detected_holes_count"] == 2
+
+    # 3. kartTutucuUstKapak: Ceplerdeki 15 adet R=6.35mm (D=12.7) ve R=4/5mm köşe kavisleri elenmeli
+    kart_step = os.path.join(cad_dir, "kartTutucuUstKapak_TM_LGK (1) (1).stp")
+    if os.path.exists(kart_step):
+        res = parser.parse_step(kart_step)
+        holes = res["mounting_interface"]["holes"]
+        # Hiçbir delik D=12.7 (cep köşe kavisi) veya D=10.0 (cep geçiş kavisi) olmamalı
+        fillet_diameters = [h["diameter_mm"] for h in holes if abs(h["diameter_mm"] - 12.7) < 0.1 or abs(h["diameter_mm"] - 10.0) < 0.1]
+        assert len(fillet_diameters) == 0, f"Köşe kavisleri delik olarak algılandı: {fillet_diameters}"
+
