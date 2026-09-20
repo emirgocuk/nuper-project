@@ -47,6 +47,7 @@ Bu proje, oturumlar ve yapay zekâ asistanları arasında kesintisiz hafıza akt
 - [[memory-bank/techContext|💻 Teknoloji Yığını (Tech Context)]] - Tauri, FastAPI, pythonocc-core, SQLite, Qwen/Llama.
 - [[memory-bank/progress|📊 İlerleme ve Durum (Progress)]] - Tamamlananlar, yol haritası ve risk matrisi.
 - [[AGENTS|📜 Proje Zekası ve Kuralları (AGENTS.md)]] - Askeri mühendislik ve kodlama kuralları.
+- [[nuper_citadel_review|🔍 Kapsamlı Proje İncelemesi ve Teknik Öneriler (Review)]] - Mimari analiz, pazar değerlendirmesi ve uygulama yol haritası.
 
 ---
 
@@ -94,12 +95,15 @@ Nuper Citadel'i bir sonraki seviyeye taşıyacak tartışmaya ve geliştirmeye a
 ## 📊 Hızlı Sistem Durumu
 | Bileşen | Durum | Öncelikli Hedef |
 | :--- | :---: | :--- |
-| **Hafıza ve Mimari Tanımı** | 🟢 Tamamlandı | Obsidian & Memory Bank senkronizasyonu |
-| **CAD Ayrıştırıcı (pythonocc)** | 🟡 Tasarlandı | STEP dosyasından CoG ve delik tespiti prototipi |
-| **Kural Motoru (SQLite)** | 🟡 Tasarlandı | MIL-STD-810H Cat 14/4 tablolarının kodlanması |
-| **FEA Köprüsü (NX/ANSYS)** | 🟡 Tasarlandı | 100+ noktalı PSD CSV interpolasyon algoritması |
-| **Yerel LLM (Ollama/Qwen)** | 🟡 Tasarlandı | Air-gapped JSON -> ETP prompt şablonu |
-| **Masaüstü Kabuğu (Tauri)** | ⚪ Planlandı | Rust/Tauri + Next.js iskelet kurulumu |
+| **Hafıza ve Mimari Tanımı** | 🟢 Tamamlandı | Obsidian & Memory Bank senkronizasyonu (%100) |
+| **CAD Ayrıştırıcı (pythonocc)** | 🟢 Tamamlandı | OpenCASCADE BRep mesh, kütle, CoG ve delik tespiti |
+| **Kural Motoru (SQLite)** | 🟢 Tamamlandı | MIL-STD-810H Cat 14/4/20 ve kütle sönümleme |
+| **FEA Köprüsü (NX/ANSYS)** | 🟢 Tamamlandı | 120-noktalı PSD CSV ve ANSYS APDL üretimi |
+| **Post-FEA Kapalı Döngü** | 🟢 Tamamlandı | Rezonans kaçınma, dinamik Q ve notching derinliği |
+| **Resmi Savunma A4 PDF** | 🟢 Tamamlandı | ReportLab antetli, doküman no'lu askeri ETP PDF |
+| **Yerel LLM (Ollama/Qwen)** | 🟢 Tamamlandı | ETP sentezi, over-testing itiraz ajanı ve DPO |
+| **Masaüstü Kabuğu (Tauri)** | 🟡 Sırada | Tek tıkla installer ve embedded Python yönetimi |
+| **Birim & Entegrasyon Testleri** | 🟢 52/52 PASSED | %100 Başarı (14 saniye) |
 
 ---
 *Bu kasa, savunma standartlarının deterministik kesinliği ile yerel yapay zekânın üretken gücünü birleştiren bir mühendislik rehberi olarak tasarlanmıştır.*

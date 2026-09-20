@@ -17,10 +17,16 @@ class RuleEngine:
         self.standards_db_path = standards_db_path
         self.materials_db_path = materials_db_path
 
-    def list_platforms(self) -> List[Dict[str, Any]]:
+    def list_platforms(self, standard_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         conn = sqlite3.connect(self.standards_db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT id, platform_name, platform_category, standard_code, description FROM military_platforms")
+        if standard_filter:
+            cursor.execute(
+                "SELECT id, platform_name, platform_category, standard_code, description FROM military_platforms WHERE standard_code LIKE ?",
+                (f"%{standard_filter}%",)
+            )
+        else:
+            cursor.execute("SELECT id, platform_name, platform_category, standard_code, description FROM military_platforms")
         rows = cursor.fetchall()
         conn.close()
         return [
@@ -33,6 +39,137 @@ class RuleEngine:
             }
             for r in rows
         ]
+
+    def add_custom_platform(
+        self,
+        platform_name: str,
+        platform_category: str,
+        standard_code: str,
+        description: str,
+        vibration_data: Dict[str, Any],
+        temperature_data: Optional[Dict[str, Any]] = None,
+        shock_data: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        conn = sqlite3.connect(self.standards_db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
+                VALUES (?, ?, ?, ?)
+                """,
+                (platform_name, platform_category, standard_code, description),
+            )
+            platform_id = cursor.lastrowid
+
+            # Vibration profile
+            method_code = vibration_data.get("method_code", "CUSTOM")
+            category_id = vibration_data.get("category_id", 99)
+            annex_figure = vibration_data.get("annex_figure", "User Defined Spectrum")
+            duration = vibration_data.get("duration_per_axis_minutes", 60)
+            axes = vibration_data.get("axes", "X,Y,Z")
+            mass_atten = 1 if vibration_data.get("mass_attenuation_applicable") else 0
+            breakpoints = vibration_data.get("breakpoints", [])
+
+            calc_grms = self.calculate_grms(breakpoints) if breakpoints else 0.0
+
+            cursor.execute(
+                """
+                INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (platform_id, method_code, category_id, annex_figure, calc_grms, duration, axes, mass_atten),
+            )
+            prof_id = cursor.lastrowid
+
+            for idx, bp in enumerate(breakpoints, start=1):
+                cursor.execute(
+                    """
+                    INSERT INTO vibration_breakpoints (profile_id, seq_order, frequency_hz, psd_value, slope_db_oct)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (prof_id, idx, bp["frequency_hz"], bp["psd_value"], bp.get("slope_db_oct", 0.0)),
+                )
+
+            # Temperature profile
+            if temperature_data:
+                cursor.execute(
+                    """
+                    INSERT INTO temperature_profiles (platform_id, climatic_category, operational_high_c, storage_high_c, operational_low_c, storage_low_c)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        platform_id,
+                        temperature_data.get("climatic_category", "Custom Thermal"),
+                        temperature_data.get("operational_high_c", 60.0),
+                        temperature_data.get("storage_high_c", 70.0),
+                        temperature_data.get("operational_low_c", -40.0),
+                        temperature_data.get("storage_low_c", -50.0),
+                    ),
+                )
+
+            # Shock profile
+            if shock_data:
+                cursor.execute(
+                    """
+                    INSERT INTO shock_profiles (platform_id, procedure_name, pulse_shape, peak_acceleration_g, duration_ms, num_shocks_per_axis)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        platform_id,
+                        shock_data.get("procedure_name", "Custom Shock"),
+                        shock_data.get("pulse_shape", "Half-Sine"),
+                        shock_data.get("peak_acceleration_g", 20.0),
+                        shock_data.get("duration_ms", 11.0),
+                        shock_data.get("num_shocks_per_axis", 6),
+                    ),
+                )
+
+            conn.commit()
+            return platform_id
+        finally:
+            conn.close()
+
+    def add_custom_material(
+        self,
+        name: str,
+        category: str,
+        density_kg_m3: float,
+        elastic_modulus_gpa: float,
+        poissons_ratio: float,
+        yield_strength_mpa: float,
+        ultimate_strength_mpa: float,
+        cte_per_k: float,
+        basquin_a_mpa: Optional[float] = None,
+        basquin_b_exponent: Optional[float] = None,
+        description: Optional[str] = None,
+    ) -> int:
+        if basquin_a_mpa is None:
+            basquin_a_mpa = round(ultimate_strength_mpa * 1.3, 1)
+        if basquin_b_exponent is None:
+            basquin_b_exponent = -0.100
+
+        conn = sqlite3.connect(self.materials_db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO materials (
+                    name, category, density_kg_m3, elastic_modulus_gpa, poissons_ratio,
+                    yield_strength_mpa, ultimate_strength_mpa, cte_per_k,
+                    basquin_a_mpa, basquin_b_exponent, description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    name, category, density_kg_m3, elastic_modulus_gpa, poissons_ratio,
+                    yield_strength_mpa, ultimate_strength_mpa, cte_per_k,
+                    basquin_a_mpa, basquin_b_exponent, description or "Özel kullanıcı tanımlı malzeme"
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            conn.close()
 
     def list_materials(self) -> List[Dict[str, Any]]:
         conn = sqlite3.connect(self.materials_db_path)

@@ -19,6 +19,9 @@ import {
   FileUp,
   ChevronRight,
   Activity,
+  Plus,
+  X,
+  Sliders,
 } from 'lucide-react';
 import { CADViewer3D } from './components/CADViewer3D';
 import { FastenerTable } from './components/FastenerTable';
@@ -83,7 +86,39 @@ export default function App() {
   const [platforms, setPlatforms] = useState<any[]>([]);
   const [selectedPlatformId, setSelectedPlatformId] = useState<number>(1);
   const [selectedMaterial, setSelectedMaterial] = useState<string>('Aluminium 6061-T6');
+  const [materialsList, setMaterialsList] = useState<any[]>([]);
+  const [standardFilterTab, setStandardFilterTab] = useState<string>('ALL');
   const [missionProfile, setMissionProfile] = useState<any>(null);
+
+  // Custom Standard Modal State
+  const [customStandardModalOpen, setCustomStandardModalOpen] = useState<boolean>(false);
+  const [customStandardName, setCustomStandardName] = useState<string>('ASELSAN MYS Aviyonik Pod');
+  const [customStandardCategory, setCustomStandardCategory] = useState<string>('CUSTOM_AVIONICS');
+  const [customStandardCode, setCustomStandardCode] = useState<string>('ASELSAN MYS-101');
+  const [customStandardDesc, setCustomStandardDesc] = useState<string>('ASELSAN şirket içi zorlu çevre koşulları standart profili');
+  const [customPsdRows, setCustomPsdRows] = useState<{ freq: number; psd: number }[]>([
+    { freq: 15.0, psd: 0.02 },
+    { freq: 100.0, psd: 0.08 },
+    { freq: 600.0, psd: 0.08 },
+    { freq: 2000.0, psd: 0.01 },
+  ]);
+  const [customOpHigh, setCustomOpHigh] = useState<number>(75.0);
+  const [customOpLow, setCustomOpLow] = useState<number>(-45.0);
+  const [customShockG, setCustomShockG] = useState<number>(30.0);
+  const [isSavingCustomStandard, setIsSavingCustomStandard] = useState<boolean>(false);
+
+  // Custom Material Modal State
+  const [customMaterialModalOpen, setCustomMaterialModalOpen] = useState<boolean>(false);
+  const [customMatName, setCustomMatName] = useState<string>('Alüminyum 2024-T3');
+  const [customMatCategory, setCustomMatCategory] = useState<string>('ALUMINIUM_ALLOY');
+  const [customMatDensity, setCustomMatDensity] = useState<number>(2780.0);
+  const [customMatModulus, setCustomMatModulus] = useState<number>(73.1);
+  const [customMatPoisson, setCustomMatPoisson] = useState<number>(0.33);
+  const [customMatYield, setCustomMatYield] = useState<number>(325.0);
+  const [customMatUltimate, setCustomMatUltimate] = useState<number>(470.0);
+  const [customMatCte, setCustomMatCte] = useState<number>(23.2);
+  const [customMatDesc, setCustomMatDesc] = useState<string>('Yüksek yorulma dirençli havacılık gövde alaşımı.');
+  const [isSavingCustomMaterial, setIsSavingCustomMaterial] = useState<boolean>(false);
 
   // FEA, Fixture, Fatigue Results
   const [feaPsdCsv, setFeaPsdCsv] = useState<string>('');
@@ -125,6 +160,7 @@ export default function App() {
   useEffect(() => {
     checkHealth();
     fetchPlatforms();
+    fetchMaterials();
     fetchMachineId();
     loadDefaultFasteners();
   }, []);
@@ -150,16 +186,35 @@ export default function App() {
     }
   };
 
-  const fetchPlatforms = async () => {
+  const fetchPlatforms = async (targetIdToSelect?: number) => {
     try {
       const res = await fetch(`${API_BASE}/api/platforms`);
       if (res.ok) {
         const data = await res.json();
         setPlatforms(data);
-        if (data.length > 0) evaluateMission(data[0].id);
+        const selId = targetIdToSelect || (data.length > 0 ? data[0].id : 1);
+        setSelectedPlatformId(selId);
+        evaluateMission(selId);
       }
     } catch (e) {
       console.error('Platforms fetch error:', e);
+    }
+  };
+
+  const fetchMaterials = async (materialNameToSelect?: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/materials`);
+      if (res.ok) {
+        const data = await res.json();
+        setMaterialsList(data);
+        if (materialNameToSelect) {
+          setSelectedMaterial(materialNameToSelect);
+        } else if (data.length > 0 && !data.some((m: any) => m.name === selectedMaterial)) {
+          setSelectedMaterial(data[0].name);
+        }
+      }
+    } catch (e) {
+      console.error('Materials fetch error:', e);
     }
   };
 
@@ -658,6 +713,115 @@ export default function App() {
     }
   };
 
+  const handleSaveCustomStandard = async () => {
+    if (!customStandardName.trim()) {
+      alert('Lütfen platform adını giriniz.');
+      return;
+    }
+    if (customPsdRows.length < 2) {
+      alert('En az 2 kırılma frekans noktası girmelisiniz.');
+      return;
+    }
+    setIsSavingCustomStandard(true);
+    try {
+      const payload = {
+        platform_name: customStandardName,
+        platform_category: customStandardCategory,
+        standard_code: customStandardCode,
+        description: customStandardDesc,
+        vibration: {
+          method_code: customStandardCode,
+          category_id: 99,
+          annex_figure: 'Kullanıcı Tanımlı Eğri',
+          duration_per_axis_minutes: 60,
+          axes: 'X,Y,Z',
+          mass_attenuation_applicable: false,
+          breakpoints: customPsdRows.map((r) => ({
+            frequency_hz: Number(r.freq),
+            psd_value: Number(r.psd),
+            slope_db_oct: 0.0,
+          })),
+        },
+        temperature: {
+          climatic_category: 'Özel Sıcaklık Zarfı',
+          operational_high_c: Number(customOpHigh),
+          storage_high_c: Number(customOpHigh) + 15,
+          operational_low_c: Number(customOpLow),
+          storage_low_c: Number(customOpLow) - 10,
+        },
+        shock: {
+          procedure_name: 'Özel Şok Prosedürü',
+          pulse_shape: 'Half-Sine',
+          peak_acceleration_g: Number(customShockG),
+          duration_ms: 11.0,
+          num_shocks_per_axis: 6,
+        },
+      };
+
+      const res = await fetch(`${API_BASE}/api/standards/custom`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        showNotification(`✅ Yeni standart kaydedildi: ${data.platform_name}`);
+        setCustomStandardModalOpen(false);
+        await fetchPlatforms(data.id);
+        setStandardFilterTab('ALL');
+      } else {
+        const err = await res.text();
+        alert(`Standart ekleme hatası: ${err}`);
+      }
+    } catch (e) {
+      alert(`Bağlantı hatası: ${e}`);
+    } finally {
+      setIsSavingCustomStandard(false);
+    }
+  };
+
+  const handleSaveCustomMaterial = async () => {
+    if (!customMatName.trim()) {
+      alert('Lütfen malzeme adını giriniz.');
+      return;
+    }
+    setIsSavingCustomMaterial(true);
+    try {
+      const payload = {
+        name: customMatName,
+        category: customMatCategory,
+        density_kg_m3: Number(customMatDensity),
+        elastic_modulus_gpa: Number(customMatModulus),
+        poissons_ratio: Number(customMatPoisson),
+        yield_strength_mpa: Number(customMatYield),
+        ultimate_strength_mpa: Number(customMatUltimate),
+        cte_per_k: Number(customMatCte) * 1e-6,
+        description: customMatDesc,
+      };
+
+      const res = await fetch(`${API_BASE}/api/materials/custom`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        showNotification(`✅ Yeni malzeme kaydedildi: ${data.name}`);
+        setCustomMaterialModalOpen(false);
+        await fetchMaterials(data.name);
+      } else {
+        const err = await res.text();
+        alert(`Malzeme ekleme hatası: ${err}`);
+      }
+    } catch (e) {
+      alert(`Bağlantı hatası: ${e}`);
+    } finally {
+      setIsSavingCustomMaterial(false);
+    }
+  };
+
   const steps = [
     { id: 1, title: 'Girdi & Görev Kurulumu', desc: 'STEP & PDF Yükleme' },
     { id: 2, title: '3D Geometri & Bağlayıcılar', desc: 'Model & Cıvata Reçetesi' },
@@ -930,53 +1094,113 @@ export default function App() {
                 </div>
 
                 <div className="space-y-4 my-auto">
-                  {/* Selectable Platform Cards */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                      MIL-STD-810H Askeri Platform Seçimi:
-                    </label>
-                    <div className="grid grid-cols-1 gap-2.5">
-                      {platforms.map((p) => {
-                        const isSelected = selectedPlatformId === p.id;
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Kalifikasyon Platformu:
+                      </label>
+                      <button
+                        onClick={() => setCustomStandardModalOpen(true)}
+                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Özel Standart Ekle</span>
+                      </button>
+                    </div>
+
+                    {/* Standard Category Filter Pills */}
+                    <div className="flex items-center gap-1.5 mb-2.5 overflow-x-auto pb-1 text-[11px] font-bold select-none">
+                      {[
+                        { id: 'ALL', label: 'TÜMÜ' },
+                        { id: 'MIL-STD-810H', label: 'MIL-STD-810H' },
+                        { id: 'DO-160G', label: 'RTCA DO-160G' },
+                        { id: 'STANAG', label: 'STANAG 4370' },
+                        { id: 'CUSTOM', label: 'ÖZEL / ŞİRKET' },
+                      ].map((tab) => {
+                        const isTabActive = standardFilterTab === tab.id;
                         return (
-                          <div
-                            key={p.id}
-                            onClick={() => evaluateMission(p.id)}
-                            className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                              isSelected
-                                ? 'bg-blue-50/80 border-blue-500 shadow-sm ring-1 ring-blue-500'
-                                : 'bg-slate-50 border-slate-200 hover:bg-slate-100/80'
+                          <button
+                            key={tab.id}
+                            onClick={() => setStandardFilterTab(tab.id)}
+                            className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                              isTabActive
+                                ? 'bg-slate-900 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                           >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-                                  isSelected ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'
-                                }`}
-                              >
-                                {p.id}
-                              </div>
-                              <div>
-                                <div className="font-bold text-slate-900 text-xs">{p.name}</div>
-                                <div className="text-[11px] text-slate-500">{p.description}</div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-[10px] font-mono font-bold bg-white text-blue-700 border border-slate-200 px-2 py-0.5 rounded">
-                                {p.category}
-                              </span>
-                            </div>
-                          </div>
+                            {tab.label}
+                          </button>
                         );
                       })}
+                    </div>
+
+                    {/* Filtered Platform List */}
+                    <div className="grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto pr-1">
+                      {platforms
+                        .filter((p) => {
+                          if (standardFilterTab === 'ALL') return true;
+                          if (standardFilterTab === 'MIL-STD-810H') return p.standard_code.includes('MIL-STD-810');
+                          if (standardFilterTab === 'DO-160G') return p.standard_code.includes('DO-160');
+                          if (standardFilterTab === 'STANAG') return p.standard_code.includes('STANAG');
+                          if (standardFilterTab === 'CUSTOM')
+                            return (
+                              !p.standard_code.includes('MIL-STD-810') &&
+                              !p.standard_code.includes('DO-160') &&
+                              !p.standard_code.includes('STANAG')
+                            );
+                          return true;
+                        })
+                        .map((p) => {
+                          const isSelected = selectedPlatformId === p.id;
+                          return (
+                            <div
+                              key={p.id}
+                              onClick={() => evaluateMission(p.id)}
+                              className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                                isSelected
+                                  ? 'bg-blue-50/80 border-blue-500 shadow-xs ring-1 ring-blue-500'
+                                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100/80'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div
+                                  className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                                    isSelected ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  {p.id}
+                                </div>
+                                <div className="truncate max-w-[280px]">
+                                  <div className="font-bold text-slate-900 text-xs truncate">{p.name}</div>
+                                  <div className="text-[10px] text-slate-500 truncate">{p.description}</div>
+                                </div>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-[9px] font-mono font-bold bg-white text-blue-700 border border-slate-200 px-1.5 py-0.5 rounded">
+                                  {p.standard_code}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
 
                   {/* Material Dropdown & Live Property Chips */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                      Gövde Malzemesi:
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Gövde Malzemesi:
+                      </label>
+                      <button
+                        onClick={() => setCustomMaterialModalOpen(true)}
+                        className="text-[11px] font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Özel Malzeme Tanımla</span>
+                      </button>
+                    </div>
+
                     <select
                       value={selectedMaterial}
                       onChange={(e) => {
@@ -985,39 +1209,57 @@ export default function App() {
                       }}
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="Aluminium 6061-T6">Aluminium 6061-T6 (Havacılık Şasisi)</option>
-                      <option value="Aluminium 7075-T6">Aluminium 7075-T6 (Yüksek Mukavemet)</option>
-                      <option value="Alumec 89">Alumec 89 (Yüksek Rijitlikli Takım Plakası)</option>
-                      <option value="Titanium Ti-6Al-4V">Titanium Ti-6Al-4V (Grade 5 Havacılık)</option>
-                      <option value="Steel C45">Steel C45 (İmalat Çeliği)</option>
+                      {materialsList.length > 0 ? (
+                        materialsList.map((m) => (
+                          <option key={m.id || m.name} value={m.name}>
+                            {m.name} ({m.yield_strength_mpa} MPa - {m.density_kg_m3} kg/m³)
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="Aluminium 6061-T6">Aluminium 6061-T6 (Havacılık Şasisi)</option>
+                          <option value="Aluminium 7075-T6">Aluminium 7075-T6 (Yüksek Mukavemet)</option>
+                          <option value="Titanium Ti-6Al-4V (Grade 5)">Titanium Ti-6Al-4V (Grade 5 Havacılık)</option>
+                          <option value="Stainless Steel 304 / A2-70">Stainless Steel 304 / A2-70</option>
+                        </>
+                      )}
                     </select>
 
-                    <div className="grid grid-cols-3 gap-2 mt-2 text-[11px] font-mono">
-                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
-                        <span className="text-slate-400 block text-[10px]">Yoğunluk</span>
-                        <span className="font-bold text-slate-800">
-                          {selectedMaterial.includes('Titanium') ? '4430' : selectedMaterial.includes('Steel') ? '7850' : '2700'} kg/m³
-                        </span>
-                      </div>
-                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
-                        <span className="text-slate-400 block text-[10px]">Akma (σy)</span>
-                        <span className="font-bold text-emerald-700">
-                          {selectedMaterial.includes('7075') ? '503' : selectedMaterial.includes('Titanium') ? '880' : '275'} MPa
-                        </span>
-                      </div>
-                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
-                        <span className="text-slate-400 block text-[10px]">Elastisite (E)</span>
-                        <span className="font-bold text-blue-700">
-                          {selectedMaterial.includes('Titanium') ? '114' : selectedMaterial.includes('Steel') ? '210' : '68.9'} GPa
-                        </span>
-                      </div>
-                    </div>
+                    {/* Dynamic Property Chips */}
+                    {(() => {
+                      const curMat = materialsList.find((m) => m.name === selectedMaterial) || {
+                        density_kg_m3: selectedMaterial.includes('Titanium') ? 4430 : selectedMaterial.includes('Steel') ? 7850 : 2700,
+                        yield_strength_mpa: selectedMaterial.includes('7075') ? 503 : selectedMaterial.includes('Titanium') ? 880 : 275,
+                        elastic_modulus_gpa: selectedMaterial.includes('Titanium') ? 114 : selectedMaterial.includes('Steel') ? 210 : 68.9,
+                        cte_per_k: 23e-6,
+                      };
+                      return (
+                        <div className="grid grid-cols-4 gap-2 mt-2 text-[11px] font-mono">
+                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
+                            <span className="text-slate-400 block text-[9px]">Yoğunluk</span>
+                            <span className="font-bold text-slate-800">{curMat.density_kg_m3} kg/m³</span>
+                          </div>
+                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
+                            <span className="text-slate-400 block text-[9px]">Akma (σy)</span>
+                            <span className="font-bold text-emerald-700">{curMat.yield_strength_mpa} MPa</span>
+                          </div>
+                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
+                            <span className="text-slate-400 block text-[9px]">Elastisite (E)</span>
+                            <span className="font-bold text-blue-700">{curMat.elastic_modulus_gpa} GPa</span>
+                          </div>
+                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center">
+                            <span className="text-slate-400 block text-[9px]">CTE (α)</span>
+                            <span className="font-bold text-amber-700">{(curMat.cte_per_k * 1e6).toFixed(1)} µ/K</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
                 <div className="text-[11px] text-slate-500 border-t border-slate-100 pt-3 flex items-center justify-between">
-                  <span>Standard: <b>MIL-STD-810H Metot 514.8 Titreşim</b></span>
-                  <span>Hedef Grms: <b className="text-blue-700">{missionProfile?.vibration_profile?.nominal_grms || '7.70'} grms</b></span>
+                  <span>Standard: <b>{missionProfile?.standard_code || 'MIL-STD-810H'}</b></span>
+                  <span>Hedef Grms: <b className="text-blue-700">{missionProfile?.vibration_profile?.nominal_grms || missionProfile?.vibration_profile?.integrated_grms || '7.70'} grms</b></span>
                 </div>
               </div>
             </div>
@@ -1794,6 +2036,350 @@ export default function App() {
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer"
               >
                 Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. CUSTOM STANDARD MODAL */}
+      {customStandardModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Yeni Askeri / Şirket Standardı Tanımla</h3>
+                  <p className="text-[11px] text-slate-500">ASELSAN, TUSAŞ vb. kurumsal çevre şartnamesi veya özel PSD eğrisi</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCustomStandardModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Platform / Görev Adı:</label>
+                  <input
+                    type="text"
+                    value={customStandardName}
+                    onChange={(e) => setCustomStandardName(e.target.value)}
+                    placeholder="örn. ASELSAN Aviyonik Pod"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Standart Kodu / No:</label>
+                  <input
+                    type="text"
+                    value={customStandardCode}
+                    onChange={(e) => setCustomStandardCode(e.target.value)}
+                    placeholder="örn. ASELSAN MYS-101"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Platform Kategorisi:</label>
+                  <select
+                    value={customStandardCategory}
+                    onChange={(e) => setCustomStandardCategory(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
+                  >
+                    <option value="CUSTOM_AVIONICS">Hava / Aviyonik</option>
+                    <option value="CUSTOM_LAND">Kara / Zırhlı Araç</option>
+                    <option value="CUSTOM_MISSILE">Füze / Mühimmat</option>
+                    <option value="CUSTOM_NAVAL">Deniz / Suüstü</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Açıklama / Görev Konumu:</label>
+                <input
+                  type="text"
+                  value={customStandardDesc}
+                  onChange={(e) => setCustomStandardDesc(e.target.value)}
+                  placeholder="örn. Kanat ucu pod gövdesi içi aviyonik elektronik rafı"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
+                />
+              </div>
+
+              {/* PSD Breakpoints Table Editor */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
+                    Rastgele Titreşim (PSD) Kırılma Frekansları:
+                  </span>
+                  <button
+                    onClick={() => {
+                      const lastFreq = customPsdRows[customPsdRows.length - 1]?.freq || 1000;
+                      setCustomPsdRows([...customPsdRows, { freq: lastFreq + 500, psd: 0.01 }]);
+                    }}
+                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-xs cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Nokta Ekle</span>
+                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  {customPsdRows.map((row, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-slate-400 w-5 text-right">{idx + 1}.</span>
+                      <div className="flex-1 flex items-center gap-1">
+                        <span className="text-[10px] text-slate-500">f:</span>
+                        <input
+                          type="number"
+                          step="1"
+                          value={row.freq}
+                          onChange={(e) => {
+                            const newRows = [...customPsdRows];
+                            newRows[idx].freq = Number(e.target.value);
+                            setCustomPsdRows(newRows);
+                          }}
+                          className="w-full bg-white border border-slate-300 rounded px-2 py-1 font-mono text-xs"
+                        />
+                        <span className="text-[10px] text-slate-400">Hz</span>
+                      </div>
+                      <div className="flex-1 flex items-center gap-1">
+                        <span className="text-[10px] text-slate-500">PSD:</span>
+                        <input
+                          type="number"
+                          step="0.001"
+                          value={row.psd}
+                          onChange={(e) => {
+                            const newRows = [...customPsdRows];
+                            newRows[idx].psd = Number(e.target.value);
+                            setCustomPsdRows(newRows);
+                          }}
+                          className="w-full bg-white border border-slate-300 rounded px-2 py-1 font-mono text-xs"
+                        />
+                        <span className="text-[10px] text-slate-400">g²/Hz</span>
+                      </div>
+                      {customPsdRows.length > 2 && (
+                        <button
+                          onClick={() => setCustomPsdRows(customPsdRows.filter((_, i) => i !== idx))}
+                          className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Thermal & Shock Limits */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <label className="text-[10px] font-semibold text-slate-500 block mb-1">Çalışma Yüksek Sıcaklık:</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={customOpHigh}
+                      onChange={(e) => setCustomOpHigh(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded px-2 py-1 font-mono text-xs"
+                    />
+                    <span className="text-[10px] text-slate-500">°C</span>
+                  </div>
+                </div>
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <label className="text-[10px] font-semibold text-slate-500 block mb-1">Çalışma Düşük Sıcaklık:</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={customOpLow}
+                      onChange={(e) => setCustomOpLow(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded px-2 py-1 font-mono text-xs"
+                    />
+                    <span className="text-[10px] text-slate-500">°C</span>
+                  </div>
+                </div>
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <label className="text-[10px] font-semibold text-slate-500 block mb-1">Mekanik Şok (Tepe):</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={customShockG}
+                      onChange={(e) => setCustomShockG(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded px-2 py-1 font-mono text-xs"
+                    />
+                    <span className="text-[10px] text-slate-500">g</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setCustomStandardModalOpen(false)}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-4 py-2 rounded-xl cursor-pointer"
+              >
+                İptal
+              </button>
+              <button
+                disabled={isSavingCustomStandard}
+                onClick={handleSaveCustomStandard}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{isSavingCustomStandard ? 'Kaydediliyor...' : 'Standart Veritabanına Kaydet'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. CUSTOM MATERIAL MODAL */}
+      {customMaterialModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <Wrench className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Yeni Malzeme Şartnamesi Tanımla</h3>
+                  <p className="text-[11px] text-slate-500">MMPDS veya test sertifikasından mekanik/termal özellik girişi</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCustomMaterialModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Malzeme Adı:</label>
+                  <input
+                    type="text"
+                    value={customMatName}
+                    onChange={(e) => setCustomMatName(e.target.value)}
+                    placeholder="örn. Alüminyum 2024-T3"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Alaşım Sınıfı:</label>
+                  <select
+                    value={customMatCategory}
+                    onChange={(e) => setCustomMatCategory(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
+                  >
+                    <option value="ALUMINIUM_ALLOY">Alüminyum Alaşımı</option>
+                    <option value="TITANIUM_ALLOY">Titanyum Alaşımı</option>
+                    <option value="STEEL_ALLOY">Çelik Alaşımı</option>
+                    <option value="SUPERALLOY">Nikel Süperalaşım</option>
+                    <option value="LOW_EXPANSION_ALLOY">Düşük Isıl Genleşme (Kovar/Invar)</option>
+                    <option value="COPPER_ALLOY">Bakır / Berilyum Alaşımı</option>
+                    <option value="ENGINEERING_POLYMER">Mühendislik Polimeri (PEEK)</option>
+                    <option value="COMPOSITE_LAMINATE">Kompozit Laminat (CFRP/GFRP)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 block mb-1">Yoğunluk (ρ, kg/m³):</label>
+                  <input
+                    type="number"
+                    value={customMatDensity}
+                    onChange={(e) => setCustomMatDensity(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 block mb-1">Elastisite (E, GPa):</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={customMatModulus}
+                    onChange={(e) => setCustomMatModulus(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 block mb-1">Poisson Oranı (ν):</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={customMatPoisson}
+                    onChange={(e) => setCustomMatPoisson(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 block mb-1">Akma Muk. (σy, MPa):</label>
+                  <input
+                    type="number"
+                    value={customMatYield}
+                    onChange={(e) => setCustomMatYield(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 font-mono text-xs text-emerald-700 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 block mb-1">Çekme Muk. (σu, MPa):</label>
+                  <input
+                    type="number"
+                    value={customMatUltimate}
+                    onChange={(e) => setCustomMatUltimate(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 block mb-1">Isıl Genleşme (CTE, µ/K):</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={customMatCte}
+                    onChange={(e) => setCustomMatCte(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 font-mono text-xs text-amber-700"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold text-slate-500 block mb-1">Kullanım Alanı / Şartname Notu:</label>
+                <input
+                  type="text"
+                  value={customMatDesc}
+                  onChange={(e) => setCustomMatDesc(e.target.value)}
+                  placeholder="örn. Yüksek mukavemetli aviyonik gövde ve braket alaşımı"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setCustomMaterialModalOpen(false)}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-4 py-2 rounded-xl cursor-pointer"
+              >
+                İptal
+              </button>
+              <button
+                disabled={isSavingCustomMaterial}
+                onClick={handleSaveCustomMaterial}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{isSavingCustomMaterial ? 'Kaydediliyor...' : 'Malzeme Veritabanına Kaydet'}</span>
               </button>
             </div>
           </div>

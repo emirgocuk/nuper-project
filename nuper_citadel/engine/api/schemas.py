@@ -309,4 +309,74 @@ class PDFExportRequest(BaseModel):
     classification: Optional[str] = "TASNİF DIŞI / UNCLASSIFIED"
 
 
+# --- CUSTOM PLATFORM & MATERIAL ---
+class CustomBreakpointInput(BaseModel):
+    frequency_hz: float
+    psd_value: float
+    slope_db_oct: Optional[float] = 0.0
+
+
+class CustomVibrationInput(BaseModel):
+    method_code: str = "CUSTOM"
+    category_id: int = 99
+    annex_figure: str = "User Defined Spectrum"
+    duration_per_axis_minutes: int = 60
+    axes: str = "X,Y,Z"
+    mass_attenuation_applicable: bool = False
+    breakpoints: List[CustomBreakpointInput]
+
+
+class CustomTemperatureInput(BaseModel):
+    climatic_category: str = "Custom Thermal Profile"
+    operational_high_c: float = 60.0
+    storage_high_c: float = 70.0
+    operational_low_c: float = -40.0
+    storage_low_c: float = -50.0
+
+
+class CustomShockInput(BaseModel):
+    procedure_name: str = "Custom Shock"
+    pulse_shape: str = "Half-Sine"
+    peak_acceleration_g: float = 20.0
+    duration_ms: float = 11.0
+    num_shocks_per_axis: int = 6
+
+
+class CustomPlatformCreateRequest(BaseModel):
+    platform_name: str
+    platform_category: str = "CUSTOM_PLATFORM"
+    standard_code: str = "ÖZEL ŞİRKET STANDARDI"
+    description: Optional[str] = "Kullanıcı tanımlı özel görev profili"
+    vibration: CustomVibrationInput
+    temperature: Optional[CustomTemperatureInput] = None
+    shock: Optional[CustomShockInput] = None
+
+
+class CustomPlatformResponse(BaseModel):
+    id: int
+    platform_name: str
+    standard_code: str
+    status: str = "created"
+
+
+class CustomMaterialCreateRequest(BaseModel):
+    name: str
+    category: str = "CUSTOM_ALLOY"
+    density_kg_m3: float
+    elastic_modulus_gpa: float
+    poissons_ratio: float
+    yield_strength_mpa: float
+    ultimate_strength_mpa: float
+    cte_per_k: float
+    basquin_a_mpa: Optional[float] = None
+    basquin_b_exponent: Optional[float] = None
+    description: Optional[str] = None
+
+
+class CustomMaterialResponse(BaseModel):
+    id: int
+    name: str
+    status: str = "created"
+
+
 

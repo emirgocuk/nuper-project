@@ -1,45 +1,48 @@
 # Active Context: Nuper Citadel
 
 ## 1. Mevcut Odak ve Aşama (Current Focus)
-- **Aktif Durum:** 5 Fazın Tümü Eksiksiz Olarak Tamamlandı & Doğrulandı (%100 Başarı - 40/40 Test).
+- **Aktif Durum:** Faz 1-6, Faz 6.2 (Post-FEA & A4 PDF) ve **Faz 6.3 (Standart & Malzeme Genişletmesi: RTCA DO-160G, STANAG 4370, İleri Malzemeler & Özel Standart/Malzeme Altyapısı)** Eksiksiz Tamamlandı.
+- **Test Doğrulama Skoru:** **56/56 PASSED (%100 Başarı)** - Süre: ~11 saniye. Frontend: `tsc -b && vite build` sıfır hata.
 - **Genel Özet:**
   - **Faz 1 (Deterministik Çekirdek):** OpenCASCADE C++ native STEP okuyucu, piecewise log-log PSD integrasyonu, kütle sönümleme, FEA NX/ANSYS 120-nokta ihracı, Steinberg 3-bant Gauss ve Palmgren-Miner ($D \le 0.20$), sarsıcı tabla fikstür rezonans zarfı ($f_1 \ge 2400\text{ Hz}$).
   - **Faz 2 (Yerel LLM & DPO):** Yerel Ollama (`127.0.0.1:11434`) CUDA hızlandırmalı `qwen2.5-coder:7b`, strict prompt template, over-testing itiraz savunma mektubu ajanı ve SQLite `telemetry.db` DPO çifti kayıt motoru.
-  - **Faz 3 (Masaüstü Arayüzü & 3D):** Aydınlık havacılık stüdyosu teması (`#f8fafc`), Three.js WebGL interaktif CAD görüntüleyici, CoG küresi, montaj delikleri, HUD koordinat paneli ve çok sekmeli operasyon merkezi.
+  - **Faz 3 (Masaüstü Arayüzü & 3D):** Aydınlık havacılık stüdyosu teması, Three.js WebGL interaktif CAD görüntüleyici, CoG küresi, montaj delikleri, HUD koordinat paneli ve 5 adımlı sıralı analiz etüdü.
   - **Faz 4 (Lisans & GD&T CMM Köprüsü):** SHA-256 donanım parmak izi (`NUPER-XXXX-XXXX-XXXX-XXXX`), offline RSA-2048 `.lic` imza doğrulayıcı, ASME Y14.5 MMC True Position ve taban düzlemsellik ($Flatness$) denetimi.
-  - **Faz 5 (Golden Bench Doğrulama):** 3 referans savunma vakası (`tests/golden_benchmarks/cases.json` - Aviyonik Şasi, Zırhlı Araç Braketi, İHA Pylon) ile uçtan uca deterministik test doğrulandı.
-- **Sistem Mimarisi İlkesi:** Sıfır bulut bağımlılığı, sıfır veri sızıntısı (`127.0.0.1`), deterministik mühendislik doğruluğu.
+  - **Faz 5 (Golden Bench Doğrulama):** 3 referans savunma vakası (Aviyonik Şasi, Zırhlı Araç Braketi, İHA Pylon) ile uçtan uca deterministik test doğrulandı.
+  - **Faz 6 (Sıralı İş İstasyonu & Gerçek CAD/Teknik Resim Entegrasyonu):** ASELSAN Röle Bağlantı Parçası (`ROLE BAGLANTI PARCA_AA (1).stp`) ve 2D çizimi (`ROLE BAGLANTI PARCA_TR_AA-1.pdf`) ile 4x Helicoil çapraz doğrulaması.
+  - **Faz 6.2 (Post-FEA & Resmi Savunma A4 PDF Raporlama):** `post_fea_engine.py` rezonans kaçınma, dinamik amplifikasyon $Q$ ve çentikleme hesabı; `pdf_report_generator.py` ReportLab tabanlı kurumsal antetli, doküman numaralı, gizlilik damgalı A4 PDF motoru.
+  - **Faz 6.3 (Savunma Standartları & Malzeme Kütüphanesi Genişletmesi):** *(YENİ TAMAMLANDI ✅)*
+    1. **RTCA DO-160G Standardı:** Section 8 Titreşim (Curve S Robust Random, Curve B/C Uçak Gövdesi, Curve F Helikopter), Section 4 Sıcaklık/İrtifa, Section 7 Operasyonel/Kaza Şoku.
+    2. **STANAG 4370 / AECTP-400 Standardı:** Method 401 Paletli Araçlar ($3.45\text{ }g_{\text{rms}}$) ve Tekerlekli Zırhlı Araçlar ($2.80\text{ }g_{\text{rms}}$).
+    3. **İleri MMPDS Malzemeleri:** Kovar (Fe-Ni29-Co17), Invar 36 (Fe-Ni36), Inconel 718, CuBe2 (C17200), PEEK Polimer, CFRP Quasi-Isotropic Kompozit eklendi (toplam 13 kütüphane malzemesi).
+    4. **Özel Standart Altyapısı (`/api/standards/custom`):** Şirket içi (ASELSAN MYS, TUSAŞ vb.) özel PSD frekans kırılma tablosu, sıcaklık limitleri ve şok değerlerini SQLite'a yazan motor ve frontend modalı.
+    5. **Özel Malzeme Tanımlama (`/api/materials/custom`):** Test kuponu verilerini ($\sigma_y$, $\rho$, $E$, $\alpha$) `materials.db` içine yerel kaydeden motor ve frontend modalı.
+    6. **Frontend Arayüz Zenginleştirmesi:** Standart filtreleme hapları (`TÜMÜ`, `MIL-STD-810H`, `RTCA DO-160G`, `STANAG 4370`, `ÖZEL`), 4-sütunlu canlı malzeme özellikleri paneli ve iki adet interaktif yönetim modalı.
 
 ---
 
-1. **Sıralı Analiz Etüdü & Havacılık CAD İş İstasyonu Tasarımı (Faz 6 UI Overhaul):**
-   - Eski sıkışık, boş beyaz alan içeren ve sekmeli prototip yapısı tamamen kaldırıldı.
-   - Ansys Workbench / Siemens Simcenter benzeri sıralı 5 adımlı analiz iş istasyonu mimarisine geçildi.
-2. **Son Tamamlanan Geliştirmeler (2026-09-20):**
-   - **Gerçek 3D STEP Tessellation (OpenCASCADE BRepMesh):**
-     - Parametrik kutu fallback yerine `BRepMesh_IncrementalMesh` ve `BRep_Tool.Triangulation_s` ile STEP katısının gerçek tepe noktaları ve üçgen indeksleri üretilerek Three.js `BufferGeometry` ile render ediliyor.
-     - Parça koordinat ofsetleri (örneğin $X \approx -1670\text{ mm}$) normalize edilerek model $(0,0,0)$ merkezine çekildi.
-     - `BRepGProp.SurfaceProperties_s` ile delik merkezleri doğrudan kırpılmış silindir yüzeyinin kütle merkezinden alındı ve yüzey normaline göre 3D oryantasyon verildi.
-   - **Three.js OrbitControls & Kamera Dock:**
-     - Sol tık ile serbest küresel döndürme (Orbit).
-     - Fare tekerleği ile pürüzsüz yakınlaşma / uzaklaşma (Dolly Zoom).
-     - Sağ tık ile ekran düzleminde kaydırma (Pan).
-     - Sağ üst köşede `Zoom In`, `Zoom Out`, `İZO`, `ÜST`, `ÖN`, `YAN` ve `Görünümü Sıfırla` dock butonları.
-   - **Askeri Teknik Resim Çıkarımları (`ROLE BAGLANTI PARCA_TR_AA-1.pdf`):**
-     - Çift dilli başlıklar, MIL-DTL-5541 F Alodine kaplama, ASME Y14.5 / ISO 2768-m toleransları, helicoil (tel diş) ve ASTM E1417 penetrant muayene kriterleri sisteme entegre edildi.
-3. **Kullanıcı Savunma Parçası Doğrulaması (Röle Bağlantı Parçası):**
-   - Kullanıcı tarafından `cad_models/` dizinine aktarılan gerçek ASELSAN aviyonik parçası analiz edildi:
-     - Katı Model: `ROLE BAGLANTI PARCA_AA (1).stp` ($55.08 \times 31.66 \times 31.68\text{ mm}$, $35.7\text{ g}$ Alüminyum, Manifold geçerli, 2x M4 + 2x M3 Helicoil delikleri tam tespit edildi).
-     - Teknik Resim: `ROLE BAGLANTI PARCA_TR_AA-1.pdf` (Doküman No: `603739-00000-01-1Y2`, Malzeme: `AL 5083 / Al6063` -> `Al 6061-T6`, Kaplama: `Alodine MIL-DTL-5541 F Sınıf 1A`, True Position $\varnothing 0.20\text{ mm}$ @ MMC).
-     - FastenerEngine: DIN 912 M4 ($2.7\text{ N}\cdot\text{m}$, Nord-Lock NL4) ve M3 ($1.2\text{ N}\cdot\text{m}$, Nord-Lock NL3) reçetesi çizimdeki Helicoil ölçüleriyle %100 örtüştü.
-     - Miner hasar indeksi $D = 0.0069 \le 0.20$ ile parça titreşim yorulmasında **KABUL EDİLDİ (PASS)**.
-4. **Doğrulama:**
-   - 45/45 birim/entegrasyon testi %100 başarıyla geçti.
-   - Canlı API ve web arayüzü hatasız çalışıyor.
+## 2. Kapsamlı İnceleme (`nuper_citadel_review.md`) Uygulama ve Yol Haritası Durumu
+
+| Madde / Öneri | İnceleme Başlığı | Yol Haritası Seviyesi | Durum | Açıklama |
+| :--- | :--- | :--- | :---: | :--- |
+| **4.3. FEA Geri Besleme Döngüsü** | Rezonans, Q faktörü, notching | Kısa Vade (1-3 Ay) | **TAMAMLANDI ✅** | `post_fea_engine.py`, API `/api/fea/evaluate-post`, Frontend Step 4 paneli |
+| **4.4. PDF/A4 Rapor Çıktısı** | Askeri format, antet, imza | Kısa Vade (1-3 Ay) | **TAMAMLANDI ✅** | `pdf_report_generator.py`, API `/api/export/etp/pdf`, Frontend Step 5 indirme |
+| **4.1. Standart DB Kapsamı** | RTCA DO-160G & STANAG 4370 | Kısa/Orta Vade | **TAMAMLANDI ✅** | DO-160G Curves S, B, C, F; STANAG 4370 Paletli & Tekerlekli araçlar |
+| **4.5. İleri Malzeme Katmanı** | Kovar, Invar, Inconel, PEEK, CFRP | Orta Vade (3-6 Ay) | **TAMAMLANDI ✅** | 13 MMPDS alaşımı ve kompoziti, 4-özellik canlı HUD kartı |
+| **Özel Standart / Malzeme Tanımı** | Şirket içi MYS / Test kuponu | Orta Vade (3-6 Ay) | **TAMAMLANDI ✅** | `/api/standards/custom`, `/api/materials/custom` ve Step 1 modal formları |
+| **4.2. Çoklu Parça (Assembly)** | Çoklu STEP, birleşik CoG | Orta Vade (3-6 Ay) | **SIRADA ⏳** | Montaj kütle merkezi, parçalar arası cıvata matrisi eşleme |
+| **4.6. Tauri Desktop Paketi** | Tek `.exe` / `.msi` installer | Kısa Vade (1-3 Ay) | **SIRADA ⏳** | Embedded python yönetimi, sistem tepsisi (Rust toolchain gereksinimi) |
+| **Uluslararasılaştırma (i18n)** | İngilizce lokalizasyon | Orta Vade (3-6 Ay) | **Yol Haritasında** | İhracat pazarları için çift dilli arayüz ve raporlama |
+| **DPO Yerel LoRA Pipeline** | telemetry.db'den fine-tuning | Uzun Vade (6-12 Ay) | **Yol Haritasında** | Yerel Qwen/Llama ağırlıklarının şirket refleksine uyarlanması |
+| **Doğrudan FEA Dosya Okuyucu** | ANSYS `.rst` / NX `.op2` | Uzun Vade (6-12 Ay) | **Yol Haritasında** | Otomatik modal ve stres veri ithalatı |
+| **Termal Analiz Modülü** | Metot 501/502 gradyan hesabı | Uzun Vade (6-12 Ay) | **Yol Haritasında** | Isıl gerilme ve genleşme farkı ön yük kaybı analizi |
+| **PLM/PDM Entegrasyonu** | Teamcenter / Windchill | Uzun Vade (6-12 Ay) | **Yol Haritasında** | Kurumsal savunma veri yönetimi köprüsü |
 
 ---
 
 ## 3. Aktif Kararlar ve Değerlendirmeler (Decisions & Considerations)
-- **Determinizm Sınırı:** Sayısal toleranslar, PSD integralleri ve fikstür kalınlıkları doğrudan OpenCASCADE, C++ ve analitik Python modüllerinde çözülür; LLM sadece sentez ve dilekçe şablonlama görevi yürütür.
-- **Güvenlik ve Lisans:** RSA-2048 çevrimdışı imza sayesinde sistem internete hiç bağlanmayan TUSAŞ, ASELSAN ve ROKETSAN gibi tesislerde güvenle çalışır.
-- **Tasarım:** Sıkışık, ham ve boş form alanları barındıran prototip arayüzü yerine tam ekran (100vh) profesyonel havacılık CAD/FEA iş istasyonu tasarımı getirildi. Aydınlık, ferah ve yüksek kontrastlı modern bir savunma-havacılık mühendislik stüdyosu arayüzü kuruldu.
+- **Determinizm ve Çoklu Standart Desteği:** İster MIL-STD-810H ister DO-160G ister kullanıcının girdiği özel kurumsal standart olsun; PSD integralleri log-log analitik denklemlerle hesaplanır, $g_{\text{rms}}$ asla tahmin edilmez.
+- **Malzeme Katmanı Bütünlüğü:** Yeni eklenen Kovar, Invar 36, Inconel 718, CuBe2, PEEK ve CFRP malzemeleri `materials.db` üzerinde normalize edilmiş olup yoğunluk, elastisite modülü, akma dayanımı ve CTE değerleriyle tork, yorulma ve post-FEA hesaplarına doğrudan beslenmektedir.
+- **Sıradaki Öncelik Seçenekleri:**
+  1. **Çoklu Parça / Montaj (Assembly) Desteği (Madde 4.2):** Çoklu STEP yükleme, bileşik kütle merkezi $\vec{R}_{cog}$, arayüz temas yüzeyleri ve parçalar arası cıvata deseni eşleme.
+  2. **Tauri 2 Desktop Paketi (Madde 4.6):** Rust derleme ortamının kurulması ve tek tıkla çalışan `.exe` paketleyicisi.

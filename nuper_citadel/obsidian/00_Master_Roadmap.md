@@ -105,16 +105,57 @@ Nuper Citadel'in kavramsal tasarımını; sahada çalışan, air-gapped çalış
 
 ---
 
-### FAZ 5: Golden Test Bench, Doğrulama ve Dağıtım
+### FAZ 5: Golden Test Bench, Doğrulama ve Dağıtım - [x] %100 TAMAMLANDI
 - **Savunma Kıyaslama Vakaları (`tests/golden_benchmarks/`):**
   - Vaka 1: Aviyonik Şasi Kutusu (MIL-STD-810H Cat 14 Titreşim).
   - Vaka 2: Titanyum Sensör Bağlantı Braketi (Metot 516.8 Şok).
   - Vaka 3: İHA Kanat Altı Pod Pylon Aksamı (Termo-Mekanik Kombine).
-  - Gerçek TÜBİTAK SAGE / TRTEST raporlarıyla Citadel çıktılarının karşılaştırılması.
-- **Taşınabilir Kurulum Paketi (`.msi` / `.exe`)**: Bağımsız, tek tıkla kurulabilir masaüstü kurulum paketi.
+- **Test Başarısı:** 44/44 test başarıyla geçti.
+
+---
+
+### FAZ 6: Sıralı Analiz İş İstasyonu & Gerçek Savunma Parçası Doğrulaması - [x] %100 TAMAMLANDI
+- **5 Aşamalı Sıralı Analiz Boru Hattı:** Girdi/Kurulum $\rightarrow$ 3D CAD & Bağlayıcılar $\rightarrow$ GD&T/CMM $\rightarrow$ Pre-FEA $\rightarrow$ Askeri Kabul.
+- **Gerçek Parça Doğrulaması:** ASELSAN Röle Bağlantı Parçası (`ROLE BAGLANTI PARCA_AA (1).stp`) ve 2D çizimi (`ROLE BAGLANTI PARCA_TR_AA-1.pdf`).
+- **OpenCASCADE `TopAbs_REVERSED`:** İç delik / dış kavis ayrımı kesinleştirildi.
+- **FastenerEngine:** DIN 912 tork ve ön yük hesaplama tablosu entegre edildi.
+
+---
+
+### FAZ 6.2: Post-FEA Kapalı Döngü & Resmi Askeri A4 PDF Raporu - [x] %100 TAMAMLANDI *(UYGULANDI)*
+- **`engine/core/post_fea_engine.py`**:
+  - Rezonans kaçınma kontrolü ($f_1 > 1.20 \times f_{\max}$).
+  - Dinamik büyütme faktörü ($Q = 1/(2\zeta)$).
+  - Akma emniyet marjı ($MS = (\sigma_y / (\sigma_{\text{peak}} \times SF)) - 1$).
+  - Otomatik çentikleme (notching) derinliği ($\Delta \text{dB} = 20 \log_{10}(\sigma_{\text{allowable}} / \sigma_{\text{peak}})$).
+- **`engine/core/pdf_report_generator.py`**:
+  - ReportLab ile kurumsal antetli, doküman no'lu, gizlilik damgalı ("TASNİF DIŞI / UNCLASSIFIED"), tüm analiz tablolarını ve resmi onay imza bloklarını içeren A4 PDF üretimi.
+- **Frontend & API Entegrasyonu:** Step 4 Post-FEA paneli ve Step 5 A4 PDF indirme akışı tamamlandı.
+- **Testler:** 52/52 PASSED (%100 Başarı).
+
+---
+
+### 🔮 Nuper Citadel Kapsamlı İnceleme (Review) İleri Yol Haritası
+*(Detaylar için bkz: [[nuper_citadel_review|nuper_citadel_review.md]])*
+
+| Zaman Çizelgesi | Hedef Özellik / Modül | Durum |
+| :--- | :--- | :---: |
+| **Kısa Vade (1-3 Ay)** | Resmi A4 PDF ETP Raporu (ReportLab) | **TAMAMLANDI ✅** |
+| **Kısa Vade (1-3 Ay)** | Post-FEA Kapalı Döngü & Notching | **TAMAMLANDI ✅** |
+| **Kısa Vade (1-3 Ay)** | RTCA DO-160G Standardı Ekleme (Sivil Havacılık) | **SIRADA ⏳** |
+| **Kısa Vade (1-3 Ay)** | Tauri 2 Desktop Paketleme (Tek .exe / embedded Python) | **SIRADA ⏳** |
+| **Orta Vade (3-6 Ay)** | Çoklu Parça / Montaj (Assembly CoG & Cıvata Matrisi) | **Yol Haritasında** |
+| **Orta Vade (3-6 Ay)** | STANAG 4370 / AECTP-400 (NATO Çevre Standartları) | **Yol Haritasında** |
+| **Orta Vade (3-6 Ay)** | Kompozit Malzeme Katmanı (CFRP/GFRP Ply Stack) | **Yol Haritasında** |
+| **Orta Vade (3-6 Ay)** | Uluslararasılaştırma (İngilizce i18n Lokalizasyon) | **Yol Haritasında** |
+| **Uzun Vade (6-12 Ay)** | telemetry.db DPO Verisi ile Yerel LoRA Fine-Tuning | **Yol Haritasında** |
+| **Uzun Vade (6-12 Ay)** | ANSYS .rst / NX .op2 Doğrudan Sonuç Ayrıştırıcı | **Yol Haritasında** |
+| **Uzun Vade (6-12 Ay)** | Termo-Mekanik Sıcaklık Gradyanı ve Ön Yük Kaybı Analizi | **Yol Haritasında** |
+| **Uzun Vade (6-12 Ay)** | Kurumsal PLM/PDM (Teamcenter / Windchill) Entegrasyonu | **Yol Haritasında** |
 
 ---
 Bağlantılı Notlar:
 - [[00_System_Architecture_Blueprint|Sistem Mimarisi Blueprint]]
 - [[07_Commercial_and_Operational_Pillars|Operasyonel Güvenlik ve Lisanslama]]
 - [[00_Nuper_Citadel_MOC|Master MOC]]
+- [[nuper_citadel_review|Kapsamlı Proje İncelemesi ve Öneriler]]

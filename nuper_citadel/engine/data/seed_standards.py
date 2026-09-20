@@ -24,7 +24,7 @@ def seed_standards_db():
     );
     """)
 
-    # 2. Titreşim Profilleri (MIL-STD-810H Method 514.8)
+    # 2. Titreşim Profilleri (MIL-STD-810H, RTCA DO-160G, STANAG 4370)
     cursor.execute("""
     CREATE TABLE vibration_profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,7 +53,7 @@ def seed_standards_db():
     );
     """)
 
-    # 4. Sıcaklık Profilleri (Method 501.7 / 502.7)
+    # 4. Sıcaklık Profilleri
     cursor.execute("""
     CREATE TABLE temperature_profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +67,7 @@ def seed_standards_db():
     );
     """)
 
-    # 5. Mekanik Şok Profilleri (Method 516.8)
+    # 5. Mekanik Şok Profilleri
     cursor.execute("""
     CREATE TABLE shock_profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,21 +82,19 @@ def seed_standards_db():
     """)
 
     # --- VERİ GİRİŞLERİ ---
-    # Platform 1: Taktik İHA Kanat Altı (External Stores)
+    # Platform 1: Taktik İHA Kanat Altı (External Stores - MIL-STD-810H)
     cursor.execute("""
     INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
     VALUES ('Taktik İHA Kanat Altı', 'UAV_EXTERNAL_STORE', 'MIL-STD-810H', 'Taktik ve Stratejik İHA kanat altı pylon ve pod donanımları.');
     """)
     p1_id = cursor.lastrowid
 
-    # Profile 1: Cat 14 External Stores
     cursor.execute("""
     INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
     VALUES (?, '514.8', 14, 'Annex C, Figure 514.8C-1', 7.70, 60, 'X,Y,Z', 1);
     """, (p1_id,))
     prof1_id = cursor.lastrowid
 
-    # Cat 14 Breakpoints (7.70 grms nominal)
     bp1 = [
         (prof1_id, 1, 20.0, 0.0053, 6.0),
         (prof1_id, 2, 150.0, 0.0400, 0.0),
@@ -108,19 +106,17 @@ def seed_standards_db():
     VALUES (?, ?, ?, ?, ?);
     """, bp1)
 
-    # Temp Profile for UAV Wing: Induced High Temp & Severe Cold
     cursor.execute("""
     INSERT INTO temperature_profiles (platform_id, climatic_category, operational_high_c, storage_high_c, operational_low_c, storage_low_c)
     VALUES (?, 'Basic Hot (A1) & Severe Cold (C2)', 71.0, 85.0, -40.0, -51.0);
     """, (p1_id,))
 
-    # Shock Profile for UAV Wing: Procedure I Functional Shock
     cursor.execute("""
     INSERT INTO shock_profiles (platform_id, procedure_name, pulse_shape, peak_acceleration_g, duration_ms, num_shocks_per_axis)
     VALUES (?, 'Procedure I - Functional Shock', 'Terminal Peak Sawtooth (TPS)', 40.0, 11.0, 6);
     """, (p1_id,))
 
-    # Platform 2: Taktik Tekerlekli Zırhlı Araç (Ground Vehicle - Cat 4)
+    # Platform 2: Taktik Tekerlekli Zırhlı Araç (MIL-STD-810H - Cat 4)
     cursor.execute("""
     INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
     VALUES ('Taktik Tekerlekli Zırhlı Araç', 'GROUND_VEHICLE', 'MIL-STD-810H', '4x4 / 8x8 Zırhlı Muharebe Aracı gövde ve kule içi elektroniği.');
@@ -154,7 +150,7 @@ def seed_standards_db():
     VALUES (?, 'Procedure I - Functional Shock', 'Half-Sine', 20.0, 11.0, 6);
     """, (p2_id,))
 
-    # Platform 3: Helikopter Aviyonik Bölmesi (Rotary Wing - Cat 20)
+    # Platform 3: Helikopter Aviyonik Bölmesi (MIL-STD-810H - Cat 20)
     cursor.execute("""
     INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
     VALUES ('Helikopter Aviyonik Bölmesi', 'ROTARY_WING', 'MIL-STD-810H', 'Genel maksat ve taarruz helikopterleri kokpit ve aviyonik kompartmanı.');
@@ -188,16 +184,16 @@ def seed_standards_db():
     VALUES (?, 'Procedure V - Crash Hazard Shock', 'Half-Sine', 75.0, 6.0, 2);
     """, (p3_id,))
 
-    # Platform 4: RTCA DO-160G Standart Havacılık ve İHA (Section 8 - Vibration)
+    # Platform 4: RTCA DO-160G Curve S (Taktik İHA & Jet Aviyonik - Robust Random)
     cursor.execute("""
     INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
-    VALUES ('RTCA DO-160G Havacılık ve Taktik İHA', 'AIRBORNE_CIVIL_UAV', 'RTCA DO-160G', 'Sivil havacılık, genel maksat uçakları ve taktik İHA gövde içi aviyonik sistemleri (Section 8 - Vibration).');
+    VALUES ('RTCA DO-160G Curve S - İHA & Jet Aviyonik', 'AIRBORNE_CIVIL_UAV', 'RTCA DO-160G', 'Sivil/askeri havacılık ve taktik İHA gövde içi aviyonik sistemleri (Section 8 Curve S Robust).');
     """)
     p4_id = cursor.lastrowid
 
     cursor.execute("""
     INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
-    VALUES (?, 'Section 8', 8, 'Section 8, Curve S (Random)', 4.12, 60, 'X,Y,Z', 0);
+    VALUES (?, 'Section 8', 8, 'Section 8, Curve S (Robust Random)', 8.25, 60, 'X,Y,Z', 0);
     """, (p4_id,))
     prof4_id = cursor.lastrowid
 
@@ -222,24 +218,24 @@ def seed_standards_db():
     VALUES (?, 'Section 7 - Operational Shock', 'Half-Sine', 20.0, 11.0, 6);
     """, (p4_id,))
 
-    # Platform 5: STANAG 4370 / AECTP-400 NATO Paletli Zırhlı Muharebe Aracı
+    # Platform 5: RTCA DO-160G Curve B/C (Sabit Kanatlı Uçak Gövdesi - Standard Random)
     cursor.execute("""
     INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
-    VALUES ('STANAG 4370 NATO Paletli Zırhlı Araç', 'TRACKED_COMBAT_VEHICLE', 'STANAG 4370', 'NATO müttefik çevresel test koşulları - Taktik paletli zırhlı muharebe araçları (AECTP-400 Method 401).');
+    VALUES ('RTCA DO-160G Curve B/C - Sabit Kanatlı Uçak', 'FIXED_WING_AIRCRAFT', 'RTCA DO-160G', 'Sabit kanatlı turbojet ve turboprop uçak gövde ve kabin ekipmanları (Section 8 Standard Random).');
     """)
     p5_id = cursor.lastrowid
 
     cursor.execute("""
     INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
-    VALUES (?, 'AECTP-400 Method 401', 401, 'Method 401, Figure 401-1 Tracked', 3.45, 90, 'Vertical,Transverse,Longitudinal', 0);
+    VALUES (?, 'Section 8', 8, 'Section 8, Curve B/C (Standard Random)', 3.05, 60, 'X,Y,Z', 0);
     """, (p5_id,))
     prof5_id = cursor.lastrowid
 
     bp5 = [
-        (prof5_id, 1, 5.0, 0.0050, 6.0),
-        (prof5_id, 2, 15.0, 0.0400, 0.0),
-        (prof5_id, 3, 50.0, 0.0400, -6.0),
-        (prof5_id, 4, 500.0, 0.0010, 0.0),
+        (prof5_id, 1, 10.0, 0.0010, 3.0),
+        (prof5_id, 2, 40.0, 0.0100, 0.0),
+        (prof5_id, 3, 500.0, 0.0100, -6.0),
+        (prof5_id, 4, 2000.0, 0.0010, 0.0),
     ]
     cursor.executemany("""
     INSERT INTO vibration_breakpoints (profile_id, seq_order, frequency_hz, psd_value, slope_db_oct)
@@ -248,13 +244,115 @@ def seed_standards_db():
 
     cursor.execute("""
     INSERT INTO temperature_profiles (platform_id, climatic_category, operational_high_c, storage_high_c, operational_low_c, storage_low_c)
-    VALUES (?, 'A1 Extreme Hot & C2 Extreme Cold', 65.0, 75.0, -46.0, -55.0);
+    VALUES (?, 'Category A1/A2 - Temperature & Altitude', 55.0, 70.0, -40.0, -55.0);
     """, (p5_id,))
 
     cursor.execute("""
     INSERT INTO shock_profiles (platform_id, procedure_name, pulse_shape, peak_acceleration_g, duration_ms, num_shocks_per_axis)
-    VALUES (?, 'Method 403 - Functional Shock', 'Terminal Peak Sawtooth (TPS)', 30.0, 11.0, 6);
+    VALUES (?, 'Section 7 - Crash Safety', 'Half-Sine', 6.0, 20.0, 2);
     """, (p5_id,))
+
+    # Platform 6: RTCA DO-160G Curve F (Helikopter Döner Kanat)
+    cursor.execute("""
+    INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
+    VALUES ('RTCA DO-160G Curve F - Döner Kanat / Helikopter', 'ROTARY_WING_CIVIL', 'RTCA DO-160G', 'Döner kanatlı hava araçları ve genel maksat helikopter kompartmanı (Section 8 Curve F).');
+    """)
+    p6_id = cursor.lastrowid
+
+    cursor.execute("""
+    INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
+    VALUES (?, 'Section 8', 8, 'Section 8, Curve F (Helicopter)', 4.30, 90, 'X,Y,Z', 0);
+    """, (p6_id,))
+    prof6_id = cursor.lastrowid
+
+    bp6 = [
+        (prof6_id, 1, 10.0, 0.0020, 3.0),
+        (prof6_id, 2, 50.0, 0.0200, 0.0),
+        (prof6_id, 3, 500.0, 0.0200, -6.0),
+        (prof6_id, 4, 2000.0, 0.0020, 0.0),
+    ]
+    cursor.executemany("""
+    INSERT INTO vibration_breakpoints (profile_id, seq_order, frequency_hz, psd_value, slope_db_oct)
+    VALUES (?, ?, ?, ?, ?);
+    """, bp6)
+
+    cursor.execute("""
+    INSERT INTO temperature_profiles (platform_id, climatic_category, operational_high_c, storage_high_c, operational_low_c, storage_low_c)
+    VALUES (?, 'Category B1/C - Helicopter Temp', 60.0, 75.0, -45.0, -55.0);
+    """, (p6_id,))
+
+    cursor.execute("""
+    INSERT INTO shock_profiles (platform_id, procedure_name, pulse_shape, peak_acceleration_g, duration_ms, num_shocks_per_axis)
+    VALUES (?, 'Section 7 - Operational Shock', 'Half-Sine', 15.0, 11.0, 6);
+    """, (p6_id,))
+
+    # Platform 7: STANAG 4370 NATO Paletli Zırhlı Muharebe Aracı
+    cursor.execute("""
+    INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
+    VALUES ('STANAG 4370 NATO Paletli Zırhlı Araç', 'TRACKED_COMBAT_VEHICLE', 'STANAG 4370', 'NATO müttefik çevresel test koşulları - Taktik paletli zırhlı muharebe araçları (AECTP-400 Method 401).');
+    """)
+    p7_id = cursor.lastrowid
+
+    cursor.execute("""
+    INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
+    VALUES (?, 'AECTP-400 Method 401', 401, 'Method 401, Figure 401-1 Tracked', 3.45, 90, 'Vertical,Transverse,Longitudinal', 0);
+    """, (p7_id,))
+    prof7_id = cursor.lastrowid
+
+    bp7 = [
+        (prof7_id, 1, 5.0, 0.0050, 6.0),
+        (prof7_id, 2, 15.0, 0.0400, 0.0),
+        (prof7_id, 3, 50.0, 0.0400, -6.0),
+        (prof7_id, 4, 500.0, 0.0010, 0.0),
+    ]
+    cursor.executemany("""
+    INSERT INTO vibration_breakpoints (profile_id, seq_order, frequency_hz, psd_value, slope_db_oct)
+    VALUES (?, ?, ?, ?, ?);
+    """, bp7)
+
+    cursor.execute("""
+    INSERT INTO temperature_profiles (platform_id, climatic_category, operational_high_c, storage_high_c, operational_low_c, storage_low_c)
+    VALUES (?, 'A1 Extreme Hot & C2 Extreme Cold', 65.0, 75.0, -46.0, -55.0);
+    """, (p7_id,))
+
+    cursor.execute("""
+    INSERT INTO shock_profiles (platform_id, procedure_name, pulse_shape, peak_acceleration_g, duration_ms, num_shocks_per_axis)
+    VALUES (?, 'Method 403 - Functional Shock', 'Terminal Peak Sawtooth (TPS)', 30.0, 11.0, 6);
+    """, (p7_id,))
+
+    # Platform 8: STANAG 4370 NATO Taktik Tekerlekli Araç
+    cursor.execute("""
+    INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
+    VALUES ('STANAG 4370 NATO Taktik Tekerlekli Araç', 'WHEELED_COMBAT_VEHICLE', 'STANAG 4370', 'NATO müttefik taktik lojistik ve zırhlı tekerlekli kara araçları (AECTP-400 Method 401 Wheeled).');
+    """)
+    p8_id = cursor.lastrowid
+
+    cursor.execute("""
+    INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
+    VALUES (?, 'AECTP-400 Method 401', 401, 'Method 401, Figure 401-2 Wheeled', 1.49, 90, 'Vertical,Transverse,Longitudinal', 0);
+    """, (p8_id,))
+    prof8_id = cursor.lastrowid
+
+    bp8 = [
+        (prof8_id, 1, 5.0, 0.0020, 6.0),
+        (prof8_id, 2, 20.0, 0.0200, 0.0),
+        (prof8_id, 3, 60.0, 0.0200, -6.0),
+        (prof8_id, 4, 500.0, 0.0005, 0.0),
+    ]
+    cursor.executemany("""
+    INSERT INTO vibration_breakpoints (profile_id, seq_order, frequency_hz, psd_value, slope_db_oct)
+    VALUES (?, ?, ?, ?, ?);
+    """, bp8)
+
+    cursor.execute("""
+    INSERT INTO temperature_profiles (platform_id, climatic_category, operational_high_c, storage_high_c, operational_low_c, storage_low_c)
+    VALUES (?, 'A2 Hot Dry & C1 Basic Cold', 58.0, 71.0, -35.0, -45.0);
+    """, (p8_id,))
+
+    cursor.execute("""
+    INSERT INTO shock_profiles (platform_id, procedure_name, pulse_shape, peak_acceleration_g, duration_ms, num_shocks_per_axis)
+    VALUES (?, 'Method 403 - Functional Shock', 'Half-Sine', 20.0, 11.0, 6);
+    """, (p8_id,))
 
     conn.commit()
     conn.close()
@@ -376,6 +474,84 @@ def seed_materials_db():
             800.0,
             -0.095,
             "Ağır yük ve rijit sarsıcı test fikstürleri için yekpare ıslah çeliği."
+        ),
+        (
+            "Kovar (Fe-Ni29-Co17)",
+            "LOW_EXPANSION_ALLOY",
+            8360.0,
+            138.0,
+            0.30,
+            340.0,
+            520.0,
+            5.5e-6,
+            600.0,
+            -0.095,
+            "Hermetik mikroelektronik ve aviyonik paket gövde kapağı alaşımı (cam/seramik uyumlu genleşme)."
+        ),
+        (
+            "Invar 36 (Fe-Ni36)",
+            "LOW_EXPANSION_ALLOY",
+            8050.0,
+            144.0,
+            0.28,
+            240.0,
+            490.0,
+            1.2e-6,
+            520.0,
+            -0.090,
+            "Ultra düşük ısıl genleşmeli elektro-optik, lazer ve jiroskop yatak gövdesi alaşımı."
+        ),
+        (
+            "Inconel 718 (Nickel Superalloy)",
+            "SUPERALLOY",
+            8190.0,
+            205.0,
+            0.29,
+            1100.0,
+            1375.0,
+            13.0e-6,
+            1500.0,
+            -0.085,
+            "Roket motoru, gaz türbini ve yüksek sıcaklık aşırı yük savunma bileşenleri."
+        ),
+        (
+            "Beryllium Copper CuBe2 (C17200)",
+            "COPPER_ALLOY",
+            8250.0,
+            131.0,
+            0.30,
+            965.0,
+            1140.0,
+            17.0e-6,
+            1200.0,
+            -0.092,
+            "Yüksek mukavemet, aşınma direnci ve RF iletkenliği sağlayan askeri konektör ve yay alaşımı."
+        ),
+        (
+            "PEEK (Polyetheretherketone)",
+            "ENGINEERING_POLYMER",
+            1320.0,
+            4.0,
+            0.38,
+            100.0,
+            115.0,
+            47.0e-6,
+            130.0,
+            -0.110,
+            "Hafif, korozyonsuz ve yüksek dielektrik dayanımlı havacılık yapısal termoplastiği."
+        ),
+        (
+            "Carbon Fiber CFRP (Quasi-Isotropic)",
+            "COMPOSITE_LAMINATE",
+            1550.0,
+            65.0,
+            0.31,
+            550.0,
+            720.0,
+            2.0e-6,
+            800.0,
+            -0.075,
+            "T300/Epoksi [0/45/90/-45]s dengeli simetrik kuasi-izotropik havacılık laminatı."
         ),
     ]
 

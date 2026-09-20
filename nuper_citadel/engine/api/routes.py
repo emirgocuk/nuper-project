@@ -36,6 +36,10 @@ from engine.api.schemas import (
     PostFEAEvaluationRequest,
     PostFEAEvaluationResponse,
     PDFExportRequest,
+    CustomPlatformCreateRequest,
+    CustomPlatformResponse,
+    CustomMaterialCreateRequest,
+    CustomMaterialResponse,
 )
 from engine.core.rule_engine import RuleEngine
 from engine.core.cad_parser import CADParser
@@ -82,30 +86,79 @@ def get_health():
 # 2. STANDARDS & PLATFORMS
 # ---------------------------------------------------------------------------
 @router.get("/platforms", response_model=List[PlatformSummarySchema])
-def list_platforms():
+def list_platforms(standard: Optional[str] = None):
     if not os.path.exists(STANDARDS_DB_PATH):
         raise HTTPException(status_code=500, detail="Standards database not found.")
     
-    conn = sqlite3.connect(STANDARDS_DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, platform_name, platform_category, standard_code, description
-        FROM military_platforms
-        ORDER BY id ASC
-    """)
-    rows = cursor.fetchall()
-    conn.close()
-
+    engine = RuleEngine()
+    platforms = engine.list_platforms(standard_filter=standard)
     return [
         PlatformSummarySchema(
-            id=r[0],
-            name=r[1],
-            category=r[2],
-            standard_code=r[3],
-            description=r[4],
+            id=p["id"],
+            name=p["platform_name"],
+            category=p["platform_category"],
+            standard_code=p["standard_code"],
+            description=p["description"],
         )
-        for r in rows
+        for p in platforms
     ]
+
+
+@router.post("/standards/custom", response_model=CustomPlatformResponse)
+def create_custom_platform(req: CustomPlatformCreateRequest):
+    try:
+        engine = RuleEngine()
+        vib_dict = req.vibration.model_dump()
+        temp_dict = req.temperature.model_dump() if req.temperature else None
+        shock_dict = req.shock.model_dump() if req.shock else None
+
+        plat_id = engine.add_custom_platform(
+            platform_name=req.platform_name,
+            platform_category=req.platform_category,
+            standard_code=req.standard_code,
+            description=req.description or "Özel şirket standart profili",
+            vibration_data=vib_dict,
+            temperature_data=temp_dict,
+            shock_data=shock_dict,
+        )
+        return CustomPlatformResponse(
+            id=plat_id,
+            platform_name=req.platform_name,
+            standard_code=req.standard_code,
+            status="created",
+        )
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail=f"Platform '{req.platform_name}' zaten kayıtlı.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Özel standart oluşturma hatası: {str(e)}")
+
+
+@router.post("/materials/custom", response_model=CustomMaterialResponse)
+def create_custom_material(req: CustomMaterialCreateRequest):
+    try:
+        engine = RuleEngine()
+        mat_id = engine.add_custom_material(
+            name=req.name,
+            category=req.category,
+            density_kg_m3=req.density_kg_m3,
+            elastic_modulus_gpa=req.elastic_modulus_gpa,
+            poissons_ratio=req.poissons_ratio,
+            yield_strength_mpa=req.yield_strength_mpa,
+            ultimate_strength_mpa=req.ultimate_strength_mpa,
+            cte_per_k=req.cte_per_k,
+            basquin_a_mpa=req.basquin_a_mpa,
+            basquin_b_exponent=req.basquin_b_exponent,
+            description=req.description,
+        )
+        return CustomMaterialResponse(
+            id=mat_id,
+            name=req.name,
+            status="created",
+        )
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail=f"Malzeme '{req.name}' zaten kayıtlı.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Özel malzeme oluşturma hatası: {str(e)}")
 
 
 @router.get("/materials")

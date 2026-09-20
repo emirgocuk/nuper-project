@@ -1,149 +1,126 @@
 # System Patterns: Nuper Citadel
 
-## 1. Mimari Felsefe: "Deterministik Çekirdek + Ayrık Üretken Ajan"
-Nuper Citadel, savunma mühendisliğinin sıfır tolerans gereksinimini karşılamak için **iki katmanlı bir ayrım (Strict Separation of Concerns)** uygular:
-1. **Deterministik Mühendislik Katmanı:** Geometri hesapları (kütle, atalet, CoG), standart eşleme kuralları, kırılma frekansları ve PSD tabloları **asla yapay zekâya bırakılmaz**. C++ tabanlı OpenCASCADE (`pythonocc-core`) ve ilişkisel veri tabanı (`SQLite`) ile matematiksel olarak çözülür.
+## 1. Mimari Felsefe: "Deterministik Çekirdek + Ayrık Üretken Ajan + Kapalı Döngü Doğrulama"
+Nuper Citadel, savunma mühendisliğinin sıfır tolerans gereksinimini karşılamak için **katı bir katman ayrımı (Strict Separation of Concerns)** ve **kapalı döngü (closed-loop)** bir mühendislik akışı uygular:
+
+1. **Deterministik Mühendislik Katmanı:** Geometri hesapları (kütle, atalet, CoG), montaj deliği tespiti, standart sınır şartları, PSD integralleri, fikstür rezonans kalınlığı, Palmgren-Miner yorulma hasarı ve FEA sonrası rezonans/notching hesapları **asla yapay zekâya bırakılmaz**. C++ tabanlı OpenCASCADE (`pythonocc-core`) ve ilişkisel veri tabanı (`SQLite`) ile matematiksel olarak çözülür.
 2. **Üretken Yerel Zekâ Katmanı:** LLM (Qwen 2.5 Coder / Llama 3.3), deterministik katmanın ürettiği yapılandırılmış JSON verisini girdi alarak yalnızca metin sentezi, askeri ETP şablonu oluşturma ve arıza modu açıklamalarını derleme görevini üstlenir.
+3. **Resmi Dokümantasyon Katmanı:** ReportLab vektörel motoruyla, akredite test laboratuvarlarının doğrudan kabul ettiği kurumsal A4 formatında, antetli, revizyonlu ve imza bloklu resmi PDF üretilir.
+4. **Kapalı Döngü (Closed-Loop) Geri Besleme:** Pre-FEA çıktısından sonra, çözülen simülasyonun modal ve stres sonuçları sisteme geri beslenerek rezonans kaçınma ($f_1 > 1.2 \times f_{\max}$), dinamik amplifikasyon ($Q$) ve notching doğrulaması yapılır.
+5. **Dinamik ve Genişletilebilir Standart/Malzeme Altyapısı:** Kullanıcılar askeri ve havacılık standartları (MIL-STD-810H, RTCA DO-160G, STANAG 4370) arasında geçiş yapabilir; kurumsal iç şartnamelerini (ASELSAN MYS vb.) ve özel test kuponu malzemelerini anında sisteme kaydedebilir.
 
 ```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                 KULLANICI ARAYÜZÜ                                      │
-│                (Tauri / Next.js Desktop Shell - 127.0.0.1:Port)                        │
-│   - STEP/STP Drag & Drop           - Standart & Görev Profili Seçimi                   │
-│   - 3D Geometri Önizleme           - FEA Geri Besleme & Düzenleme Arayüzü              │
-└───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                            │ IPC / Yerel HTTP REST
-                                            ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                               FASTAPI YEREL ÇEKİRDEK                                  │
-│                                                                                        │
-│  ┌───────────────────────┐   ┌────────────────────────┐   ┌─────────────────────────┐  │
-│  │ 1. CAD & GEOMETRİ     │   │ 2. DETERMINİSTİK KURAL │   │ 3. FEA ÖN-İŞLEMCİ       │  │
-│  │    AYRIŞTIRICI        │   │    MOTORU (STANDART DB)│   │    JENERATÖRÜ           │  │
-│  │  - pythonocc-core     │──►│  - SQLite Standart Matrisi│──►│  - PSD CSV/AFU Dışa     │  │
-│  │  - OpenCASCADE        │   │  - MIL-STD-810H Metot 514 │   │    Aktarma              │  │
-│  │  - Kütle, BBox, CoG,  │   │  - Sıcaklık Metot 501/502  │   │  - NX/ANSYS Yük         │  │
-│  │    Delik Taraması     │   │  - Analitik Karar Ağacı│   │    Yönergesi            │  │
-│  └───────────────────────┘   └───────────┬────────────┘   └─────────────────────────┘  │
-│                                          │                                             │
-│                                          ▼ Context Enjeksiyonu                         │
-│  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
-│  │ 4. YEREL AJAN & SENTEZ KATMANI                                                   │  │
-│  │  - LLM Runtime: Ollama / llama.cpp (Qwen 2.5 Coder 14B / Llama 3.3 8B Quantized) │  │
-│  │  - Görev: Yapılandırılmış JSON verisini resmi ETP/Analiz Doğrulama Raporuna dökme │  │
-│  └───────────────────────────────────────┬──────────────────────────────────────────┘  │
-│                                          │                                             │
-│                                          ▼ Doğrulama / Diff                            │
-│  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
-│  │ 5. ADAPTİF GERİ BİLDİRİM & ÖĞRENME MOTORU (Local LoRA Pipeline)                  │  │
-│  │  - Mühendisin onay/düzeltme logları (SQLite: prompt, chosen, rejected)          │  │
-│  │  - Periyodik yerel LoRA/DPO veri seti derleyici                                 │  │
-│  └──────────────────────────────────────────────────────────────────────────────────┘  │
-└───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                            │ Çıktı Üretimi
-                                            ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                     ÇIKTI MODÜLÜ                                       │
-│   - Simcenter NX / ANSYS Uyumlu PSD Spektrum Tablosu (.csv / .txt)                     │
-│   - Resmi Çevresel Test Planı (ETP - PDF / A4 Şablon)                                  │
-│   - FEA Sonrası Standart Uygunluk & Risk Raporu                                       │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-```mermaid
-flowchart TD
-    User[Kullanıcı / Mühendis] -->|STEP + Platform Seçimi| UI[Tauri + Next.js Desktop UI]
-    UI -->|IPC / HTTP 127.0.0.1| API[FastAPI Local Core]
-    
-    subgraph Deterministik Katman
-        API --> CAD[1. CAD & Geometri Ayrıştırıcı<br/>pythonocc-core / cad_engine.py]
-        CAD --> JSON1[Geometri JSON: Kütle, CoG, BBox, Delikler]
-        JSON1 --> RULE[2. Deterministik Kural Motoru<br/>SQLite: MIL-STD-810H / rule_engine.py]
-        RULE --> FEA[3. FEA Ön-İşlemci Jeneratörü<br/>PSD CSV/AFU/APDL / fea_bridge.py]
-    end
-
-    subgraph Üretken Katman
-        RULE -->|Yapılandırılmış Context JSON| LLM[4. Yerel LLM / Sentez Ajanı<br/>agent_core.py: Ollama/llama.cpp]
-        LLM --> ETP[Resmi Test Planı & Rapor]
-    end
-
-    subgraph Öğrenme Döngüsü
-        User -->|Düzeltme & Onay| DPO[5. Adaptif Geri Bildirim Motoru<br/>telemetry.db: prompt/chosen/rejected]
-        DPO -.->|Periyodik Yerel LoRA| LLM
-    end
-
-    FEA --> Out1[Simcenter NX / ANSYS PSD Dosyası]
-    ETP --> Out2[Resmi ETP Dokümanı PDF/A4]
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                           KULLANICI ARAYÜZÜ                                            │
+│                       (Vite / Next.js / Tauri Desktop Shell - 127.0.0.1:Port)                          │
+│   - STEP/STP Drag & Drop                   - 3D Gerçek B-Rep Mesh Önizleme & CoG / Delikler            │
+│   - Standart Filtreleri (MIL/DO/STANAG/ÖZEL)- Malzeme Seçici & Canlı Özellik HUD Kartı (Akma, CTE vb.) │
+│   - Özel Standart & Malzeme Modalları      - DIN 912 Tork & Ön Yük Tablosu                             │
+│   - Pre-FEA Spektrum & APDL Kod İhracı    - Post-FEA Mod/Gerilme Doğrulama & Notching Kartı            │
+│   - Askeri ETP Metin Düzenleyici (DPO)     - Resmi Askeri A4 PDF Rapor İndirme                         │
+└───────────────────────────────────────────────────┬────────────────────────────────────────────────────┘
+                                                    │ IPC / Yerel HTTP REST (127.0.0.1:8765)
+                                                    ▼
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                         FASTAPI YEREL ÇEKİRDEK                                         │
+│                                                                                                        │
+│  ┌────────────────────────┐   ┌──────────────────────────┐   ┌──────────────────────────────────────┐  │
+│  │ 1. CAD & BAĞLAYICILAR  │   │ 2. DETERMINİSTİK KURAL   │   │ 3. PRE-FEA ÖN-İŞLEMCİ                │  │
+│  │  - OpenCASCADE C++     │──►│  - SQLite: MIL-STD-810H  │──►│  - 120-noktalı Log-Log PSD CSV       │  │
+│  │  - Kütle, BBox, CoG    │   │  - RTCA DO-160G / STANAG │   │  - ANSYS APDL / Simcenter NX         │  │
+│  │  - TopAbs_REVERSED Delik   │  - Özel Standart & Malzeme│  - Sınır Şartı & Fikstür Kalınlığı   │  │
+│  │  - DIN 912 Tork/Ön Yük │   │  - Palmgren-Miner S-N    │   │  - ASME Y14.5 MMC CMM Köprüsü        │  │
+│  └────────────────────────┘   └─────────────┬────────────┘   └──────────────────────────────────────┘  │
+│                                             │                                                          │
+│                                             ▼                                                          │
+│  ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ 4. POST-FEA KAPALI DÖNGÜ DOĞRULAMA (post_fea_engine.py)                                          │  │
+│  │  - FEA Doğal Frekansları (f1, f2, f3) & Pik Gerilme Girdisi                                      │  │
+│  │  - Rezonans Kaçınma Kontrolü: f1 > 1.20 * f_input                                                │  │
+│  │  - Dinamik Büyütme Faktörü: Q = 1 / (2 * zeta)                                                   │  │
+│  │  - Akma Emniyet Marjı: MS = (Sigma_y / (Sigma_peak * SF)) - 1                                     │  │
+│  │  - Otomatik Çentikleme (Notching): Delta dB = 20 * log10(Sigma_allowable / Sigma_peak)           │  │
+│  └──────────────────────────────────────────┬───────────────────────────────────────────────────────┘  │
+│                                             │ Yapılandırılmış Context JSON                             │
+│                                             ▼                                                          │
+│  ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ 5. YEREL LLM & SENTEZ KATMANI (local_client.py, prompts.py, objection_agent.py)                  │  │
+│  │  - Ollama / llama.cpp (Qwen 2.5 Coder 7B / 14B)                                                  │  │
+│  │  - Askeri ETP Şablonlama & Over-Testing İtiraz Savunma Mektubu                                   │  │
+│  └──────────────────────────────────────────┬───────────────────────────────────────────────────────┘  │
+│                                             │                                                          │
+│                                             ▼                                                          │
+│  ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ 6. RESMİ SAVUNMA A4 PDF MOTORU (pdf_report_generator.py)                                         │  │
+│  │  - ReportLab ile saf yerel A4 PDF üretimi (Harici C/GTK bağımlılığı yok)                         │  │
+│  │  - Kurumsal Antet, Tasnif Damgası, Doküman No, Tablolar, İmza Blokları                           │  │
+│  └──────────────────────────────────────────┬───────────────────────────────────────────────────────┘  │
+│                                             │ Onay & Mühendis Revizyonu                                │
+│                                             ▼                                                          │
+│  ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ 7. ADAPTİF GERİ BİLDİRİM & ÖĞRENME MOTORU (feedback_engine.py -> telemetry.db)                   │  │
+│  │  - DPO çifti kaydı: (prompt, rejected, chosen, rating)                                            │  │
+│  └──────────────────────────────────────────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Bileşen İlişkileri ve Modül Mimarisi
+## 2. Temel Modüller ve İşlevleri
 
-### Modül 1: STEP/CAD Ayrıştırıcı (`cad_parser.py`)
-- **Görev:** Katı model geometrisini topolojik ve fiziksel olarak ayrıştırma.
-- **Teknoloji:** `pythonocc-core` (`BRepGProp`, `Bnd_Box`, `TopExp_Explorer`).
+### Modül 1: STEP/CAD & Bağlayıcı Ayrıştırıcı (`cad_parser.py`, `fastener_engine.py`)
+- **Teknoloji:** `pythonocc-core` (`BRepMesh_IncrementalMesh`, `BRepGProp`, `TopExp_Explorer`, `TopAbs_REVERSED`).
 - **Türetilen Değerler:**
-  - Net Hacim ($V$, $\text{mm}^3$)
-  - Malzeme yoğunluğuna göre Kütle ($m$, $\text{kg}$)
-  - Bounding Box ($L \times W \times H$, $\text{mm}$)
-  - Kütle Merkezi ($CoG: x, y, z$, $\text{mm}$)
-  - Montaj Delikleri (Adet, çap, yayılım açıklığı, montaj tabanı - $h_{cg}$ devrilme kolu)
+  - Net hacim, kütle, bounding box, CoG koordinatları.
+  - Sadece iç delikleri filtreleme (`TopAbs_REVERSED`), dış radyüsleri eleme.
+  - ISO 273 normal/yakın geçme ve DIN 912 metrik cıvata boyutlandırması.
+  - Sıkma torku ($M_A$), nominal ön yük ($F_M$) ve Nord-Lock pul reçetesi.
 
-### Modül 2: Deterministik Kural Motoru (`rule_engine.py`)
-- **Görev:** Seçilen askeri platforma karşılık gelen standart sınır şartlarını deterministik tablolardan çekmek.
-- **Teknoloji:** SQLite ilişkisel şema + kural doğrulama zinciri.
-- **Standart Kapsamı:**
-  - MIL-STD-810H Metot 514.8 Titreşim (Cat 4, Cat 14, Cat 20 vb.)
-  - MIL-STD-810H Metot 501.7 / 502.7 Sıcaklık (A1, C1 profilleri)
-  - MIL-STD-810H Metot 516.8 Şok (Fonksiyonel / Çarpışma Şoku)
+### Modül 2: Çoklu Standart ve Dinamik Kural Motoru (`rule_engine.py`)
+- **Desteklenen Standart Aileleri:**
+  - `MIL-STD-810H`: Kategori 14 Jet Uçak, Kategori 4 Kamyon/Treyler, Kategori 20 Helikopter.
+  - `RTCA DO-160G`: Section 8 Titreşim (Curve S Robust Random, Curve B/C Uçak, Curve F Helikopter), Section 4 Sıcaklık/İrtifa, Section 7 Şok.
+  - `STANAG 4370 / AECTP-400`: Method 401 Paletli ve Tekerlekli Zırhlı Araç Profilleri.
+  - `ÖZEL ŞİRKET STANDARTLARI`: ASELSAN MYS, TUSAŞ vb. kullanıcı tarafından tanımlanan çok noktalı PSD kırılma frekansları, sıcaklık ve şok profilleri.
+- **Kütle Sönümleme:** $((20 / M)^{0.15})$ analitik formülü.
 
-### Modül 3: FEA Ön-İşlemci Jeneratörü (`fea_exporter.py`)
-- **Görev:** Standart kırılma noktalarını (break points) sonlu elemanlar yazılımlarının doğrudan içe aktarabileceği formatlara çevirmek.
-- **Formatlar:**
-  - Simcenter NX: Response Simulation `.csv` ve `.afu`
-  - ANSYS: Random Vibration APDL / PSD `.csv`
-  - Nastran: `TABDMP1` / `RANDPS` / `TABLED1` kartları
-- **Yönerge Üretimi:** Montaj deliklerine uygulanacak serbestlik derecesi (DOF) sınırları, minimum %85 efektif modal kütle katılımı için frekans çözünürlük önerisi.
+### Modül 3: Pre-FEA & Fikstür Ön-İşlemcisi (`fea_exporter.py`, `fixture_engine.py`)
+- **Formatlar:** 120-noktalı log-log enterpolasyonlu Simcenter NX ve ANSYS Table PSD `.csv`, APDL makrosu.
+- **Fikstür Zarfı:** Sarsıcı tabla $50\times 50\text{ mm}$ M10 grid eşlemesi, analitik plaka bükülme frekansı ($f_1 \ge 1.20 \times f_{\max}$), $t_{\min}$ kalınlığı ve Alumec 89 / 7075-T6 malzeme seçimi.
 
-### Modül 4: Yerel LLM ve Doğrulama Katmanı (`local_client.py` & `prompts.py`)
-- **Görev:** Salt mühendislik JSON girdisi ile resmi kabul dokümantasyonunu üretmek.
-- **Çalışma Prensibi:** Sıfır serbest sohbet; strict JSON in -> strict Markdown/PDF out.
-- **Kullanılan Modeller:** Qwen 2.5 Coder 14B Q4_K_M veya Llama 3.3 8B Quantized.
+### Modül 4: Post-FEA Kapalı Döngü Doğrulama Motoru (`post_fea_engine.py`)
+- **Algoritmalar:**
+  - **Rezonans Kaçınma Eşiği:** $f_1 > 1.20 \times f_{\max}$ (Güvenli) / $f_1 < f_{\max}$ (Kritik Rezonans).
+  - **Dinamik Amplifikasyon Faktörü:** $Q = \frac{1}{2\zeta}$.
+  - **Akma Emniyet Marjı:** $MS = \frac{\sigma_y}{\sigma_{\text{peak}} \times SF} - 1$.
+  - **Çentikleme (Notching) Hesabı:**
+    $$\Delta \text{dB} = 20 \log_{10}\left(\frac{\sigma_{\text{allowable}}}{\sigma_{\text{peak}}}\right)$$
 
-### Modül 5: Adaptif Geri Bildirim ve Yerel Öğrenme (`feedback_engine.py`)
-- **Görev:** Mühendisin arayüz üzerinde yaptığı düzeltmeleri DPO (Direct Preference Optimization) formatında saklamak.
-- **Şema:**
-  - `prompt`: Standart ve geometri bağlamı.
-  - `rejected`: Modelin ilk önerdiği taslak metin.
-  - `chosen`: Mühendisin onaylayıp kaydettiği nihai revizyon.
+### Modül 5: Resmi Askeri A4 PDF Rapor Motoru (`pdf_report_generator.py`)
+- **Teknoloji:** Saf Python **ReportLab** vektörel motoru (Air-gapped, harici binary bağımsız).
+- **Bölümler:** Resmi antet, doküman no, gizlilik damgası, parça kimliği, PSD kırılma tablosu, sıcaklık & şok profili, cıvata tork reçetesi, CMM toleransları, yorulma kabulü, post-FEA rezonans bloğu ve resmi onay/imza blokları.
 
----
+### Modül 6: İleri Malzeme Kütüphanesi & Özel Malzeme Motoru
+- **13 MMPDS / CMH-17 Malzemesi:** Al 6061-T6, Al 7075-T6, Alumec 89, Ti-6Al-4V, 4340 Çelik, 304 SS, C45, Kovar (Fe-Ni29-Co17), Invar 36, Inconel 718, CuBe2, PEEK, CFRP Quasi-Isotropic.
+- **Özel Malzeme Tanımlama:** Akma dayanımı ($\sigma_y$), elastisite modülü ($E$), yoğunluk ($\rho$) ve CTE ($\alpha$) verilerini test kuponundan veritabanına işleme.
 
-## 3. Veri Akış Durum Makinesi (State Machine)
+### Modül 7: Yerel LLM & Savunma Ajanı (`local_client.py`, `prompts.py`, `objection_agent.py`)
+- **LLM:** Ollama / llama.cpp (`qwen2.5-coder:7b` / `14b`).
+- **İtiraz Ajanı:** Sarsıcı ivmeölçer piklerinde ($\pm 3\text{ dB}$) resmi itiraz ve savunma mektubu üretir.
 
-```mermaid
-stateDiagram-v2
-    [*] --> Idle: Uygulama Başlatıldı (127.0.0.1)
-    Idle --> StepIngested: STEP Dosyası Yüklendi
-    StepIngested --> GeometryCalculated: pythonocc Kütle/CoG Çıkardı
-    GeometryCalculated --> ProfileSelected: Platform/Standart Seçildi
-    ProfileSelected --> RulesEvaluated: MIL-STD-810 Parametreleri Çekildi
-    RulesEvaluated --> FEAPrepared: PSD CSV & Yönerge Üretildi
-    FEAPrepared --> ReportSynthesized: Yerel LLM ETP Dokümanını Yazdı
-    ReportSynthesized --> UserReview: Mühendis İncelemesi / Düzenlemesi
-    UserReview --> FeedbackRecorded: DPO SQLite Kaydı Yapıldı
-    FeedbackRecorded --> ExportDone: PDF/CSV İndirildi
-    ExportDone --> Idle: Yeni Analiz
-```
+### Modül 8: DPO Telemetri Motoru (`feedback_engine.py`)
+- Mühendis düzenlemelerini SQLite `telemetry.db` içinde `(prompt, chosen, rejected)` olarak depolar.
 
 ---
 
-## 4. Kalifikasyon Kalkanı Katmanları (Citadel Shield)
+## 3. Gelecek Mimari Kalıpları (Roadmap System Patterns)
 
-Nuper Citadel, pasif bir hesap makinesi olmaktan çıkıp kalifikasyon sürecini koruyan 5 ileri katmana sahiptir:
-1. **Fikstür Tasarım İsterleri & Rezonans Zarfı (`fixture_engine.py`):** Shaker $50\times 50\text{ mm}$ gridi ile delik desenini eşler, fikstür rezonansını $>2400\text{ Hz}$'e taşıyacak $t_{\text{min}}$ kalınlığını ve Alumec 89/7075-T6 malzeme zarfını çıkarır.
-2. **İmalat Toleransı & CMM Doğrulama (`gdt_bridge.py`):** CMM ölçüm sapmalarını (ör. $-0.15\text{ mm}$) FEA rijitlik matrisine işleyip %14 yorulma ömrü düşüşü uyarısı verir.
-3. **Çoklu Çevresel Koşullar (Termo-Mekanik):** $-40^\circ\text{C}$ ve $+85^\circ\text{C}$ sıcaklıkta Al/Çelik $\Delta \alpha$ genleşme farkının cıvata ön yükü ve gevşeme üzerindeki dinamik etkisini modeller.
-4. **Palmgren-Miner S-N Yorulma Motoru (`fatigue_engine.py`):** Gauss $1\sigma, 2\sigma, 3\sigma$ döngülerini Wöhler eğrisiyle eşleyerek kümülatif hasar ($D < 0.20$) ve güvenli uçuş saati ömrü hesaplar.
-5. **Askeri İhale ve Savunma İtiraz Motoru (`objection_agent.py`):** Shaker ivmeölçer piklerinde ($\pm 3\text{ dB}$) MIL-STD-810H Bölüm 4.2.2 tolerans dayanağıyla otonom itiraz dilekçesi yazar ve TDP şartname denetimi yapar.
+### 3.1. Çoklu Parça / Montaj (Assembly) Deseni (Sırada ⏳)
+- Hiyerarşik montaj yapısı (`AssemblyNode: parent, children, transformation_matrix`).
+- Çoklu STEP dosyalarının ayrıştırılması, birleşik kütle merkezi:
+  $$\vec{R}_{\text{assembly}} = \frac{\sum m_i \vec{r}_i}{\sum m_i}$$
+- Parçalar arası cıvata çemberi (bolt pattern) ve temas yüzeylerinin otomatik eşlenmesi.
+
+### 3.2. Tauri 2 Yerel Masaüstü IPC Kalıbı (Sırada ⏳)
+- Rust tabanlı Tauri v2 shell ile Python runtime'ının gömülü yönetimi.
+- Tek `.exe` / `.msi` kurulumu ve Explorer'dan doğrudan sürükle-bırak.
