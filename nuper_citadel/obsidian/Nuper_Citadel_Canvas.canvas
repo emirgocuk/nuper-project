@@ -1,0 +1,152 @@
+{
+  "nodes": [
+    {
+      "id": "n_brief",
+      "type": "file",
+      "file": "memory-bank/projectbrief.md",
+      "x": -500,
+      "y": -320,
+      "width": 380,
+      "height": 260,
+      "color": "1"
+    },
+    {
+      "id": "n_blueprint",
+      "type": "file",
+      "file": "01 - System Architecture/00_System_Architecture_Blueprint.md",
+      "x": -500,
+      "y": -20,
+      "width": 380,
+      "height": 280,
+      "color": "3"
+    },
+    {
+      "id": "n_input",
+      "type": "text",
+      "text": "### 🚀 1. Girdi Katmanı\n- **3D CAD:** `.step` / `.stp`\n- **Görev:** Taktik İHA Kanat Altı Podu\n- **Malzeme:** Alüminyum 6061-T6\n- **Standart:** MIL-STD-810H Metot 514.8",
+      "x": 0,
+      "y": -320,
+      "width": 360,
+      "height": 180,
+      "color": "4"
+    },
+    {
+      "id": "n_cad",
+      "type": "file",
+      "file": "01 - System Architecture/02_CAD_Geometry_Engine.md",
+      "x": 0,
+      "y": -60,
+      "width": 360,
+      "height": 240,
+      "color": "2"
+    },
+    {
+      "id": "n_rule",
+      "type": "file",
+      "file": "01 - System Architecture/03_Deterministic_Rule_Engine.md",
+      "x": 0,
+      "y": 240,
+      "width": 360,
+      "height": 240,
+      "color": "3"
+    },
+    {
+      "id": "n_fea",
+      "type": "file",
+      "file": "01 - System Architecture/04_FEA_Bridge_PreProcessor.md",
+      "x": -450,
+      "y": 320,
+      "width": 380,
+      "height": 260,
+      "color": "5"
+    },
+    {
+      "id": "n_llm",
+      "type": "file",
+      "file": "01 - System Architecture/05_Local_LLM_DPO_Pipeline.md",
+      "x": 450,
+      "y": 240,
+      "width": 380,
+      "height": 260,
+      "color": "6"
+    },
+    {
+      "id": "n_etp",
+      "type": "file",
+      "file": "02 - Defense Standards & Engineering/Environmental_Test_Plan_ETP_Spec.md",
+      "x": 450,
+      "y": 560,
+      "width": 380,
+      "height": 240,
+      "color": "1"
+    },
+    {
+      "id": "n_brainstorm",
+      "type": "file",
+      "file": "03 - Brainstorming & Fikir Gelistirme/Fikir_Havuzu_ve_Vizyon.md",
+      "x": 0,
+      "y": 560,
+      "width": 360,
+      "height": 240,
+      "color": "4"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_b_bp",
+      "fromNode": "n_brief",
+      "fromSide": "bottom",
+      "toNode": "n_blueprint",
+      "toSide": "top",
+      "label": "Mimari Blueprint"
+    },
+    {
+      "id": "e1",
+      "fromNode": "n_input",
+      "fromSide": "bottom",
+      "toNode": "n_cad",
+      "toSide": "top",
+      "label": "STEP Analizi (pythonocc)"
+    },
+    {
+      "id": "e2",
+      "fromNode": "n_cad",
+      "fromSide": "bottom",
+      "toNode": "n_rule",
+      "toSide": "top",
+      "label": "Geometri JSON (Kütle, CoG, Delikler)"
+    },
+    {
+      "id": "e3",
+      "fromNode": "n_rule",
+      "fromSide": "left",
+      "toNode": "n_fea",
+      "toSide": "right",
+      "label": "Kırılma Frekansları & Grms"
+    },
+    {
+      "id": "e4",
+      "fromNode": "n_rule",
+      "fromSide": "right",
+      "toNode": "n_llm",
+      "toSide": "left",
+      "label": "Doğrulanmış Context JSON"
+    },
+    {
+      "id": "e5",
+      "fromNode": "n_llm",
+      "fromSide": "bottom",
+      "toNode": "n_etp",
+      "toSide": "top",
+      "label": "Resmi ETP Üretimi"
+    },
+    {
+      "id": "e6",
+      "fromNode": "n_rule",
+      "fromSide": "bottom",
+      "toNode": "n_brainstorm",
+      "toSide": "top",
+      "label": "Gelecek Ar-Ge & RFC Genişlemesi"
+    }
+  ]
+}

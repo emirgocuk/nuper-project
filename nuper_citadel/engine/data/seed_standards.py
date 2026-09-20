@@ -1,0 +1,329 @@
+import os
+import sqlite3
+
+DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+STANDARDS_DB_PATH = os.path.join(DATA_DIR, "standards.db")
+MATERIALS_DB_PATH = os.path.join(DATA_DIR, "materials.db")
+
+
+def seed_standards_db():
+    if os.path.exists(STANDARDS_DB_PATH):
+        os.remove(STANDARDS_DB_PATH)
+
+    conn = sqlite3.connect(STANDARDS_DB_PATH)
+    cursor = conn.cursor()
+
+    # 1. Platformlar
+    cursor.execute("""
+    CREATE TABLE military_platforms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        platform_name TEXT NOT NULL UNIQUE,
+        platform_category TEXT NOT NULL,
+        standard_code TEXT NOT NULL,
+        description TEXT
+    );
+    """)
+
+    # 2. Titreşim Profilleri (MIL-STD-810H Method 514.8)
+    cursor.execute("""
+    CREATE TABLE vibration_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        platform_id INTEGER NOT NULL,
+        method_code TEXT NOT NULL,
+        category_id INTEGER NOT NULL,
+        annex_figure TEXT NOT NULL,
+        calculated_grms REAL NOT NULL,
+        duration_per_axis_minutes INTEGER NOT NULL,
+        axes TEXT NOT NULL,
+        mass_attenuation_applicable BOOLEAN DEFAULT 0,
+        FOREIGN KEY(platform_id) REFERENCES military_platforms(id)
+    );
+    """)
+
+    # 3. Kırılma Noktaları (Breakpoints)
+    cursor.execute("""
+    CREATE TABLE vibration_breakpoints (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        seq_order INTEGER NOT NULL,
+        frequency_hz REAL NOT NULL,
+        psd_value REAL NOT NULL,
+        slope_db_oct REAL,
+        FOREIGN KEY(profile_id) REFERENCES vibration_profiles(id)
+    );
+    """)
+
+    # 4. Sıcaklık Profilleri (Method 501.7 / 502.7)
+    cursor.execute("""
+    CREATE TABLE temperature_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        platform_id INTEGER NOT NULL,
+        climatic_category TEXT NOT NULL,
+        operational_high_c REAL NOT NULL,
+        storage_high_c REAL NOT NULL,
+        operational_low_c REAL NOT NULL,
+        storage_low_c REAL NOT NULL,
+        FOREIGN KEY(platform_id) REFERENCES military_platforms(id)
+    );
+    """)
+
+    # 5. Mekanik Şok Profilleri (Method 516.8)
+    cursor.execute("""
+    CREATE TABLE shock_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        platform_id INTEGER NOT NULL,
+        procedure_name TEXT NOT NULL,
+        pulse_shape TEXT NOT NULL,
+        peak_acceleration_g REAL NOT NULL,
+        duration_ms REAL NOT NULL,
+        num_shocks_per_axis INTEGER NOT NULL,
+        FOREIGN KEY(platform_id) REFERENCES military_platforms(id)
+    );
+    """)
+
+    # --- VERİ GİRİŞLERİ ---
+    # Platform 1: Taktik İHA Kanat Altı (External Stores)
+    cursor.execute("""
+    INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
+    VALUES ('Taktik İHA Kanat Altı', 'UAV_EXTERNAL_STORE', 'MIL-STD-810H', 'Taktik ve Stratejik İHA kanat altı pylon ve pod donanımları.');
+    """)
+    p1_id = cursor.lastrowid
+
+    # Profile 1: Cat 14 External Stores
+    cursor.execute("""
+    INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
+    VALUES (?, '514.8', 14, 'Annex C, Figure 514.8C-1', 7.70, 60, 'X,Y,Z', 1);
+    """, (p1_id,))
+    prof1_id = cursor.lastrowid
+
+    # Cat 14 Breakpoints (7.70 grms nominal)
+    bp1 = [
+        (prof1_id, 1, 20.0, 0.0053, 6.0),
+        (prof1_id, 2, 150.0, 0.0400, 0.0),
+        (prof1_id, 3, 1000.0, 0.0400, -6.0),
+        (prof1_id, 4, 2000.0, 0.0100, 0.0),
+    ]
+    cursor.executemany("""
+    INSERT INTO vibration_breakpoints (profile_id, seq_order, frequency_hz, psd_value, slope_db_oct)
+    VALUES (?, ?, ?, ?, ?);
+    """, bp1)
+
+    # Temp Profile for UAV Wing: Induced High Temp & Severe Cold
+    cursor.execute("""
+    INSERT INTO temperature_profiles (platform_id, climatic_category, operational_high_c, storage_high_c, operational_low_c, storage_low_c)
+    VALUES (?, 'Basic Hot (A1) & Severe Cold (C2)', 71.0, 85.0, -40.0, -51.0);
+    """, (p1_id,))
+
+    # Shock Profile for UAV Wing: Procedure I Functional Shock
+    cursor.execute("""
+    INSERT INTO shock_profiles (platform_id, procedure_name, pulse_shape, peak_acceleration_g, duration_ms, num_shocks_per_axis)
+    VALUES (?, 'Procedure I - Functional Shock', 'Terminal Peak Sawtooth (TPS)', 40.0, 11.0, 6);
+    """, (p1_id,))
+
+    # Platform 2: Taktik Tekerlekli Zırhlı Araç (Ground Vehicle - Cat 4)
+    cursor.execute("""
+    INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
+    VALUES ('Taktik Tekerlekli Zırhlı Araç', 'GROUND_VEHICLE', 'MIL-STD-810H', '4x4 / 8x8 Zırhlı Muharebe Aracı gövde ve kule içi elektroniği.');
+    """)
+    p2_id = cursor.lastrowid
+
+    cursor.execute("""
+    INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
+    VALUES (?, '514.8', 4, 'Annex A, Figure 514.8A-1', 2.24, 60, 'Vertical,Transverse,Longitudinal', 0);
+    """, (p2_id,))
+    prof2_id = cursor.lastrowid
+
+    bp2 = [
+        (prof2_id, 1, 5.0, 0.0050, 0.0),
+        (prof2_id, 2, 10.0, 0.0100, 3.0),
+        (prof2_id, 3, 40.0, 0.0100, -6.0),
+        (prof2_id, 4, 500.0, 0.0001, 0.0),
+    ]
+    cursor.executemany("""
+    INSERT INTO vibration_breakpoints (profile_id, seq_order, frequency_hz, psd_value, slope_db_oct)
+    VALUES (?, ?, ?, ?, ?);
+    """, bp2)
+
+    cursor.execute("""
+    INSERT INTO temperature_profiles (platform_id, climatic_category, operational_high_c, storage_high_c, operational_low_c, storage_low_c)
+    VALUES (?, 'Hot Dry (A2) & Basic Cold (C1)', 60.0, 71.0, -32.0, -40.0);
+    """, (p2_id,))
+
+    cursor.execute("""
+    INSERT INTO shock_profiles (platform_id, procedure_name, pulse_shape, peak_acceleration_g, duration_ms, num_shocks_per_axis)
+    VALUES (?, 'Procedure I - Functional Shock', 'Half-Sine', 20.0, 11.0, 6);
+    """, (p2_id,))
+
+    # Platform 3: Helikopter Aviyonik Bölmesi (Rotary Wing - Cat 20)
+    cursor.execute("""
+    INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
+    VALUES ('Helikopter Aviyonik Bölmesi', 'ROTARY_WING', 'MIL-STD-810H', 'Genel maksat ve taarruz helikopterleri kokpit ve aviyonik kompartmanı.');
+    """)
+    p3_id = cursor.lastrowid
+
+    cursor.execute("""
+    INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
+    VALUES (?, '514.8', 20, 'Annex D, Figure 514.8D-1', 4.12, 120, 'X,Y,Z', 0);
+    """, (p3_id,))
+    prof3_id = cursor.lastrowid
+
+    bp3 = [
+        (prof3_id, 1, 10.0, 0.0020, 3.0),
+        (prof3_id, 2, 40.0, 0.0150, 0.0),
+        (prof3_id, 3, 500.0, 0.0150, -6.0),
+        (prof3_id, 4, 2000.0, 0.0010, 0.0),
+    ]
+    cursor.executemany("""
+    INSERT INTO vibration_breakpoints (profile_id, seq_order, frequency_hz, psd_value, slope_db_oct)
+    VALUES (?, ?, ?, ?, ?);
+    """, bp3)
+
+    cursor.execute("""
+    INSERT INTO temperature_profiles (platform_id, climatic_category, operational_high_c, storage_high_c, operational_low_c, storage_low_c)
+    VALUES (?, 'Basic Hot (A1) & Cold (C1)', 55.0, 71.0, -40.0, -46.0);
+    """, (p3_id,))
+
+    cursor.execute("""
+    INSERT INTO shock_profiles (platform_id, procedure_name, pulse_shape, peak_acceleration_g, duration_ms, num_shocks_per_axis)
+    VALUES (?, 'Procedure V - Crash Hazard Shock', 'Half-Sine', 75.0, 6.0, 2);
+    """, (p3_id,))
+
+    conn.commit()
+    conn.close()
+    print(f"Standards database created and seeded at: {STANDARDS_DB_PATH}")
+
+
+def seed_materials_db():
+    if os.path.exists(MATERIALS_DB_PATH):
+        os.remove(MATERIALS_DB_PATH)
+
+    conn = sqlite3.connect(MATERIALS_DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE materials (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        category TEXT NOT NULL,
+        density_kg_m3 REAL NOT NULL,
+        elastic_modulus_gpa REAL NOT NULL,
+        poissons_ratio REAL NOT NULL,
+        yield_strength_mpa REAL NOT NULL,
+        ultimate_strength_mpa REAL NOT NULL,
+        cte_per_k REAL NOT NULL,
+        basquin_a_mpa REAL NOT NULL,
+        basquin_b_exponent REAL NOT NULL,
+        description TEXT
+    );
+    """)
+
+    materials = [
+        (
+            "Aluminium 6061-T6",
+            "ALUMINIUM_ALLOY",
+            2700.0,
+            68.9,
+            0.33,
+            275.0,
+            310.0,
+            23.0e-6,
+            490.0,
+            -0.108,
+            "Havacılık ve savunma gövde yapılarında en yaygın kullanılan hafif alaşım."
+        ),
+        (
+            "Aluminium 7075-T6",
+            "ALUMINIUM_ALLOY",
+            2810.0,
+            71.7,
+            0.33,
+            503.0,
+            572.0,
+            23.4e-6,
+            780.0,
+            -0.112,
+            "Yüksek mukavemetli uçak ve füze kanat/pylon bağlantı braketleri."
+        ),
+        (
+            "Titanium Ti-6Al-4V (Grade 5)",
+            "TITANIUM_ALLOY",
+            4430.0,
+            113.8,
+            0.34,
+            880.0,
+            950.0,
+            8.6e-6,
+            1200.0,
+            -0.095,
+            "Yüksek sıcaklık dayanımı ve korozyon direnci gerektiren kritik savunma elemanları."
+        ),
+        (
+            "Structural Steel 4340",
+            "STEEL_ALLOY",
+            7850.0,
+            205.0,
+            0.29,
+            470.0,
+            740.0,
+            12.3e-6,
+            950.0,
+            -0.090,
+            "Ağır yük taşıyıcı mafsallar ve kara araçları şasi elemanları."
+        ),
+        (
+            "Stainless Steel 304 / A2-70",
+            "FASTENER_STEEL",
+            7900.0,
+            193.0,
+            0.29,
+            450.0,
+            700.0,
+            17.3e-6,
+            850.0,
+            -0.100,
+            "Standart askeri aviyonik ve şasi montaj cıvataları."
+        ),
+        (
+            "Alumec 89 (Fixture Alloy)",
+            "FIXTURE_ALLOY",
+            2830.0,
+            72.0,
+            0.33,
+            590.0,
+            640.0,
+            23.0e-6,
+            750.0,
+            -0.110,
+            "Yüksek rijitlik/kütle oranına sahip sarsıcı tabla fikstür alüminyum alaşımı."
+        ),
+        (
+            "C45 Carbon Steel (1.0503)",
+            "STEEL_ALLOY",
+            7850.0,
+            210.0,
+            0.30,
+            430.0,
+            650.0,
+            12.0e-6,
+            800.0,
+            -0.095,
+            "Ağır yük ve rijit sarsıcı test fikstürleri için yekpare ıslah çeliği."
+        ),
+    ]
+
+    cursor.executemany("""
+    INSERT INTO materials (
+        name, category, density_kg_m3, elastic_modulus_gpa, poissons_ratio,
+        yield_strength_mpa, ultimate_strength_mpa, cte_per_k,
+        basquin_a_mpa, basquin_b_exponent, description
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    """, materials)
+
+    conn.commit()
+    conn.close()
+    print(f"Materials database created and seeded at: {MATERIALS_DB_PATH}")
+
+
+if __name__ == "__main__":
+    seed_standards_db()
+    seed_materials_db()
