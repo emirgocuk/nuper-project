@@ -1,0 +1,35 @@
+# CAD Models & Engineering Drawings (Air-gap / Confidentiality / Large Binaries)
+cad_models/
+*.stp
+*.step
+*.iges
+*.igs
+
+# Python Virtual Environments & Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Node & Frontend Build
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+
+# IDE & OS Artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Logs & Temporary Files
+*.log
+temp_cad_*
