@@ -271,3 +271,42 @@ class FastenerEvaluationResponse(BaseModel):
     directives: List[str]
 
 
+class PostFEAEvaluationRequest(BaseModel):
+    resonant_frequencies_hz: List[float]
+    peak_von_mises_stress_mpa: float
+    yield_strength_mpa: float = 275.0
+    damping_ratio: float = 0.02
+    safety_factor: float = 1.25
+    excitation_range_hz: Optional[List[float]] = None
+    platform_name: Optional[str] = None
+
+
+class PostFEAEvaluationResponse(BaseModel):
+    first_mode_hz: float
+    second_mode_hz: float
+    third_mode_hz: float
+    dynamic_amplification_q: float
+    peak_von_mises_stress_mpa: float
+    allowable_stress_mpa: float
+    margin_of_safety: float
+    is_yield_safe: bool
+    resonance_status: str
+    resonance_message: str
+    notching_required: bool
+    suggested_notch_depth_db: float
+    notch_frequency_band_hz: List[float]
+    recommended_actions: List[str]
+
+
+class PDFExportRequest(BaseModel):
+    cad_data: Dict[str, Any]
+    mission_profile: Dict[str, Any]
+    fastener_data: Optional[Dict[str, Any]] = None
+    fixture_data: Optional[Dict[str, Any]] = None
+    fatigue_data: Optional[Dict[str, Any]] = None
+    post_fea_data: Optional[Dict[str, Any]] = None
+    document_no: Optional[str] = None
+    classification: Optional[str] = "TASNİF DIŞI / UNCLASSIFIED"
+
+
+

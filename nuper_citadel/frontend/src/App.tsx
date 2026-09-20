@@ -18,6 +18,7 @@ import {
   CheckCircle,
   FileUp,
   ChevronRight,
+  Activity,
 } from 'lucide-react';
 import { CADViewer3D } from './components/CADViewer3D';
 import { FastenerTable } from './components/FastenerTable';
@@ -107,6 +108,16 @@ export default function App() {
   const [objectionDesc, setObjectionDesc] = useState<string>('Sarsıcı kontrol döngüsü 480 Hz civarında beklenmedik rezonans pikleri oluşturdu.');
   const [objectionLetter, setObjectionLetter] = useState<string>('');
   const [isGeneratingObjection, setIsGeneratingObjection] = useState<boolean>(false);
+
+  // Post-FEA Closed-Loop Validation State
+  const [postFeaFreq1, setPostFeaFreq1] = useState<number>(245.0);
+  const [postFeaFreq2, setPostFeaFreq2] = useState<number>(780.0);
+  const [postFeaFreq3, setPostFeaFreq3] = useState<number>(1420.0);
+  const [postFeaStress, setPostFeaStress] = useState<number>(75.0);
+  const [postFeaDamping, setPostFeaDamping] = useState<number>(0.02);
+  const [postFeaResult, setPostFeaResult] = useState<any>(null);
+  const [isEvaluatingPostFea, setIsEvaluatingPostFea] = useState<boolean>(false);
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
 
   const [notification, setNotification] = useState<string>('');
 
@@ -578,6 +589,72 @@ export default function App() {
       alert(`İtiraz dilekçesi üretim hatası: ${e}`);
     } finally {
       setIsGeneratingObjection(false);
+    }
+  };
+
+  const evaluatePostFea = async () => {
+    setIsEvaluatingPostFea(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/fea/evaluate-post`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resonant_frequencies_hz: [postFeaFreq1, postFeaFreq2, postFeaFreq3],
+          peak_von_mises_stress_mpa: postFeaStress,
+          yield_strength_mpa: cadData?.physical_properties?.yield_strength_mpa || 275.0,
+          damping_ratio: postFeaDamping,
+          safety_factor: 1.25,
+          platform_name: missionProfile?.platform_name || 'Taktik Platform',
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPostFeaResult(data);
+        showNotification('✅ Post-FEA modal doğrulama ve notching analizi tamamlandı');
+      } else {
+        const err = await res.text();
+        alert(`Post-FEA hatası: ${err}`);
+      }
+    } catch (e) {
+      alert(`Post-FEA bağlantı hatası: ${e}`);
+    } finally {
+      setIsEvaluatingPostFea(false);
+    }
+  };
+
+  const downloadOfficialEtpPdf = async () => {
+    setIsExportingPdf(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/export/etp/pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cad_data: cadData,
+          mission_profile: missionProfile,
+          fastener_data: fastenerData,
+          fixture_data: fixtureResult,
+          fatigue_data: fatigueResult,
+          post_fea_data: postFeaResult,
+          classification: 'TASNİF DIŞI / UNCLASSIFIED',
+        }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const baseName = cadData?.metadata?.file_name ? cadData.metadata.file_name.replace(/\.[^/.]+$/, '') : 'PARCA';
+        a.download = `NUPER_CITADEL_OFFICIAL_ETP_${baseName}.pdf`;
+        a.click();
+        showNotification('✅ Resmi Askeri A4 PDF Raporu indirildi');
+      } else {
+        const err = await res.text();
+        alert(`PDF indirme hatası: ${err}`);
+      }
+    } catch (e) {
+      alert(`PDF indirme bağlantı hatası: ${e}`);
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -1282,6 +1359,136 @@ export default function App() {
                   <pre>{feaApdl || '! ANSYS APDL PSD Sınır Şartı'}</pre>
                 </div>
               </div>
+
+              {/* POST-FEA CLOSED LOOP VALIDATION CARD */}
+              <div className="studio-card p-6 space-y-4 border-2 border-indigo-100 bg-gradient-to-br from-white to-slate-50">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                      <Activity className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">FEA Kapalı Döngü Doğrulama & Notching Analizi (Post-FEA)</h3>
+                      <p className="text-[11px] text-slate-500">Simülasyon çözücüsünden (NX / ANSYS) çıkan modal frekansları ve pik gerilmeyi doğrulayın.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={evaluatePostFea}
+                    disabled={isEvaluatingPostFea}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
+                  >
+                    <Activity className="w-3.5 h-3.5" /> {isEvaluatingPostFea ? 'Doğrulanıyor...' : 'FEA Sonuçlarını Doğrula'}
+                  </button>
+                </div>
+
+                {/* Input Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">1. Mod f₁ (Hz):</label>
+                    <input
+                      type="number"
+                      value={postFeaFreq1}
+                      onChange={(e) => setPostFeaFreq1(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-indigo-700 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">2. Mod f₂ (Hz):</label>
+                    <input
+                      type="number"
+                      value={postFeaFreq2}
+                      onChange={(e) => setPostFeaFreq2(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-800 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">3. Mod f₃ (Hz):</label>
+                    <input
+                      type="number"
+                      value={postFeaFreq3}
+                      onChange={(e) => setPostFeaFreq3(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-800 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Pik Gerilme σ (MPa):</label>
+                    <input
+                      type="number"
+                      value={postFeaStress}
+                      onChange={(e) => setPostFeaStress(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono font-bold text-amber-600 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Sönüm Oranı (ζ):</label>
+                    <input
+                      type="number"
+                      step="0.005"
+                      value={postFeaDamping}
+                      onChange={(e) => setPostFeaDamping(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 font-mono text-slate-800 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Results Preview */}
+                {postFeaResult && (
+                  <div className="space-y-3 pt-2 border-t border-slate-200">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Rezonans Zarfı:</span>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-black ${
+                          postFeaResult.resonance_status === 'SAFE'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : postFeaResult.resonance_status === 'WARNING'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-red-50 text-red-700 border border-red-200'
+                        }`}>
+                          {postFeaResult.resonance_status}
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Dinamik Büyütme (Q):</span>
+                        <span className="text-base font-black text-slate-900 font-mono block mt-0.5">
+                          Q = {postFeaResult.dynamic_amplification_q}
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Emniyet Marjı (MS):</span>
+                        <span className={`text-base font-black font-mono block mt-0.5 ${
+                          postFeaResult.is_yield_safe ? 'text-emerald-700' : 'text-red-600'
+                        }`}>
+                          {postFeaResult.margin_of_safety >= 0 ? `+${postFeaResult.margin_of_safety}` : postFeaResult.margin_of_safety}
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200">
+                        <span className="text-slate-500 text-[10px] block">Notching İsteri:</span>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-black ${
+                          postFeaResult.notching_required
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {postFeaResult.notching_required ? `${postFeaResult.suggested_notch_depth_db} dB Gerekli` : 'Düz Giriş (Gereksiz)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-indigo-50/60 p-3.5 rounded-xl border border-indigo-200 text-xs text-indigo-950 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-indigo-900">
+                        <CheckCircle className="w-3.5 h-3.5 text-indigo-700" />
+                        <span>Mühendislik Değerlendirmesi:</span>
+                      </div>
+                      <p className="text-[11px] text-slate-700">{postFeaResult.resonance_message}</p>
+                      {postFeaResult.recommended_actions?.map((act: string, idx: number) => (
+                        <div key={idx} className="text-[11px] font-medium text-slate-800 flex items-start gap-1.5 pt-1">
+                          <span className="text-indigo-600 font-bold">•</span>
+                          <span>{act}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Bottom Navigation Dock */}
@@ -1350,32 +1557,54 @@ export default function App() {
                     />
                     <div className="flex items-center justify-between text-xs text-slate-500 mt-2">
                       <span>* Mühendis olarak düzenlediğiniz her kabul metni yerel model eğitimi için telemetry.db içine yazılır.</span>
-                      <button
-                        onClick={() => {
-                          const blob = new Blob([etpText], { type: 'text/markdown' });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `ETP_${cadData.metadata.file_name}.md`;
-                          a.click();
-                          showNotification('✅ ETP raporu Markdown olarak indirildi');
-                        }}
-                        className="text-blue-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" /> Markdown İndir
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const blob = new Blob([etpText], { type: 'text/markdown' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `ETP_${cadData.metadata.file_name}.md`;
+                            a.click();
+                            showNotification('✅ ETP raporu Markdown olarak indirildi');
+                          }}
+                          className="text-slate-600 font-semibold hover:text-slate-900 flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Markdown İndir
+                        </button>
+
+                        <button
+                          onClick={downloadOfficialEtpPdf}
+                          disabled={isExportingPdf}
+                          className="bg-red-700 hover:bg-red-800 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <Download className="w-3.5 h-3.5" /> {isExportingPdf ? 'PDF Üretiliyor...' : 'Resmi Askeri PDF İndir (A4)'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                    <FileText className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-                    <p className="text-slate-600 text-xs font-semibold">Henüz ETP raporu üretilmedi.</p>
-                    <button
-                      onClick={generateETP}
-                      className="mt-3 text-xs bg-white text-blue-600 font-bold px-4 py-2 rounded-lg border border-slate-200 shadow-sm hover:bg-slate-50 cursor-pointer"
-                    >
-                      Şimdi Yerel LLM ile Sentezle
-                    </button>
+                  <div className="text-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300 space-y-3">
+                    <FileText className="w-10 h-10 text-slate-400 mx-auto" />
+                    <div>
+                      <p className="text-slate-700 text-xs font-bold">Resmi Askeri ETP Dokümantasyonu</p>
+                      <p className="text-slate-400 text-[11px]">Akredite test merkezi ve müşteri onayına sunulacak A4 resmi test planı.</p>
+                    </div>
+                    <div className="flex items-center justify-center gap-3 pt-1">
+                      <button
+                        onClick={generateETP}
+                        className="text-xs bg-white text-blue-600 font-bold px-4 py-2 rounded-lg border border-slate-200 shadow-sm hover:bg-slate-50 cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Şimdi Yerel LLM ile Sentezle
+                      </button>
+                      <button
+                        onClick={downloadOfficialEtpPdf}
+                        disabled={isExportingPdf}
+                        className="text-xs bg-red-700 hover:bg-red-800 text-white font-bold px-4 py-2 rounded-lg shadow-sm cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <Download className="w-3.5 h-3.5" /> {isExportingPdf ? 'PDF Hazırlanıyor...' : 'Doğrudan A4 PDF Raporu Al'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

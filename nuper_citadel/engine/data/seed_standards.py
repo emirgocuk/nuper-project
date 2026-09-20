@@ -188,6 +188,74 @@ def seed_standards_db():
     VALUES (?, 'Procedure V - Crash Hazard Shock', 'Half-Sine', 75.0, 6.0, 2);
     """, (p3_id,))
 
+    # Platform 4: RTCA DO-160G Standart Havacılık ve İHA (Section 8 - Vibration)
+    cursor.execute("""
+    INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
+    VALUES ('RTCA DO-160G Havacılık ve Taktik İHA', 'AIRBORNE_CIVIL_UAV', 'RTCA DO-160G', 'Sivil havacılık, genel maksat uçakları ve taktik İHA gövde içi aviyonik sistemleri (Section 8 - Vibration).');
+    """)
+    p4_id = cursor.lastrowid
+
+    cursor.execute("""
+    INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
+    VALUES (?, 'Section 8', 8, 'Section 8, Curve S (Random)', 4.12, 60, 'X,Y,Z', 0);
+    """, (p4_id,))
+    prof4_id = cursor.lastrowid
+
+    bp4 = [
+        (prof4_id, 1, 10.0, 0.0100, 3.0),
+        (prof4_id, 2, 40.0, 0.0800, 0.0),
+        (prof4_id, 3, 500.0, 0.0800, -6.0),
+        (prof4_id, 4, 2000.0, 0.0050, 0.0),
+    ]
+    cursor.executemany("""
+    INSERT INTO vibration_breakpoints (profile_id, seq_order, frequency_hz, psd_value, slope_db_oct)
+    VALUES (?, ?, ?, ?, ?);
+    """, bp4)
+
+    cursor.execute("""
+    INSERT INTO temperature_profiles (platform_id, climatic_category, operational_high_c, storage_high_c, operational_low_c, storage_low_c)
+    VALUES (?, 'Category B2/C - High/Low Temp', 70.0, 85.0, -55.0, -65.0);
+    """, (p4_id,))
+
+    cursor.execute("""
+    INSERT INTO shock_profiles (platform_id, procedure_name, pulse_shape, peak_acceleration_g, duration_ms, num_shocks_per_axis)
+    VALUES (?, 'Section 7 - Operational Shock', 'Half-Sine', 20.0, 11.0, 6);
+    """, (p4_id,))
+
+    # Platform 5: STANAG 4370 / AECTP-400 NATO Paletli Zırhlı Muharebe Aracı
+    cursor.execute("""
+    INSERT INTO military_platforms (platform_name, platform_category, standard_code, description)
+    VALUES ('STANAG 4370 NATO Paletli Zırhlı Araç', 'TRACKED_COMBAT_VEHICLE', 'STANAG 4370', 'NATO müttefik çevresel test koşulları - Taktik paletli zırhlı muharebe araçları (AECTP-400 Method 401).');
+    """)
+    p5_id = cursor.lastrowid
+
+    cursor.execute("""
+    INSERT INTO vibration_profiles (platform_id, method_code, category_id, annex_figure, calculated_grms, duration_per_axis_minutes, axes, mass_attenuation_applicable)
+    VALUES (?, 'AECTP-400 Method 401', 401, 'Method 401, Figure 401-1 Tracked', 3.45, 90, 'Vertical,Transverse,Longitudinal', 0);
+    """, (p5_id,))
+    prof5_id = cursor.lastrowid
+
+    bp5 = [
+        (prof5_id, 1, 5.0, 0.0050, 6.0),
+        (prof5_id, 2, 15.0, 0.0400, 0.0),
+        (prof5_id, 3, 50.0, 0.0400, -6.0),
+        (prof5_id, 4, 500.0, 0.0010, 0.0),
+    ]
+    cursor.executemany("""
+    INSERT INTO vibration_breakpoints (profile_id, seq_order, frequency_hz, psd_value, slope_db_oct)
+    VALUES (?, ?, ?, ?, ?);
+    """, bp5)
+
+    cursor.execute("""
+    INSERT INTO temperature_profiles (platform_id, climatic_category, operational_high_c, storage_high_c, operational_low_c, storage_low_c)
+    VALUES (?, 'A1 Extreme Hot & C2 Extreme Cold', 65.0, 75.0, -46.0, -55.0);
+    """, (p5_id,))
+
+    cursor.execute("""
+    INSERT INTO shock_profiles (platform_id, procedure_name, pulse_shape, peak_acceleration_g, duration_ms, num_shocks_per_axis)
+    VALUES (?, 'Method 403 - Functional Shock', 'Terminal Peak Sawtooth (TPS)', 30.0, 11.0, 6);
+    """, (p5_id,))
+
     conn.commit()
     conn.close()
     print(f"Standards database created and seeded at: {STANDARDS_DB_PATH}")

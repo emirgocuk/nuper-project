@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import sqlite3
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Response
 
 from engine.api.schemas import (
     HealthResponse,
@@ -33,6 +33,9 @@ from engine.api.schemas import (
     DrawingUploadResponse,
     FastenerEvaluationRequest,
     FastenerEvaluationResponse,
+    PostFEAEvaluationRequest,
+    PostFEAEvaluationResponse,
+    PDFExportRequest,
 )
 from engine.core.rule_engine import RuleEngine
 from engine.core.cad_parser import CADParser
@@ -44,6 +47,8 @@ from engine.core.license_engine import LicenseEngine
 from engine.core.gdt_bridge import GDTBridge
 from engine.core.fastener_engine import FastenerEngine
 from engine.core.drawing_parser import DrawingParser
+from engine.core.post_fea_engine import PostFEAEngine
+from engine.core.pdf_report_generator import PDFReportGenerator
 from engine.llm.local_client import LocalLLMClient
 from engine.llm.prompts import (
     DEFENSE_COPILOT_SYSTEM_PROMPT,
@@ -542,5 +547,52 @@ def verify_cmm_inspection(req: CMMVerificationRequest):
         flatness_tolerance_mm=req.flatness_tolerance_mm,
     )
     return CMMVerificationResponse(**res)
+
+
+# ---------------------------------------------------------------------------
+# 13. POST-FEA CLOSED-LOOP VALIDATION & NOTCHING
+# ---------------------------------------------------------------------------
+@router.post("/fea/evaluate-post", response_model=PostFEAEvaluationResponse)
+def evaluate_post_fea(req: PostFEAEvaluationRequest):
+    engine = PostFEAEngine()
+    res = engine.evaluate_post_fea(
+        resonant_frequencies_hz=req.resonant_frequencies_hz,
+        peak_von_mises_stress_mpa=req.peak_von_mises_stress_mpa,
+        yield_strength_mpa=req.yield_strength_mpa,
+        damping_ratio=req.damping_ratio,
+        safety_factor=req.safety_factor,
+        excitation_range_hz=req.excitation_range_hz,
+        platform_name=req.platform_name,
+    )
+    return PostFEAEvaluationResponse(**res)
+
+
+# ---------------------------------------------------------------------------
+# 14. OFFICIAL DEFENSE A4 PDF REPORT EXPORT
+# ---------------------------------------------------------------------------
+@router.post("/export/etp/pdf")
+def export_etp_pdf(req: PDFExportRequest):
+    generator = PDFReportGenerator()
+    try:
+        pdf_bytes = generator.generate_etp_pdf(
+            cad_data=req.cad_data,
+            mission_profile=req.mission_profile,
+            fastener_data=req.fastener_data,
+            fixture_data=req.fixture_data,
+            fatigue_data=req.fatigue_data,
+            post_fea_data=req.post_fea_data,
+            document_no=req.document_no,
+            classification=req.classification or "TASNİF DIŞI / UNCLASSIFIED",
+        )
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "attachment; filename=Nuper_Citadel_Official_ETP.pdf"
+            },
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+
 
 

@@ -157,3 +157,45 @@ def test_gdt_verify_cmm_endpoint():
     assert data["total_holes_evaluated"] == 2
     assert data["surface_flatness"]["is_conformant"] is True
 
+
+def test_post_fea_evaluate_endpoint():
+    resp = client.post(
+        "/api/fea/evaluate-post",
+        json={
+            "resonant_frequencies_hz": [195.0, 520.0, 980.0],
+            "peak_von_mises_stress_mpa": 110.0,
+            "yield_strength_mpa": 275.0,
+            "damping_ratio": 0.02,
+            "safety_factor": 1.25
+        }
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["first_mode_hz"] == 195.0
+    assert data["resonance_status"] == "SAFE"
+    assert data["is_yield_safe"] is True
+    assert data["dynamic_amplification_q"] == 25.0
+
+
+def test_export_etp_pdf_endpoint():
+    resp = client.post(
+        "/api/export/etp/pdf",
+        json={
+            "cad_data": {
+                "metadata": {"part_name": "Test Bracket"},
+                "physical_properties": {"mass_kg": 0.5, "yield_strength_mpa": 275.0},
+                "bounding_box_mm": {"length_x": 100, "width_y": 50, "height_z": 20},
+                "mounting_interface": {"mounting_holes_count": 4, "hole_diameters_mm": [4.5]}
+            },
+            "mission_profile": {
+                "platform_name": "Taktik İHA Kanat Altı",
+                "standard_code": "MIL-STD-810H",
+                "vibration": {"effective_grms": 7.7, "breakpoints": []}
+            }
+        }
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content.startswith(b"%PDF-1.")
+
+
