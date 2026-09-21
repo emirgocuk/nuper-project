@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- NUPER Emblem - Circle Singularity Core Variant -->
+  <g id="nuper-emblem-circle" fill="#FFFFFF">
+    <polygon points="39,7 47,7 47,44 26,44" />
+    <polygon points="53,7 61,7 74,44 53,44" />
+    <polygon points="53,67 76,50 91,93" />
+    <polygon points="47,67 24,50 9,93" />
+    <circle cx="50" cy="56" r="6" />
+  </g>
+</svg>

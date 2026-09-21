@@ -1,256 +1,85 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
-import * as THREE from 'three';
+import React from 'react';
 
-const createPlanetTexture = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 512;
-    const context = canvas.getContext('2d');
-    if (!context) return new THREE.Texture();
+/**
+ * Nuper Defense & DeepTech Telemetry Grid Backdrop
+ *
+ * Anti-Slop Felsefesi:
+ * - Rastgele Three.js gezegen küreleri ve bulanık glow orbları kaldırıldı.
+ * - Anduril ve Skunkworks telemetri ızgarası: Deterministik koordinat aksları,
+ *   derece açıları, mil-spec hedefleme çemberleri ve pürüzsüz taktiksel radar süpürmesi.
+ * - %100 CSS & SVG vektör tabanlı, sıfır GPU yükü ve anında açılış.
+ */
+export const SpaceHero: React.FC = () => {
+  return (
+    <div className="absolute inset-0 z-0 overflow-hidden bg-[#080B11] select-none pointer-events-none">
+      {/* İnce Mühendislik Izgarası (Blueprint / Telemetry Grid) */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:48px_48px]" />
 
-    const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, '#0d324d');
-    gradient.addColorStop(1, '#2a6f97');
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    for (let i = 0; i < 50; i++) {
-        context.beginPath();
-        context.arc(
-            Math.random() * canvas.width,
-            Math.random() * canvas.height,
-            Math.random() * 100,
-            0,
-            Math.PI * 2
-        );
-        context.fillStyle = `rgba(135, 206, 235, ${Math.random() * 0.08})`;
-        context.fill();
-    }
-
-    for (let i = 0; i < 25; i++) {
-        const x = Math.random() * canvas.width;
-        const y = Math.random() * canvas.height;
-        const radius = Math.random() * 20 + 5;
-
-        context.beginPath();
-        context.arc(x, y, radius, 0, Math.PI * 2);
-        context.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        context.fill();
-
-        context.beginPath();
-        context.arc(x - radius * 0.1, y - radius * 0.1, radius, Math.PI * 1.2, Math.PI * 1.8);
-        context.strokeStyle = `rgba(255, 255, 255, 0.05)`;
-        context.lineWidth = 2;
-        context.stroke();
-    }
-
-    for (let i = 0; i < 10000; i++) {
-        const x = Math.random() * canvas.width;
-        const y = Math.random() * canvas.height;
-        context.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.15})`;
-        context.fillRect(x, y, 1, 1);
-    }
-
-    return new THREE.CanvasTexture(canvas);
-};
-
-const createRingTexture = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1;
-    canvas.height = 256;
-    const context = canvas.getContext('2d');
-    if (!context) return new THREE.Texture();
-
-    const gradient = context.createLinearGradient(0, 0, 0, 256);
-    gradient.addColorStop(0.0, 'rgba(173, 216, 230, 0.0)');
-    gradient.addColorStop(0.5, 'rgba(0, 191, 255, 0.8)');
-    gradient.addColorStop(1.0, 'rgba(173, 216, 230, 0.0)');
-
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, 1, 256);
-
-    return new THREE.CanvasTexture(canvas);
-}
-
-function createStarField(radius: number, count: number) {
-    const starMaterial = new THREE.PointsMaterial({
-        color: 0x00BFFF,
-        size: 0.15,
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        opacity: 0.9,
-    });
-    const starPositions = [];
-    for (let i = 0; i < count; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const x = Math.cos(angle) * radius;
-        const z = Math.sin(angle) * radius;
-        const y = (Math.random() - 0.5) * 0.2;
-        starPositions.push(x, y, z);
-    }
-    const starGeometry = new THREE.BufferGeometry();
-    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
-    return new THREE.Points(starGeometry, starMaterial);
-}
-
-const SpaceHero = () => {
-    const mountRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const currentMount = mountRef.current;
-        if (!currentMount) return;
-
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 15, 90);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        currentMount.appendChild(renderer.domElement);
-
-        scene.background = null;
-
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
-        directionalLight.position.set(10, 20, 30);
-        scene.add(directionalLight);
-
-        const planetGroup = new THREE.Group();
-        scene.add(planetGroup);
-
-        const planetGeometry = new THREE.SphereGeometry(15, 48, 48); // Optimized polycount
-        const planetMaterial = new THREE.MeshStandardMaterial({
-            map: createPlanetTexture(),
-            metalness: 0.2, // deeper reflection
-            roughness: 0.7
-        });
-        const planet = new THREE.Mesh(planetGeometry, planetMaterial);
-        planetGroup.add(planet);
-
-        const updatePlanetPosition = () => {
-            if (window.innerWidth < 1024) {
-                planetGroup.position.x = 0;
-            } else {
-                planetGroup.position.x = 30;
-            }
-        };
-
-        const ring1Group = new THREE.Group();
-        planetGroup.add(ring1Group);
-        const ring1Geometry = new THREE.RingGeometry(22, 23, 128);
-        const ring1Material = new THREE.MeshBasicMaterial({
-            map: createRingTexture(), side: THREE.DoubleSide, transparent: true, blending: THREE.AdditiveBlending,
-        });
-        const ring1 = new THREE.Mesh(ring1Geometry, ring1Material);
-        ring1.rotation.x = Math.PI * 0.5;
-        ring1Group.add(ring1);
-
-        const stars1 = createStarField(22.5, 200);
-        ring1Group.add(stars1);
-
-        const ring2Group = new THREE.Group();
-        planetGroup.add(ring2Group);
-        const ring2Geometry = new THREE.RingGeometry(18, 19, 128);
-        const ring2 = new THREE.Mesh(ring2Geometry, ring1Material); // Re-use material
-        ring2.rotation.x = Math.PI * 0.5;
-        ring2.rotation.z = Math.PI * 0.1;
-        ring2Group.add(ring2);
-
-        const stars2 = createStarField(18.5, 150);
-        ring2Group.add(stars2);
-
-        const ring3Group = new THREE.Group();
-        planetGroup.add(ring3Group);
-        const ring3Geometry = new THREE.RingGeometry(26, 27, 128);
-        const ring3 = new THREE.Mesh(ring3Geometry, ring1Material); // Re-use material
-        ring3.rotation.x = Math.PI * 0.5;
-        ring3.rotation.y = Math.PI * 0.2;
-        ring3Group.add(ring3);
-
-        const stars3 = createStarField(26.5, 250);
-        ring3Group.add(stars3);
-
-        const particlesCount = 2500; // Optimized from 6000
-        const positions = new Float32Array(particlesCount * 3);
-        for (let i = 0; i < particlesCount; i++) {
-            const phi = Math.acos(2 * Math.random() - 1);
-            const theta = 2 * Math.PI * Math.random();
-            const r = 200 + Math.random() * 400;
-            const x = r * Math.sin(phi) * Math.cos(theta);
-            const y = r * Math.sin(phi) * Math.sin(theta);
-            const z = r * Math.cos(phi);
-            positions[i * 3] = x;
-            positions[i * 3 + 1] = y;
-            positions[i * 3 + 2] = z;
-        }
-        const particlesGeometry = new THREE.BufferGeometry();
-        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const particlesMaterial = new THREE.PointsMaterial({
-            color: 0xffffff, size: 0.2, transparent: true, blending: THREE.AdditiveBlending
-        });
-        const particleSystem = new THREE.Points(particlesGeometry, particlesMaterial);
-        scene.add(particleSystem);
-
-        const clock = new THREE.Clock();
-        let animationId: number;
-        const animate = () => {
-            animationId = requestAnimationFrame(animate);
-            const elapsedTime = clock.getElapsedTime();
-
-            planetGroup.rotation.x = elapsedTime * 0.05;
-            planetGroup.rotation.y = elapsedTime * 0.1;
-            ring2Group.rotation.y = elapsedTime * 0.15;
-            ring3Group.rotation.y = elapsedTime * -0.12;
-            particleSystem.rotation.y = elapsedTime * 0.02;
-
-            camera.lookAt(scene.position);
-            renderer.render(scene, camera);
-        };
-        animate();
-
-        const handleResize = () => {
-            if (currentMount) {
-                const width = window.innerWidth;
-                const height = window.innerHeight;
-                camera.aspect = width / height;
-                camera.updateProjectionMatrix();
-                renderer.setSize(width, height);
-                updatePlanetPosition();
-            }
-        };
-
-        updatePlanetPosition();
-        window.addEventListener('resize', handleResize);
-
-        return () => {
-            cancelAnimationFrame(animationId);
-            if (currentMount && renderer.domElement) currentMount.removeChild(renderer.domElement);
-            window.removeEventListener('resize', handleResize);
-            
-            // Memory optimization: Dispose Three.js objects
-            planetGeometry.dispose();
-            planetMaterial.map?.dispose();
-            planetMaterial.dispose();
-            ring1Geometry.dispose();
-            ring1Material.map?.dispose();
-            ring1Material.dispose();
-            ring2Geometry.dispose();
-            ring3Geometry.dispose();
-            particlesGeometry.dispose();
-            particlesMaterial.dispose();
-            renderer.dispose();
-        };
-    }, []);
-
-    return (
-        <div className="absolute inset-0 z-0 w-full h-full overflow-hidden pointer-events-none">
-            <div ref={mountRef} className="absolute top-0 left-0 w-full h-full" />
+      {/* Merkezli Radyal Telemetri Çemberleri */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1100px] h-[1100px] rounded-full border border-white/[0.03] flex items-center justify-center">
+        {/* Halka 2 */}
+        <div className="w-[820px] h-[820px] rounded-full border border-white/[0.04] border-dashed flex items-center justify-center">
+          {/* Halka 3 */}
+          <div className="w-[560px] h-[560px] rounded-full border border-white/[0.06] flex items-center justify-center">
+            {/* Halka 4 (İç Hedefleme Çemberi) */}
+            <div className="w-[320px] h-[320px] rounded-full border border-sky-400/[0.12] border-dashed flex items-center justify-center">
+              {/* Merkez Odak Çaprazı */}
+              <div className="w-12 h-12 rounded-full border border-sky-400/25 flex items-center justify-center">
+                <div className="w-1.5 h-1.5 rounded-full bg-sky-400/40 animate-ping" />
+              </div>
+            </div>
+          </div>
         </div>
-    );
+      </div>
+
+      {/* Ana Koordinat Eksenleri (Artı İşareti) */}
+      <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[1px] bg-gradient-to-b from-transparent via-white/[0.05] to-transparent" />
+      <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[1px] bg-gradient-to-r from-transparent via-white/[0.05] to-transparent" />
+
+      {/* Taktiksel Radar Süpürme Efekti (GPU Optimized) */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full overflow-hidden pointer-events-none opacity-40">
+        <div
+          className="w-full h-full rounded-full"
+          style={{
+            background: 'conic-gradient(from 0deg at 50% 50%, rgba(56, 189, 248, 0.08) 0deg, transparent 60deg, transparent 360deg)',
+            animation: 'radar-sweep 12s linear infinite',
+          }}
+        />
+      </div>
+
+      {/* Köşe Telemetri Verileri (Mil-Spec UI Tags) */}
+      <div className="absolute top-24 left-8 hidden lg:flex flex-col gap-1 text-[10px] font-mono text-gray-500 uppercase tracking-wider">
+        <div className="text-gray-400 font-bold flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          NUPER RADAR // SECTOR 01
+        </div>
+        <div>GRID // LAT 41.0082° N • LON 28.9784° E</div>
+        <div>STATUS // ARSENAL OPERATIONAL</div>
+      </div>
+
+      <div className="absolute top-24 right-8 hidden lg:flex flex-col items-end gap-1 text-[10px] font-mono text-gray-500 uppercase tracking-wider">
+        <div className="text-gray-400 font-bold">FREQUENCY // 9.41 GHz X-BAND</div>
+        <div>DEFENSE AI CORE // SYNCHRONIZED</div>
+        <div>DOCTRINE // SOVEREIGN BOOTSTRAP</div>
+      </div>
+
+      {/* Alt Karartma Gradyanı */}
+      <div className="absolute bottom-0 left-0 right-0 h-36 bg-gradient-to-t from-[#080B11] via-[#080B11]/80 to-transparent" />
+
+      <style jsx>{`
+        @keyframes radar-sweep {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
+    </div>
+  );
 };
 
 export default SpaceHero;

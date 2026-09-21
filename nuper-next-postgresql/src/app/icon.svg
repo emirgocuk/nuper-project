@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- NUPER Official Browser Favicon / Tab Icon -->
+  <rect width="32" height="32" rx="7" fill="#080B11" />
+  <g transform="translate(3.5, 3.5) scale(0.25)" fill="#FFFFFF">
+    <polygon points="39,7 47,7 47,44 26,44" />
+    <polygon points="53,7 61,7 74,44 53,44" />
+    <polygon points="53,67 76,50 91,93" />
+    <polygon points="47,67 24,50 9,93" />
+    <polygon points="43,49 57,49 50,64" />
+  </g>
+</svg>

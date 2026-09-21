@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- NUPER Master Emblem - Sovereign Pylon Triad (Black / Monochrome) -->
+  <g id="nuper-emblem-black" fill="#000000">
+    <!-- Üst İkiz Kanat (Eşkenar Yamuk, Dış Kenar Eğim Açısı: -0.35 dX/dY) -->
+    <polygon points="39,7 47,7 47,44 26,44" />
+    <polygon points="53,7 61,7 74,44 53,44" />
+
+    <!-- Sağ Alt Dışa Bakan Üçgen (Dış Kenar: 74,44 -> 76,50 -> 91,93 Koliner Çizgi) -->
+    <polygon points="53,67 76,50 91,93" />
+
+    <!-- Sol Alt Dışa Bakan Üçgen (Dış Kenar: 26,44 -> 24,50 -> 9,93 Koliner Çizgi) -->
+    <polygon points="47,67 24,50 9,93" />
+
+    <!-- Merkez Çekirdek: Yere Bakan Keskin Üçgen Göz -->
+    <polygon points="43,49 57,49 50,64" />
+  </g>
+</svg>

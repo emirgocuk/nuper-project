@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- NUPER App Icon / Avatar - Obsidian Void Background -->
+  <rect width="120" height="120" rx="28" fill="#080B11" />
+  <rect width="118" height="118" x="1" y="1" rx="27" stroke="rgba(255,255,255,0.08)" stroke-width="2" />
+  
+  <g id="nuper-emblem-icon" transform="translate(16, 16) scale(0.88)" fill="#FFFFFF">
+    <!-- Üst İkiz Kanat -->
+    <polygon points="39,7 47,7 47,44 26,44" />
+    <polygon points="53,7 61,7 74,44 53,44" />
+
+    <!-- Sağ Alt Dışa Bakan Üçgen -->
+    <polygon points="53,67 76,50 91,93" />
+
+    <!-- Sol Alt Dışa Bakan Üçgen -->
+    <polygon points="47,67 24,50 9,93" />
+
+    <!-- Merkez Çekirdek: Yere Bakan Keskin Üçgen Göz -->
+    <polygon points="43,49 57,49 50,64" />
+  </g>
+</svg>

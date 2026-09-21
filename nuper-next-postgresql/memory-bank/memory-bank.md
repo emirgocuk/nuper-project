@@ -48,13 +48,12 @@ The Memory Bank consists of core files and optional context files, all in Markdo
    - Known issues
    - Evolution of project decisions
 
-### Additional Context
-Create additional files/folders within memory-bank/ when they help organize:
-- Complex feature documentation
-- Integration specifications
-- API documentation
-- Testing strategies
-- Deployment procedures
+### Additional Context (Obsidian Vault & Second Brain)
+- `00 - Nuper İkinci Beyin & Vault İndeksi.md`: Ana kontrol paneli ve Map of Content (MOC).
+- `Nuper Marka Rehberi ve Yaratıcılık Manifestosu.md`: Yaratıcılık prensiplerini savunma ve yüksek mühendislik hedefleriyle buluşturan marka doktrini ve tasarım rehberi.
+- `Kitap - Yaratıcılık - Onur Yanık.md`: Onur Yanık'ın 40 sayfalık yaratıcılık kitabının eksiksiz Obsidian Markdown kütüphanesi.
+- `innovationEnginePlan.md`: AI İnovasyon Fabrikası ve Ar-Ge istihbarat mimarisi.
+- `.obsidian/`: Obsidian Vault konfigürasyon dosyaları.
 
 ## Documentation Updates
 

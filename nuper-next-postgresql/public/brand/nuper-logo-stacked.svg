@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- NUPER Vertical / Stacked Logo Lockup - White -->
+  <g id="nuper-logo-stacked">
+    <!-- Emblem (Center Top) -->
+    <g transform="translate(30, 8) scale(0.60)" fill="#FFFFFF">
+      <polygon points="39,7 47,7 47,44 26,44" />
+      <polygon points="53,7 61,7 74,44 53,44" />
+      <polygon points="53,67 76,50 91,93" />
+      <polygon points="47,67 24,50 9,93" />
+      <polygon points="43,49 57,49 50,64" />
+    </g>
+
+    <!-- Wordmark (Center Bottom) -->
+    <text
+      x="60"
+      y="98"
+      text-anchor="middle"
+      font-family="'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+      font-size="22"
+      font-weight="900"
+      letter-spacing="0.04em"
+      fill="#FFFFFF"
+    >NUPER</text>
+  </g>
+</svg>

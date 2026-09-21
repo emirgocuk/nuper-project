@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { NuperLogo } from "@/components/brand/NuperLogo";
 
 export const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -24,29 +25,26 @@ export const Navbar = () => {
     const { data: session } = useSession();
 
     // Premium deep space themed navbar for all pages
-    const navClasses = 'bg-[#0b1120]/75 backdrop-blur-lg border-b border-white/5 text-white';
-    const linkHoverClass = 'hover:text-blue-400 text-gray-300 transition-colors duration-200';
-    const mobileMenuBgClass = 'bg-[#0b1120]/95 border-b border-white/10';
+    const navClasses = 'bg-[#080B11]/85 backdrop-blur-md border-b border-white/10 text-white';
+    const linkHoverClass = 'hover:text-sky-300 text-gray-300 transition-colors duration-200';
+    const mobileMenuBgClass = 'bg-[#080B11]/98 border-b border-white/10';
     const mobileLinkClass = 'text-gray-300 hover:text-white hover:bg-white/5';
 
     const userRole = (session?.user as any)?.role;
 
     return (
         <nav className={cn("fixed top-0 w-full z-50 transition-all duration-300 pr-[var(--removed-body-scroll-bar-size)]", navClasses)}>
-            <div className="flex items-center justify-between max-w-6xl px-4 py-4 mx-auto font-sans">
-                <Link href="/">
-                    <h1 className="text-xl font-bold cursor-pointer font-heading tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-200 to-white">
-                        NUPER INDUSTRIES
-                    </h1>
+            <div className="flex items-center justify-between max-w-7xl px-4 sm:px-6 lg:px-8 py-3.5 mx-auto font-sans">
+                <Link href="/" className="flex items-center group">
+                    <NuperLogo size={28} showText={true} variant="nexus" fontFamily="heading" tracking="anduril" />
                 </Link>
                 <div className="flex items-center space-x-4">
-                    <div className="items-center hidden space-x-6 md:flex">
-                        <Link href="/" className={cn("font-medium text-sm py-2", linkHoverClass)}>Ana Sayfa</Link>
-                        <Link href="/about" className={cn("font-medium text-sm py-2", linkHoverClass)}>Hakkımızda</Link>
-                        <Link href="/projects" className={cn("font-medium text-sm py-2", linkHoverClass)}>Projeler</Link>
-                        <Link href="/ideas" className={cn("font-medium text-sm py-2", linkHoverClass)}>Fikirler</Link>
-                        <Link href="/bulletins" className={cn("font-medium text-sm py-2", linkHoverClass)}>Bültenler</Link>
-                        <Link href="/events" className={cn("font-medium text-sm py-2", linkHoverClass)}>Etkinlikler</Link>
+                    <div className="items-center hidden space-x-6 md:flex font-mono text-xs uppercase tracking-wider">
+                        <Link href="/" className={cn("py-2", linkHoverClass)}>Ana Sayfa</Link>
+                        <Link href="/about" className={cn("py-2", linkHoverClass)}>Doktrin</Link>
+                        <Link href="/projects" className={cn("py-2", linkHoverClass)}>Sistemler</Link>
+                        <Link href="/ideas" className={cn("py-2", linkHoverClass)}>Laboratuvar</Link>
+                        <Link href="/bulletins" className={cn("py-2", linkHoverClass)}>Gelişmeler</Link>
 
                         {session ? (
                             <div className="flex items-center gap-4">
@@ -114,12 +112,11 @@ export const Navbar = () => {
                         className={cn("md:hidden py-4 px-4 shadow-lg", mobileMenuBgClass)}
                     >
                         <nav className="flex flex-col space-y-3">
-                            <Link href="/" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-base font-medium transition-colors", mobileLinkClass)}>Ana Sayfa</Link>
-                            <Link href="/about" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-base font-medium transition-colors", mobileLinkClass)}>Hakkımızda</Link>
-                            <Link href="/projects" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-base font-medium transition-colors", mobileLinkClass)}>Projeler</Link>
-                            <Link href="/ideas" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-base font-medium transition-colors", mobileLinkClass)}>Fikirler</Link>
-                            <Link href="/bulletins" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-base font-medium transition-colors", mobileLinkClass)}>Bültenler</Link>
-                            <Link href="/events" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-base font-medium transition-colors", mobileLinkClass)}>Etkinlikler</Link>
+                            <Link href="/" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Ana Sayfa</Link>
+                            <Link href="/about" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Doktrin</Link>
+                            <Link href="/projects" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Sistemler</Link>
+                            <Link href="/ideas" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Laboratuvar</Link>
+                            <Link href="/bulletins" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Gelişmeler</Link>
                             {session ? (
                                 <>
                                     <div className="h-px bg-white/10 my-2" />

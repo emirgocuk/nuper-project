@@ -6,9 +6,12 @@
 
   /* ─── Nuper Brand Colors ───────────────────────────────────────────── */
   --color-nuper-blue: #1E3A8A;
-  --color-nuper-dark-blue: #0b1120;
+  --color-nuper-dark-blue: #080B11;
   --color-nuper-navy: #172554;
   --color-nuper-gray: #F3F4F6;
+  --color-obsidian-void: #080B11;
+  --color-steel-surface: #0C101A;
+  --color-tactical-sky: #38BDF8;
 
   /* ─── Elite Neon Accents ───────────────────────────────────────────── */
   --color-neon-blue: #3b82f6;

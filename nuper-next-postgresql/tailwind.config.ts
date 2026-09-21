@@ -62,8 +62,11 @@ const config: Config = {
                     "5": "hsl(var(--chart-5))",
                 },
                 'nuper-blue': '#1E3A8A',
-                'nuper-dark-blue': '#172554',
+                'nuper-dark-blue': '#080B11',
                 'nuper-gray': '#F3F4F6',
+                'obsidian-void': '#080B11',
+                'steel-surface': '#0C101A',
+                'tactical-sky': '#38BDF8',
             },
             keyframes: {
                 "accordion-down": {

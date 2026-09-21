@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Cpu, Lock, Unlock, Eye, HelpCircle, User } from "lucide-react";
+import { Cpu, Lock, Unlock, Shield, Terminal, Clock, DollarSign, Activity } from "lucide-react";
 
 interface ProjectCardProps {
   project: {
@@ -34,96 +32,126 @@ export function ProjectCard({ project, isIdea = false }: ProjectCardProps) {
       setError(false);
     } else {
       setError(true);
-      toastError();
+      setTimeout(() => setError(false), 2500);
     }
-  };
-
-  const toastError = () => {
-    // Basic browser alert or styling handles the error feedback
-    setTimeout(() => setError(false), 2000);
   };
 
   const isRestricted = project.visibility === "SEMI_PUBLIC" && !isUnlocked;
 
   return (
-    <Card className="h-full bg-glass border border-white/10 hover:border-white/20 hover:bg-white/5 transition-all duration-300 flex flex-col justify-between overflow-hidden">
-      <CardHeader className="pb-4">
-        <div className="flex justify-between items-start">
-          <div className="p-2.5 bg-blue-500/10 border border-blue-400/20 rounded-xl text-blue-300">
-            <Cpu className="w-6 h-6" />
-          </div>
-          <div className="flex items-center gap-1.5">
-            {project.visibility === "SEMI_PUBLIC" && (
-              <Badge className="bg-red-500/20 text-red-300 border-red-500/30 flex items-center gap-1" variant="outline">
-                {isUnlocked ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                {isUnlocked ? "Erişim Açık" : "Şifreli"}
-              </Badge>
-            )}
-            <Badge 
-              className={
-                isIdea 
-                  ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30" 
-                  : project.status === 'COMPLETED'
-                  ? 'bg-green-500/20 text-green-300 border-green-500/30' 
-                  : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-              } 
-              variant="outline"
-            >
-              {isIdea ? "Fikir/Konsept" : project.status === 'COMPLETED' ? 'Tamamlandı' : 'Devam Ediyor'}
-            </Badge>
-          </div>
+    <div className="h-full bg-[#0C101A] border border-white/10 hover:border-sky-500/40 transition-all duration-300 rounded-xl p-6 flex flex-col justify-between relative overflow-hidden group">
+      {/* Corner Mil-Spec Accent Marks */}
+      <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/30 group-hover:border-sky-400 transition-colors" />
+      <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-white/30 group-hover:border-sky-400 transition-colors" />
+
+      {/* Header Area */}
+      <div>
+        {/* Top Badges Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-4 mb-4 border-b border-white/[0.06]">
+          {/* Security Clearance Badge */}
+          {project.visibility === "SEMI_PUBLIC" ? (
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider ${
+              isUnlocked 
+                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" 
+                : "bg-red-500/10 text-red-400 border border-red-500/30"
+            }`}>
+              {isUnlocked ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+              {isUnlocked ? "SEVİYE 02 // ERİŞİLDİ" : "SEVİYE 02 // ŞİFRELİ"}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-sky-500/10 text-sky-400 border border-sky-500/30">
+              <Shield className="w-3 h-3" />
+              SEVİYE 01 // AÇIK
+            </span>
+          )}
+
+          {/* Operational Status Badge */}
+          <span className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider ${
+            isIdea
+              ? "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+              : project.status === 'COMPLETED'
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+              : "bg-sky-500/10 text-sky-400 border border-sky-500/30"
+          }`}>
+            {isIdea ? "KONSEPT / AR-GE" : project.status === 'COMPLETED' ? "OPERASYONEL" : "GELİŞTİRİLİYOR"}
+          </span>
         </div>
-        <CardTitle className="text-xl mt-5 text-white font-heading font-bold">
+
+        {/* Project Title */}
+        <h3 className="text-xl font-bold text-white font-heading tracking-tight mb-3 group-hover:text-sky-300 transition-colors">
           {project.title}
-        </CardTitle>
-      </CardHeader>
-      
-      <CardContent className="pt-0 flex-1 flex flex-col justify-between space-y-4">
+        </h3>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col justify-between mt-2">
         {isRestricted ? (
-          <div className="flex-grow flex flex-col justify-between space-y-4">
-            <div className="p-4 bg-red-950/20 border border-red-500/10 rounded-xl text-center text-gray-400 text-xs">
-              <Lock className="w-8 h-8 mx-auto mb-2 text-red-400/80" />
-              Bu projenin teknik özetleri ve gereksinim analizleri şifrelenmiştir.
+          <div className="py-4 flex flex-col justify-center space-y-4">
+            <div className="p-4 bg-[#080B11] border border-red-500/20 rounded-lg text-left font-mono">
+              <div className="flex items-center gap-2 text-red-400 text-xs font-bold mb-1">
+                <Lock className="w-4 h-4" />
+                GİZLİ TEKNOLOJİ KATMANI
+              </div>
+              <p className="text-gray-400 text-[11px] leading-relaxed">
+                Bu projenin mimari şemaları ve teknik spesifikasyonları kilitlidir. İncelemek için yetki anahtarınızı girin.
+              </p>
             </div>
-            
-            <form onSubmit={handleUnlock} className="flex gap-2">
-              <input
-                type="password"
-                placeholder="Erişim Şifresi"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={`flex-grow bg-slate-900/60 border ${error ? 'border-red-500 animate-pulse' : 'border-white/10'} focus:border-blue-500 text-white rounded-lg px-3 py-1.5 text-xs outline-none transition-colors`}
-              />
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 text-xs font-bold transition-colors"
-              >
-                Aç
-              </button>
+
+            <form onSubmit={handleUnlock} className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-500 font-mono text-xs">
+                    &gt;
+                  </div>
+                  <input
+                    type="password"
+                    placeholder="PROTOKOL ANAHTARI"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`w-full bg-[#080B11] border ${
+                      error ? 'border-red-500' : 'border-white/10'
+                    } focus:border-sky-400 text-white rounded pl-6 pr-3 py-2 text-xs font-mono outline-none transition-colors uppercase`}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 text-xs font-mono font-bold tracking-wider rounded transition-colors uppercase"
+                >
+                  Doğrula
+                </button>
+              </div>
+              {error && (
+                <div className="text-[11px] font-mono text-red-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                  GEÇERSİZ ERİŞİM ANAHTARI
+                </div>
+              )}
             </form>
           </div>
         ) : (
-          <div className="flex-grow space-y-4">
-            <p className="text-gray-300 text-sm leading-relaxed mb-4">{project.description}</p>
-            
-            {/* AI Estimation Summary if available and unlocked */}
+          <div className="space-y-4">
+            <p className="text-gray-300 text-sm leading-relaxed">
+              {project.description}
+            </p>
+
+            {/* AI Estimation & Technical Metrics */}
             {(project.aiBudgetEstimate || project.aiTimeEstimate || project.aiDifficultyScore) && (
-              <div className="p-3.5 bg-blue-950/20 border border-blue-500/10 rounded-xl space-y-2 text-xs">
-                <div className="text-[10px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
-                  <BrainCircuit className="w-3.5 h-3.5" />
-                  Yapay Zeka Kaynak Analizi
+              <div className="p-3.5 bg-[#080B11] border border-white/[0.06] rounded-lg space-y-2">
+                <div className="text-[10px] font-mono font-bold text-sky-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Cpu className="w-3.5 h-3.5" />
+                  MÜHENDİSLİK & KAYNAK TELEMETRİSİ
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-gray-300">
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                   {project.aiBudgetEstimate && (
-                    <div>
-                      <span className="text-gray-500 block">Tahmini Bütçe:</span>
-                      <span className="font-semibold text-white">{project.aiBudgetEstimate}</span>
+                    <div className="p-2 rounded bg-white/[0.02]">
+                      <span className="text-gray-500 block text-[10px]">KAYNAK / BÜTÇE:</span>
+                      <span className="font-semibold text-gray-200">{project.aiBudgetEstimate}</span>
                     </div>
                   )}
                   {project.aiTimeEstimate && (
-                    <div>
-                      <span className="text-gray-500 block">Tahmini Süre:</span>
-                      <span className="font-semibold text-white">{project.aiTimeEstimate}</span>
+                    <div className="p-2 rounded bg-white/[0.02]">
+                      <span className="text-gray-500 block text-[10px]">ÇEVRİM SÜRESİ:</span>
+                      <span className="font-semibold text-gray-200">{project.aiTimeEstimate}</span>
                     </div>
                   )}
                 </div>
@@ -132,36 +160,19 @@ export function ProjectCard({ project, isIdea = false }: ProjectCardProps) {
           </div>
         )}
 
-        <div className="text-xs text-gray-500 border-t border-white/5 pt-4 flex justify-between items-center">
-          <span>{isIdea ? 'Müellif' : 'Geliştirici'}</span>
-          <span className="font-semibold text-gray-300">
-            {project.user?.name || 'Nuper Industries'}
-          </span>
+        {/* Footer Info Row */}
+        <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-gray-500">
+          <div>
+            <span className="text-gray-600 block text-[10px]">KADRO //</span>
+            <span className="text-gray-300 font-semibold">{project.user?.name || 'NUPER DEFENSE LABS'}</span>
+          </div>
+          <div className="text-right">
+            <span className="text-gray-600 block text-[10px]">SİSTEM ID //</span>
+            <span className="text-sky-400/80">#{project.id.slice(0, 6).toUpperCase()}</span>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-// Small inline Lucide fallback component if BrainCircuit doesn't import
-function BrainCircuit(props: any) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <path d="M12 2v8" />
-      <path d="m16 6-4 4-4-4" />
-      <circle cx="12" cy="18" r="4" />
-      <path d="M12 14v4" />
-    </svg>
-  );
-}

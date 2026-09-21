@@ -12,8 +12,8 @@ const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-headi
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Nuper Industries - Geleceğin Teknolojileri',
-  description: 'Nuper Industries bünyesinde geliştirilen inovasyonlar, Ar-Ge projeleri, teknoloji bültenleri ve etkinlikler.',
+  title: 'Nuper Industries - Savunma & Derin Teknoloji Sistemleri',
+  description: 'Nuper Industries: Savunma teknolojileri, derin sistem mimarileri ve birinci prensiplerle geliştirilen egemen teknoloji ekosistemi.',
 }
 
 export default function RootLayout({
