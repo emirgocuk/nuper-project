@@ -19,18 +19,13 @@ export const Footer = () => (
           </div>
         </div>
 
-        {/* Center Telemetry Status */}
-        <div className="flex items-center gap-2 px-3 py-1 rounded bg-white/[0.02] border border-white/5 text-[11px] font-mono text-gray-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>SİSTEM OPERASYONEL // PROTOKOL V.2.4</span>
-        </div>
+
 
         {/* Right Legal Links */}
         <div className="flex flex-wrap items-center gap-6 text-xs font-mono text-gray-400">
-          <Link href="/about" className="hover:text-white transition-colors">DOKTRİN</Link>
-          <Link href="/projects" className="hover:text-white transition-colors">SİSTEMLER</Link>
-          <Link href="/ideas" className="hover:text-white transition-colors">LABORATUVAR</Link>
-          <Link href="/bulletins" className="hover:text-white transition-colors">GELİŞMELER</Link>
+          <Link href="/about" className="hover:text-white transition-colors">BİZ KİMİZ</Link>
+          <Link href="/projects" className="hover:text-white transition-colors">ÇÖZÜMLERİMİZ</Link>
+          <Link href="/contact" className="hover:text-white transition-colors">İLETİŞİM</Link>
           <Link href="/legal/privacy" className="hover:text-white transition-colors">GİZLİLİK</Link>
           <Link href="/legal/terms" className="hover:text-white transition-colors">KOŞULLAR</Link>
         </div>

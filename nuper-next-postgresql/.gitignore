@@ -56,3 +56,6 @@ next-env.d.ts
 
 # Symlink for linting/type-checking from parent directory
 /nuper-next-postgresql
+
+# Agent customizations
+/.agents

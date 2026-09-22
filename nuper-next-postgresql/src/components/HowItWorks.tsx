@@ -10,24 +10,24 @@ const DOCTRINE_PILLARS = [
     step: '01',
     code: 'DOCTRINE // VISION',
     icon: <Crosshair className="w-6 h-6 text-sky-400" />,
-    title: 'Düş Mühendisliği (Kavramsal Tasarım)',
-    desc: 'Mevcut endüstriyel kalıpları ve ezberleri reddetmek. Kritik sistemik darboğazları saptamak ve birinci prensipler doğrultusunda radikal kavramsal hipotezler geliştirmek.',
+    title: 'Düş Mühendisliği',
+    desc: 'Mevcut endüstriyel kalıpları ve ezberleri aşmak. Kritik sistemik darboğazları saptamak ve birinci prensipler doğrultusunda doğrudan sahaya inen çözümler geliştirmek.',
     tag: 'Birinci Prensipler Metodolojisi',
   },
   {
     step: '02',
     code: 'SYSTEMS // DEEP SOFTWARE',
     icon: <Terminal className="w-6 h-6 text-sky-400" />,
-    title: 'Derin Mimari & Kod (Mühendislik)',
-    desc: 'Tavizsiz mühendislik iradesiyle inşa edilen egemen çekirdek. Küçük ve hiper-uzman bir kadroyla devasa hantal organizasyonların yapamadığı çeviklikte deterministik yazılım, algoritmalar ve fiziksel yapay zeka üretmek.',
+    title: 'Derin Mimari & Kod',
+    desc: 'Tavizsiz mühendislik iradesiyle inşa edilen egemen çekirdek. Yüksek uzmanlıkla çalışan çevik ekiplerle deterministik yazılım, hassas algoritmalar ve derin teknoloji sistemleri üretmek.',
     tag: 'Fiziksel AI & Derin Sistemler',
   },
   {
     step: '03',
     code: 'SOVEREIGN // BOOTSTRAP',
     icon: <ShieldCheck className="w-6 h-6 text-sky-400" />,
-    title: 'Egemen İcraat (Öz Sermaye)',
-    desc: 'Dış fonlara veya bürokrasiye bağımlı kalmadan; kendi yatırımlarıyla büyüyen, ürettiği değeri doğrudan yeni nesil teknolojiye dönüştüren tam bağımsız bir ekosistem inşası.',
+    title: 'Egemen İcraat',
+    desc: 'Dışa bağımlı kalmadan; kendi kaynaklarıyla büyüyen, ürettiği değeri doğrudan sahaya ve yeni nesil teknolojiye dönüştüren bağımsız bir mühendislik ekosistemi.',
     tag: 'Egemen Azınlıklar Doktrini',
   },
 ];
@@ -46,8 +46,7 @@ export const HowItWorks: React.FC = () => {
             EGEMEN ÜRETİMİN 3 SACAYAĞI
           </h2>
           <p className="mt-4 text-base text-gray-400 leading-relaxed">
-            Büyük hantal organizasyonların aksine; yüksek kaldıraçlı, azınlık fakat üstün icraat gücüne sahip 
-            mühendislik prensiplerimiz.
+            Yüksek odaklı, çevik ve sahada doğrudan sonuç üreten modern mühendislik prensiplerimiz.
           </p>
         </div>
 
@@ -103,14 +102,14 @@ export const HowItWorks: React.FC = () => {
               Düş Mühendisliği Metodolojisini Keşfedin
             </div>
             <div className="text-xs text-gray-400 mt-0.5">
-              Kitap özetleri, problem çözme egzersizleri ve kurucu manifestosu.
+              Kitap özetleri, problem çözme yaklaşımları ve vizyonumuz.
             </div>
           </div>
           <Link
             href="/about"
             className="px-5 py-2.5 bg-white text-black font-mono font-bold text-xs uppercase tracking-wider rounded-lg hover:bg-gray-200 transition-colors shrink-0"
           >
-            Manifestoyu Oku →
+            Biz Kimiz →
           </Link>
         </div>
       </div>

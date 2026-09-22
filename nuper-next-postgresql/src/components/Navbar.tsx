@@ -41,10 +41,9 @@ export const Navbar = () => {
                 <div className="flex items-center space-x-4">
                     <div className="items-center hidden space-x-6 md:flex font-mono text-xs uppercase tracking-wider">
                         <Link href="/" className={cn("py-2", linkHoverClass)}>Ana Sayfa</Link>
-                        <Link href="/about" className={cn("py-2", linkHoverClass)}>Doktrin</Link>
-                        <Link href="/projects" className={cn("py-2", linkHoverClass)}>Sistemler</Link>
-                        <Link href="/ideas" className={cn("py-2", linkHoverClass)}>Laboratuvar</Link>
-                        <Link href="/bulletins" className={cn("py-2", linkHoverClass)}>Gelişmeler</Link>
+                        <Link href="/about" className={cn("py-2", linkHoverClass)}>Biz Kimiz</Link>
+                        <Link href="/projects" className={cn("py-2", linkHoverClass)}>Çözümlerimiz</Link>
+                        <Link href="/contact" className={cn("py-2", linkHoverClass)}>İletişim</Link>
 
                         {session ? (
                             <div className="flex items-center gap-4">
@@ -113,10 +112,9 @@ export const Navbar = () => {
                     >
                         <nav className="flex flex-col space-y-3">
                             <Link href="/" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Ana Sayfa</Link>
-                            <Link href="/about" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Doktrin</Link>
-                            <Link href="/projects" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Sistemler</Link>
-                            <Link href="/ideas" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Laboratuvar</Link>
-                            <Link href="/bulletins" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Gelişmeler</Link>
+                            <Link href="/about" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Biz Kimiz</Link>
+                            <Link href="/projects" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>Çözümlerimiz</Link>
+                            <Link href="/contact" onClick={() => setIsMenuOpen(false)} className={cn("block px-3 py-2 rounded-lg text-sm font-mono uppercase tracking-wider transition-colors", mobileLinkClass)}>İletişim</Link>
                             {session ? (
                                 <>
                                     <div className="h-px bg-white/10 my-2" />

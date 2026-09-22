@@ -49,22 +49,6 @@ export const SpaceHero: React.FC = () => {
         />
       </div>
 
-      {/* Köşe Telemetri Verileri (Mil-Spec UI Tags) */}
-      <div className="absolute top-24 left-8 hidden lg:flex flex-col gap-1 text-[10px] font-mono text-gray-500 uppercase tracking-wider">
-        <div className="text-gray-400 font-bold flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          NUPER RADAR // SECTOR 01
-        </div>
-        <div>GRID // LAT 41.0082° N • LON 28.9784° E</div>
-        <div>STATUS // ARSENAL OPERATIONAL</div>
-      </div>
-
-      <div className="absolute top-24 right-8 hidden lg:flex flex-col items-end gap-1 text-[10px] font-mono text-gray-500 uppercase tracking-wider">
-        <div className="text-gray-400 font-bold">FREQUENCY // 9.41 GHz X-BAND</div>
-        <div>DEFENSE AI CORE // SYNCHRONIZED</div>
-        <div>DOCTRINE // SOVEREIGN BOOTSTRAP</div>
-      </div>
-
       {/* Alt Karartma Gradyanı */}
       <div className="absolute bottom-0 left-0 right-0 h-36 bg-gradient-to-t from-[#080B11] via-[#080B11]/80 to-transparent" />
 
