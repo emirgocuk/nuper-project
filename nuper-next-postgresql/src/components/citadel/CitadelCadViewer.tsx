@@ -305,111 +305,118 @@ export function CitadelCadViewer() {
         </div>
       </div>
 
-      {/* 3D Canvas Konteyneri */}
-      <div
-        ref={containerRef}
-        className="w-full h-[460px] cursor-grab active:cursor-grabbing relative"
-      />
+      {/* 3D Görünüm Sahnesi ve HUD Katmanı */}
+      <div className="relative w-full h-[460px] overflow-hidden">
+        <div
+          ref={containerRef}
+          className="w-full h-full cursor-grab active:cursor-grabbing"
+        />
 
-      {/* Sol Alt: Canlı CAD Geometri HUD Bilgi Kartı */}
-      <div className="absolute bottom-4 left-4 z-20 p-3.5 rounded-xl bg-black/75 backdrop-blur-md border border-white/10 font-mono text-xs space-y-1.5 pointer-events-none select-none max-w-xs sm:max-w-sm">
-        <div className="text-[10px] text-amber-400 uppercase font-bold tracking-widest border-b border-white/10 pb-1 flex justify-between">
-          <span>PARÇA: sample_bracket.step</span>
-          <span className="text-gray-400">AL 6061-T6</span>
-        </div>
-        <div className="grid grid-cols-2 gap-x-4 text-[11px] text-gray-300">
-          <div>KÜTLE: <span className="text-white font-bold">0.385 kg</span></div>
-          <div>HACİM: <span className="text-white font-bold">142.590 mm³</span></div>
-          <div>DELİK: <span className="text-white font-bold">4x M4 (ISO 273)</span></div>
-          <div>BOYUT: <span className="text-white font-bold">120x85x45 mm</span></div>
-        </div>
-        <div className="text-[10px] text-gray-400 pt-0.5">
-          AĞIRLIK MERKEZİ (CoG): <span className="text-red-400 font-bold">(5.2, 0.0, 22.5) mm</span>
-        </div>
-      </div>
-
-      {/* Sağ Üst / Alt: İnteraktif Kontrol Butonları */}
-      <div className="absolute top-16 right-4 z-20 flex flex-col gap-2 font-mono text-xs">
-        {/* Mod Seçiciler */}
-        <div className="flex flex-col gap-1 p-1.5 rounded-xl bg-black/80 backdrop-blur-md border border-white/10 shadow-lg">
-          <button
-            onClick={() => setRenderMode('SOLID')}
-            className={`px-3 py-1.5 rounded-lg text-left flex items-center gap-2 transition-all ${
-              renderMode === 'SOLID'
-                ? 'bg-amber-500 text-black font-bold'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span>Katı Metal</span>
-          </button>
-
-          <button
-            onClick={() => setRenderMode('WIREFRAME')}
-            className={`px-3 py-1.5 rounded-lg text-left flex items-center gap-2 transition-all ${
-              renderMode === 'WIREFRAME'
-                ? 'bg-amber-500 text-black font-bold'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <Box className="w-3.5 h-3.5" />
-            <span>CAD Tel Kafes</span>
-          </button>
-
-          <button
-            onClick={() => setRenderMode('FEA_STRESS')}
-            className={`px-3 py-1.5 rounded-lg text-left flex items-center gap-2 transition-all ${
-              renderMode === 'FEA_STRESS'
-                ? 'bg-amber-500 text-black font-bold'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <Flame className="w-3.5 h-3.5" />
-            <span>FEA Gerilme</span>
-          </button>
+        {/* Sol Alt: Canlı CAD Geometri HUD Bilgi Kartı */}
+        <div className="absolute bottom-4 left-4 z-20 p-3.5 rounded-xl bg-black/85 backdrop-blur-md border border-white/15 font-mono text-xs space-y-1.5 pointer-events-none select-none max-w-xs sm:max-w-sm shadow-2xl">
+          <div className="text-[10px] text-amber-400 uppercase font-bold tracking-widest border-b border-white/10 pb-1 flex justify-between">
+            <span>PARÇA: sample_bracket.step</span>
+            <span className="text-gray-400">AL 6061-T6</span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 text-[11px] text-gray-300">
+            <div>KÜTLE: <span className="text-white font-bold">0.385 kg</span></div>
+            <div>HACİM: <span className="text-white font-bold">142.590 mm³</span></div>
+            <div>DELİK: <span className="text-white font-bold">4x M4 (ISO 273)</span></div>
+            <div>BOYUT: <span className="text-white font-bold">120x85x45 mm</span></div>
+          </div>
+          <div className="text-[10px] text-gray-400 pt-0.5">
+            AĞIRLIK MERKEZİ (CoG): <span className="text-red-400 font-bold">(5.2, 0.0, 22.5) mm</span>
+          </div>
         </div>
 
-        {/* CoG ve Döndürme Kontrolleri */}
-        <div className="flex flex-col gap-1 p-1.5 rounded-xl bg-black/80 backdrop-blur-md border border-white/10 shadow-lg">
-          <button
-            onClick={() => setShowCoG(!showCoG)}
-            className={`px-3 py-1.5 rounded-lg text-left flex items-center gap-2 transition-all ${
-              showCoG
-                ? 'text-red-400 font-bold bg-red-500/10'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <Crosshair className="w-3.5 h-3.5" />
-            <span>CoG {showCoG ? 'Açık' : 'Kapalı'}</span>
-          </button>
+        {/* Sağ Üst: İnteraktif Kontrol Butonları */}
+        <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 font-mono text-xs">
+          {/* Mod Seçiciler */}
+          <div className="flex flex-col gap-1 p-1.5 rounded-xl bg-black/85 backdrop-blur-md border border-white/15 shadow-xl">
+            <button
+              onClick={() => setRenderMode('SOLID')}
+              className={`px-3 py-1.5 rounded-lg text-left flex items-center gap-2 transition-all ${
+                renderMode === 'SOLID'
+                  ? 'bg-amber-500 text-black font-bold shadow-sm'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Katı Metal</span>
+            </button>
 
-          <button
-            onClick={() => setAutoRotate(!autoRotate)}
-            className={`px-3 py-1.5 rounded-lg text-left flex items-center gap-2 transition-all ${
-              autoRotate
-                ? 'text-amber-400 font-bold bg-amber-500/10'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <RotateCw className="w-3.5 h-3.5" />
-            <span>Dönüş {autoRotate ? 'Açık' : 'Durdu'}</span>
-          </button>
+            <button
+              onClick={() => setRenderMode('WIREFRAME')}
+              className={`px-3 py-1.5 rounded-lg text-left flex items-center gap-2 transition-all ${
+                renderMode === 'WIREFRAME'
+                  ? 'bg-amber-500 text-black font-bold shadow-sm'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Box className="w-3.5 h-3.5" />
+              <span>CAD Tel Kafes</span>
+            </button>
 
-          <button
-            onClick={resetView}
-            className="px-3 py-1.5 rounded-lg text-left text-gray-400 hover:text-white flex items-center gap-2 transition-all"
-            title="Kamerayı Sıfırla"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Sıfırla</span>
-          </button>
+            <button
+              onClick={() => setRenderMode('FEA_STRESS')}
+              className={`px-3 py-1.5 rounded-lg text-left flex items-center gap-2 transition-all ${
+                renderMode === 'FEA_STRESS'
+                  ? 'bg-amber-500 text-black font-bold shadow-sm'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5" />
+              <span>FEA Gerilme</span>
+            </button>
+          </div>
+
+          {/* CoG ve Döndürme Kontrolleri */}
+          <div className="flex flex-col gap-1 p-1.5 rounded-xl bg-black/85 backdrop-blur-md border border-white/15 shadow-xl">
+            <button
+              onClick={() => setShowCoG(!showCoG)}
+              className={`px-3 py-1.5 rounded-lg text-left flex items-center gap-2 transition-all ${
+                showCoG
+                  ? 'text-red-400 font-bold bg-red-500/10'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+              <span>CoG {showCoG ? 'Açık' : 'Kapalı'}</span>
+            </button>
+
+            <button
+              onClick={() => setAutoRotate(!autoRotate)}
+              className={`px-3 py-1.5 rounded-lg text-left flex items-center gap-2 transition-all ${
+                autoRotate
+                  ? 'text-amber-400 font-bold bg-amber-500/10'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+              <span>Dönüş {autoRotate ? 'Açık' : 'Durdu'}</span>
+            </button>
+
+            <button
+              onClick={resetView}
+              className="px-3 py-1.5 rounded-lg text-left text-gray-400 hover:text-white flex items-center gap-2 transition-all"
+              title="Kamerayı Sıfırla"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Sıfırla</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Alt Kullanım Rehberi */}
-      <div className="px-4 py-2 bg-[#0B0F19]/80 border-t border-white/5 font-mono text-[10px] text-gray-400 flex flex-wrap items-center justify-between gap-2">
-        <span>Fare Sol Tuş: 360° Çevir • Tekerlek: Yakınlaş/Uzaklaş</span>
-        <span className="text-amber-400 font-bold">GERÇEK ZAMANLI ÜÇ BOYUTLU İNCELEME KONSOLU</span>
+      <div className="px-4 py-2.5 bg-[#0B0F19]/90 border-t border-white/10 font-mono text-[10px] text-gray-400 flex flex-wrap items-center justify-between gap-2 z-10 relative">
+        <span className="flex items-center gap-1.5 text-gray-300">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+          Fare Sol Tuş: 360° Çevir • Tekerlek: Yakınlaş / Uzaklaş
+        </span>
+        <span className="text-amber-400/90 font-bold hidden sm:inline tracking-wider">
+          GERÇEK ZAMANLI B-REP İNCELEME KONSOLU
+        </span>
       </div>
     </div>
   );
