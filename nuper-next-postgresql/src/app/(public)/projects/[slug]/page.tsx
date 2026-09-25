@@ -206,7 +206,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                 Post-FEA Kapalı Döngü Doğrulama
               </h3>
               <p className="text-xs text-gray-400 leading-relaxed font-sans">
-                Simülasyon çıktıları sisteme aktarılarak ilk mod frekansının sınır şartını ($f_1 > 1.2 \times f_{\max}$) sağlayıp sağlamadığı denetlenir. Dinamik büyütme ($Q$), akma emniyet marjı ($MS$) ve gerekliyse çentikleme derinliği ($\Delta \text{dB}$) türetilir.
+                Simülasyon çıktıları sisteme aktarılarak ilk mod frekansının sınır şartını ($f_1 &gt; 1.2 \times f_max$) sağlayıp sağlamadığı denetlenir. Dinamik büyütme ($Q$), akma emniyet marjı ($MS$) ve gerekliyse çentikleme derinliği ($\Delta \text{dB}$) türetilir.
               </p>
             </div>
 
