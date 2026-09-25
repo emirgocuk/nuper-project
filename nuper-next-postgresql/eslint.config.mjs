@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "imported_projects/**",
+    "nuper_citadel/**",
   ]),
 ]);
 

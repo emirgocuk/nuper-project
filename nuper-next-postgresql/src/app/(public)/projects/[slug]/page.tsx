@@ -18,9 +18,21 @@ import {
   Download,
   Flame,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { CADPattern } from '@/components/arsenal/CADPattern';
-import { CitadelCadViewer } from '@/components/citadel/CitadelCadViewer';
 import { CitadelSpecSimulator } from '@/components/citadel/CitadelSpecSimulator';
+
+const CitadelCadViewer = dynamic(
+  () => import('@/components/citadel/CitadelCadViewer').then((mod) => mod.CitadelCadViewer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[460px] rounded-2xl bg-[#070A11] border border-amber-500/30 flex items-center justify-center font-mono text-xs text-amber-400">
+        <span className="animate-pulse">3D CAD B-REP GÖRÜNTÜLEYİCİ YÜKLENİYOR...</span>
+      </div>
+    ),
+  }
+);
 
 interface ProjectDetailPageProps {
   params: Promise<{
