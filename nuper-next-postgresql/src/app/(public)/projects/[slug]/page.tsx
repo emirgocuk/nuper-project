@@ -6,33 +6,11 @@ import {
   ArrowLeft,
   CheckCircle2,
   ShieldCheck,
-  Cpu,
-  Layers,
-  FileText,
   Mail,
-  Terminal,
-  Activity,
-  Box,
-  Sliders,
-  HardDrive,
-  Download,
-  Flame,
 } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import { CADPattern } from '@/components/arsenal/CADPattern';
 import { CitadelSpecSimulator } from '@/components/citadel/CitadelSpecSimulator';
-
-const CitadelCadViewer = dynamic(
-  () => import('@/components/citadel/CitadelCadViewer').then((mod) => mod.CitadelCadViewer),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="w-full h-[460px] rounded-2xl bg-[#070A11] border border-amber-500/30 flex items-center justify-center font-mono text-xs text-amber-400">
-        <span className="animate-pulse">3D CAD B-REP GÖRÜNTÜLEYİCİ YÜKLENİYOR...</span>
-      </div>
-    ),
-  }
-);
+import { CitadelCadViewer } from '@/components/citadel/CitadelCadViewer';
 
 interface ProjectDetailPageProps {
   params: Promise<{
@@ -52,6 +30,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
 
   if (!project) {
     notFound();
+    return null;
   }
 
   const isCitadel = project.slug === 'nuper-citadel';
@@ -178,7 +157,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                 Katı Geometri ve DIN 912 Cıvata Ayrıştırma
               </h3>
               <p className="text-xs text-gray-400 leading-relaxed font-sans">
-                Yüklenen 3D STEP dosyasından net hacim, kütle, ağırlık merkezi (CoG) koordinatları ve montaj flanş delik aralıkları deterministik çözülür. ISO 273 normlarına göre DIN 912 cıvataların ön yük ($F_M$) ve tork reçetesi hazırlanır.
+                Yüklenen 3D STEP dosyasından net hacim, kütle, ağırlık merkezi (CoG) koordinatları ve montaj flanş delik aralıkları deterministik çözülür. ISO 273 normlarına göre DIN 912 cıvataların ön yük (FM) ve tork reçetesi hazırlanır.
               </p>
             </div>
 
@@ -206,7 +185,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                 Post-FEA Kapalı Döngü Doğrulama
               </h3>
               <p className="text-xs text-gray-400 leading-relaxed font-sans">
-                Simülasyon çıktıları sisteme aktarılarak ilk mod frekansının sınır şartını ($f_1 &gt; 1.2 \times f_max$) sağlayıp sağlamadığı denetlenir. Dinamik büyütme ($Q$), akma emniyet marjı ($MS$) ve gerekliyse çentikleme derinliği ($\Delta \text{dB}$) türetilir.
+                Simülasyon çıktıları sisteme aktarılarak ilk mod frekansının sınır şartını (&quot;f1 &gt; 1.2 × f_max&quot;) sağlayıp sağlamadığı denetlenir. Dinamik büyütme (Q), akma emniyet marjı (MS) ve gerekliyse çentikleme derinliği (&Delta;dB) türetilir.
               </p>
             </div>
 
