@@ -90,3 +90,21 @@ Kalite kontrol bir "bekleme odası" veya hurda ayıklama istasyonu olmaktan çı
    > *"Operasyon 2'deki $\varnothing 30\text{ H7}$ deliği nominalden $+0.015\text{ mm}$ büyük çıkıyor; rayba aşınması sınır değere ulaştı."*
 3. CNC kontrol ünitesine (Fanuc, Siemens Sinumerik, Heidenhain) doğrudan yüklenebilir takım ofset düzeltme komutu üretilir (T03 Wear: $-0.012\text{ mm}$).
 4. Sonuç: Parça hatalı çıkmadan önce CNC tezgahı kendi kendini düzeltir; hurda oranı sıfıra iner.
+
+---
+
+## 📑 5. Operatör Kurulum Sayfası (Inspection Setup Sheet) Çıktısı
+
+Yalnızca DMIS kodu üretmek atölye zemininde yetersizdir; operatörün parçayı tezgah tablasına nasıl bağlayacağını, hangi prob ucunu takacağını ve nereden kaba sıfır alacağını gösteren tek sayfalık otomatik bir PDF Kurulum Föyü basılır:
+1. **İzometrik Görünüm:** Parçanın yönü ve bağlama pabuçlarının Keep-Out kırmızı bölgeleri.
+2. **Prob Reçetesi:** Takılacak stylus çapı ($\varnothing 2\text{ mm}$), şaft boyu ($20\text{ mm}$) ve uzatma çubuğu boyu ($50\text{ mm}$).
+3. **Manuel Ön-Hizalama Şeması:** `MODE/MAN` ile dokunulacak 3 kaba referans noktasının resimli koordinat talimatı.
+
+---
+
+## 🔦 6. Hibrit Metroloji Desteği (Optik & Lazer Tarama)
+
+Delik ve pim gibi hassas geçmelerde ($H7$) dokunmatik prob kullanılırken; serbest döküm yüzeyleri ve serbest formlar için lazer çizgi tarayıcılar (LineScan) devreye girer.
+* AST veri modelinde `SensorType::Tactile` ve `SensorType::OpticalLaser` polimorfik olarak desteklenir.
+* Lazer seçildiğinde diskret temas noktaları yerine paralel tarama şerit hatları (scan stripes) derlenir.
+

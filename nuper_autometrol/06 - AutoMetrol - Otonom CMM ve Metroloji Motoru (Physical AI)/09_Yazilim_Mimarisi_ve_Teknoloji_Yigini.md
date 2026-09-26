@@ -35,14 +35,16 @@ AutoMetrol, web veya bulut tabanlı bir servis değildir. Savunma ve hassas imal
 
 ---
 
-## 🖥️ 2. Ön Yüz Mimarisi (Tauri + React + Three.js)
+## 🖥️ 2. Ön Yüz Mimarisi (Tauri + React + Three.js: Solid Slate Light)
 
-- **Tauri 2.0:** Electron'un getirdiği ağır bellek (RAM) yükünü ve yavaşlığı ortadan kaldırır. Kurulum paketi $< 80\text{ MB}$, başlangıç süresi $< 1\text{ saniye}$.
-- **Three.js / WebGL-WebGPU:**
-  - Rust tarafından tesellasyon (tessellation) ile üretilen mesh verisi doğrudan GPU'ya aktarılır.
-  - Ölçülecek yüzeyler yeşil, silindirik delikler mavi, kör/ulaşılamayan noktalar kırmızı ile vurgulanır.
-  - Probun izleyeceği hareket yolları sarı çizgilerle, $+50\text{ mm}$ emniyet kutusu (Clearance Box) yarı saydam bir zarf olarak görselleştirilir.
-  - Operatör için tam animasyonlu prob hareket simülasyonu sunulur.
+- **Tauri 2.0:** Electron'un getirdiği ağır bellek (RAM) yükünü ve yavaşlığı ortadan kaldırır. Kurulum paketi $< 80\text{ MB}$, başlangıç süresi $< 1\text{ saniye}$, arayüz RAM tüketimi $80-150\text{ MB}$.
+- **Solid Slate Light Mühendislik Teması:** Kalite kontrol odalarındaki teknik resim kağıdı ile ekran arasındaki göz uyumunu koruyan açık gri-beyaz `#F1F5F9` zemin, saf beyaz kartlar ve $1\text{px}$ `#CBD5E1` kenarlıklar.
+- **Sıfır İsraf Three.js Mimarisi:**
+  - PBR, SSAO, HDR ve gölgeler devre dışı; SolidWorks tarzı hafif mat CAD görünümü (`MeshLambertMaterial`) ve koyu gri kenar çizgileri (`LineSegments` `#475569`). VRAM tüketimi 800 MB'dan 60 MB'a iner.
+  - **On-Demand Rendering:** Sabit dururken ekran saniyede 60 kez çizilmez; yalnızca kullanıcı modeli döndürdüğünde veya simülasyon oynarken render tetiklenir (boşta %0 GPU).
+  - Ölçülecek delikler açık mavi (`#0284C7`), datumlar zümrüt yeşili (`#059669`), prob yolu koyu amber (`#D97706`), çarpışmalar net kırmızı (`#DC2626`).
+  - Sanal Liste (Virtual Scrolling) ile 1.000 unsurlu havacılık parçalarında bile DOM şişmesi engellenir.
+
 
 ---
 

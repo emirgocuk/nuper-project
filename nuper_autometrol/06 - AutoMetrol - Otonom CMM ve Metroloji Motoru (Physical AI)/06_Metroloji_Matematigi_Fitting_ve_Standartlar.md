@@ -104,3 +104,16 @@ Savunma ve havacılık sektörlerinde kalite direktörlerinin ilk sorusu şudur:
 1. **PTB (Physikalisch-Technische Bundesanstalt - Almanya):** Alman Ulusal Metroloji Enstitüsü'nün yayınladığı açık referans koordinat veri setleri (Reference Data Sets for Geometric Tolerancing).
 2. **NIST (National Institute of Standards and Technology - ABD):** Özel form bozukluğuna sahip standart test noktaları.
 3. **Doğrulama Sertifikası (Validation Certificate):** AutoMetrol'ün Rust matematik çekirdeği PTB veri kümeleriyle birim testlere (unit tests) sokulur. Algoritmaların hata payının $10^{-6}\text{ mm}$ (nanometre) altında olduğu belgelenerek müşteriye resmi test raporu olarak sunulur.
+
+---
+
+## 🏛️ 7. Uluslararası Standartlar ve Belirsizlik Yönetimi
+
+| Akademik / Endüstriyel Konu | Referans Standart | Koddaki Algoritmik Karşılığı |
+|---|---|---|
+| **Belirsizlik & Simülasyon** | **ISO 15530-3 / GUM** | Sanal CMM Monte Carlo simülasyonu ve Test Belirsizlik Oranı ($\text{TUR} \ge 4:1$) kontrolü |
+| **Uç Değer & Filtreleme** | **ISO 16610-21 / 31** | Robust Gaussian profil filtresi ve 3-Sigma çapak/toz ayıklama |
+| **Datum Kinematiği** | **ISO 5459 / ISO 1101** | $A \mid B \mid C$ datum önceliği ve 6 Serbestlik Derecesi (DoF) rank analizi matrisi |
+| **CAD Veri Protokolü** | **ISO 10303 (AP214 / AP242)** | STEP AP242 doğrudan semantik PMI okuma; AP214'te 2D PDF Vision-LLM fallback |
+| **Kalite Karar Eşiği** | **ISO 14253-1** | Guard-Banding ($[LSL + U, USL - U]$) ile şüpheli sınır toleransı koruması |
+

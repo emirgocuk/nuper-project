@@ -57,6 +57,10 @@ tera = "1.19"
 # C++ Köprüsü
 cxx = "1.0"
 
+# Çizge Eşleme ve Çarpışma Hesaplama
+petgraph = "0.6"
+parry3d = "0.13"
+
 # Günlükleme ve Teşhis
 tracing = "0.1"
 tracing-subscriber = "0.3"
