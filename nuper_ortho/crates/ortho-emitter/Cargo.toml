@@ -1,0 +1,16 @@
+[package]
+name = "ortho-emitter"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+ortho-ast = { path = "../ortho-ast" }
+ortho-kinematics = { path = "../ortho-kinematics" }
+ortho-router = { path = "../ortho-router" }
+glam.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tera.workspace = true

@@ -1,0 +1,5 @@
+C:\Projeler\nuper-project\nuper_ortho\target\debug\deps\bitflags-8c2e4557eff5caf9.d: C:\Users\mertg\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bitflags-1.3.2\src\lib.rs
+
+C:\Projeler\nuper-project\nuper_ortho\target\debug\deps\libbitflags-8c2e4557eff5caf9.rmeta: C:\Users\mertg\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bitflags-1.3.2\src\lib.rs
+
+C:\Users\mertg\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bitflags-1.3.2\src\lib.rs:

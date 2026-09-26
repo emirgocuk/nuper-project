@@ -1,0 +1,17 @@
+[package]
+name = "ortho-kinematics"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+ortho-ast = { path = "../ortho-ast" }
+glam.workspace = true
+approx.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+approx.workspace = true

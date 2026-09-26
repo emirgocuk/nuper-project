@@ -1,0 +1,20 @@
+[package]
+name = "ortho-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "ortho"
+path = "src/main.rs"
+
+[dependencies]
+ortho-ast = { path = "../ortho-ast" }
+ortho-brep = { path = "../ortho-brep" }
+ortho-kinematics = { path = "../ortho-kinematics" }
+ortho-router = { path = "../ortho-router" }
+ortho-emitter = { path = "../ortho-emitter" }
+glam.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

@@ -1,0 +1,18 @@
+[package]
+name = "ortho-brep"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+default = []
+occt = ["dep:cxx"]
+
+[dependencies]
+ortho-ast = { path = "../ortho-ast" }
+glam.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+cxx = { workspace = true, optional = true }
+
