@@ -27,7 +27,7 @@ pub use composite_gdandt::{CompositeTolerance, SingleToleranceZone};
 pub use datum::{DatumFeature, DatumLabel, DatumPrecedence, DatumReferenceFrame};
 pub use error::AstError;
 pub use feature::{FeatureType, GeometricFeature};
-pub use plan::{InspectionPlan, LengthUnit};
+pub use plan::{InspectionPlan, LengthUnit, MultiSetupPlan};
 pub use threads::{
     classify_thread_from_bore, classify_thread_from_callout, ManualGaugeItem, SetupSheetGaugeReport,
     ThreadBypassStrategy, ThreadDiameterKind, ThreadSpecification, ThreadStandard,
@@ -311,6 +311,78 @@ mod tests {
         let md_table = report.format_markdown_table();
         assert!(md_table.contains("M10x1.50"));
         assert!(md_table.contains("G 1/4\""));
+    }
+
+    #[test]
+    fn test_multi_setup_plan_splitting() {
+        let drf = DatumReferenceFrame::new_3_2_1("PCS_1", 1, 2, 3);
+        let mut plan = InspectionPlan::new("MANIFOLD_BLOCK", "block.step", drf);
+
+        // Üst yüzey (+Z normal)
+        let top_face = GeometricFeature::new_plane(
+            1,
+            "TOP_FACE",
+            glam::DVec3::new(50.0, 50.0, 50.0),
+            glam::DVec3::Z,
+            5000.0,
+            10.0,
+        ).unwrap();
+        plan.features.push(top_face);
+
+        // Yan delik (+X normal)
+        let side_hole = GeometricFeature::new_internal_cylinder(
+            2,
+            "SIDE_BORE",
+            glam::DVec3::new(100.0, 50.0, 25.0),
+            glam::DVec3::X,
+            15.0,
+            20.0,
+            942.0,
+            5.0,
+        ).unwrap();
+        plan.features.push(side_hole);
+
+        // Alt taban yüzeyi (-Z normal)
+        let bottom_face = GeometricFeature::new_plane(
+            3,
+            "BOTTOM_FLANGE",
+            glam::DVec3::new(50.0, 50.0, 0.0),
+            -glam::DVec3::Z,
+            5000.0,
+            10.0,
+        ).unwrap();
+        plan.features.push(bottom_face);
+
+        // Alt delik (-Z normal)
+        let bottom_hole = GeometricFeature::new_internal_cylinder(
+            4,
+            "BOTTOM_PIN_BORE",
+            glam::DVec3::new(50.0, 50.0, 0.0),
+            -glam::DVec3::Z,
+            8.0,
+            15.0,
+            376.0,
+            5.0,
+        ).unwrap();
+        plan.features.push(bottom_hole);
+
+        plan.tolerances.push(ToleranceConstraint::new_h7_hole(101, 2, 15.0, 0.018));
+        plan.tolerances.push(ToleranceConstraint::new_h7_hole(102, 4, 8.0, 0.015));
+
+        // Z_up tablası normaline göre OP10 ve OP20'ye böl
+        let multi_setup = plan.split_into_multi_setup(glam::DVec3::Z);
+
+        assert_eq!(multi_setup.op10.features.len(), 2); // TOP_FACE, SIDE_BORE
+        assert_eq!(multi_setup.op10.tolerances.len(), 1); // Tol 101
+
+        assert!(multi_setup.op20.is_some());
+        let op20 = multi_setup.op20.unwrap();
+        assert_eq!(op20.features.len(), 2); // BOTTOM_FLANGE, BOTTOM_PIN_BORE
+        assert_eq!(op20.tolerances.len(), 1); // Tol 102
+        assert_eq!(op20.part_name, "MANIFOLD_BLOCK_OP20");
+
+        assert_eq!(multi_setup.setup_instructions.len(), 3);
+        assert!(multi_setup.setup_instructions[1].contains("180° ters çevirin"));
     }
 }
 

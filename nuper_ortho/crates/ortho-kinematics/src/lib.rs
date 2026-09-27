@@ -7,6 +7,7 @@ pub mod ph10;
 pub mod plan;
 pub mod sampling;
 pub mod tree;
+pub mod uncertainty;
 
 pub use fitting::{
     evaluate_composite_position_2d, evaluate_surface_profile, fit_chebyshev_circumscribed_cylinder,
@@ -23,4 +24,7 @@ pub use sampling::{
     sample_thread_locator_pin, SamplingPoint, SurfaceEvalSample,
 };
 pub use tree::{ProbeStack, StarProbeAssembly, StemMaterial};
+pub use uncertainty::{
+    ConformanceDecision, RobustOutlierFilter, UncertaintyBudget,
+};
 

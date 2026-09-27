@@ -1,4 +1,5 @@
 pub mod calypso;
+pub mod closed_loop;
 pub mod template_engine;
 
 use std::fmt::Write;
@@ -9,6 +10,9 @@ use ortho_router::{CertifiedCollisionFreeTrajectory, MotionSegment};
 use thiserror::Error;
 
 pub use calypso::{CalypsoEmitter, CalypsoError};
+pub use closed_loop::{
+    ClosedLoopEngine, ClosedLoopError, CncControllerType, FeatureDeviation, ToolCompensationMapping,
+};
 pub use template_engine::{TemplateContextData, TemplateEngine, ThermalConfig};
 
 #[derive(Error, Debug)]

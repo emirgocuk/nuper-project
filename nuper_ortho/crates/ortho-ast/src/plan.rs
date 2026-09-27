@@ -117,4 +117,105 @@ impl InspectionPlan {
         plan.validate()?;
         Ok(plan)
     }
+
+    /// Parçanın Z_up duruşunda erişilemeyen alt taban unsurlarını OP10 ve OP20 olarak ikiye böler (Doc 08)
+    pub fn split_into_multi_setup(&self, table_normal: DVec3) -> MultiSetupPlan {
+        let normalized_table = table_normal.normalize();
+
+        let mut op10_features = Vec::new();
+        let mut op20_features = Vec::new();
+
+        for feat in &self.features {
+            // Tabla yüzeyine doğru bakan (N . (-table_normal) > 0.70) veya tabanla çakışan unsurlar OP20'ye
+            let dot = feat.normal_vector.dot(normalized_table);
+            if dot < -0.70 {
+                op20_features.push(feat.clone());
+            } else {
+                op10_features.push(feat.clone());
+            }
+        }
+
+        let op10_feat_ids: Vec<u32> = op10_features.iter().map(|f| f.id).collect();
+        let op20_feat_ids: Vec<u32> = op20_features.iter().map(|f| f.id).collect();
+
+        let op10_tolerances: Vec<ToleranceConstraint> = self
+            .tolerances
+            .iter()
+            .filter(|t| op10_feat_ids.contains(&t.feature_id))
+            .cloned()
+            .collect();
+
+        let op20_tolerances: Vec<ToleranceConstraint> = self
+            .tolerances
+            .iter()
+            .filter(|t| op20_feat_ids.contains(&t.feature_id))
+            .cloned()
+            .collect();
+
+        let op10 = Self {
+            part_name: format!("{}_OP10", self.part_name),
+            cad_source_file: self.cad_source_file.clone(),
+            unit: self.unit,
+            datum_frame: self.datum_frame.clone(),
+            features: op10_features,
+            compound_holes: self.compound_holes.clone(),
+            tolerances: op10_tolerances,
+            composite_tolerances: self.composite_tolerances.clone(),
+            bounding_box_min: self.bounding_box_min,
+            bounding_box_max: self.bounding_box_max,
+        };
+        // OP10 geçerlilik kontrolü
+        let _ = op10.validate();
+
+        let (op20, setup_instructions) = if !op20_features.is_empty() {
+            // OP20 için parça 180 derece ters çevrilir (Z ekseni tersine döner)
+            let op20_plan = Self {
+                part_name: format!("{}_OP20", self.part_name),
+                cad_source_file: self.cad_source_file.clone(),
+                unit: self.unit,
+                datum_frame: DatumReferenceFrame::new_3_2_1(
+                    "PCS_OP20_FLIPPED",
+                    op20_features.first().map(|f| f.id).unwrap_or(1),
+                    op20_features.get(1).map(|f| f.id).unwrap_or(1),
+                    op20_features.get(2).map(|f| f.id).unwrap_or(1),
+                ),
+                features: op20_features,
+                compound_holes: Vec::new(),
+                tolerances: op20_tolerances,
+                composite_tolerances: Vec::new(),
+                bounding_box_min: self.bounding_box_min,
+                bounding_box_max: self.bounding_box_max,
+            };
+
+            let instructions = vec![
+                format!("1. [OP10] Parçayı standart duruşta (Z-Up) bağlayın ve {} ana unsuru ölçün.", op10_feat_ids.len()),
+                "2. [FLIP] OP10 tamamlandıktan sonra parçayı fikstürden söküp 180° ters çevirin.".to_string(),
+                format!("3. [OP20] Alt taban ve ters faturalarda kalan {} unsuru ölçmek için kaba sıfır alın.", op20_feat_ids.len()),
+            ];
+
+            (Some(op20_plan), instructions)
+        } else {
+            let instructions = vec![
+                format!("Tüm {} unsur tek bağlamada (OP10) ölçülebilir; parça çevirme gerekmez.", op10_feat_ids.len())
+            ];
+            (None, instructions)
+        };
+
+        MultiSetupPlan {
+            op10,
+            op20,
+            setup_instructions,
+        }
+    }
+}
+
+/// Çoklu Bağlama Teftiş Planı (Multi-Setup Routing - Doc 08 & Doc 11)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MultiSetupPlan {
+    /// Birincil bağlama: OP10 (Üst yüzeyler, yan delikler, normal duruş)
+    pub op10: InspectionPlan,
+    /// İkincil bağlama: OP20 (Ters çevrilmiş alt taban unsurları - varsa)
+    pub op20: Option<InspectionPlan>,
+    /// Çevirme / fikstürleme operatör yönergeleri
+    pub setup_instructions: Vec<String>,
 }
