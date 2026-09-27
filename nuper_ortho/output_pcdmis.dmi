@@ -1,0 +1,119 @@
+FILNAM/'VALVE_BODY_OP10', 5.3
+DVPOFT/0
+UNITS/MM, ANGDEC
+DECPL/ALL, 4
+$$ ==============================================================
+$$ NUPER ORTHO OTONOM CMM TEFTIS PROGRAMI
+$$ PARCA: VALVE_BODY_OP10
+$$ CAD KAYNAK: tests/data/valve_block.step
+$$ GUVENLIK: CERTIFIED COLLISION-FREE (GJK/EPA PASS)
+$$ ROTA MUHRU (SHA-256): 2F69CBF634E2C5D29456576DD9BA63BCFB83D3EAAAC65B77629AA6705A73EC78
+$$ ==============================================================
+
+TEMPR/PART, 20.00, MATL, 23.4000  $$ 20.0C, Aluminum 7075-T6
+SNSET/APPRCH, 4.0000
+SNSET/RETRCT, 5.0000
+SNSET/SEARCH, 8.0000
+SNSET/CLRSRF, 100.0000
+
+$$ ==============================================================
+$$ GUVENLI BASLANGIC VE PARK EL SIKISMASI (Z-FIRST TRAVERSAL)
+$$ ==============================================================
+GOTO/CART, 0.0000, 0.0000, 150.0000  $$ 1. Bulunulan noktadan bagimsiz tavana cek
+GOTO/CART, 50.0000, 40.0000, 150.0000  $$ 2. Guvenli tavanda parca merkezine intikal
+GOTO/CART, 50.0000, 40.0000, 100.0000  $$ 3. Parcanin Clearance Box emniyet kutusuna in
+
+$$ ==============================================================
+$$ 1. OPERATOR REHBERLIGI: MANUEL KABA ON-HIZALAMA (3-2-1)
+$$ ==============================================================
+MODE/MAN
+TEXT/OPER, 'JOYSTICK ILE PRIMER DATUM A DUZLEMINE 3 NOKTA TEMAS ALINIZ'
+F(ROUGH_A) = FEAT/PLANE,CART, 0.0, 0.0, 100.0000, 0.0, 0.0, 1.0
+MEAS/PLANE, F(ROUGH_A), 3
+  PTMEAS/CART, 0.0, 0.0, 100.0000, 0.0, 0.0, 1.0
+  PTMEAS/CART, 20.0, 0.0, 100.0000, 0.0, 0.0, 1.0
+  PTMEAS/CART, 0.0, 20.0, 100.0000, 0.0, 0.0, 1.0
+ENDMES
+DATDEF/FA(ROUGH_A), DAT(A)
+
+$$ ==============================================================
+$$ 2. OTONOM DCC MODU
+$$ ==============================================================
+MODE/AUTO, PROG
+SNSLCT/SA(A0.0B0.0)
+GOTO/CART, 0.0000, 0.0000, 100.0000
+
+$$ ==============================================================
+$$ 3. HASSAS GEOMETRIK UNSUR OLCUMLERI
+$$ ==============================================================
+F(PLANE_1) = FEAT/PLANE,CART, 50.0000, 0.0000, 25.0000, 0.0000, -1.0000, 0.0000
+F(PLANE_2) = FEAT/PLANE,CART, 2.0000, 40.0000, 25.0000, 1.0000, 0.0000, 0.0000
+F(PLANE_3) = FEAT/PLANE,CART, 50.0000, 40.0000, 50.0000, 0.0000, 0.0000, 1.0000
+F(PLANE_5) = FEAT/PLANE,CART, 50.0000, 40.0000, 0.0000, -0.0000, -0.0000, 1.0000
+F(PLANE_6) = FEAT/PLANE,CART, 0.0000, 40.0000, 25.0000, -1.0000, 0.0000, 0.0000
+F(BORE_25) = FEAT/CYLNDR,IN,CART, 50.0000, 40.0000, 0.0000, 0.0000, 0.0000, 1.0000, 25.0000, 30.0000
+
+$$ ==============================================================
+$$ 4. SERTIFIKALI CARPISMASIZ HAREKET HATTI
+$$ ==============================================================
+SNSLCT/SA(A0.0B-180.0)
+GOTO/CART, 25.0000, 65.0000, 100.0000
+PTMEAS/CART, 25.0000, 65.0000, 0.0000, -0.0000, -0.0000, 1.0000
+GOTO/CART, 25.0000, 65.0000, 5.0000
+GOTO/CART, 25.0000, 15.0000, 100.0000
+PTMEAS/CART, 25.0000, 15.0000, 0.0000, -0.0000, -0.0000, 1.0000
+GOTO/CART, 25.0000, 15.0000, 5.0000
+GOTO/CART, 75.0000, 15.0000, 100.0000
+PTMEAS/CART, 75.0000, 15.0000, 0.0000, -0.0000, -0.0000, 1.0000
+GOTO/CART, 75.0000, 15.0000, 5.0000
+GOTO/CART, 75.0000, 65.0000, 100.0000
+PTMEAS/CART, 75.0000, 65.0000, 0.0000, -0.0000, -0.0000, 1.0000
+GOTO/CART, 75.0000, 65.0000, 5.0000
+PTMEAS/CART, 50.0000, 52.5000, 7.5000, -0.0000, -1.0000, -0.0000
+GOTO/CART, 50.0000, 47.5000, 7.5000
+PTMEAS/CART, 37.5000, 40.0000, 7.5000, 1.0000, -0.0000, -0.0000
+GOTO/CART, 42.5000, 40.0000, 7.5000
+PTMEAS/CART, 50.0000, 27.5000, 7.5000, 0.0000, 1.0000, -0.0000
+GOTO/CART, 50.0000, 32.5000, 7.5000
+PTMEAS/CART, 62.5000, 40.0000, 7.5000, -1.0000, 0.0000, 0.0000
+GOTO/CART, 57.5000, 40.0000, 7.5000
+PTMEAS/CART, 50.0000, 52.5000, 22.5000, -0.0000, -1.0000, -0.0000
+GOTO/CART, 50.0000, 47.5000, 22.5000
+PTMEAS/CART, 37.5000, 40.0000, 22.5000, 1.0000, -0.0000, -0.0000
+GOTO/CART, 42.5000, 40.0000, 22.5000
+PTMEAS/CART, 50.0000, 27.5000, 22.5000, 0.0000, 1.0000, -0.0000
+GOTO/CART, 50.0000, 32.5000, 22.5000
+PTMEAS/CART, 62.5000, 40.0000, 22.5000, -1.0000, 0.0000, 0.0000
+GOTO/CART, 57.5000, 40.0000, 22.5000
+
+$$ ==============================================================
+$$ 5. TOLERANS RAPORU VE FITTING (GAUSS / CHEBYSHEV)
+$$ ==============================================================
+T(TOL_101) = TOL/DIAM, 25.0000, 0.0210, 0.0000
+EVAL/FA(FEAT_7), TA(TOL_101), ALGOR/MINSC  $$ Chebyshev Inscribed (H7)
+OUTPUT/FA(FEAT_7), TA(TOL_101)
+
+$$ ==============================================================
+$$ 6. ASME Y14.5 BILESIK KONUM TOLERANSI (COMPOSITE FCF)
+$$ ==============================================================
+$$ BILESIK FCF: BORE_PATTERN_COMPOSITE
+T(TOL_PLTZF_201) = TOL/POS, 2D, 0.5000, RFS, DAT(A), DAT(B), DAT(C)
+T(TOL_FRTZF_201) = TOL/POS, 2D, 0.1000, RFS, DAT(A)
+EVAL/FA(FEAT_7), TA(TOL_PLTZF_201)
+OUTPUT/FA(FEAT_7), TA(TOL_PLTZF_201)
+EVAL/FA(FEAT_7), TA(TOL_FRTZF_201)
+OUTPUT/FA(FEAT_7), TA(TOL_FRTZF_201)
+
+$$ ==============================================================
+$$ GUVENLI BITIS VE PARK KONUMUNA DONUS (Z-FIRST TRAVERSAL)
+$$ ==============================================================
+GOTO/CART, 50.0000, 40.0000, 100.0000
+GOTO/CART, 50.0000, 40.0000, 150.0000
+GOTO/CART, 0.0000, 0.0000, 150.0000
+ENDFIL
+
+$$ ==============================================================
+$$ METROLOGICAL INTEGRITY & AUDIT TRAIL (AS9100 REV D)
+$$ SHA-256 HASH: 2F69CBF634E2C5D29456576DD9BA63BCFB83D3EAAAC65B77629AA6705A73EC78
+$$ STATUS: CERTIFIED_COLLISION_FREE
+$$ ==============================================================

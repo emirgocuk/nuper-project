@@ -51,6 +51,8 @@ pub struct GeometricFeature {
     pub is_datum_candidate: bool,
     /// Unsur vida dişi içeriyor mu? (M-Thread vb.)
     pub is_threaded: bool,
+    /// Varsa ayrıntılı vida dişi teknik özellikleri
+    pub thread_spec: Option<crate::threads::ThreadSpecification>,
     /// Yüzeyin dış sınır tel poligonu (mm cinsinden köşe koordinatları)
     pub boundary_polygon: Vec<DVec3>,
 }
@@ -79,6 +81,37 @@ impl GeometricFeature {
             min_wall_thickness,
             is_datum_candidate: true,
             is_threaded: false,
+            thread_spec: None,
+            boundary_polygon: Vec::new(),
+        };
+        feature.validate()?;
+        Ok(feature)
+    }
+
+    /// Yeni bir serbest formlu yüzey (NURBS / B-Spline) oluşturur
+    pub fn new_freeform_surface(
+        id: u32,
+        name: impl Into<String>,
+        centroid: DVec3,
+        average_normal: DVec3,
+        area: f64,
+        min_wall_thickness: f64,
+    ) -> Result<Self, AstError> {
+        let feature = Self {
+            id,
+            name: name.into(),
+            feature_type: FeatureType::FreeformBSpline,
+            centroid,
+            normal_vector: average_normal.normalize(),
+            axis_vector: None,
+            diameter: None,
+            depth_or_length: None,
+            cone_half_angle_rad: None,
+            area,
+            min_wall_thickness,
+            is_datum_candidate: false,
+            is_threaded: false,
+            thread_spec: None,
             boundary_polygon: Vec::new(),
         };
         feature.validate()?;
@@ -96,8 +129,6 @@ impl GeometricFeature {
         area: f64,
         min_wall_thickness: f64,
     ) -> Result<Self, AstError> {
-        // İç silindirde yüzey normali eksenden dışa doğru daireseldir,
-        // ancak unsur bazında eksen vektörünü temsilci normal olarak alabiliriz.
         let feature = Self {
             id,
             name: name.into(),
@@ -112,6 +143,38 @@ impl GeometricFeature {
             min_wall_thickness,
             is_datum_candidate: true,
             is_threaded: false,
+            thread_spec: None,
+            boundary_polygon: Vec::new(),
+        };
+        feature.validate()?;
+        Ok(feature)
+    }
+
+    /// Yeni bir dişli delik (Tapped Hole) oluşturur
+    pub fn new_tapped_hole(
+        id: u32,
+        name: impl Into<String>,
+        centroid: DVec3,
+        axis_vector: DVec3,
+        thread: crate::threads::ThreadSpecification,
+        area: f64,
+        min_wall_thickness: f64,
+    ) -> Result<Self, AstError> {
+        let feature = Self {
+            id,
+            name: name.into(),
+            feature_type: FeatureType::InternalCylinder,
+            centroid,
+            normal_vector: axis_vector.normalize(),
+            axis_vector: Some(axis_vector.normalize()),
+            diameter: Some(thread.nominal_major_diameter),
+            depth_or_length: Some(thread.thread_depth),
+            cone_half_angle_rad: None,
+            area,
+            min_wall_thickness,
+            is_datum_candidate: false,
+            is_threaded: true,
+            thread_spec: Some(thread),
             boundary_polygon: Vec::new(),
         };
         feature.validate()?;
@@ -143,6 +206,41 @@ impl GeometricFeature {
             min_wall_thickness,
             is_datum_candidate: true,
             is_threaded: false,
+            thread_spec: None,
+            boundary_polygon: Vec::new(),
+        };
+        feature.validate()?;
+        Ok(feature)
+    }
+
+    /// Yeni bir konik yüzey (havşa veya valf yuvası) oluşturur
+    pub fn new_cone(
+        id: u32,
+        name: impl Into<String>,
+        centroid: DVec3,
+        axis_vector: DVec3,
+        diameter: f64,
+        cone_half_angle_rad: f64,
+        depth: f64,
+        area: f64,
+        min_wall_thickness: f64,
+    ) -> Result<Self, AstError> {
+        let axis = axis_vector.normalize();
+        let feature = Self {
+            id,
+            name: name.into(),
+            feature_type: FeatureType::Cone,
+            centroid,
+            normal_vector: axis,
+            axis_vector: Some(axis),
+            diameter: Some(diameter),
+            depth_or_length: Some(depth),
+            cone_half_angle_rad: Some(cone_half_angle_rad),
+            area,
+            min_wall_thickness,
+            is_datum_candidate: false,
+            is_threaded: false,
+            thread_spec: None,
             boundary_polygon: Vec::new(),
         };
         feature.validate()?;

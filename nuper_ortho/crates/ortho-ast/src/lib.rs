@@ -4,7 +4,9 @@
 //! Bu sandık, CMM markalarından ve donanımlarından bağımsız olarak teftiş unsurlarını,
 //! ASME Y14.5 ve ISO 1101 datum zincirlerini ve geometrik toleransları modelleyen tip-güvenli çekirdektir.
 
+pub mod alignment;
 pub mod compound;
+pub mod composite_gdandt;
 pub mod datum;
 pub mod error;
 pub mod feature;
@@ -13,13 +15,26 @@ pub mod threads;
 pub mod tolerance;
 
 // Kolay erişim için ana tipleri dışa aktar
-pub use compound::CompoundHoleFeature;
+pub use alignment::{
+    recommend_3_2_1_alignment, recommend_adaptive_alignment, verify_6dof_jacobian_rank,
+    AlignmentColorRole, AlignmentPointGuidance, AlignmentRecommendation, AlignmentStrategyType,
+};
+pub use compound::{
+    detect_compound_holes, BoreSegment, CompoundHoleFeature, ConcentricityEvaluation,
+    CounterborePocket, CountersinkChamfer, StepPlaneFace,
+};
+pub use composite_gdandt::{CompositeTolerance, SingleToleranceZone};
 pub use datum::{DatumFeature, DatumLabel, DatumPrecedence, DatumReferenceFrame};
 pub use error::AstError;
 pub use feature::{FeatureType, GeometricFeature};
 pub use plan::{InspectionPlan, LengthUnit};
-pub use threads::{ThreadBypassStrategy, ThreadSpecification, ThreadStandard};
-pub use tolerance::{FittingAlgorithm, MaterialModifier, ToleranceConstraint, ToleranceType};
+pub use threads::{
+    classify_thread_from_bore, classify_thread_from_callout, ManualGaugeItem, SetupSheetGaugeReport,
+    ThreadBypassStrategy, ThreadDiameterKind, ThreadSpecification, ThreadStandard,
+};
+pub use tolerance::{
+    FittingAlgorithm, MaterialModifier, ProfileZoneDisposition, ToleranceConstraint, ToleranceType,
+};
 
 #[cfg(test)]
 mod tests {
@@ -182,4 +197,120 @@ mod tests {
         assert_eq!(restored_plan.part_name, "HYDRAULIC_BLOCK");
         assert_eq!(restored_plan.features.len(), 3);
     }
+
+    #[test]
+    fn test_surface_profile_unilateral_definition() {
+        let profile_tol = ToleranceConstraint::new_surface_profile(
+            201,
+            1,
+            0.8,
+            ProfileZoneDisposition::UnequallyDisposed {
+                total_width: 0.8,
+                outward_offset: 0.2,
+            },
+            vec![DatumLabel::A, DatumLabel::B, DatumLabel::C],
+        );
+
+        assert_eq!(profile_tol.tolerance_type, ToleranceType::ProfileOfSurface);
+        assert!((profile_tol.upper_tolerance - 0.2).abs() < 1e-6);
+        assert!((profile_tol.lower_tolerance - (-0.6)).abs() < 1e-6);
+        assert_eq!(profile_tol.recommended_fitting, FittingAlgorithm::MinimumZone);
+    }
+
+    #[test]
+    fn test_composite_tolerance_validation() {
+        let hole1 = GeometricFeature::new_internal_cylinder(
+            10,
+            "HOLE_1",
+            DVec3::new(10.0, 10.0, 0.0),
+            DVec3::Z,
+            10.0,
+            20.0,
+            100.0,
+            5.0,
+        )
+        .unwrap();
+
+        let hole2 = GeometricFeature::new_internal_cylinder(
+            20,
+            "HOLE_2",
+            DVec3::new(30.0, 10.0, 0.0),
+            DVec3::Z,
+            10.0,
+            20.0,
+            100.0,
+            5.0,
+        )
+        .unwrap();
+
+        let features = vec![hole1, hole2];
+
+        // Geçerli ASME Y14.5 Bileşik Tolerans: PLTZF = 0.8 [A, B, C], FRTZF = 0.15 [A]
+        let valid_comp = CompositeTolerance::new_composite_position(
+            1,
+            "COMP_HOLE_PATTERN",
+            vec![10, 20],
+            0.80,
+            vec![DatumLabel::A, DatumLabel::B, DatumLabel::C],
+            0.15,
+            vec![DatumLabel::A],
+        );
+        assert!(valid_comp.validate(&features).is_ok());
+
+        // Geçersiz: FRTZF PLTZF'den büyük (Kural ihlali)
+        let invalid_tol = CompositeTolerance::new_composite_position(
+            2,
+            "INVALID_TOL",
+            vec![10, 20],
+            0.10,
+            vec![DatumLabel::A],
+            0.50, // 0.50 > 0.10
+            vec![DatumLabel::A],
+        );
+        assert!(invalid_tol.validate(&features).is_err());
+
+        // Geçersiz: FRTZF yeni veya sırası bozuk datum getiriyor
+        let invalid_datum = CompositeTolerance::new_composite_position(
+            3,
+            "INVALID_DATUM",
+            vec![10, 20],
+            0.80,
+            vec![DatumLabel::A, DatumLabel::B],
+            0.20,
+            vec![DatumLabel::B], // A atlanıp doğrudan B getirilemez
+        );
+        assert!(invalid_datum.validate(&features).is_err());
+    }
+
+    #[test]
+    fn test_classify_thread_from_callout_and_gauge_report() {
+        let spec_m10 = classify_thread_from_callout("4x M10 - 6H", 25.0, Some(8.5))
+            .expect("M10 tespit edilmeli");
+        assert_eq!(spec_m10.nominal_major_diameter, 10.0);
+        assert_eq!(spec_m10.tap_drill_diameter, 8.5);
+
+        let spec_gas = classify_thread_from_callout("Port G 1/4\" BSPP", 15.0, Some(11.8))
+            .expect("G 1/4 tespit edilmeli");
+        assert_eq!(spec_gas.tap_drill_diameter, 11.8);
+
+        let spec_unc = classify_thread_from_callout("Bolt 1/4-20 UNC", 12.0, None)
+            .expect("1/4-20 UNC tespit edilmeli");
+        assert_eq!(spec_unc.tap_drill_diameter, 5.10);
+
+        // Setup Sheet Rapor Tablosu Oluşturma
+        let mut report = SetupSheetGaugeReport::new();
+        report.add_item(spec_m10.to_gauge_item(101, "HOLE_M10_01"));
+        report.add_item(spec_gas.to_gauge_item(102, "PORT_G14_PRESSURE"));
+
+        assert_eq!(report.len(), 2);
+        let ascii_table = report.format_ascii_table();
+        assert!(ascii_table.contains("HOLE_M10_01"));
+        assert!(ascii_table.contains("PORT_G14_PRESSURE"));
+        assert!(ascii_table.contains("ISO 1502 / DIN 13"));
+
+        let md_table = report.format_markdown_table();
+        assert!(md_table.contains("M10x1.50"));
+        assert!(md_table.contains("G 1/4\""));
+    }
 }
+

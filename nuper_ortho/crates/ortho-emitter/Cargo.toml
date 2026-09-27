@@ -11,6 +11,6 @@ ortho-kinematics = { path = "../ortho-kinematics" }
 ortho-router = { path = "../ortho-router" }
 glam.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-tera.workspace = true

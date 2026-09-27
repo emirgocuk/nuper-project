@@ -55,6 +55,21 @@ pub enum FittingAlgorithm {
     MinimumZone,
 }
 
+/// Yüzey Profili Tolerans Bölgesi Konfigürasyonu (Bilateral vs Unilateral / Unequally Disposed)
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum ProfileZoneDisposition {
+    /// İki taraflı simetrik: [-t/2, +t/2]
+    BilateralSymmetric,
+    /// ASME Y14.5 Unilateral / Unequally Disposed (Ⓤ Modifikatörü):
+    /// total_width: t (toplam tolerans genişliği, örn. 0.80 mm)
+    /// outward_offset: u (nominal yüzeyden dışarı / artı yöne izin verilen sapma, örn. 0.20 mm)
+    /// İçeri sapma sınırı: -(t - u) = -0.60 mm
+    UnequallyDisposed {
+        total_width: f64,
+        outward_offset: f64,
+    },
+}
+
 /// Nötr Teftiş AST'sinde tekil bir Geometrik Tolerans Kısıtı (Feature Control Frame)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToleranceConstraint {
@@ -75,6 +90,9 @@ pub struct ToleranceConstraint {
     pub recommended_fitting: FittingAlgorithm,
     /// ASME Y14.5 Bileşik Tolerans (Composite FCF) mu?
     pub is_composite: bool,
+    /// Yüzey Profili için bölge dağılımı (Bilateral veya ASME Ⓤ Unilateral)
+    #[serde(default)]
+    pub profile_disposition: Option<ProfileZoneDisposition>,
 }
 
 impl ToleranceConstraint {
@@ -91,6 +109,7 @@ impl ToleranceConstraint {
             material_modifier: MaterialModifier::RFS,
             recommended_fitting: FittingAlgorithm::ChebyshevMaximumInscribed,
             is_composite: false,
+            profile_disposition: None,
         }
     }
 
@@ -113,6 +132,37 @@ impl ToleranceConstraint {
             material_modifier: modifier,
             recommended_fitting: FittingAlgorithm::GaussLeastSquares,
             is_composite: false,
+            profile_disposition: None,
+        }
+    }
+
+    /// ASME Y14.5 / ISO 1101 Yüzey Profili (Profile of a Surface) toleransı oluşturur
+    pub fn new_surface_profile(
+        id: u32,
+        feature_id: u32,
+        total_tolerance: f64,
+        disposition: ProfileZoneDisposition,
+        datums: Vec<DatumLabel>,
+    ) -> Self {
+        let (upper, lower) = match disposition {
+            ProfileZoneDisposition::BilateralSymmetric => (total_tolerance / 2.0, -total_tolerance / 2.0),
+            ProfileZoneDisposition::UnequallyDisposed {
+                total_width,
+                outward_offset,
+            } => (outward_offset, -(total_width - outward_offset)),
+        };
+        Self {
+            id,
+            feature_id,
+            tolerance_type: ToleranceType::ProfileOfSurface,
+            nominal_value: 0.0,
+            upper_tolerance: upper,
+            lower_tolerance: lower,
+            datum_precedence: datums,
+            material_modifier: MaterialModifier::RFS,
+            recommended_fitting: FittingAlgorithm::MinimumZone,
+            is_composite: false,
+            profile_disposition: Some(disposition),
         }
     }
 }

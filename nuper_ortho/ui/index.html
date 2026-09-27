@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nuper Ortho — 3D Dijital İkiz ve Otonom CMM Simülatörü</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    :root {
+      --bg-canvas: #F1F5F9;
+      --bg-panel: #FFFFFF;
+      --border-color: #E2E8F0;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --color-primary: #0284C7;
+      --color-primary-light: #E0F2FE;
+      --color-datum: #059669;
+      --color-datum-light: #D1FAE5;
+      --color-amber: #D97706;
+      --color-amber-light: #FEF3C7;
+      --color-danger: #DC2626;
+      --color-danger-light: #FEE2E2;
+      --color-clamp: #F97316;
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-ui);
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Bar */
+    header {
+      height: 48px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-icon {
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, #0284C7, #0369A1);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .badge-version {
+      background: #F1F5F9;
+      color: #475569;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .step-item.active {
+      color: var(--color-primary);
+      background: var(--color-primary-light);
+    }
+
+    .step-divider {
+      color: #CBD5E1;
+      font-size: 12px;
+    }
+
+    .hardware-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    .hw-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: #F8FAFC;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .seal-badge {
+      background: var(--color-datum-light);
+      color: var(--color-datum);
+      border-color: #A7F3D0;
+      font-weight: 600;
+    }
+
+    /* Main Area Layout */
+    .main-workspace {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Left Sidebar: Feature Tree */
+    .sidebar-left {
+      width: 300px;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      z-index: 5;
+    }
+
+    .panel-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tree-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .tree-group {
+      margin-bottom: 12px;
+    }
+
+    .tree-group-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #94A3B8;
+      text-transform: uppercase;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tree-node {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      margin-bottom: 2px;
+    }
+
+    .tree-node:hover {
+      background: #F8FAFC;
+    }
+
+    .tree-node.active {
+      background: #EFF6FF;
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+
+    .node-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .node-icon {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+    }
+
+    .icon-datum { background: var(--color-datum); }
+    .icon-hole { background: var(--color-primary); }
+    .icon-thread { background: #8B5CF6; }
+    .icon-freeform { background: #EC4899; }
+    .icon-clamp { background: var(--color-clamp); }
+
+    .node-status {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #F1F5F9;
+      color: #475569;
+    }
+
+    /* 3D Viewport */
+    .viewport-container {
+      flex: 1;
+      position: relative;
+      background: var(--bg-canvas);
+    }
+
+    #webgl-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .canvas-overlay-hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px);
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    .hud-title {
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+
+    .hud-meta {
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    .viewport-controls {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .v-btn {
+      width: 36px;
+      height: 36px;
+      background: #FFFFFF;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      color: #334155;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+      transition: all 0.15s ease;
+    }
+
+    .v-btn:hover {
+      background: #F8FAFC;
+      color: var(--color-primary);
+    }
+
+    /* Right Sidebar: Diagnostics Card */
+    .sidebar-right {
+      width: 320px;
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      z-index: 5;
+    }
+
+    .diag-body {
+      padding: 16px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .card-fcf {
+      background: #F8FAFC;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .fcf-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .fcf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: #FFFFFF;
+      border: 2px solid #0F172A;
+      border-radius: 4px;
+    }
+
+    .fcf-table td {
+      border: 1px solid #0F172A;
+      padding: 6px 10px;
+      text-align: center;
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px dashed #E2E8F0;
+      font-size: 12px;
+    }
+
+    .metric-label {
+      color: var(--text-muted);
+    }
+
+    .metric-val {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .pass-tag {
+      color: var(--color-datum);
+      font-weight: 700;
+    }
+
+    /* Bottom Timeline Drawer */
+    .timeline-drawer {
+      height: 180px;
+      background: var(--bg-panel);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+
+    .timeline-bar {
+      height: 48px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+
+    .player-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .play-btn {
+      width: 32px;
+      height: 32px;
+      background: var(--color-primary);
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+    }
+
+    .progress-slider {
+      width: 340px;
+      accent-color: var(--color-primary);
+    }
+
+    .timeline-time {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .code-console-tabs {
+      display: flex;
+      gap: 16px;
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 16px;
+      background: #F8FAFC;
+    }
+
+    .c-tab {
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+
+    .c-tab.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+      background: #fff;
+    }
+
+    .code-viewer {
+      flex: 1;
+      padding: 10px 16px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      overflow-y: auto;
+      background: #FFFFFF;
+      color: #334155;
+      line-height: 1.5;
+    }
+
+    .code-line.active {
+      background: #FEF3C7;
+      border-left: 3px solid #D97706;
+      padding-left: 4px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">N</div>
+      <span>Nuper Ortho</span>
+      <span class="badge-version">v0.1.0-alpha</span>
+    </div>
+
+    <div class="stepper">
+      <div class="step-item">1. CAD Ingestion</div>
+      <div class="step-divider">›</div>
+      <div class="step-item">2. Fikstür & 3-2-1</div>
+      <div class="step-divider">›</div>
+      <div class="step-item active">3. Rota & GJK Emniyet</div>
+      <div class="step-divider">›</div>
+      <div class="step-item">4. DMIS / Calypso</div>
+    </div>
+
+    <div class="hardware-info">
+      <div class="hw-badge">CMM: Hexagon Global S</div>
+      <div class="hw-badge">Prob: Renishaw PH10M / TP20</div>
+      <div class="hw-badge seal-badge">SHA-256: 170D62F7 PASS</div>
+    </div>
+  </header>
+
+  <!-- Main Multi-Panel Workspace -->
+  <div class="main-workspace">
+
+    <!-- Left Explorer: Feature Tree -->
+    <aside class="sidebar-left">
+      <div class="panel-header">
+        <span>Teftiş Ağacı (Inspection Tree)</span>
+        <span style="font-family: var(--font-mono);">6 Unsur</span>
+      </div>
+      <div class="tree-scroll">
+        <div class="tree-group">
+          <div class="tree-group-title">3-2-1 Datum Çerçevesi (PCS_AUTO_321)</div>
+          <div class="tree-node active" onclick="selectFeature('datum_a')">
+            <div class="node-label">
+              <span class="node-icon icon-datum"></span>
+              <span>DATUM_A_TOP</span>
+            </div>
+            <span class="node-status">Plane (Z=50)</span>
+          </div>
+          <div class="tree-node" onclick="selectFeature('datum_b')">
+            <div class="node-label">
+              <span class="node-icon icon-datum"></span>
+              <span>DATUM_B_FRONT</span>
+            </div>
+            <span class="node-status">Plane (Y=0)</span>
+          </div>
+          <div class="tree-node" onclick="selectFeature('datum_c')">
+            <div class="node-label">
+              <span class="node-icon icon-datum"></span>
+              <span>DATUM_C_LEFT</span>
+            </div>
+            <span class="node-status">Plane (X=0)</span>
+          </div>
+        </div>
+
+        <div class="tree-group">
+          <div class="tree-group-title">Ölçüm Unsurları & Toleranslar</div>
+          <div class="tree-node" onclick="selectFeature('bore_h7')">
+            <div class="node-label">
+              <span class="node-icon icon-hole"></span>
+              <span>BORE_20_H7</span>
+            </div>
+            <span class="node-status">Ø20 H7 (Chebyshev)</span>
+          </div>
+          <div class="tree-node" onclick="selectFeature('thread_m8')">
+            <div class="node-label">
+              <span class="node-icon icon-thread"></span>
+              <span>THREAD_M8_BOLT</span>
+            </div>
+            <span class="node-status">M8x1.25 Mastar</span>
+          </div>
+          <div class="tree-node" onclick="selectFeature('airfoil')">
+            <div class="node-label">
+              <span class="node-icon icon-freeform"></span>
+              <span>SURF_AIRFOIL_PROFILE</span>
+            </div>
+            <span class="node-status">0.80 Ⓤ 0.20 mm</span>
+          </div>
+        </div>
+
+        <div class="tree-group">
+          <div class="tree-group-title">Emniyet & Engeller (Keep-Out)</div>
+          <div class="tree-node" onclick="selectFeature('clamp')">
+            <div class="node-label">
+              <span class="node-icon icon-clamp"></span>
+              <span>FIXTURE_CLAMP_OP10</span>
+            </div>
+            <span class="node-status">+40mm Lift-Hop</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center 3D Digital Twin Viewport -->
+    <main class="viewport-container">
+      <div id="webgl-canvas"></div>
+
+      <div class="canvas-overlay-hud">
+        <div class="hud-title" id="hud-feature-name">BORE_20_H7 [Chebyshev MIC]</div>
+        <div class="hud-meta" id="hud-feature-coords">X: 50.000 mm | Y: 50.000 mm | Z: 50.000 mm</div>
+        <div class="hud-meta" id="hud-feature-details">Çap: Ø20.000 (+0.021/0) | PH10 Açısı: A0.0° B0.0°</div>
+      </div>
+
+      <div class="viewport-controls">
+        <button class="v-btn" title="İzometrik Görünüş" onclick="resetCamera()">⤢</button>
+        <button class="v-btn" title="Üst Görünüş (Z)" onclick="topView()">Z</button>
+        <button class="v-btn" title="Ön Görünüş (Y)" onclick="frontView()">Y</button>
+        <button class="v-btn" title="Yan Görünüş (X)" onclick="sideView()">X</button>
+      </div>
+    </main>
+
+    <!-- Right Sidebar: Smart Feature Diagnostics -->
+    <aside class="sidebar-right">
+      <div class="panel-header">
+        <span>Unsur Teşhisi (Diagnostics)</span>
+        <span class="pass-tag">0 Çarpışma</span>
+      </div>
+      <div class="diag-body" id="diag-content">
+        <!-- Dinamik İçerik JavaScript Tarafından Güncellenir -->
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Bottom Timeline Drawer & Live Code Inspector -->
+  <footer class="timeline-drawer">
+    <div class="timeline-bar">
+      <div class="player-controls">
+        <button class="play-btn" id="play-pause-btn" onclick="toggleSimulation()">▶</button>
+        <input type="range" class="progress-slider" id="time-slider" min="0" max="100" value="0" oninput="seekSimulation(this.value)">
+        <span class="timeline-time" id="time-display">00:00 / 00:35</span>
+      </div>
+      <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: flex; gap: 12px;">
+        <span>İntikal Hızı: 150 mm/s</span>
+        <span>Dokunma Hızı: 5.0 mm/s</span>
+        <span style="color: var(--color-datum);">GJK Emniyet Zarfı: AKTİF</span>
+      </div>
+    </div>
+
+    <div class="code-console-tabs">
+      <div class="c-tab active" onclick="switchCodeTab('dmis')">ANSI DMIS 5.3 (PC-DMIS)</div>
+      <div class="c-tab" onclick="switchCodeTab('calypso')">Zeiss Calypso ASCII Prüfplan</div>
+      <div class="c-tab" onclick="switchCodeTab('threads')">Mastar Setup Sheet (GO/NOGO)</div>
+    </div>
+
+    <div class="code-viewer" id="code-display">
+      <!-- DMIS / Calypso Kod Blokları -->
+    </div>
+  </footer>
+
+  <script>
+    // 1. THREE.JS 3D SCENE SETUP
+    const container = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xF1F5F9);
+
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 2000);
+    camera.position.set(160, 180, 200);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = false; // Zero-Waste: No heavy shadow maps!
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(50, 50, 25);
+
+    // Işıklandırma (Mat CAD Lighting)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    dirLight.position.set(150, 250, 200);
+    scene.add(dirLight);
+
+    // Izgara ve Granit Tabla
+    const gridHelper = new THREE.GridHelper(400, 40, 0xCBD5E1, 0xE2E8F0);
+    gridHelper.position.y = -0.5;
+    scene.add(gridHelper);
+
+    // Koordinat Eksenleri (MCS)
+    const axesHelper = new THREE.AxesHelper(40);
+    scene.add(axesHelper);
+
+    // 2. WORKPIECE MODEL (Valve Block Geometry)
+    const blockGroup = new THREE.Group();
+
+    // Ana Blok (100 x 100 x 50 mm)
+    const blockGeo = new THREE.BoxGeometry(100, 50, 100);
+    const blockMat = new THREE.MeshLambertMaterial({
+      color: 0x94A3B8,
+      transparent: true,
+      opacity: 0.88,
+    });
+    const blockMesh = new THREE.Mesh(blockGeo, blockMat);
+    blockMesh.position.set(50, 25, 50);
+    blockGroup.add(blockMesh);
+
+    // Blok Tel Çerçeve Kenarları (CAD Edge Lines)
+    const edges = new THREE.EdgesGeometry(blockGeo);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x475569, linewidth: 1 });
+    const wireframe = new THREE.LineSegments(edges, lineMat);
+    wireframe.position.copy(blockMesh.position);
+    blockGroup.add(wireframe);
+
+    // H7 Silindirik Delik (Ø20 x 30 mm derinlik, Z=50'den içeri)
+    const holeGeo = new THREE.CylinderGeometry(10, 10, 30, 32, 1, true);
+    const holeMat = new THREE.MeshLambertMaterial({ color: 0x0284C7, side: THREE.DoubleSide });
+    const holeMesh = new THREE.Mesh(holeGeo, holeMat);
+    holeMesh.position.set(50, 35, 50); // Y ekseni Three.js'te yukarı baktığı için
+    blockGroup.add(holeMesh);
+
+    // M8 Vida Dişli Delik (Ø8 x 16 mm)
+    const threadGeo = new THREE.CylinderGeometry(4, 4, 16, 24, 1, true);
+    const threadMat = new THREE.MeshLambertMaterial({ color: 0x8B5CF6, side: THREE.DoubleSide });
+    const threadMesh = new THREE.Mesh(threadGeo, threadMat);
+    threadMesh.position.set(80, 42, 20);
+    blockGroup.add(threadMesh);
+
+    // Havacılık Kanat Profili Eğrisi (Serbest Yüzey)
+    const curvePoints = [];
+    for (let t = 0; t <= 1.0; t += 0.05) {
+      const x = 30 + t * 40;
+      const z = 75 + Math.sin(t * Math.PI) * 12;
+      curvePoints.push(new THREE.Vector3(x, 50.5, z));
+    }
+    const curveGeo = new THREE.BufferGeometry().setFromPoints(curvePoints);
+    const curveLineMat = new THREE.LineBasicMaterial({ color: 0xEC4899, linewidth: 3 });
+    const curveLine = new THREE.Line(curveGeo, curveLineMat);
+    blockGroup.add(curveLine);
+
+    // Fikstür Pabucu (Keep-Out Zone)
+    const clampGeo = new THREE.BoxGeometry(20, 35, 30);
+    const clampMat = new THREE.MeshLambertMaterial({
+      color: 0xF97316,
+      transparent: true,
+      opacity: 0.65,
+    });
+    const clampMesh = new THREE.Mesh(clampGeo, clampMat);
+    clampMesh.position.set(-5, 17.5, 25);
+    blockGroup.add(clampMesh);
+
+    const clampEdges = new THREE.EdgesGeometry(clampGeo);
+    const clampLineMat = new THREE.LineBasicMaterial({ color: 0xC2410C, linewidth: 2 });
+    const clampWire = new THREE.LineSegments(clampEdges, clampLineMat);
+    clampWire.position.copy(clampMesh.position);
+    blockGroup.add(clampWire);
+
+    scene.add(blockGroup);
+
+    // 3. CMM STYLUS ASSEMBLY MODEL (Renishaw PH10M + TP20 + Ø2x20mm Stylus)
+    const probeGroup = new THREE.Group();
+
+    // PH10 Kafa Gövdesi
+    const headGeo = new THREE.BoxGeometry(18, 28, 18);
+    const headMat = new THREE.MeshLambertMaterial({ color: 0x1E293B });
+    const headMesh = new THREE.Mesh(headGeo, headMat);
+    headMesh.position.y = 40;
+    probeGroup.add(headMesh);
+
+    // TP20 Modül Gövdesi (Ø13.2 x 30 mm)
+    const moduleGeo = new THREE.CylinderGeometry(6.6, 6.6, 30, 24);
+    const moduleMat = new THREE.MeshLambertMaterial({ color: 0x64748B });
+    const moduleMesh = new THREE.Mesh(moduleGeo, moduleMat);
+    moduleMesh.position.y = 15;
+    probeGroup.add(moduleMesh);
+
+    // Karbür Şaft (Ø1.5 x 20 mm)
+    const stemGeo = new THREE.CylinderGeometry(0.75, 0.75, 20, 16);
+    const stemMat = new THREE.MeshLambertMaterial({ color: 0xCBD5E1 });
+    const stemMesh = new THREE.Mesh(stemGeo, stemMat);
+    stemMesh.position.y = -10;
+    probeGroup.add(stemMesh);
+
+    // Yakut Bilye (Ø2.0 mm Ruby Ball)
+    const ballGeo = new THREE.SphereGeometry(1.0, 20, 20);
+    const ballMat = new THREE.MeshLambertMaterial({ color: 0xDC2626 });
+    const ballMesh = new THREE.Mesh(ballGeo, ballMat);
+    ballMesh.position.y = -20;
+    probeGroup.add(ballMesh);
+
+    probeGroup.position.set(0, 100, 0); // Z_clearance başlangıç noktası
+    scene.add(probeGroup);
+
+    // 4. TRAJECTORY PATH VISUALIZATION
+    const trajectoryWaypoints = [
+      new THREE.Vector3(0, 100, 0),        // Başlangıç
+      new THREE.Vector3(20, 100, 20),      // Z-First intikal
+      new THREE.Vector3(20, 50, 20),       // Datum A Temas 1
+      new THREE.Vector3(20, 55, 20),       // Geri çekilme
+      new THREE.Vector3(80, 100, 20),      // Datum A Temas 2 Intikal
+      new THREE.Vector3(80, 50, 20),       // Datum A Temas 2
+      new THREE.Vector3(80, 55, 20),
+      new THREE.Vector3(50, 100, 50),      // H7 Delik Üstü
+      new THREE.Vector3(50, 42.5, 50),     // Delik İçi Seviye 1
+      new THREE.Vector3(60, 42.5, 50),     // Duvar Temas
+      new THREE.Vector3(50, 42.5, 50),
+      new THREE.Vector3(50, 27.5, 50),     // Delik İçi Seviye 2
+      new THREE.Vector3(40, 27.5, 50),     // Duvar Temas
+      new THREE.Vector3(50, 27.5, 50),
+      new THREE.Vector3(50, 100, 50),      // Emniyet Tavanı Çıkış
+      new THREE.Vector3(0, 100, 0),        // Bitiş
+    ];
+
+    const trajGeo = new THREE.BufferGeometry().setFromPoints(trajectoryWaypoints);
+    const trajMat = new THREE.LineBasicMaterial({ color: 0xD97706, linewidth: 2 });
+    const trajLine = new THREE.Line(trajGeo, trajMat);
+    scene.add(trajLine);
+
+    // Temas Noktaları Görselleştirmesi
+    const touchPoints = [
+      new THREE.Vector3(20, 50, 20),
+      new THREE.Vector3(80, 50, 20),
+      new THREE.Vector3(60, 42.5, 50),
+      new THREE.Vector3(40, 27.5, 50),
+    ];
+    touchPoints.forEach(pt => {
+      const dotGeo = new THREE.SphereGeometry(1.2, 12, 12);
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0x059669 });
+      const dotMesh = new THREE.Mesh(dotGeo, dotMat);
+      dotMesh.position.copy(pt);
+      scene.add(dotMesh);
+    });
+
+    // 5. ANIMATION & SIMULATION ENGINE
+    let isPlaying = false;
+    let animProgress = 0.0;
+    const totalWaypoints = trajectoryWaypoints.length - 1;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (isPlaying) {
+        animProgress += 0.003;
+        if (animProgress > 1.0) animProgress = 0.0;
+        document.getElementById('time-slider').value = Math.floor(animProgress * 100);
+        updateProbePosition();
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    function updateProbePosition() {
+      const totalDistIndex = animProgress * totalWaypoints;
+      const currentIndex = Math.floor(totalDistIndex);
+      const nextIndex = Math.min(currentIndex + 1, totalWaypoints);
+      const alpha = totalDistIndex - currentIndex;
+
+      const p1 = trajectoryWaypoints[currentIndex];
+      const p2 = trajectoryWaypoints[nextIndex];
+
+      const currentPos = new THREE.Vector3().lerpVectors(p1, p2, alpha);
+      // Bilye ucunu hedef noktaya oturtmak için kafa montaj ofseti (+20)
+      probeGroup.position.set(currentPos.x, currentPos.y + 20, currentPos.z);
+
+      const sec = Math.floor(animProgress * 35);
+      document.getElementById('time-display').innerText = `00:${sec < 10 ? '0' + sec : sec} / 00:35`;
+    }
+
+    function toggleSimulation() {
+      isPlaying = !isPlaying;
+      document.getElementById('play-pause-btn').innerText = isPlaying ? '⏸' : '▶';
+    }
+
+    function seekSimulation(val) {
+      isPlaying = false;
+      document.getElementById('play-pause-btn').innerText = '▶';
+      animProgress = val / 100.0;
+      updateProbePosition();
+    }
+
+    // 6. VIEWPORT BUTTONS
+    function resetCamera() {
+      camera.position.set(160, 180, 200);
+      controls.target.set(50, 50, 25);
+    }
+    function topView() {
+      camera.position.set(50, 260, 50);
+      controls.target.set(50, 25, 50);
+    }
+    function frontView() {
+      camera.position.set(50, 25, 260);
+      controls.target.set(50, 25, 50);
+    }
+    function sideView() {
+      camera.position.set(260, 25, 50);
+      controls.target.set(50, 25, 50);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    // 7. DIAGNOSTICS & FEATURE SELECTION
+    const featureData = {
+      bore_h7: {
+        title: "BORE_20_H7",
+        type: "İç Silindir (Internal Cylinder)",
+        coords: "X: 50.000 mm | Y: 50.000 mm | Z: 50.000 mm",
+        details: "Çap: Ø20.000 (+0.021/0) | PH10 Açısı: A0.0° B0.0°",
+        fcf_sym: "⨁",
+        fcf_val: "0.020 Ⓜ",
+        fcf_datums: ["A", "B", "C"],
+        metrics: [
+          ["Nominal Çap", "20.0000 mm"],
+          ["Ölçülen Çap (Chebyshev MIC)", "20.0042 mm"],
+          ["Üst Tolerans Sınırı", "+0.0210 mm"],
+          ["Alt Tolerans Sınırı", "0.0000 mm"],
+          ["Silindiriklik Form Hatası", "0.0018 mm"],
+          ["Şaft Emniyet Boşluğu", "4.25 mm (PASS)"],
+          ["GJK Çarpışma Testi", "0 Çakışma (Mühürlü)"],
+        ]
+      },
+      airfoil: {
+        title: "SURF_AIRFOIL_PROFILE",
+        type: "Serbest Form Yüzey (B-Spline Surface)",
+        coords: "X: 50.000 mm | Y: 75.000 mm | Z: 50.000 mm",
+        details: "Tolerans: 0.80 Ⓤ 0.20 mm | PH10 Açısı: A0.0° B-180.0°",
+        fcf_sym: "⌓",
+        fcf_val: "0.80 Ⓤ 0.20",
+        fcf_datums: ["A", "B"],
+        metrics: [
+          ["Tolerans Bölgesi Tipi", "Unequally Disposed (Ⓤ)"],
+          ["Toplam Bant Genişliği", "0.8000 mm"],
+          ["Dışarı Sapma İzni (Outward)", "+0.2000 mm"],
+          ["İçeri Sapma İzni (Inward)", "-0.6000 mm"],
+          ["Ölçülen Maksimum Sapma", "+0.0340 mm"],
+          ["Tolerans Güvenlik Payı", "+0.1660 mm (PASS)"],
+        ]
+      },
+      thread_m8: {
+        title: "THREAD_M8_BOLT",
+        type: "Metrik Dişli Delik (M8x1.25 - 6H)",
+        coords: "X: 80.000 mm | Y: 20.000 mm | Z: 50.000 mm",
+        details: "Prob Baypas Edildi | Kurulum Föyü: Mastar Denetimi",
+        fcf_sym: "M",
+        fcf_val: "M8x1.25",
+        fcf_datums: ["A"],
+        metrics: [
+          ["Diş Anma Çapı", "8.0000 mm"],
+          ["Hatve (Pitch)", "1.25 mm"],
+          ["Matkap Delik Çapı", "6.80 mm"],
+          ["Prob Durumu", "BAYPAS (Prob Kırılması Önleme)"],
+          ["Gerekli Mastar", "M8x1.25 GO / NOGO Plug Gauge"],
+          ["Standart Kodu", "ISO 1502 (6H)"],
+        ]
+      },
+      datum_a: {
+        title: "DATUM_A_TOP",
+        type: "Primer Düzlem (Primary Datum Plane)",
+        coords: "Z: 50.000 mm | Normal: [0, 0, 1]",
+        details: "3-2-1 Kilitli DoF: Z-Trans, X-Rot, Y-Rot (3 DoF)",
+        fcf_sym: "⏥",
+        fcf_val: "0.0100",
+        fcf_datums: [],
+        metrics: [
+          ["Düzlemsellik (Flatness)", "0.0026 mm"],
+          ["RMS Uyum Hatası", "0.0008 mm"],
+          ["Nokta Sayısı", "4 Nokta (Izgara Dağılımı)"],
+          ["Kararlılık Skoru", "%97.0 (Mükemmel)"],
+        ]
+      }
+    };
+
+    function selectFeature(key) {
+      const data = featureData[key] || featureData.bore_h7;
+      document.getElementById('hud-feature-name').innerText = `${data.title} [${data.type}]`;
+      document.getElementById('hud-feature-coords').innerText = data.coords;
+      document.getElementById('hud-feature-details').innerText = data.details;
+
+      let datumsHtml = data.fcf_datums.map(d => `<td>${d}</td>`).join('');
+      let metricsHtml = data.metrics.map(m => `
+        <div class="metric-row">
+          <span class="metric-label">${m[0]}</span>
+          <span class="metric-val">${m[1]}</span>
+        </div>
+      `).join('');
+
+      document.getElementById('diag-content').innerHTML = `
+        <div class="card-fcf">
+          <div class="fcf-title">ASME Y14.5 Tolerans Çerçevesi (FCF)</div>
+          <table class="fcf-table">
+            <tr>
+              <td style="font-size: 14px;">${data.fcf_sym}</td>
+              <td>${data.fcf_val}</td>
+              ${datumsHtml}
+            </tr>
+          </table>
+        </div>
+
+        <div style="font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 8px;">
+          Metrolojik Ölçüm Parametreleri
+        </div>
+        ${metricsHtml}
+      `;
+
+      // Ağaçta aktif sınıfını güncelle
+      document.querySelectorAll('.tree-node').forEach(el => el.classList.remove('active'));
+    }
+
+    // İlk Yükleme
+    selectFeature('bore_h7');
+
+    // 8. CODE VIEWER SNIPPETS
+    const codeSnippets = {
+      dmis: `FILNAM/'VALVE_BODY_OP10', 5.3
+DVPOFT/0
+UNITS/MM, ANGDEC
+DECPL/ALL, 4
+$$ ==============================================================
+$$ NUPER ORTHO OTONOM CMM TEFTIS PROGRAMI
+$$ PARCA: VALVE_BODY_OP10 | GUVENLIK: CERTIFIED COLLISION-FREE
+$$ ROTA MUHRU (SHA-256): 170D62F7A8E0F0E681A1BA41EC19231C...
+$$ ==============================================================
+TEMPR/PART, 20.0, MATL, 23.4000
+SNSET/APPRCH, 4.0000
+SNSET/RETRCT, 5.0000
+SNSET/CLRSRF, 100.0000
+MODE/AUTO, PROG
+SNSLCT/SA(A0.0B0.0)
+GOTO/CART, 0.0000, 0.0000, 100.0000
+F(BORE_20_H7) = FEAT/CYLNDR,IN,CART, 50.0000, 50.0000, 50.0000, 0.0000, 0.0000, -1.0000, 20.0000, 30.0000
+PTMEAS/CART, 60.0000, 50.0000, 42.5000, -1.0000, 0.0000, 0.0000
+T(TOL_101) = TOL/DIAM, 20.0000, 0.0210, 0.0000
+EVAL/FA(FEAT_4), TA(TOL_101), ALGOR/MINSC  $$ Chebyshev Inscribed (H7)
+OUTPUT/FA(FEAT_4), TA(TOL_101)
+T(TOL_102) = TOL/PROFS, UNILAT, 0.2000, 0.8000, DAT(A), DAT(B)
+EVAL/FA(FEAT_6), TA(TOL_102)
+OUTPUT/FA(FEAT_6), TA(TOL_102)
+ENDFIL`,
+      calypso: `; ZEISS CALYPSO PRUEFPLAN DEFINITION
+; GENERATED BY NUPER ORTHO v0.1.0-alpha
+; PART_NAME: VALVE_BODY_OP10
+[FEATURES]
+FEATURE_TYPE: CYLINDER_INTERNAL
+NAME: BORE_20_H7
+NOM_CENTER: 50.0000, 50.0000, 50.0000
+NOM_DIAMETER: 20.0000
+NOM_LENGTH: 30.0000
+END_FEATURE
+
+FEATURE_TYPE: FREEFORM_SURFACE
+NAME: SURF_AIRFOIL_PROFILE
+NOM_CENTROID: 50.0000, 75.0000, 50.0000
+AREA: 3200.00
+END_FEATURE
+
+[CHARACTERISTICS]
+CHAR_TYPE: DIAMETER
+FEATURE_REF_ID: 4
+NOMINAL: 20.0000
+UPPER_TOL: +0.0210
+EVALUATION: MAXIMUM_INSCRIBED (MIC)
+END_CHAR
+
+CHAR_TYPE: SURFACE_PROFILE
+FEATURE_REF_ID: 6
+TOLERANCE_ZONE: 0.8000
+DISPOSITION: UNEQUALLY_DISPOSED
+OUTWARD_OFFSET: 0.2000
+INWARD_OFFSET: -0.6000
+DATUMS: A, B
+EVALUATION: MINIMUM_ZONE
+END_CHAR
+[END_PRUEFPLAN]`,
+      threads: `$$ ==============================================================
+$$ OPERATOR KURULUM FOYU: MANUEL DIS MASTAR (GO/NOGO) LISTESI
+$$ ==============================================================
+$$ [MASTAR 1]
+$$   UNSUR: THREAD_M8_BOLT (Feature ID #5)
+$$   DIS: M8x1.25 | ANMA CAPI: 8.00 mm | HATVE: 1.25 mm
+$$   MATKAP DELIK CAPI: 6.80 mm | DIS DERINLIGI: 16.00 mm
+$$   MASTAR TIPI: Gecer / Gecmez Dis Tampon Mastari (GO/NOGO Plug Gauge)
+$$   STANDART: ISO 1502 (6H Tolerans Sinifi)
+$$   UYARI: Prob ile giris yapilmaz; parca tezgaha baglanmadan once
+$$          operator tarafindan elle tork anahtariyla kontrol edilir.`
+    };
+
+    function switchCodeTab(tab) {
+      document.querySelectorAll('.c-tab').forEach(el => el.classList.remove('active'));
+      event.target.classList.add('active');
+      const text = codeSnippets[tab] || codeSnippets.dmis;
+      document.getElementById('code-display').innerHTML = text.split('\n').map((line, i) => {
+        const isHighlight = line.includes('EVAL') || line.includes('PROFS') || line.includes('MINSC') || line.includes('MASTAR');
+        return `<div class="code-line ${isHighlight ? 'active' : ''}">${line}</div>`;
+      }).join('');
+    }
+
+    switchCodeTab('dmis');
+  </script>
+</body>
+</html>

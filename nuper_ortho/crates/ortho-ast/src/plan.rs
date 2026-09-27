@@ -2,6 +2,7 @@ use glam::DVec3;
 use serde::{Deserialize, Serialize};
 
 use crate::compound::CompoundHoleFeature;
+use crate::composite_gdandt::CompositeTolerance;
 use crate::datum::DatumReferenceFrame;
 use crate::error::AstError;
 use crate::feature::GeometricFeature;
@@ -32,6 +33,9 @@ pub struct InspectionPlan {
     pub compound_holes: Vec<CompoundHoleFeature>,
     /// Geometrik tolerans kısıtları (Feature Control Frames)
     pub tolerances: Vec<ToleranceConstraint>,
+    /// ASME Y14.5 Bileşik tolerans kısıtları (Composite FCFs - PLTZF / FRTZF)
+    #[serde(default)]
+    pub composite_tolerances: Vec<CompositeTolerance>,
     /// Parçanın dış sınır kutusu minimum köşe [X, Y, Z] (mm)
     pub bounding_box_min: DVec3,
     /// Parçanın dış sınır kutusu maksimum köşe [X, Y, Z] (mm)
@@ -53,6 +57,7 @@ impl InspectionPlan {
             features: Vec::new(),
             compound_holes: Vec::new(),
             tolerances: Vec::new(),
+            composite_tolerances: Vec::new(),
             bounding_box_min: DVec3::ZERO,
             bounding_box_max: DVec3::ZERO,
         }
@@ -75,6 +80,11 @@ impl InspectionPlan {
                     feature_id: tol.feature_id,
                 });
             }
+        }
+
+        // 4. ASME Y14.5 Bileşik toleransları doğrula
+        for c_tol in &self.composite_tolerances {
+            c_tol.validate(&self.features)?;
         }
 
         Ok(())

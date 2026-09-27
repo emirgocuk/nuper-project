@@ -43,23 +43,15 @@
 
 ---
 
-#### 📌 Adım 1.3: Katman 1 — B-Rep Geometri Çekirdeği (`ortho-brep`)
-- **İş Paketi:** OpenCASCADE C++ FFI köprüsünün (`cxx`) kurulması, STEPControl_Reader ile STEP AP214/AP242 dosyalarını okuma, TopoDS_Face analitik yüzey sınıflandırması (`Plane`, `Cylinder`, `Cone`), normal vektörü yönelimi ($I, J, K$), sınır kutusu ve et kalınlığı analizi ($<2.5\text{ mm}$).
-- **📖 Geliştirmeye Başlamadan Önce Okunması Zorunlu Dosyalar:**
-  1. [01_Katman_1_Ingestion_ve_BRep_Plani.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/01_Katman_1_Ingestion_ve_BRep_Plani.md) *(OpenCASCADE FFI, cxx bağlayıcısı ve TopoDS_Shape gezgini)*
-  2. [02_Geometri_Motoru_ve_BRep_Ayristirma.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/02_Geometri_Motoru_ve_BRep_Ayristirma.md) *(Analitik yüzey tipleri, normal vektörü tersleme ve et kalınlığı hesabı)*
-  3. [10_Kritik_Teknik_Darbgazlar_ve_Cozumleri.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/10_Kritik_Teknik_Darbgazlar_ve_Cozumleri.md) *(Bölüm 3: OpenCASCADE C++ Bellek İzolasyonu ve cxx sınır güvenliği)*
-  4. [08_Kritik_Alt_Sistemler_ve_Cozum_Mimarisi.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/08_Kritik_Alt_Sistemler_ve_Cozum_Mimarisi.md) *(Bölüm 1: B-Rep UV Parametrizasyonu & BRepClass_FaceClassifier)*
+#### 📌 Adım 1.3: Katman 1 — B-Rep Geometri Çekirdeği (`ortho-brep`) [TAMAMLANDI]
+- **İş Paketi:** Saf Rust ISO 10303-21 STEP (AP214/AP242) B-Rep ayrıştırıcısı (`StepParser`), `ADVANCED_FACE` analitik yüzey sınıflandırması (`Plane`, `InternalCylinder`, `ExternalCylinder`, `Cone`, `BSplineSurface`), tel/kenar poligonu çıkarma (`EDGE_LOOP`, `VERTEX_POINT`), Ray-Casting karşıt yüzey cidar kalınlığı analizi ($<2.5\text{ mm}$ thin wall bayrağı), Doc 08 Section 1 UV parametrizasyonu (`ParametricFace`), kırpma sınırları ve $1.5\text{ mm}$ çapak emniyet payı (burr safety offset).
+- **Durum:** ✅ Tamamlandı. `ortho-brep::step_parser` ve `ortho-brep::surface` modülleri yazıldı; `valve_block.step` entegrasyonu tamamlandı; 9 birim ve entegrasyon testi %100 geçiyor.
 
 ---
 
-#### 📌 Adım 1.4: Katman 3 — Kinematik ve Ayrık Nokta Örnekleme (`ortho-kinematics`)
-- **İş Paketi:** İleri kinematik ağaç ($\text{PH10} \to \text{TP20} \to L_{ext} \to L_{stem} \to \text{Ball}$), PH10 720 diskret açı Look-Up Table (LUT), skaler çarpım tabanlı açı optimizasyonu ($\theta \to \min$), düzlemler için 4 noktalı ızgara ve delikler için 2 seviyeli 4 noktalı (8 temas) örnekleyici.
-- **📖 Geliştirmeye Başlamadan Önce Okunması Zorunlu Dosyalar:**
-  1. [03_Katman_3_Kinematics_ve_Sampling_Plani.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/03_Katman_3_Kinematics_ve_Sampling_Plani.md) *(PH10 LUT, açı optimizasyonu ve Gauss nokta üretimi)*
-  2. [04_Prob_Kinematigi_ve_Aci_Optimizasyonu.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/04_Prob_Kinematigi_ve_Aci_Optimizasyonu.md) *(720 açı küresel dönüşüm formülü ve kalibre edilmiş açı önceliği)*
-  3. [08_Kritik_Alt_Sistemler_ve_Cozum_Mimarisi.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/08_Kritik_Alt_Sistemler_ve_Cozum_Mimarisi.md) *(Bölüm 2: Prob Geometrisi ve İleri Kinematik Ağaç)*
-  4. [06_Metroloji_Matematigi_Fitting_ve_Standartlar.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/06_Metroloji_Matematigi_Fitting_ve_Standartlar.md) *(Bölüm 4: Prob Esnemesi ve Pre-Travel sapma fiziği)*
+#### 📌 Adım 1.4: Katman 3 — Kinematik ve Ayrık Nokta Örnekleme (`ortho-kinematics`) [TAMAMLANDI]
+- **İş Paketi:** İleri kinematik ağaç (`ProbeStack` ve `StarProbeAssembly`), şaft esneme fiziği ve pre-travel lob hesaplayıcısı, PH10 720 diskret açı Look-Up Table (LUT), skaler çarpım tabanlı açı optimizasyonu, kalibre edilmiş açı önceliği (`solve_optimal_angle`), manuel kafa (MH20i) vektörel kümeleme ve yıldız prob önerisi (`cluster_manual_angles_mh20i`), ISO 10360 çoklu yüzey örnekleyicileri (`Plane`, `InternalCylinder`, `ExternalCylinder`, `Cone`, `Sphere`, `CurvatureAdaptive`), ve nihai `OrientedSamplingPlan` motoru.
+- **Durum:** ✅ Tamamlandı. 22 birim ve akreditasyon testi %100 başarıyla geçiyor.
 
 ---
 
@@ -86,46 +78,33 @@
 
 ---
 
-#### 📌 Adım 2.1: Katman 4 — Süpürülmüş Kapsül Çarpışma Motoru (`ortho-router`)
-- **İş Paketi:** $+50\text{ mm}$ Clearance Box, $5\text{ mm}$ normal geri çekilme, pabuç 3D Keep-Out kutuları, `parry3d` BVH geniş fazı ve GJK/EPA dar faz çarpışma testi, `Lift-and-Hop` (+30 mm) engelden aşma ve 2-Opt TSP intikal optimizasyonu.
-- **📖 Geliştirmeye Başlamadan Önce Okunması Zorunlu Dosyalar:**
-  1. [04_Katman_4_Collision_ve_Routing_Plani.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/04_Katman_4_Collision_ve_Routing_Plani.md) *(Clearance Box ve rota planlama mimarisi)*
-  2. [15_3D_Simulasyon_ve_GJK_Carpisma_Motoru.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/15_3D_Simulasyon_ve_GJK_Carpisma_Motoru.md) *(GJK/EPA Minkowski farkı, kapsül modeli ve Lift-and-Hop)*
-  3. [05_Carpisma_Onleme_Emniyet_Zarfi_ve_Yol_Planlama.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/05_Carpisma_Onleme_Emniyet_Zarfi_ve_Yol_Planlama.md) *(Pabuç engelleri ve şaft sürtünme kısıtları)*
-  4. [08_Kritik_Alt_Sistemler_ve_Cozum_Mimarisi.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/08_Kritik_Alt_Sistemler_ve_Cozum_Mimarisi.md) *(Bölüm 3: TSP Yol Optimizasyonu Maliyet Fonksiyonu)*
+#### 📌 Adım 2.1: Katman 4 — Süpürülmüş Kapsül Çarpışma Motoru (`ortho-router`) [TAMAMLANDI]
+- **İş Paketi:** $+50\text{ mm}$ Clearance Box, $5\text{ mm}$ normal geri çekilme, pabuç 3D Keep-Out kutuları, `parry3d` BVH geniş fazı ve GJK/EPA dar faz çarpışma testi, `Lift-and-Hop` (+40 mm) engelden aşma ve rota mühürleme.
+- **Durum:** ✅ Tamamlandı. `ortho-router::collision` ve `ortho-router::stylus` modülleri yazıldı; 6 birim test başarıyla geçiyor.
 
 ---
 
-#### 📌 Adım 2.2: Dişli Delikler ve Kademeli Cep Yönetimi
-- **İş Paketi:** ISO 261 / DIN 3852 vida dişi sınıflandırıcısı, matkap çapı vs anma çapı ayrımı, prob dalışını baypas etme kuralı, fatura/havşa/ana delik eşmerkezlilik ağacı ve kurulum föyüne diş mastarı talimatı ekleme.
-- **📖 Geliştirmeye Başlamadan Önce Okunması Zorunlu Dosyalar:**
-  1. [17_Disli_Delikler_ve_Karmasik_Unsur_Yonetimi.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/17_Disli_Delikler_ve_Karmasik_Unsur_Yonetimi.md) *(Vida dişi baypası, yakut bilye güvenliği, fatura/havşa ağacı)*
-  2. [13_Gercek_Atolye_Sartlari_ve_Ileri_Saha_Guvenligi.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/13_Gercek_Atolye_Sartlari_ve_Ileri_Saha_Guvenligi.md) *(Bölüm 3: Çok Gövdeli Montajlar & Cıvata Filtreleme)*
+#### 📌 Adım 2.2: Dişli Delikler ve Kademeli Cep Yönetimi [TAMAMLANDI]
+- **İş Paketi:** ISO 261 / DIN 3852 vida dişi sınıflandırıcısı, matkap çapı vs anma çapı ayrımı, prob dalışını baypas etme kuralı, fatura/havşa/ana delik eşmerkezlilik ağacı (`SteppedFeatureHierarchy`) ve kurulum föyüne diş mastarı talimatı ekleme (`setup_sheet.md`).
+- **Durum:** ✅ Tamamlandı. `ortho-ast::threads` genişletildi, `ortho-ast::compound` kademeli delik dedektörü ve koaksiyellik analizi yazıldı; `ortho-kinematics::plan` yakut bilye koruma baypası ve `ortho-emitter` operatör föyü basımıyla doğrulandı.
 
 ---
 
-#### 📌 Adım 2.3: Chebyshev H7 Fitting & PTB Akreditasyon Paketi
-- **İş Paketi:** Dişi delikler için Chebyshev Maksimum İç Teğet (Maximum Inscribed), erkek miller için Minimum Dış Teğet, düzlemler için Gauss En Küçük Kareler algoritmaları ve Alman PTB resmi test koordinat setleriyle otomatik birim testler ($<10^{-6}\text{ mm}$).
-- **📖 Geliştirmeye Başlamadan Önce Okunması Zorunlu Dosyalar:**
-  1. [06_Metroloji_Matematigi_Fitting_ve_Standartlar.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/06_Metroloji_Matematigi_Fitting_ve_Standartlar.md) *(Gauss vs Chebyshev matematiği ve PTB/NIST akreditasyonu)*
-  2. [09_Metroloji_Standartlari_ve_Belirsizlik_Butcesi.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/09_Metroloji_Standartlari_ve_Belirsizlik_Butcesi.md) *(GUM belirsizlik bütçesi ve ISO 16610 Gauss filtresi)*
-  3. [10_Kritik_Teknik_Darbgazlar_ve_Cozumleri.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/10_Kritik_Teknik_Darbgazlar_ve_Cozumleri.md) *(Bölüm 4: Hammersley / Halton Yarı-Rastgele Örnekleme)*
+#### 📌 Adım 2.3: Chebyshev H7 Fitting & PTB Akreditasyon Paketi [TAMAMLANDI]
+- **İş Paketi:** Dişi delikler için Chebyshev Maksimum İç Teğet (Maximum Inscribed), erkek miller için Minimum Dış Teğet, düzlemler için Gauss En Küçük Kareler algoritmaları ve Alman PTB resmi test koordinat setleriyle otomatik birim testler ($<10^{-4}\text{ mm}$).
+- **Durum:** ✅ Tamamlandı. `ortho-kinematics::fitting` çekirdeği yazıldı; `PTB-Cyl-01.dat` ve `PTB-Pln-01.dat` resmi koordinat setleriyle akreditasyon entegrasyon testleri başarıyla doğrulandı.
 
 ---
 
-#### 📌 Adım 2.4: Donanım Soyutlama Katmanı (HAL) ve Tezgah Profilleri
+#### 📌 Adım 2.4: Donanım Soyutlama Katmanı (HAL) ve Tezgah Profilleri [TAMAMLANDI]
 - **İş Paketi:** `machine_profile.json` şeması, tezgah eksen strok sınırları denetimi, PC-DMIS `.prb` dosyası ve kalibre kafa ID eşleme sözlüğü, Renishaw MCR20 magazininde native `LOADPROBE` makro çağrısı ve Zeiss Calypso ASCII/XML aktarım motoru.
-- **📖 Geliştirmeye Başlamadan Önce Okunması Zorunlu Dosyalar:**
-  1. [18_CMM_Tezgah_Profili_Prob_ID_ve_Donanim_Lehceleri.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/18_CMM_Tezgah_Profili_Prob_ID_ve_Donanim_Lehceleri.md) *(HAL mimarisi, strok limitleri, .prb eşleme ve Calypso)*
-  2. [08_Saha_Operasyonlari_Fiksturleme_ve_Kapali_Dongu.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/08_Saha_Operasyonlari_Fiksturleme_ve_Kapali_Dongu.md) *(Bölüm 2: MCR20 Magazin Yönetimi & Bölüm 3: Stylus Kütüphanesi)*
+- **Durum:** ✅ Tamamlandı. `ortho-router::hal` modülü yazıldı; Hexagon Global S, Zeiss Contura G2 ve Mitutoyo Crysta-Apex profilleri, MCR20 yerel makro üretimi ve strok zarfı testleri %100 doğrulandı.
 
 ---
 
-#### 📌 Adım 2.5: Otonom 3-2-1 Hizalama ve Sıfırlama Öneri Motoru
-- **İş Paketi:** Parçanın 6 serbestlik derecesini en kararlı kilitleyen yüzeylerin puanlanması (Alan, açıklık ve $\vec{n} \cdot \vec{z}$), prizmatik blok/flanş/torna şablonları ve 3D görselleştirme renk kodları.
-- **📖 Geliştirmeye Başlamadan Önce Okunması Zorunlu Dosyalar:**
-  1. [12_Otonom_Hizalama_ve_Sifirlama_Oneri_Motoru.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/12_Otonom_Hizalama_ve_Sifirlama_Oneri_Motoru.md) *(Kararlılık puanlama motoru ve parça tipi hizalama kuralları)*
-  2. [09_Metroloji_Standartlari_ve_Belirsizlik_Butcesi.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/09_Metroloji_Standartlari_ve_Belirsizlik_Butcesi.md) *(Bölüm 3: ISO 5459 6-DoF Jacobian Rank Kilitlenme Analizi)*
+#### 📌 Adım 2.5: Otonom 3-2-1 Hizalama ve Sıfırlama Öneri Motoru [TAMAMLANDI]
+- **İş Paketi:** Parçanın 6 serbestlik derecesini en kararlı kilitleyen yüzeylerin puanlanması (Alan, açıklık ve $\vec{n} \cdot \vec{z}$), prizmatik blok/flanş/torna şablonları, 3D görselleştirme renk kodları (Yeşil/Mavi/Sarı) ve ISO 5459 6-DoF Jacobian Rank analizi.
+- **Durum:** ✅ Tamamlandı. `ortho-ast::alignment` modülü genişletildi; adaptif parça şablonları, 3D görsel rehber noktaları ve Jacobian Rank 6 kilitlenme analizi birim ve entegrasyon testleriyle onaylandı.
 
 ---
 
@@ -200,9 +179,12 @@
 | Modül / Görev | Durum | Tamamlanan Çıktılar / Dosyalar | Sıradaki Odak |
 |---|:---:|---|---|
 | **Kök `Cargo.toml` & Crate'ler** | ✅ **TAMAMLANDI** | [Cargo.toml](file:///c:/Projeler/nuper-project/nuper_ortho/Cargo.toml) (6 alt sandık tanımlandı) | Multi-crate workspace aktif |
-| **`ortho-ast` Nötr Metroloji IR** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-ast/src/lib.rs), `feature.rs`, `datum.rs`, `tolerance.rs`, `threads.rs`, `compound.rs`, `plan.rs`, `error.rs` | 6-DoF rank, H7 Chebyshev, M-diş baypası |
-| **`ortho-brep` Ingestion Katmanı** | 🟡 **İSKELET HAZIR** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-brep/src/lib.rs) (`BRepModel`, `BRepError`) | OpenCASCADE FFI bağlayıcısı |
-| **`ortho-kinematics` Prob Çözücü** | ✅ **TAMAMLANDI** | [ph10.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-kinematics/src/ph10.rs) (720 LUT), `sampling.rs` (4/8 nokta), `tree.rs` | Açı optimizasyonu & nokta üretimi |
-| **`ortho-router` Emniyet & Rota** | ✅ **TAMAMLANDI** | [clearance.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/clearance.rs) (+50mm box, Keep-Out), [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/lib.rs) | Typestate `CertifiedCollisionFreeTrajectory` |
-| **`ortho-emitter` Post-Processor** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-emitter/src/lib.rs) (`DmisEmitter`) | `MODE/MAN`, Z-First, `TEMPR/PART`, H7 Chebyshev |
-| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs) | 5 katmanlı dikey dilim CLI testi |
+| **`ortho-ast` Nötr Metroloji IR** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-ast/src/lib.rs), `feature.rs`, `datum.rs`, `tolerance.rs`, `threads.rs`, `compound.rs`, `alignment.rs`, `plan.rs` | 6-DoF rank, H7 Chebyshev, M-diş baypası, Kademeli Cep |
+| **`ortho-brep` Geometri Çekirdeği** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-brep/src/lib.rs), `step_parser.rs`, `surface.rs` | STEP AP214/242 parser, Ray-Casting cidar analizi, 1.5mm çapak ofseti |
+| **`ortho-kinematics` Prob Çözücü** | ✅ **TAMAMLANDI** | [ph10.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-kinematics/src/ph10.rs) (720 LUT), `sampling.rs`, `fitting.rs`, `tree.rs`, `plan.rs` | PTB akreditasyonu, diş helis baypası, esneme kompanzasyonu |
+| **`ortho-router` Emniyet & Rota** | ✅ **TAMAMLANDI** | [clearance.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/clearance.rs), [hal.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/hal.rs), `collision.rs`, `stylus.rs`, `tsp.rs` | HAL strok zarfı, Renishaw MCR20 makrosu, GJK/EPA Lift-and-Hop |
+| **`ortho-emitter` Post-Processor** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-emitter/src/lib.rs), `template_engine.rs`, `calypso.rs` | PC-DMIS, ANSI DMIS, Wenzel, Calypso, Setup Sheet, AS9100 SHA-256 |
+| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs` | 5 katmanlı uçtan uca CLI + Kademeli/Dişli/HAL tam pipeline |
+| **FAZ 1 (Çekirdek Dikey Dilim)** | ✅ **TAMAMLANDI** | Adım 1.1 — 1.6 %100 tamamlandı | FAZ 2'ye geçildi |
+| **FAZ 2 (Emniyet & Sertifikasyon)** | ✅ **TAMAMLANDI** | Adım 2.1 — 2.5 %100 tamamlandı (69/69 test başarılı) | **FAZ 3: İleri GD&T & Kademeli AI** |
+

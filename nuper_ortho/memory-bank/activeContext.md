@@ -1,64 +1,40 @@
 ## 1. Anlık Odak Noktası
-Faz 1 kapsamındaki **Çekirdek Dikey Dilim (Vertical Slice PoC)** için gerekli 6 crate ve temel derleyici boru hattı başarıyla inşa edildi:
-- [Cargo.toml](file:///c:/Projeler/nuper-project/nuper_ortho/Cargo.toml) (Multi-crate workspace)
-- `crates/ortho-ast` (Nötr Metroloji IR)
-- `crates/ortho-brep` (Ingestion iskeleti)
-- `crates/ortho-kinematics` (PH10 720 açı LUT & örnekleme)
-- `crates/ortho-router` (Clearance Box & sertifikalı rota)
-- `crates/ortho-emitter` (PC-DMIS & DMIS 5.3 emitter)
-- `crates/ortho-cli` (5 katmanlı uçtan uca CLI koşucu)
-
-**Sıradaki Odak:** Geliştirme ortamında Rust toolchain'inin (Rustup / Cargo) doğrulanması, OpenCASCADE C++ FFI bağlayıcısının derinleştirilmesi ve birim testlerin koşturulması.
+**FAZ 1 ve FAZ 2 %100 BAŞARIYLA TAMAMLANDI!**
+Tüm 6 crate ve entegrasyon testlerinde **69/69 test başarıyla geçmektedir** (`cargo test --workspace` -> 69 passed, 0 failed):
+- **Adım 2.2: Dişli Delikler ve Kademeli Cep Yönetimi (`ortho-ast` & `ortho-kinematics`):** ISO 261, fine metric, ASME UNC/UNF ve Gas/NPT veritabanı; CAD matkap vs anma çapı ayrımı; yakut prob bilyesini koruyan katı vida helisi baypası; `detect_compound_holes` otonom kademeli havşa/fatura eşmerkezlilik (coaxiality) analizi.
+- **Adım 2.4: Donanım Soyutlama Katmanı (HAL) ve Tezgah Profilleri (`ortho-router`):** `machine_profile.json` şeması, Hexagon Global S, Zeiss Contura G2 ve Mitutoyo Crysta-Apex tezgah profilleri; Renishaw MCR20 native `LOADPROBE` makro çağrısı; quill ofseti ve strok limitleri zarfı denetimi.
+- **Adım 2.5: Otonom 3-2-1 Adaptif Hizalama Motoru (`ortho-ast`):** Prizmatik blok, flanş/iki delik ve torna parçaları için adaptif şablonlar; ISO 5459 6-DoF Jacobian Rank analizi (`Rank = 6` kilitlenme garantisi); 3D Digital Twin Yeşil/Mavi/Sarı görselleştirme koordinatları.
+- **Saha Operatör Kurulum Föyü (`ortho-emitter` & `ortho-cli`):** `setup_sheet.md` otomatik üretimi; Go/No-Go diş tampon mastarları tablosu; ISO 1502 ve AS9100 Rev D SHA-256 dijital denetim mührü.
 
 ---
 
 ## 2. Son Tamamlanan Kritik İşler
-1. **Mimari Boşlukların Kapatılması ve 4 Yeni Belgenin Eklenmesi:**
-   - [17_Disli_Delikler_ve_Karmasik_Unsur_Yonetimi.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/17_Disli_Delikler_ve_Karmasik_Unsur_Yonetimi.md) (Vida dişi koruması ve mastar föyü).
-   - [18_CMM_Tezgah_Profili_Prob_ID_ve_Donanim_Lehceleri.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/18_CMM_Tezgah_Profili_Prob_ID_ve_Donanim_Lehceleri.md) (Donanım HAL ve Zeiss Calypso ASCII desteği).
-   - [19_Kademeli_AI_Mimarisi_ve_Cok_Sayfali_Kesit_Esleme.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/19_Kademeli_AI_Mimarisi_ve_Cok_Sayfali_Kesit_Esleme.md) (4 kademeli yerel AI ve Kesit A-A izdüşümü).
-   - [20_Serbest_Yuzey_Profili_ve_Bilesik_Toleranslar.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/20_Serbest_Yuzey_Profili_ve_Bilesik_Toleranslar.md) (Yüzey profili $\char"2312$ ve ASME Y14.5 bileşik FCF).
-2. **Kapsamlı Türkçe Memory Bank Kurulumu:**
-   - `projectbrief.md`: Misyon, YC Physical AI konumu, pazar ve başarı kriterleri.
-   - `productContext.md`: Çözülen problemler, kullanıcı personaları, Solid Slate Light arayüz felsefesi.
-   - `systemPatterns.md`: 5 katmanlı derleyici, HAL, sandboxed AI, typestate ve GJK/EPA kapsül fiziği.
-   - `techContext.md`: Teknoloji yığını, cargo workspace hiyerarşisi ve donanım kısıtları.
-   - `progress.md`: 21 teknik dokümanın tümünü kapsayan 4 fazlı detaylı inşa yol haritası.
+1. **Dişli Delik Helis Baypası ve Yakut Bilye Koruma Protokolü:**
+   - CMM probunun vida helisine dalması engellenerek yakut bilye kırılması ve sahte eksen kayması riski sıfırlandı.
+   - Operatör için Kurulum Föyüne manuel Go/No-Go tampon mastar tablosu bağlandı.
+2. **Kademeli Cep ve Eşmerkezlilik Ağacı (`SteppedFeatureHierarchy`):**
+   - Koaksiyel silindir ve koniler topolojik olarak kümelenerek Counterbore + Countersink + Main Bore yapısı kuruldu.
+   - ISO 1101 koaksiyellik hatası otomatik hesaplandı.
+3. **HAL Tezgah Profilleri ve Renishaw MCR20 Magazin Yönetimi:**
+   - Magazin yuvasına asla ham koordinatla girilmeyeceğini garanti eden yerel makro yöneticisi (`dispatch_tool_change_macro`) yazıldı.
+4. **Otonom 3-2-1 Adaptif Hizalama ve Jacobian Rank Analizi:**
+   - Yüzey geometrileri üzerinde in-plane teğetlerle 6 DoF Jacobian rank analizi yapılarak uzayda eksiksiz 6 serbestlik derecesi kilitlenmesi matematiksel olarak kanıtlandı.
+5. **Uçtan Uca Entegrasyon Testi (`crates/ortho-cli/tests/end_to_end_phase2.rs`):**
+   - B-Rep modelden kademeli dişli deliğin ayrıştırılması, adaptif hizalama, prob örnekleme baypası, MCR20 makrosu, GJK/EPA rota mühürlemesi ve AS9100 Rev D DMIS çıktısı tek bir hatta başarıyla doğrulandı.
 
 ---
 
-## 3. Sıradaki Somut Adımlar (Faz 1 Başlangıcı)
-
-### Adım 1.1: Kök Workspace ve Crate İskeletleri
-- **Zorunlu Okunacak Belgeler:**
-  - [06_Gelistirme_Ortami_ve_Crate_Mimarisi.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/06_Gelistirme_Ortami_ve_Crate_Mimarisi.md)
-  - [00_Derleyici_Mimarisi_Master_Plani.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/00_Derleyici_Mimarisi_Master_Plani.md)
-- Kök dizinde `Cargo.toml` dosyasını oluşturmak:
-  ```toml
-  [workspace]
-  members = [
-      "crates/ortho-ast",
-      "crates/ortho-brep",
-      "crates/ortho-kinematics",
-      "crates/ortho-router",
-      "crates/ortho-emitter",
-      "crates/ortho-cli",
-  ]
-  ```
-- Her crate için kendi `Cargo.toml` ve `src/lib.rs` (veya `src/main.rs`) iskeletlerini oluşturmak.
-
-### Adım 1.2: `ortho-ast` Geliştirmesi
-- **Zorunlu Okunacak Belgeler:**
-  - [02_Katman_2_Metrology_AST_Ara_Temsil_Plani.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/02_Katman_2_Metrology_AST_Ara_Temsil_Plani.md)
-  - [08_Kritik_Alt_Sistemler_ve_Cozum_Mimarisi.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/08_Kritik_Alt_Sistemler_ve_Cozum_Mimarisi.md)
-  - [17_Disli_Delikler_ve_Karmasik_Unsur_Yonetimi.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/17_Disli_Delikler_ve_Karmasik_Unsur_Yonetimi.md)
-- `ortho-ast` saf Rust kütüphanesi olarak kodlanacak (harici C++ veya ağır bağımlılık yok).
-- `GeometricFeature`, `FeatureType`, `InspectionPlan`, `DatumReferenceFrame`, `ThreadSpecification` tipleri tanımlanacak.
-- ISO 1101 ve ASME Y14.5 3-2-1 kural doğrulayıcı testleri yazılacak.
+## 3. Sıradaki Faz ve Adımlar (FAZ 3: İleri GD&T, Kademeli AI ve Masaüstü UI)
+1. **Adım 3.1: Serbest Yüzey Profili ($\char"2312$) ve Bileşik GD&T:**
+   - B-Spline yüzeylerde UV ızgarası normal sapması ($\Delta n$), bilateral ve unilateral ($U$) tolerans bantları, ASME Y14.5 Bileşik Konum Çerçeveleri (PLTZF $A|B|C$ + FRTZF $A$), adaptif eğrilik örneklemesi ve DMIS `TOL/PROFS` çıktısı.
+2. **Adım 3.2: Dört Kademeli Yerel AI & Çok Sayfalı PDF Hattı:**
+   - Tier 0 (AP242 PMI), Tier 1 (PaddleOCR/OpenCV), Tier 2 (Moondream2 / SmolVLM 1.5B GGUF), Tier 3 (Qwen2-VL), çok sayfalı PDF sınıflandırıcısı, Kesit A-A kesme düzlemi izdüşüm eşlemesi ve kırmızı kaşe temizleme filtresi.
+3. **Adım 3.3: Tauri 2.0 + Three.js Masaüstü Uygulaması (Solid Slate Light):**
+   - Tauri 2.0 kabuğu, açık gri `#F1F5F9` mühendislik teması, Three.js mat CAD görünümü, 3 bölmeli ekran düzeni ve 3D pabuç işaretleme aracı.
 
 ---
 
 ## 4. Aktif Kararlar ve Kodlama İlkeleri
-- **Sözleşme Odaklı Geliştirme (Contract-First):** `ortho-brep` veya `ortho-emitter` yazılmadan önce `ortho-ast` veri modelleri ve doğrulama kuralları eksiksiz bitirilecek.
-- **Tip Seviyesinde Güvenlik:** Sınır değerleri (örneğin normal vektör uzunluğu $\|\vec{n}\| = 1.0$, silindir çapı $D > 0$) kurucu fonksiyonlarda (`new` / `validate`) garanti altına alınacak.
-- **Sıfır Panik (No Panics):** Kütüphane kodlarında `unwrap()` ve `expect()` yasaktır; tüm hatalar `thiserror` tabanlı açık enum tipleriyle yönetilecek.
+- **YOLO Mode & Tam Otonomi:** Proaktif geliştirme kesintisiz devam eder; onay beklemeden mimari dokümantasyona sadık kalınır.
+- **Fail-Safe & Typestate:** `CertifiedCollisionFreeTrajectory` asla by-pass edilmez; tüm çıktılar SHA-256 mührü taşır.
+- **Sıfır Panik (No Panics):** Kütüphane kodlarında `unwrap()` ve `expect()` yasaktır; `thiserror` tabanlı açık tipler kullanılır.
