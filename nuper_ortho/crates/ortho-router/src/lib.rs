@@ -20,7 +20,7 @@ pub use collision::{
 pub use hal::{
     CmmMachineProfile, HalError, ProbeTipDefinition, RackConfiguration, RackType, StrokeLimits,
 };
-pub use ipc::BinaryTrajectoryPacket;
+pub use ipc::{BinaryMeshPacket, BinaryTrajectoryPacket};
 pub use stylus::{ReachabilityReport, StylusAssembly, StylusError};
 pub use tsp::{calculate_total_path_length, optimize_inspection_sequence_2opt};
 

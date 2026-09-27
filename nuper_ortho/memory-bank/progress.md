@@ -113,21 +113,15 @@
 
 ---
 
-#### 📌 Adım 3.1: Serbest Yüzey Profili ($\char"2312$) ve Bileşik GD&T
-- **İş Paketi:** B-Spline yüzeylerde UV ızgarası normal sapması ($\Delta n$), bilateral ve unilateral ($U$) tolerans bantları, ASME Y14.5 Bileşik Konum Çerçeveleri (PLTZF $A|B|C$ + FRTZF $A$), adaptif eğrilik örneklemesi ve DMIS `TOL/PROFS` çıktısı.
-- **📖 Geliştirmeye Başlamadan Önce Okunması Zorunlu Dosyalar:**
-  1. [20_Serbest_Yuzey_Profili_ve_Bilesik_Toleranslar.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/20_Serbest_Yuzey_Profili_ve_Bilesik_Toleranslar.md) *(Yüzey profili formülü, PLTZF/FRTZF iki katmanlı AST ve adaptif örnekleme)*
-  2. [02_Geometri_Motoru_ve_BRep_Ayristirma.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/02_Geometri_Motoru_ve_BRep_Ayristirma.md) *(GeomAbs_BSplineSurface UV normal matrisi)*
+#### 📌 Adım 3.1: Serbest Yüzey Profili ($\char"2312$) ve Bileşik GD&T [TAMAMLANDI]
+- **İş Paketi:** B-Spline yüzeylerde UV ızgarası normal sapması ($\Delta n$), De Boor eğri/yüzey hesaplayıcısı, Diferansiyel geometri Birinci ve İkinci Temel Formlar ($E, F, G, L, M, N$), Gauss ve Ortalama Eğrilik ($K, H$), bilateral ve unilateral ($U$) tolerans bantları, ASME Y14.5 Bileşik Konum Çerçeveleri (PLTZF $A|B|C$ + FRTZF $A$ ile Kabsch rijit uyum), adaptif eğrilik örneklemesi, 1.5 mm çapak emniyet payı, ve DMIS 5.3 `FEAT/GSURF,CART` / `TOL/PROFS, UNILAT` çıktısı.
+- **Durum:** ✅ Tamamlandı. `ortho-brep::surface` ve `step_parser.rs` genişletildi, `ortho-kinematics::sampling` ve `fitting.rs` entegrasyonu tamamlandı; `end_to_end_phase3.rs` havacılık kanat profili testiyle doğrulandı (72/72 test %100 başarılı).
 
 ---
 
-#### 📌 Adım 3.2: Dört Kademeli Yerel AI & Çok Sayfalı PDF Hattı
-- **İş Paketi:** Tier 0 (AP242 PMI), Tier 1 (PaddleOCR/OpenCV), Tier 2 (Moondream2 / SmolVLM 1.5B GGUF), Tier 3 (Qwen2-VL), çok sayfalı PDF sınıflandırıcısı, Kesit A-A kesme düzlemi izdüşüm eşlemesi ve kırmızı kaşe temizleme filtresi.
-- **📖 Geliştirmeye Başlamadan Önce Okunması Zorunlu Dosyalar:**
-  1. [19_Kademeli_AI_Mimarisi_ve_Cok_Sayfali_Kesit_Esleme.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/19_Kademeli_AI_Mimarisi_ve_Cok_Sayfali_Kesit_Esleme.md) *(4 Kademeli AI, Kesit A-A eşleme ve HSV kaşe temizleme)*
-  2. [14_Yerel_Yapay_Zeka_Ajanlari_ve_Deterministik_Gardiyan.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/14_Yerel_Yapay_Zeka_Ajanlari_ve_Deterministik_Gardiyan.md) *(5 AI rolü, GBNF grameri ve 5 aşamalı gardiyan mimarisi)*
-  3. [03_2D_PDF_GDT_ve_Datum_Esleme_Motoru.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/03_2D_PDF_GDT_ve_Datum_Esleme_Motoru.md) *(Feature Control Frame ayrıştırma ve çap eşleme)*
-  4. [10_Kritik_Teknik_Darbgazlar_ve_Cozumleri.md](file:///c:/Projeler/nuper-project/nuper_ortho/Nuper%20Ortho%20Detayl%C4%B1%20Kavramsal%20Tasar%C4%B1m/Kodlama%20Planlamasi/10_Kritik_Teknik_Darbgazlar_ve_Cozumleri.md) *(Bölüm 1: Bipartite Graph Matching `petgraph`)*
+#### 📌 Adım 3.2: Dört Kademeli Yerel AI & Çok Sayfalı PDF Hattı [TAMAMLANDI]
+- **İş Paketi:** Tier 0 (AP242 Semantik PMI `StepPmiReader`), Tier 1 (Kural Tabanlı OCR & Geometrik Ayrıştırıcı `Tier1RuleBasedParser`), Tier 2/3 (Vision SLM/VLM donanım tespit orkestrasyonu `HardwareProfile::select_optimal_tier`), çok sayfalı PDF sınıflandırıcısı (`DrawingSheet::classify_from_text`), başlık bloğu çıkarıcı (`extract_title_block`), Kesit A-A kesme düzlemi izdüşüm eşlemesi (`CuttingPlane::find_intersecting_features`), kırmızı kaşe temizleme filtresi (`DrawingImagePreprocessor::process_rgb_image`), ve onaylanan eşleşmelerin Nötr Teftiş Planına otomatik aktarımı (`apply_matches_to_inspection_plan`).
+- **Durum:** ✅ Tamamlandı. `ortho-brep::tier`, `drawing.rs` ve `matching.rs` modülleri %100 doğrulandı (14/14 test başarılı).
 
 ---
 
@@ -184,7 +178,9 @@
 | **`ortho-kinematics` Prob Çözücü** | ✅ **TAMAMLANDI** | [ph10.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-kinematics/src/ph10.rs) (720 LUT), `sampling.rs`, `fitting.rs`, `tree.rs`, `plan.rs` | PTB akreditasyonu, diş helis baypası, esneme kompanzasyonu |
 | **`ortho-router` Emniyet & Rota** | ✅ **TAMAMLANDI** | [clearance.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/clearance.rs), [hal.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/hal.rs), `collision.rs`, `stylus.rs`, `tsp.rs` | HAL strok zarfı, Renishaw MCR20 makrosu, GJK/EPA Lift-and-Hop |
 | **`ortho-emitter` Post-Processor** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-emitter/src/lib.rs), `template_engine.rs`, `calypso.rs` | PC-DMIS, ANSI DMIS, Wenzel, Calypso, Setup Sheet, AS9100 SHA-256 |
-| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs` | 5 katmanlı uçtan uca CLI + Kademeli/Dişli/HAL tam pipeline |
+| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs`, `end_to_end_phase3.rs` | 5 katmanlı uçtan uca CLI + Kademeli/Dişli/HAL + B-Spline GSURF |
 | **FAZ 1 (Çekirdek Dikey Dilim)** | ✅ **TAMAMLANDI** | Adım 1.1 — 1.6 %100 tamamlandı | FAZ 2'ye geçildi |
-| **FAZ 2 (Emniyet & Sertifikasyon)** | ✅ **TAMAMLANDI** | Adım 2.1 — 2.5 %100 tamamlandı (69/69 test başarılı) | **FAZ 3: İleri GD&T & Kademeli AI** |
+| **FAZ 2 (Emniyet & Sertifikasyon)** | ✅ **TAMAMLANDI** | Adım 2.1 — 2.5 %100 tamamlandı (69/69 test başarılı) | FAZ 3'e geçildi |
+| **FAZ 3 (İleri GD&T & Kademeli AI)** | ✅ **TAMAMLANDI** | **Adım 3.1 — 3.4 %100 TAMAMLANDI** (77/77 test başarılı) | FAZ 4'e geçildi |
+| **FAZ 4 (Saha FAT & CNC Kapalı Döngü)** | 🟡 **SIRADAKİ HEDEF** | I++ DME ağ protokolü, canlı telemetri, ISO 10360-2 & Virtual CMM | Adım 4.1: I++ DME Ağ Protokolü |
 

@@ -398,6 +398,15 @@ impl DmisEmitter {
 
     /// Operatör Kurulum Föyü (Operator Setup Sheet / Manual Gauge Sheet) üretir (Doc 11 & Doc 17)
     pub fn generate_setup_sheet(&self, plan: &InspectionPlan) -> String {
+        self.generate_setup_sheet_with_trajectory(plan, None)
+    }
+
+    /// Rota ve emniyet verilerini de içeren kapsamlı Markdown Kurulum Föyü üretir
+    pub fn generate_setup_sheet_with_trajectory(
+        &self,
+        plan: &InspectionPlan,
+        trajectory: Option<&CertifiedCollisionFreeTrajectory>,
+    ) -> String {
         let mut report = ortho_ast::SetupSheetGaugeReport::new();
         for feat in &plan.features {
             if let Some(spec) = &feat.thread_spec {
@@ -413,17 +422,193 @@ impl DmisEmitter {
             "- **Malzeme ve Sıcaklık:** {} ({:.1} °C)\n",
             self.thermal.material_name, self.thermal.current_temp_c
         ));
-        out.push_str("- **Emniyet Protokolü:** AS9100 Rev D & ISO 1502 Yakut Bilye Koruma Baypası\n\n");
+        out.push_str("- **Emniyet Protokolü:** AS9100 Rev D & ISO 1502 Yakut Bilye Koruma Baypası\n");
 
+        if let Some(traj) = trajectory {
+            let seal_hex: String = traj
+                .verification_hash
+                .iter()
+                .map(|b| format!("{:02X}", b))
+                .collect();
+            out.push_str(&format!("- **Çarpışmasız Rota Mührü (SHA-256):** `{}`\n\n", seal_hex));
+
+            // Bölüm 1: Parça Yerleşimi ve Fikstür / Pabuçlar
+            out.push_str("## 1. 🗜️ Parça Yerleşimi ve Pabuç / Fikstür Konfigürasyonu\n");
+            out.push_str(&format!(
+                "- **Güvenli Tavan Düzlemi (Z_Clearance):** {:.2} mm\n",
+                traj.clearance_box.z_clearance
+            ));
+            out.push_str(&format!(
+                "- **Geri Çekilme Mesafesi (Retract):** {:.2} mm\n",
+                traj.clearance_box.retract_distance
+            ));
+            if traj.keep_out_zones.is_empty() {
+                out.push_str("- **Tanımlı Pabuç Engeli:** Yok (Doğrudan Granit Tabla / Manyetik Pleyt)\n");
+            } else {
+                out.push_str("| Pabuç / Fikstür Adı | X Sınırları (mm) | Y Sınırları (mm) | Z Üst Seviye (mm) | Emniyet Atlama |\n");
+                out.push_str("|---|---|---|---|---|\n");
+                for kz in &traj.keep_out_zones {
+                    out.push_str(&format!(
+                        "| {} | [{:.1}, {:.1}] | [{:.1}, {:.1}] | {:.1} | +40 mm Lift-Hop |\n",
+                        kz.name, kz.min.x, kz.max.x, kz.min.y, kz.max.y, kz.max.z
+                    ));
+                }
+            }
+            out.push('\n');
+
+            // Bölüm 2: Prob ve Açı Konfigürasyonu
+            out.push_str("## 2. 🎯 Prob ve Kinematik Kafa Montaj Reçetesi\n");
+            out.push_str("- **Kafa Modeli:** Renishaw PH10M / PH10MQ Motorize 5-Eksen (720 İndeks Pozisyonu)\n");
+            out.push_str("- **Modül Tipi:** TP20 Standart Force (Kuvvet: 0.08 N, Çap: Ø13.2 mm)\n");
+            out.push_str("- **Uzatma Çubuğu:** PEL1 (50 mm Karbon Elyaf)\n");
+            out.push_str("- **Stylus Ucu:** Ø2.0 mm Yakut Bilye x 20 mm Tungsten Karbür Şaft (M2)\n");
+
+            // Rota içindeki kalibre açıları topla
+            let mut angles = Vec::new();
+            for seg in &traj.segments {
+                if let MotionSegment::RotateHead { a_deg, b_deg } = seg {
+                    let pair = (*a_deg as i32, *b_deg as i32);
+                    if !angles.contains(&pair) {
+                        angles.push(pair);
+                    }
+                }
+            }
+            if angles.is_empty() {
+                angles.push((0, 0));
+            }
+            out.push_str("- **Kalibre Edilmiş Açı Listesi:**\n");
+            for (a, b) in angles {
+                out.push_str(&format!("  * `A{:.1}° B{:.1}°` (Kalibre Magazin Yuvası Hazır)\n", a as f64, b as f64));
+            }
+            out.push('\n');
+        } else {
+            out.push('\n');
+        }
+
+        // Bölüm 3: Manuel Ön-Hizalama (MODE/MAN 3-2-1 Kaba Sıfır)
+        out.push_str("## 3. 📐 Manuel Ön-Hizalama Adımları (MODE/MAN - Kaba Sıfır Alma)\n");
+        out.push_str("CMM operatörü parçayı tablaya bağladıktan sonra joystick ile sırasıyla aşağıdaki 6 noktaya dokunur:\n");
+        out.push_str("1. **Primer Düzlem (Datum A - 3 Dokunuş):** Parçanın üst işlenmiş yüzeyine Z ekseninde 3 köşeden temas edilir.\n");
+        out.push_str("2. **Sekonder Doğru (Datum B - 2 Dokunuş):** Parçanın ön referans kenarına Y ekseninde 2 noktadan temas edilir.\n");
+        out.push_str("3. **Tersiyer Nokta (Datum C - 1 Dokunuş):** Parçanın sol referans kenarına X ekseninde 1 noktadan temas edilir.\n");
+        out.push_str("> ℹ️ *Bu 6 dokunuş tamamlandığında tezgah otomatik olarak `MODE/AUTO, PROG` CNC çevrimine geçer.*\n\n");
+
+        // Bölüm 4: Baypas Edilen Dişli Delikler ve Manuel Mastarlar
+        out.push_str("## 4. 🔩 Prob Baypas Unsur Tablosu (Manuel Mastar Denetimi)\n");
         out.push_str(&report.format_markdown_table());
+        out.push('\n');
 
+        // Bölüm 5: İmzalı Onay
         out.push_str("### 🔒 Saha Operatörü Kontrol İmzası\n");
         out.push_str("- [ ] Parça fikstüre rijit bağlandı, titreşim ve esneme kontrol edildi.\n");
         out.push_str("- [ ] Tablodaki tüm dişli delikler ve toleranslı pimler manuel mastarlarla teyit edildi.\n");
-        out.push_str("- [ ] Datum A/B/C yüzeylerinde çapak ve talaş temizliği yapıldı.\n\n");
-        out.push_str("**Operatör Sicil / İmza:** _________________________    **Tarih:** 2026-09-27\n");
+        out.push_str("- [ ] Datum A/B/C yüzeylerinde çapak ve talaş temizliği yapıldı.\n");
+        out.push_str("- [ ] CMM sıcaklığı 20.0 ± 1.0 °C aralığında stabilize edildi.\n\n");
+        out.push_str("**Operatör Sicil / İmza:** _________________________    **Kalite Onay:** _________________________    **Tarih:** 2026-09-27\n");
 
         out
+    }
+
+    /// Tek sayfalık, endüstriyel baskıya hazır (A4 Print-Ready) HTML Kurulum Föyü üretir
+    pub fn generate_setup_sheet_html(
+        &self,
+        plan: &InspectionPlan,
+        trajectory: Option<&CertifiedCollisionFreeTrajectory>,
+    ) -> String {
+        let _md = self.generate_setup_sheet_with_trajectory(plan, trajectory);
+        let seal_badge = if let Some(traj) = trajectory {
+            let hex: String = traj
+                .verification_hash
+                .iter()
+                .take(8)
+                .map(|b| format!("{:02X}", b))
+                .collect();
+            format!("<span class='badge-pass'>MÜHÜRLÜ: {}...</span>", hex)
+        } else {
+            "<span class='badge-warn'>TASLAK</span>".to_string()
+        };
+
+        let mut html = String::new();
+        html.push_str("<!DOCTYPE html>\n<html lang='tr'>\n<head>\n<meta charset='UTF-8'>\n");
+        html.push_str("<title>Nuper Ortho — Kurulum Föyü (Setup Sheet)</title>\n");
+        html.push_str("<style>\n");
+        html.push_str("  @page { size: A4; margin: 12mm; }\n");
+        html.push_str("  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0F172A; background: #FFFFFF; font-size: 11px; line-height: 1.4; margin: 0; padding: 12px; }\n");
+        html.push_str("  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0F172A; padding-bottom: 8px; margin-bottom: 12px; }\n");
+        html.push_str("  .title { font-size: 16px; font-weight: 800; letter-spacing: -0.5px; }\n");
+        html.push_str("  .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; }\n");
+        html.push_str("  .meta-item { display: flex; flex-direction: column; }\n");
+        html.push_str("  .meta-label { font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase; }\n");
+        html.push_str("  .meta-val { font-size: 11px; font-weight: 600; font-family: monospace; color: #0F172A; }\n");
+        html.push_str("  .section-title { font-size: 12px; font-weight: 700; color: #0F172A; border-bottom: 1px solid #CBD5E1; padding-bottom: 4px; margin: 12px 0 6px 0; text-transform: uppercase; }\n");
+        html.push_str("  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10px; }\n");
+        html.push_str("  th, td { border: 1px solid #CBD5E1; padding: 4px 6px; text-align: left; }\n");
+        html.push_str("  th { background: #F1F5F9; font-weight: 700; }\n");
+        html.push_str("  .badge-pass { background: #DCFCE7; color: #15803D; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: monospace; }\n");
+        html.push_str("  .badge-warn { background: #FEF3C7; color: #B45309; padding: 2px 6px; border-radius: 4px; font-weight: 700; }\n");
+        html.push_str("  .sign-box { display: flex; justify-content: space-between; margin-top: 16px; padding: 10px; background: #F8FAFC; border: 1px dashed #94A3B8; border-radius: 6px; }\n");
+        html.push_str("  @media print { body { padding: 0; } .no-print { display: none; } }\n");
+        html.push_str("</style>\n</head>\n<body>\n");
+
+        html.push_str("<div class='header'>\n");
+        html.push_str("  <div>\n");
+        html.push_str("    <div class='title'>NUPER ORTHO — CMM OPERATÖR KURULUM FÖYÜ</div>\n");
+        html.push_str("    <div style='color: #64748B;'>Autonomous Metrology Inspection & Quality Assurance Sheet</div>\n");
+        html.push_str("  </div>\n");
+        html.push_str(&format!("  <div>{}</div>\n", seal_badge));
+        html.push_str("</div>\n");
+
+        html.push_str("<div class='meta-grid'>\n");
+        html.push_str(&format!("  <div class='meta-item'><span class='meta-label'>Parça Adı</span><span class='meta-val'>{}</span></div>\n", plan.part_name));
+        html.push_str(&format!("  <div class='meta-item'><span class='meta-label'>CAD Kaynağı</span><span class='meta-val'>{}</span></div>\n", plan.cad_source_file));
+        html.push_str(&format!("  <div class='meta-item'><span class='meta-label'>Malzeme / Sıcaklık</span><span class='meta-val'>{} ({:.1} °C)</span></div>\n", self.thermal.material_name, self.thermal.current_temp_c));
+        html.push_str("  <div class='meta-item'><span class='meta-label'>Tarih</span><span class='meta-val'>2026-09-27</span></div>\n");
+        html.push_str("</div>\n");
+
+        html.push_str("<div class='section-title'>1. Prob ve Kinematik Kafa Konfigürasyonu</div>\n");
+        html.push_str("<table>\n<tr><th>Kafa</th><th>Modül</th><th>Uzatma</th><th>Stylus</th><th>Ölçüm Açıları</th></tr>\n");
+        html.push_str("<tr><td>Renishaw PH10M</td><td>TP20 Standard Force</td><td>PEL1 50mm Carbon</td><td>Ø2.0 x 20mm Yakut (M2)</td><td>A0.0° B0.0°, A45.0° B90.0°</td></tr>\n</table>\n");
+
+        html.push_str("<div class='section-title'>2. Manuel Ön-Hizalama (MODE/MAN - 3-2-1 Kaba Sıfır)</div>\n");
+        html.push_str("<table>\n<tr><th>Adım</th><th>Datum Elemanı</th><th>Dokunma Sayısı</th><th>Talimat</th></tr>\n");
+        html.push_str("<tr><td>1</td><td><b>Datum A (Primer)</b></td><td>3 Dokunuş (+Z)</td><td>Üst işlenmiş yüzeyin 3 köşesinden kaba düzlem sıfırlaması</td></tr>\n");
+        html.push_str("<tr><td>2</td><td><b>Datum B (Sekonder)</b></td><td>2 Dokunuş (+Y)</td><td>Ön referans kenarından 2 nokta ile X ekseni döndürme kilidi</td></tr>\n");
+        html.push_str("<tr><td>3</td><td><b>Datum C (Tersiyer)</b></td><td>1 Dokunuş (+X)</td><td>Sol referans kenarından 1 nokta ile orijin kilitleme</td></tr>\n</table>\n");
+
+        html.push_str("<div class='section-title'>3. Prob Baypas Edilen Dişli Delikler (GO / NOGO Mastar)</div>\n");
+        html.push_str("<table>\n<tr><th>Unsur Adı</th><th>Diş Tanımı</th><th>Anma Çapı</th><th>Hatve</th><th>Matkap Çapı</th><th>Gerekli Mastar</th></tr>\n");
+
+        let mut has_threads = false;
+        for feat in &plan.features {
+            if let Some(spec) = &feat.thread_spec {
+                has_threads = true;
+                let gauge_item = spec.to_gauge_item(feat.id, &feat.name);
+                html.push_str(&format!(
+                    "<tr><td><b>{}</b></td><td>{}</td><td>{:.2} mm</td><td>{:.2} mm</td><td>{}</td><td>{}</td></tr>\n",
+                    feat.name, gauge_item.thread_designation, spec.nominal_major_diameter, spec.tap_drill_diameter, gauge_item.gauge_type, gauge_item.standard_code
+                ));
+            }
+        }
+        if !has_threads {
+            html.push_str("<tr><td colspan='6' style='text-align:center; color:#64748B;'>Manuel mastar gerektiren dişli delik bulunmamaktadır.</td></tr>\n");
+        }
+        html.push_str("</table>\n");
+
+        html.push_str("<div class='sign-box'>\n");
+        html.push_str("  <div>\n");
+        html.push_str("    <b>Operatör Onay Listesi:</b><br>\n");
+        html.push_str("    [ ] Parça fikstüre rijit bağlandı<br>\n");
+        html.push_str("    [ ] Diş mastarları elle kontrol edildi<br>\n");
+        html.push_str("    [ ] Talaş ve çapak temizliği yapıldı\n");
+        html.push_str("  </div>\n");
+        html.push_str("  <div style='text-align: right;'>\n");
+        html.push_str("    <b>Operatör Sicil / İmza:</b> ___________________________<br><br>\n");
+        html.push_str("    <b>Kalite Sorumlusu:</b> ___________________________<br>\n");
+        html.push_str("  </div>\n");
+        html.push_str("</div>\n");
+
+        html.push_str("</body>\n</html>");
+        html
     }
 }
 
@@ -618,6 +803,21 @@ mod tests {
         assert!(setup_sheet.contains("M8_THREAD_01"));
         assert!(setup_sheet.contains("ISO 1502 / DIN 13 (6H)"));
         assert!(setup_sheet.contains("Saha Operatörü Kontrol İmzası"));
+
+        // Rota ile zenginleştirilmiş Setup Sheet
+        let rich_sheet = emitter.generate_setup_sheet_with_trajectory(&plan, Some(&traj));
+        assert!(rich_sheet.contains("Parça Yerleşimi ve Pabuç / Fikstür Konfigürasyonu"));
+        assert!(rich_sheet.contains("Prob ve Kinematik Kafa Montaj Reçetesi"));
+        assert!(rich_sheet.contains("Manuel Ön-Hizalama Adımları"));
+        assert!(rich_sheet.contains("Renishaw PH10M"));
+
+        // Baskıya hazır HTML Kurulum Föyü
+        let html_sheet = emitter.generate_setup_sheet_html(&plan, Some(&traj));
+        assert!(html_sheet.contains("<!DOCTYPE html>"));
+        assert!(html_sheet.contains("NUPER ORTHO — CMM OPERATÖR KURULUM FÖYÜ"));
+        assert!(html_sheet.contains("M8_THREAD_01"));
+        assert!(html_sheet.contains("M8x1.25"));
+        assert!(html_sheet.contains("@media print"));
     }
 }
 

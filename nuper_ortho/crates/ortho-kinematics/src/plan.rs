@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use crate::ph10::{AngleSelectionResult, PH10Angle, PH10LookUpTable};
 use crate::sampling::{
     sample_annular_step_face, sample_cone_flank, sample_countersink_chamfer_for_center,
-    sample_cylinder_2level, sample_external_cylinder, sample_plane_grid, sample_sphere,
-    sample_thread_locator_pin, SamplingPoint,
+    sample_cylinder_2level, sample_external_cylinder, sample_freeform_feature_grid,
+    sample_plane_grid, sample_sphere, sample_thread_locator_pin, SamplingPoint,
 };
 use crate::tree::ProbeStack;
 
@@ -354,6 +354,16 @@ impl OrientedSamplingPlan {
                     ortho_ast::FeatureType::Sphere => {
                         let r = feat.diameter.unwrap_or(25.0) / 2.0;
                         sample_sphere(feat.centroid, r)
+                    }
+                    ortho_ast::FeatureType::FreeformBSpline => {
+                        sample_freeform_feature_grid(
+                            feat.centroid,
+                            feat.normal_vector,
+                            feat.area,
+                            &feat.boundary_polygon,
+                            4,
+                            4,
+                        )
                     }
                     _ => {
                         vec![SamplingPoint::new(feat.centroid, feat.normal_vector)]

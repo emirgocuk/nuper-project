@@ -23,7 +23,9 @@ pub use drawing::{
 pub use matching::{CuttingPlane, DrawingToStepMatcher, FeatureMatch};
 pub use pmi::{PmiError, StepPmiReader};
 pub use step_parser::StepParser;
-pub use surface::{ClassifierState, ParametricFace, SurfaceGeometry, SurfaceSamplingCandidate};
+pub use surface::{
+    ClassifierState, ParametricFace, SurfaceCurvature, SurfaceGeometry, SurfaceSamplingCandidate,
+};
 pub use tier::{HardwareProfile, InferenceTier, Tier1RuleBasedParser};
 
 #[derive(Error, Debug)]

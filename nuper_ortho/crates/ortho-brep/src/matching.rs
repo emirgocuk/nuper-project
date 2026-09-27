@@ -1,5 +1,5 @@
 use glam::DVec3;
-use ortho_ast::{FeatureType, GeometricFeature};
+use ortho_ast::{FeatureType, GeometricFeature, InspectionPlan, ToleranceConstraint};
 use serde::{Deserialize, Serialize};
 
 use crate::drawing::{AnnotationType, DrawingSheet, ExtractedAnnotation, SheetType};
@@ -29,6 +29,18 @@ impl CuttingPlane {
     /// Bir geometrik unsurun bu kesit düzlemi üzerinde yer alıp almadığını kontrol eder (tolerans: 2.0 mm)
     pub fn contains_feature(&self, feature: &GeometricFeature, tolerance_mm: f64) -> bool {
         self.distance_to_point(feature.centroid) <= tolerance_mm
+    }
+
+    /// Bu kesit düzlemi üzerinde yer alan tüm unsurları filtreler
+    pub fn find_intersecting_features<'a>(
+        &self,
+        features: &'a [GeometricFeature],
+        tolerance_mm: f64,
+    ) -> Vec<&'a GeometricFeature> {
+        features
+            .iter()
+            .filter(|f| self.contains_feature(f, tolerance_mm))
+            .collect()
     }
 }
 
@@ -169,5 +181,159 @@ impl DrawingToStepMatcher {
         }
 
         matches
+    }
+
+    /// Onaylanmış açıklama eşleşmelerini Nötr Teftiş Planına (InspectionPlan) otomatik tolerans olarak uygular
+    pub fn apply_matches_to_inspection_plan(
+        matches: &[FeatureMatch],
+        sheets: &[DrawingSheet],
+        plan: &mut InspectionPlan,
+    ) {
+        let mut next_tol_id = plan.tolerances.len() as u32 + 1;
+
+        for m in matches {
+            let ann_opt = sheets
+                .iter()
+                .flat_map(|s| &s.annotations)
+                .find(|a| a.id == m.annotation_id);
+
+            if let Some(ann) = ann_opt {
+                if let Some(mut tol) = ann.tolerance.clone() {
+                    tol.id = next_tol_id;
+                    tol.feature_id = m.feature_id;
+                    plan.tolerances.push(tol);
+                    next_tol_id += 1;
+                } else if let Some(mut comp_tol) = ann.composite_tolerance.clone() {
+                    if !comp_tol.feature_ids.contains(&m.feature_id) {
+                        comp_tol.feature_ids.push(m.feature_id);
+                    }
+                    if !plan.composite_tolerances.iter().any(|c| c.id == comp_tol.id) {
+                        plan.composite_tolerances.push(comp_tol);
+                    }
+                } else {
+                    match &ann.annotation_type {
+                        AnnotationType::DiameterDimension {
+                            nominal_dia,
+                            tolerance_band,
+                            ..
+                        } => {
+                            let upper = *tolerance_band;
+                            let tol = ToleranceConstraint {
+                                id: next_tol_id,
+                                feature_id: m.feature_id,
+                                tolerance_type: ortho_ast::ToleranceType::Diameter,
+                                nominal_value: *nominal_dia,
+                                upper_tolerance: upper,
+                                lower_tolerance: 0.0,
+                                datum_precedence: Vec::new(),
+                                material_modifier: ortho_ast::MaterialModifier::RFS,
+                                recommended_fitting: ortho_ast::FittingAlgorithm::ChebyshevMaximumInscribed,
+                                is_composite: false,
+                                profile_disposition: None,
+                            };
+                            plan.tolerances.push(tol);
+                            next_tol_id += 1;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ortho_ast::DatumReferenceFrame;
+    use crate::drawing::{BoundingBox2D, DrawingImagePreprocessor};
+
+    #[test]
+    fn test_apply_matches_to_plan() {
+        let mut sheet = DrawingSheet::new_overview(1, 420.0, 297.0);
+        let ann = ExtractedAnnotation {
+            id: 101,
+            sheet_number: 1,
+            raw_text: "Ø25 H7".to_string(),
+            bbox: BoundingBox2D::new(0.1, 0.1, 0.2, 0.2),
+            annotation_type: AnnotationType::DiameterDimension {
+                nominal_dia: 25.0,
+                tolerance_band: 0.021,
+                quantity: 1,
+            },
+            tolerance: None,
+            composite_tolerance: None,
+            confidence: 0.95,
+        };
+        sheet.annotations.push(ann);
+
+        let hole = GeometricFeature::new_internal_cylinder(
+            15,
+            "BORE_25",
+            DVec3::new(50.0, 50.0, 10.0),
+            DVec3::Z,
+            25.0,
+            30.0,
+            2000.0,
+            15.0,
+        )
+        .unwrap();
+
+        let matches = vec![FeatureMatch {
+            annotation_id: 101,
+            feature_id: 15,
+            confidence_score: 0.95,
+            rationale: "Tam çap uyumu".to_string(),
+        }];
+
+        let drf = DatumReferenceFrame::new_3_2_1("DRF_1", 1, 2, 3);
+        let mut plan = InspectionPlan::new("VALVE_BODY", "valve.step", drf);
+        plan.features.push(hole);
+
+        DrawingToStepMatcher::apply_matches_to_inspection_plan(&matches, &[sheet], &mut plan);
+
+        assert_eq!(plan.tolerances.len(), 1);
+        let tol = &plan.tolerances[0];
+        assert_eq!(tol.feature_id, 15);
+        assert_eq!(tol.nominal_value, 25.0);
+        assert_eq!(tol.upper_tolerance, 0.021);
+    }
+
+    #[test]
+    fn test_multi_sheet_classification() {
+        // Kesit sayfası tespiti
+        let s2 = DrawingSheet::classify_from_text(2, "KESİT A-A ÖLÇEK 1:1", 420.0, 297.0);
+        match s2.sheet_type {
+            SheetType::SectionView { section_label, .. } => {
+                assert_eq!(section_label, "A-A");
+            }
+            _ => panic!("Sheet 2 should be classified as SectionView"),
+        }
+
+        // Detay sayfası tespiti
+        let s3 = DrawingSheet::classify_from_text(3, "DETAIL B 5:1", 420.0, 297.0);
+        match s3.sheet_type {
+            SheetType::DetailView { detail_label, scale } => {
+                assert_eq!(detail_label, "B");
+                assert_eq!(scale, "5:1");
+            }
+            _ => panic!("Sheet 3 should be classified as DetailView"),
+        }
+    }
+
+    #[test]
+    fn test_rgb_stamp_removal() {
+        // 2x2 piksel görüntü: (0,0) Kırmızı Kaşe, (1,1) Siyah çizim çizgisi
+        let rgb = vec![
+            255, 0, 0,   // Piksel 0: Kırmızı Kaşe
+            255, 255, 255, // Piksel 1: Beyaz arka plan
+            255, 255, 255, // Piksel 2: Beyaz arka plan
+            0, 0, 0,     // Piksel 3: Siyah çizgi
+        ];
+
+        let processed = DrawingImagePreprocessor::process_rgb_image(&rgb, 2, 2);
+        assert_eq!(processed.len(), 4);
+        assert_eq!(processed[0], 255, "Kırmızı kaşe beyaza dönüştürülmeli");
+        assert_eq!(processed[3], 0, "Siyah çizim çizgisi siyah kalmalı");
     }
 }

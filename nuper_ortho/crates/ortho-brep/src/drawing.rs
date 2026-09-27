@@ -204,6 +204,99 @@ impl DrawingSheet {
 
         current_num
     }
+
+    /// Metin içeriğinden sayfa tipini (Genel Bakış, Kesit A-A, Detay B) otomatik sınıflandırır (Doc 19 Section 3)
+    pub fn classify_from_text(sheet_number: usize, text: &str, width_mm: f64, height_mm: f64) -> Self {
+        let upper = text.to_uppercase();
+
+        // 1. Kesit Görünüş Tespiti ("SECTION A-A", "KESİT B-B", "SECTION C-C")
+        if let Some(pos) = upper.find("SECTION").or_else(|| upper.find("KESİT")).or_else(|| upper.find("KESIT")) {
+            let rest = &upper[pos..];
+            let mut label = "A-A".to_string();
+            for word in rest.split_whitespace().skip(1).take(2) {
+                let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '-');
+                if clean_word.contains('-') || (clean_word.len() == 1 && clean_word.chars().all(|c| c.is_alphabetic())) {
+                    label = clean_word.to_string();
+                    break;
+                }
+            }
+            let plane_name = format!("PLANE_SECTION_{}", label);
+            return Self::new_section_view(sheet_number, label, plane_name, width_mm, height_mm);
+        }
+
+        // 2. Detay Görünüş Tespiti ("DETAIL B", "DETAY C")
+        if let Some(pos) = upper.find("DETAIL").or_else(|| upper.find("DETAY")) {
+            let rest = &upper[pos..];
+            let mut label = "B".to_string();
+            let mut scale = "2:1".to_string();
+            for word in rest.split_whitespace().skip(1).take(3) {
+                let clean = word.trim_matches(|c: char| !c.is_alphanumeric() && c != ':');
+                if clean.contains(':') {
+                    scale = clean.to_string();
+                } else if clean.len() <= 2 && clean.chars().all(|c| c.is_alphabetic()) {
+                    label = clean.to_string();
+                }
+            }
+            return Self {
+                sheet_number,
+                sheet_type: SheetType::DetailView {
+                    detail_label: label,
+                    scale,
+                },
+                width_mm,
+                height_mm,
+                title_block: None,
+                annotations: Vec::new(),
+                balloons: Vec::new(),
+            };
+        }
+
+        // 3. Genel Bakış (Overview)
+        Self::new_overview(sheet_number, width_mm, height_mm)
+    }
+
+    /// Sayfa metninden başlık bloğu (Title Block) bilgilerini ayıklar
+    pub fn extract_title_block(&mut self, text: &str) {
+        let upper = text.to_uppercase();
+        let mut part_name = "PART_1".to_string();
+        let mut drawing_number = "DWG_001".to_string();
+        let mut revision = "REV_A".to_string();
+        let mut material = "ALUMINUM_6061_T6".to_string();
+        let mut general_tolerance = "ISO 2768-mK".to_string();
+        let primary_datums = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+
+        for line in upper.lines() {
+            let trimmed = line.trim();
+            if trimmed.contains("PART NO") || trimmed.contains("PARÇA NO") || trimmed.contains("DWG NO") {
+                if let Some(idx) = trimmed.find(':') {
+                    drawing_number = trimmed[idx + 1..].trim().to_string();
+                }
+            } else if trimmed.contains("PART NAME") || trimmed.contains("PARÇA ADI") {
+                if let Some(idx) = trimmed.find(':') {
+                    part_name = trimmed[idx + 1..].trim().to_string();
+                }
+            } else if trimmed.contains("REV") {
+                if let Some(idx) = trimmed.find(':') {
+                    revision = trimmed[idx + 1..].trim().to_string();
+                }
+            } else if trimmed.contains("MATERIAL") || trimmed.contains("MALZEME") {
+                if let Some(idx) = trimmed.find(':') {
+                    material = trimmed[idx + 1..].trim().to_string();
+                }
+            } else if trimmed.contains("ISO 2768") || trimmed.contains("TOLERANCE") {
+                general_tolerance = trimmed.to_string();
+            }
+        }
+
+        self.title_block = Some(TitleBlock {
+            part_name,
+            drawing_number,
+            revision,
+            material,
+            general_tolerance,
+            primary_datums,
+        });
+    }
 }
 
 /// Taranmış ve kaşeli çizimler için renk filtreleme ve eğrilik düzeltme ön-işlemcisi
@@ -227,5 +320,48 @@ impl DrawingImagePreprocessor {
         } else {
             detected_angle_deg.clamp(-5.0, 5.0)
         }
+    }
+
+    /// RGB piksel dizisi üzerinde kırmızı kaşe temizleme ve Sauvola/adaptif ikileştirme simülasyonu
+    /// Kırmızı kaşeler beyaza (255) dönüştürülür, çizim çizgileri siyah (0) yapılır.
+    pub fn process_rgb_image(
+        rgb_data: &[u8],
+        width: usize,
+        height: usize,
+    ) -> Vec<u8> {
+        let mut out = vec![255u8; width * height];
+        for i in 0..(width * height) {
+            let r = rgb_data.get(i * 3).copied().unwrap_or(255) as f32;
+            let g = rgb_data.get(i * 3 + 1).copied().unwrap_or(255) as f32;
+            let b = rgb_data.get(i * 3 + 2).copied().unwrap_or(255) as f32;
+
+            // RGB -> HSV dönüşümü
+            let max_c = r.max(g).max(b);
+            let min_c = r.min(g).min(b);
+            let delta = max_c - min_c;
+
+            let h = if delta < 1e-4 {
+                0.0
+            } else if (max_c - r).abs() < 1e-4 {
+                60.0 * (((g - b) / delta) % 6.0)
+            } else if (max_c - g).abs() < 1e-4 {
+                60.0 * (((b - r) / delta) + 2.0)
+            } else {
+                60.0 * (((r - g) / delta) + 4.0)
+            };
+            let h = if h < 0.0 { h + 360.0 } else { h };
+            let s = if max_c < 1e-4 { 0.0 } else { delta / max_c };
+            let v = max_c / 255.0;
+
+            // Kırmızı kaşe pikseli ise beyaza çevir
+            if Self::is_red_stamp_pixel(h, s, v) {
+                out[i] = 255;
+            } else {
+                // Standart gri ton ve ikileştirme
+                let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                out[i] = if gray < 180.0 { 0 } else { 255 };
+            }
+        }
+        out
     }
 }

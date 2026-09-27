@@ -291,6 +291,43 @@ impl StepParser {
         polygon
     }
 
+    /// B_SPLINE_SURFACE_WITH_KNOTS içindeki iki boyutlu kontrol noktası ızgarasını çözer
+    pub fn resolve_bspline_control_points(&self, surf_entity: &StepEntity) -> Vec<Vec<DVec3>> {
+        let text = &surf_entity.raw_args;
+        let mut grid = Vec::new();
+        if let Some(outer_start) = text.find("((") {
+            let sub = &text[outer_start + 1..];
+            let mut depth = 0;
+            let mut current_row_str = String::new();
+            for c in sub.chars() {
+                if c == '(' {
+                    depth += 1;
+                    current_row_str.clear();
+                } else if c == ')' {
+                    if depth == 1 {
+                        let pt_ids = self.extract_id_references(&current_row_str);
+                        let mut row_pts = Vec::new();
+                        for id in pt_ids {
+                            if let Some(pt) = self.resolve_cartesian_point(id) {
+                                row_pts.push(pt);
+                            }
+                        }
+                        if !row_pts.is_empty() {
+                            grid.push(row_pts);
+                        }
+                    }
+                    depth -= 1;
+                    if depth < 0 {
+                        break;
+                    }
+                } else if depth == 1 {
+                    current_row_str.push(c);
+                }
+            }
+        }
+        grid
+    }
+
     /// Modeldeki tüm ADVANCED_FACE elemanlarını tarayarak analitik GeometricFeature listesini üretir
     pub fn extract_geometric_features(&self) -> Result<Vec<GeometricFeature>, BRepError> {
         let mut features = Vec::new();
@@ -445,16 +482,100 @@ impl StepParser {
                                 }
                             }
                             "B_SPLINE_SURFACE_WITH_KNOTS" | "BSPLINE_SURFACE" => {
+                                let ctrl_pts = self.resolve_bspline_control_points(surf_entity);
                                 let name = format!("FREEFORM_SURF_{}", feature_id_counter);
+
+                                let (centroid, normal, area) = if !ctrl_pts.is_empty() && !ctrl_pts[0].is_empty() {
+                                    let mut sum = DVec3::ZERO;
+                                    let mut count = 0;
+                                    for row in &ctrl_pts {
+                                        for p in row {
+                                            sum += *p;
+                                            count += 1;
+                                        }
+                                    }
+                                    let c = sum / (count as f64);
+
+                                    let rows = ctrl_pts.len();
+                                    let cols = ctrl_pts[0].len();
+                                    let mid_r = rows / 2;
+                                    let mid_c = cols / 2;
+
+                                    let du = if mid_c + 1 < cols {
+                                        ctrl_pts[mid_r][mid_c + 1] - ctrl_pts[mid_r][mid_c]
+                                    } else {
+                                        DVec3::X
+                                    };
+                                    let dv = if mid_r + 1 < rows {
+                                        ctrl_pts[mid_r + 1][mid_c] - ctrl_pts[mid_r][mid_c]
+                                    } else {
+                                        DVec3::Y
+                                    };
+                                    let n_raw = du.cross(dv);
+                                    let n = if n_raw.length() > 1e-6 {
+                                        n_raw.normalize()
+                                    } else {
+                                        DVec3::Z
+                                    };
+                                    let final_n = if is_reversed { -n } else { n };
+
+                                    let mut total_area = 0.0;
+                                    for r in 0..rows.saturating_sub(1) {
+                                        for col in 0..cols.saturating_sub(1) {
+                                            let p00 = ctrl_pts[r][col];
+                                            let p10 = ctrl_pts[r][col + 1];
+                                            let p01 = ctrl_pts[r + 1][col];
+                                            let p11 = ctrl_pts[r + 1][col + 1];
+                                            let a1 = 0.5 * (p10 - p00).cross(p01 - p00).length();
+                                            let a2 = 0.5 * (p10 - p11).cross(p01 - p11).length();
+                                            total_area += a1 + a2;
+                                        }
+                                    }
+
+                                    (c, final_n, total_area.max(100.0))
+                                } else if boundary_poly.len() >= 3 {
+                                    let mut sum = DVec3::ZERO;
+                                    for p in &boundary_poly {
+                                        sum += *p;
+                                    }
+                                    let c = sum / (boundary_poly.len() as f64);
+                                    let mut poly_area = 0.0;
+                                    for i in 1..boundary_poly.len() - 1 {
+                                        let v1 = boundary_poly[i] - boundary_poly[0];
+                                        let v2 = boundary_poly[i + 1] - boundary_poly[0];
+                                        poly_area += 0.5 * v1.cross(v2).length();
+                                    }
+                                    let v1 = boundary_poly[1] - boundary_poly[0];
+                                    let v2 = boundary_poly[2] - boundary_poly[0];
+                                    let n = v1.cross(v2).normalize();
+                                    let final_n = if is_reversed { -n } else { n };
+                                    (c, final_n, poly_area.max(100.0))
+                                } else {
+                                    (DVec3::new(50.0, 75.0, 50.0), DVec3::Z, 3500.0)
+                                };
+
                                 let mut feat = GeometricFeature::new_freeform_surface(
                                     feature_id_counter,
                                     name,
-                                    DVec3::new(50.0, 75.0, 50.0),
-                                    DVec3::Z,
-                                    3500.0,
+                                    centroid,
+                                    normal,
+                                    area,
                                     4.0,
                                 )?;
-                                feat.boundary_polygon = boundary_poly;
+                                feat.boundary_polygon = if !boundary_poly.is_empty() {
+                                    boundary_poly
+                                } else if !ctrl_pts.is_empty() {
+                                    let mut poly = Vec::new();
+                                    let rows = ctrl_pts.len();
+                                    let cols = ctrl_pts[0].len();
+                                    for c in 0..cols { poly.push(ctrl_pts[0][c]); }
+                                    for r in 1..rows { poly.push(ctrl_pts[r][cols - 1]); }
+                                    for c in (0..cols - 1).rev() { poly.push(ctrl_pts[rows - 1][c]); }
+                                    for r in (1..rows - 1).rev() { poly.push(ctrl_pts[r][0]); }
+                                    poly
+                                } else {
+                                    Vec::new()
+                                };
                                 features.push(feat);
                                 feature_id_counter += 1;
                             }

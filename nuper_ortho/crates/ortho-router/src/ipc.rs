@@ -109,6 +109,118 @@ impl BinaryTrajectoryPacket {
     }
 }
 
+/// CAD Geometri Modellerinin Web / Desktop Viewport'a Zero-Copy Aktarımı için İkili Mesh Paketi
+/// Three.js `BufferGeometry` içine doğrudan `Float32Array` olarak enjekte edilir (Doc 08 Bölüm 5).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BinaryMeshPacket {
+    /// Üçgen köşe koordinatları: [X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3, ...]
+    pub vertices: Vec<f32>,
+    /// Köşe normal vektörleri: [Nx1, Ny1, Nz1, Nx2, Ny2, Nz2, ...]
+    pub normals: Vec<f32>,
+    /// Bounding Box minimum koordinatları [X, Y, Z]
+    pub bbox_min: [f32; 3],
+    /// Bounding Box maksimum koordinatları [X, Y, Z]
+    pub bbox_max: [f32; 3],
+    /// Her üçgen için CAD Unsur / Yüzey ID'si (Raycast picking ve teşhis için)
+    pub triangle_feature_ids: Vec<u32>,
+}
+
+impl BinaryMeshPacket {
+    pub fn new(
+        vertices: Vec<f32>,
+        normals: Vec<f32>,
+        bbox_min: [f32; 3],
+        bbox_max: [f32; 3],
+        triangle_feature_ids: Vec<u32>,
+    ) -> Self {
+        Self {
+            vertices,
+            normals,
+            bbox_min,
+            bbox_max,
+            triangle_feature_ids,
+        }
+    }
+
+    pub fn triangle_count(&self) -> usize {
+        self.vertices.len() / 9
+    }
+
+    /// Köşe tamponunu doğrudan bayt dizisine çevirir (Float32Array Zero-Copy)
+    pub fn to_vertex_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(self.vertices.len() * 4);
+        for &val in &self.vertices {
+            bytes.extend_from_slice(&val.to_le_bytes());
+        }
+        bytes
+    }
+
+    /// Normal tamponunu doğrudan bayt dizisine çevirir
+    pub fn to_normal_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(self.normals.len() * 4);
+        for &val in &self.normals {
+            bytes.extend_from_slice(&val.to_le_bytes());
+        }
+        bytes
+    }
+
+    /// Prizmatik CAD gövdesi (Valf Bloğu vb.) için üçgen mesh üretici
+    pub fn new_box(min: glam::DVec3, max: glam::DVec3, feature_id: u32) -> Self {
+        let mut vertices = Vec::new();
+        let mut normals = Vec::new();
+
+        let corners = [
+            [min.x as f32, min.y as f32, min.z as f32], // 0: ---
+            [max.x as f32, min.y as f32, min.z as f32], // 1: +--
+            [max.x as f32, max.y as f32, min.z as f32], // 2: ++-
+            [min.x as f32, max.y as f32, min.z as f32], // 3: -+-
+            [min.x as f32, min.y as f32, max.z as f32], // 4: --+
+            [max.x as f32, min.y as f32, max.z as f32], // 5: +-+
+            [max.x as f32, max.y as f32, max.z as f32], // 6: +++
+            [min.x as f32, max.y as f32, max.z as f32], // 7: -++
+        ];
+
+        // 6 Yüz x 2 Üçgen = 12 Üçgen
+        let faces = [
+            // +Z (Top)
+            (4, 5, 6, [0.0, 0.0, 1.0]),
+            (4, 6, 7, [0.0, 0.0, 1.0]),
+            // -Z (Bottom)
+            (0, 2, 1, [0.0, 0.0, -1.0]),
+            (0, 3, 2, [0.0, 0.0, -1.0]),
+            // +X (Right)
+            (1, 2, 6, [1.0, 0.0, 0.0]),
+            (1, 6, 5, [1.0, 0.0, 0.0]),
+            // -X (Left)
+            (0, 7, 3, [-1.0, 0.0, 0.0]),
+            (0, 4, 7, [-1.0, 0.0, 0.0]),
+            // +Y (Front)
+            (3, 7, 6, [0.0, 1.0, 0.0]),
+            (3, 6, 2, [0.0, 1.0, 0.0]),
+            // -Y (Back)
+            (0, 1, 5, [0.0, -1.0, 0.0]),
+            (0, 5, 4, [0.0, -1.0, 0.0]),
+        ];
+
+        let mut feature_ids = Vec::with_capacity(faces.len());
+        for (i1, i2, i3, norm) in faces {
+            for &idx in &[i1, i2, i3] {
+                vertices.extend_from_slice(&corners[idx]);
+                normals.extend_from_slice(&norm);
+            }
+            feature_ids.push(feature_id);
+        }
+
+        Self {
+            vertices,
+            normals,
+            bbox_min: [min.x as f32, min.y as f32, min.z as f32],
+            bbox_max: [max.x as f32, max.y as f32, max.z as f32],
+            triangle_feature_ids: feature_ids,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,6 +253,26 @@ mod tests {
 
         let raw_bytes = packet.to_raw_bytes();
         assert_eq!(raw_bytes.len(), 12 * 4); // 48 bytes
+    }
+
+    #[test]
+    fn test_binary_mesh_packet_box_generation_and_memory_mapping() {
+        let box_mesh = BinaryMeshPacket::new_box(
+            DVec3::new(0.0, 0.0, 0.0),
+            DVec3::new(100.0, 100.0, 50.0),
+            42,
+        );
+
+        assert_eq!(box_mesh.triangle_count(), 12);
+        assert_eq!(box_mesh.vertices.len(), 12 * 3 * 3); // 12 tri * 3 vert * 3 coords = 108 floats
+        assert_eq!(box_mesh.normals.len(), 108);
+        assert_eq!(box_mesh.triangle_feature_ids.len(), 12);
+        assert_eq!(box_mesh.triangle_feature_ids[0], 42);
+
+        let v_bytes = box_mesh.to_vertex_bytes();
+        assert_eq!(v_bytes.len(), 108 * 4); // 432 bytes
+        let n_bytes = box_mesh.to_normal_bytes();
+        assert_eq!(n_bytes.len(), 108 * 4);
     }
 }
 

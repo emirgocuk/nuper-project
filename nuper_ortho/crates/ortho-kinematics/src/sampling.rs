@@ -334,6 +334,98 @@ pub fn sample_freeform_surface_adaptive(
     sampled
 }
 
+/// B-Rep GeometricFeature serbest yüzeyinden (FreeformBSpline) güvenli temas noktaları üretir (Doc 20 Section 4)
+/// Yüzey normali, yaklaşma vektörü ve 1.5 mm çapak emniyet payı katı şekilde korunur.
+pub fn sample_freeform_feature_grid(
+    centroid: DVec3,
+    normal: DVec3,
+    area: f64,
+    boundary_polygon: &[DVec3],
+    num_u: usize,
+    num_v: usize,
+) -> Vec<SamplingPoint> {
+    let n = normal.normalize();
+    let up = if n.z.abs() < 0.9 {
+        DVec3::new(0.0, 0.0, 1.0)
+    } else {
+        DVec3::new(1.0, 0.0, 0.0)
+    };
+    let u_dir = n.cross(up).normalize();
+    let v_dir = n.cross(u_dir).normalize();
+
+    let mut points = Vec::new();
+
+    // Sınır poligonu en az 4 nokta içeriyorsa (B-Spline kontrol ağı veya kenar döngüsü)
+    if boundary_polygon.len() >= 4 {
+        let mut min_u = f64::INFINITY;
+        let mut max_u = f64::NEG_INFINITY;
+        let mut min_v = f64::INFINITY;
+        let mut max_v = f64::NEG_INFINITY;
+
+        for p in boundary_polygon {
+            let diff = *p - centroid;
+            let u = diff.dot(u_dir);
+            let v = diff.dot(v_dir);
+            min_u = min_u.min(u);
+            max_u = max_u.max(u);
+            min_v = min_v.min(v);
+            max_v = max_v.max(v);
+        }
+
+        // 1.5 mm çapak emniyeti payı ile içeri çek
+        let safe_min_u = (min_u + 1.5).min(max_u - 1.5);
+        let safe_max_u = (max_u - 1.5).max(min_u + 1.5);
+        let safe_min_v = (min_v + 1.5).min(max_v - 1.5);
+        let safe_max_v = (max_v - 1.5).max(min_v + 1.5);
+
+        let step_u = if num_u > 1 {
+            (safe_max_u - safe_min_u) / ((num_u - 1) as f64)
+        } else {
+            0.0
+        };
+        let step_v = if num_v > 1 {
+            (safe_max_v - safe_min_v) / ((num_v - 1) as f64)
+        } else {
+            0.0
+        };
+
+        for i in 0..num_u {
+            let u = safe_min_u + (i as f64) * step_u;
+            for j in 0..num_v {
+                let v = safe_min_v + (j as f64) * step_v;
+                let pt = centroid + u_dir * u + v_dir * v;
+                points.push(SamplingPoint::new(pt, n));
+            }
+        }
+    } else {
+        // Alandan türetilmiş boyut
+        let side = area.sqrt().clamp(20.0, 100.0);
+        let half = (side / 2.0 - 1.5).max(2.0); // 1.5 mm çapak emniyeti
+
+        let step_u = if num_u > 1 {
+            (2.0 * half) / ((num_u - 1) as f64)
+        } else {
+            0.0
+        };
+        let step_v = if num_v > 1 {
+            (2.0 * half) / ((num_v - 1) as f64)
+        } else {
+            0.0
+        };
+
+        for i in 0..num_u {
+            let u = -half + (i as f64) * step_u;
+            for j in 0..num_v {
+                let v = -half + (j as f64) * step_v;
+                let pt = centroid + u_dir * u + v_dir * v;
+                points.push(SamplingPoint::new(pt, n));
+            }
+        }
+    }
+
+    points
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
