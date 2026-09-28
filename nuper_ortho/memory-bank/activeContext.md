@@ -25,6 +25,9 @@ Tüm 8 crate, `src-tauri` masaüstü kabuğu, Three.js Solid Slate Light dijital
   - Altın Sürüm Sertifikasyon Konsolu (`#golden-master-modal`): 10 fazın onaylandığı resmi dashboard ve `GOLDEN_MASTER_CERTIFICATE_v1.0.0.json` manifestosu.
   - Tri-Vendor Üretim Matrisi: Hexagon PC-DMIS, Zeiss Calypso, Wenzel WM | Quartis eşzamanlı tam concordance.
   - Uçtan Uca Entegrasyon Testi (`end_to_end_phase10.rs`).
+- **BÜTÜNCÜL MASAÜSTÜ PENCERESİ & ENTEGRE BAŞLIK ÇUBUĞU (Tamamlandı):**
+  - Edge `--app` tarayıcı başlığı (avatar, uzantı bulmaca simgesi, menü) kaldırıldı.
+  - Özel Solid Slate Entegre Başlık Çubuğu (`.app-titlebar`, 34px), Komut Şeridi (`.app-ribbon`, 44px) ve Electron frameless pencere motoru devreye alındı.
 
 ---
 
