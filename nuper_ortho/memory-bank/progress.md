@@ -213,6 +213,45 @@
 
 ---
 
+### 🔹 FAZ 6: Saha FAT (Factory Acceptance Test), CMM Copilot Shadow Mode Benchmark, AS9100 Rev D Kriptografik Anti-Tamper & Endüstriyel Yayın [TAMAMLANDI]
+*Hedef: Savunma ve havacılık kalite kontrol departmanlarında kıdemli operatörlerin güvenini inşa eden "Truva Atı" CMM Copilot Shadow Mode A/B benchmark'ı, sub-mikron (<0.5 µm) boyutsal uyum kanıtı, 480x süre tasarrufu, AS9100 Rev D kriptografik tahrifat engelleme ve resmi FAT kabul sertifikasyonu.*
+
+---
+
+#### 📌 Adım 6.1: CMM Offline / Shadow Copilot Benchmark Motoru (`ortho-emitter::benchmark`)
+- **İş Paketi:** 
+  - `BenchmarkComparator`: Manuel 4 saatlik (240 dk) CMM program ölçüm sonuçları ile Nuper Ortho'nun 30 saniyelik (0.5 dk) otonom çıktısını mikron seviyesinde karşılaştırma.
+  - Sub-mikron boyutsal uyum denetimi ($\Delta \le 0.5\,\mu\text{m}$), %99.79 süre tasarrufu ve 480.0x hızlanma çarpanı hesabı.
+  - `FatCertificateReport`: Resmi Fabrika Kabul Testi (FAT) Akreditasyon Sertifikası üretimi (AS9100 Rev D, ISO 10360-2, ASME Y14.5).
+- **Durum:** ✅ Tamamlandı. Birim testleri ve sertifika şablonu %100 başarılı.
+
+---
+
+#### 📌 Adım 6.2: AS9100 Rev D Kriptografik Anti-Tamper Denetim İzi (`ortho-emitter::audit`)
+- **İş Paketi:**
+  - Havacılık ve Savunma AS9100 Rev D Madde 8.5.1 ve 8.5.2 gereği; CMM programlarının sahada izinsiz tahrif edilmesini engelleyen dijital imza ve denetim izi motoru (`AntiTamperAuthority`).
+  - Kanonik SHA-256 program mührü enjeksiyonu (`$$ AS9100-REV-D-SIGNATURE`).
+  - Bütünlük denetçisi (`verify_program_integrity`): Operatörün toleransı (örn: 0.021 -> 0.050) veya nominal koordinatları değiştirmesi durumunda `ToleranceTampered` / `GeometryTampered` hatası fırlatarak programın CMM'de çalıştırılmasını anında bloke etme.
+- **Durum:** ✅ Tamamlandı. İmza basımı, bütünlük doğrulaması ve tahrifat engelleme testleri %100 başarılı.
+
+---
+
+#### 📌 Adım 6.3: UI Entegrasyonu (`ui/index.html`)
+- **İş Paketi:**
+  - Solid Slate Light arayüzünde üst araç çubuğuna `🏅 Saha FAT & Copilot` ve `🛡️ AS9100 Mühür` butonları eklendi.
+  - A/B Kıyaslama Kartı, Sub-Mikron Uyum Tablosu ve Tek Tıkla FAT Sertifikası İndirme modalleri eklendi.
+  - AS9100 Rev D Canlı Anti-Tamper Denetçisi ve İnteraktif Tahrifat Simülatörü eklendi.
+  - Alt konsol sekmesine `AS9100 Rev D Mühür` ve `Saha FAT Kıyaslama` kod blokları entegre edildi.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 6.4: Uçtan Uca Entegrasyon Testi (`end_to_end_phase6.rs`)
+- **İş Paketi:** 6 ana boyutta tüm Faz 6 gereksinimlerinin entegrasyon testi: Saha FAT Kör Uçuş ve 3-Nokta Manuel Sıfırlamadan Otonom CNC Geçişi, Copilot Shadow Mode A/B Benchmark (480x hızlanma, %100 sub-mikron uyum), AS9100 Rev D Kriptografik Mühürleme, Tahrifat Algılama & Emniyet Kilidi ve Resmi FAT Kabul Sertifikası Üretimi.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
 ## 3. Güncel Durum ve İlerleme Özeti
 
 | Modül / Görev | Durum | Tamamlanan Çıktılar / Dosyalar | Sıradaki Odak |
@@ -222,14 +261,15 @@
 | **`ortho-brep` Geometri Çekirdeği** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-brep/src/lib.rs), `step_parser.rs`, `surface.rs`, `matching.rs`, `multi_body.rs` | STEP AP214/242 parser, Ray-Casting cidar, B-Spline eğrilik, Multi-Body izolasyonu |
 | **`ortho-kinematics` Prob Çözücü** | ✅ **TAMAMLANDI** | [ph10.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-kinematics/src/ph10.rs), `sampling.rs`, `fitting.rs`, `tree.rs`, `plan.rs`, `uncertainty.rs`, `laser.rs` | PTB akreditasyonu, GUM / ISO 15530-3 belirsizlik, Lazer çizgi tarama şeritleri |
 | **`ortho-router` Emniyet & Rota** | ✅ **TAMAMLANDI** | [clearance.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/clearance.rs), [hal.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/hal.rs), `collision.rs`, `stylus.rs`, `tsp.rs`, `ipc.rs`, `ipp.rs`, `traversal.rs` | I++ DME v1.7/v2.0, Zero-Copy IPC, Z-First Absolute Traversal |
-| **`ortho-emitter` Post-Processor** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-emitter/src/lib.rs), `template_engine.rs`, `calypso.rs`, `closed_loop.rs` | PC-DMIS, ANSI DMIS, Fanuc/Siemens Closed-Loop CNC, Setup Sheet, AS9100 SHA-256 |
+| **`ortho-emitter` Post-Processor** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-emitter/src/lib.rs), `template_engine.rs`, `calypso.rs`, `closed_loop.rs`, `benchmark.rs`, `audit.rs` | PC-DMIS, ANSI DMIS, Fanuc/Siemens Closed-Loop CNC, Setup Sheet, AS9100 Rev D Anti-Tamper, FAT Benchmark |
 | **`ortho-ai` Sandboxed AI Motoru** | ✅ **TAMAMLANDI** | `guardrail.rs`, `intent.rs`, `diagnostics.rs`, `root_cause.rs`, `lib.rs` | GBNF Şema, B-Rep Ground-Truth, 3-Köşe Loblanma, Doğal Dil Teşhisi, Kök Neden |
-| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs`, `end_to_end_phase3.rs`, `end_to_end_phase3_ui_setup_sheet.rs`, `end_to_end_phase4.rs`, `end_to_end_phase5.rs` | 5 adet uçtan uca entegrasyon testi |
+| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs`, `end_to_end_phase3.rs`, `end_to_end_phase3_ui_setup_sheet.rs`, `end_to_end_phase4.rs`, `end_to_end_phase5.rs`, `end_to_end_phase6.rs` | 6 adet uçtan uca entegrasyon testi, audit & fat CLI komutları |
 | **FAZ 1 (Çekirdek Dikey Dilim)** | ✅ **TAMAMLANDI** | Adım 1.1 — 1.6 %100 tamamlandı | FAZ 2'ye geçildi |
 | **FAZ 2 (Emniyet & Sertifikasyon)** | ✅ **TAMAMLANDI** | Adım 2.1 — 2.5 %100 tamamlandı (69/69 test başarılı) | FAZ 3'e geçildi |
 | **FAZ 3 (İleri GD&T & Kademeli AI)** | ✅ **TAMAMLANDI** | Adım 3.1 — 3.4 %100 tamamlandı (77/77 test başarılı) | FAZ 4'e geçildi |
 | **FAZ 4 (Saha Entegrasyonu & CNC)** | ✅ **TAMAMLANDI** | Adım 4.1 — 4.4 %100 TAMAMLANDI (89/89 test başarılı, Dijital İkiz UI tamamlandı) | FAZ 5'e geçildi |
-| **FAZ 5 (Sandboxed AI & Saha Emniyeti)** | ✅ **TAMAMLANDI** | **Adım 5.1 — 5.4 %100 TAMAMLANDI** (7 Crate ve 5 Entegrasyon Testi) | Endüstriyel Sürüm Hazır |
+| **FAZ 5 (Sandboxed AI & Saha Emniyeti)** | ✅ **TAMAMLANDI** | Adım 5.1 — 5.4 %100 TAMAMLANDI (7 Crate ve 5 Entegrasyon Testi) | FAZ 6'ya geçildi |
+| **FAZ 6 (Saha FAT, Copilot & AS9100)** | ✅ **TAMAMLANDI** | **Adım 6.1 — 6.4 %100 TAMAMLANDI** (480x Benchmark, AS9100 Anti-Tamper, FAT Sertifikası) | Endüstriyel Yayın & Pilot Saha Dağıtımı Hazır |
 
 
 

@@ -1,3 +1,5 @@
+pub mod audit;
+pub mod benchmark;
 pub mod calypso;
 pub mod closed_loop;
 pub mod template_engine;
@@ -9,6 +11,11 @@ use ortho_ast::{
 use ortho_router::{CertifiedCollisionFreeTrajectory, MotionSegment};
 use thiserror::Error;
 
+pub use audit::{AntiTamperAuthority, AuditCertificate, TamperViolation};
+pub use benchmark::{
+    BenchmarkComparator, BenchmarkError, BenchmarkReport, FatStatus, FeatureComparison,
+    MeasurementRecord,
+};
 pub use calypso::{CalypsoEmitter, CalypsoError};
 pub use closed_loop::{
     ClosedLoopEngine, ClosedLoopError, CncControllerType, FeatureDeviation, ToolCompensationMapping,
@@ -47,6 +54,23 @@ impl DmisEmitter {
     pub fn with_thermal(mut self, thermal: ThermalConfig) -> Self {
         self.thermal = thermal;
         self
+    }
+
+    /// AS9100 Rev D Kriptografik Denetim Mührü ile imzalanmış PC-DMIS programı üretir
+    pub fn emit_signed_pcdmis(
+        &self,
+        plan: &InspectionPlan,
+        trajectory: &CertifiedCollisionFreeTrajectory,
+        cert_id: &str,
+        auditor: &str,
+    ) -> Result<String, EmitterError> {
+        let raw = self.emit_pcdmis(plan, trajectory)?;
+        Ok(AntiTamperAuthority::sign_program(
+            &raw,
+            cert_id,
+            auditor,
+            &plan.part_name,
+        ))
     }
 
     /// Doğrulanmış AST ve sertifikalı rotadan ANSI DMIS 5.3 / PC-DMIS uyumlu teftiş programı basar
