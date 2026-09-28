@@ -619,10 +619,10 @@
 | **`src-tauri` Masaüstü Kabuğu** | ✅ **TAMAMLANDI** | [tauri.conf.json](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/tauri.conf.json), [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/src/main.rs), `Cargo.toml` | Tauri 2.0 Solid Slate Light pencere, Zero-Copy IPC köprüsü |
 | **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs` – `phase10.rs` | 10 adet uçtan uca entegrasyon testi, audit, fat, license, bundle & certify CLI komutları |
 | **FAZ 1 - 10 (Çekirdek Sistem & Altın Sürüm)** | ✅ **TAMAMLANDI** | 10 Fazın tamamı %100 tamamlandı ve mühürlendi | Yeni Kullanıcı Deneyimi ve Saha Fazları |
-| **FAZ 11 (Operatör Deneyimi & Klasik CAD/CMM Menü/Ribbon)** | 📋 **PLANLANDI** | Açılış prob sihirbazı, klasik menü çubuğu, ikon+yazı ribbon, teftiş ağacı ikonları, ayarlar ekranı | Uygulamaya başlanacak ilk faz |
-| **FAZ 12 (Canlı STEP/STL + 2D Teknik Resim Yükleme)** | 📋 **PLANLANDI** | 3D katı model (STEP/STL) yükleyici, 2D teknik resim (PDF/PNG) yükleyici, senkronize çift kanvas | FAZ 11 sonrası |
-| **FAZ 13 (Eksen Düzeltme & Akıllı Bağlama/Fikstürleme)** | 📋 **PLANLANDI** | CAD eksen yönlendirme/döndürme, tabana oturtma, akıllı pabuç yerleşimi, OP10/OP20 flip analizi | FAZ 12 sonrası |
-| **FAZ 14 (Hibrit LLaMA/Ollama + OpenRouter & Onay Tablosu)** | 📋 **PLANLANDI** | Ekonomik/yerel AI, teknik resimden ölçü çıkarımı, katı model eşleme, insan-onaylı teftiş tablosu | FAZ 13 sonrası |
+| **FAZ 11 (Operatör Deneyimi & Klasik CAD/CMM Menü/Ribbon)** | ✅ **TAMAMLANDI** | Açılış prob sihirbazı, klasik menü çubuğu (8 dropdown), ikon+yazı ribbon, teftiş ağacı geometrik ikonları, ayarlar ekranı (4 sekme), pazarlama kalabalığı temizliği | `d21fb1f` |
+| **FAZ 12 (Canlı STEP/STL + 2D Teknik Resim Yükleme)** | ✅ **TAMAMLANDI** | Three.js STLLoader/OBJLoader ile gerçek 3D dosya yükleme, bounding box hesabı, otomatik kamera odaklama, 2D PNG/JPG/SVG teknik resim görüntüleyici (zoom/pan), PDF yönlendirme | `f3295ad` |
+| **FAZ 13 (Eksen Düzeltme & Akıllı Bağlama/Fikstürleme)** | ✅ **TAMAMLANDI** | X/Y/Z ±90° eksen döndürme sihirbazı, tablaya oturtma (Z=0), merkeze alma, akıllı fikstür önerisi (3 destek + 2 pabuç + Lift-Hop), OP20 flip erişilebilirlik analizi | `ea3b2ee` |
+| **FAZ 14 (Hibrit LLaMA/Ollama + OpenRouter & Onay Tablosu)** | ✅ **TAMAMLANDI** | Yerel Ollama (http://localhost:11434) + OpenRouter Free Tier bağlantısı, teknik resimden ölçü çıkarma, 7 sütunlu insan-onaylı teftiş tablosu, onaylanan ölçülerin sol ağaca ve DMIS planına aktarımı | `38358d6` |
 
 
 
