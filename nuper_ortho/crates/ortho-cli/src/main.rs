@@ -25,6 +25,9 @@ use ortho_emitter::{
 use ortho_kinematics::{
     sample_cylinder_2level, sample_plane_grid, OrientedSamplingPlan, PH10LookUpTable, ProbeStack,
 };
+use ortho_license::{
+    AirGappedLicense, FeatureFlag, HardwareFingerprint, LicenseAuthority, LicenseError, LicenseTier,
+};
 use ortho_router::{CertifiedCollisionFreeTrajectory, ClearanceBox, CmmMachineProfile, MotionSegment};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -99,6 +102,54 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             rep.max_delta_mm * 1000.0
         );
         return Ok(());
+    }
+
+    // 3. Air-Gapped Donanım Kilidi (Dongle) ve Lisans Alt Komutu (Adım 7.1)
+    if args.len() > 1 && args[1] == "license" {
+        println!("🔑 Nuper Ortho Çevrimdışı (Air-Gapped) Savunma Lisans Denetimi");
+        let hw = HardwareFingerprint::new(
+            "MCH-DEFENSE-AS9100-STATION",
+            "INTEL-CORE-I9-METROLOGY",
+            Some("NUPER-USB-DGL-9841".to_string()),
+        );
+        let license = LicenseAuthority::issue_license(
+            "LIC-ASELSAN-2026-001",
+            "ASELSAN Savunma Sistemleri A.Ş.",
+            LicenseTier::DefenseEnterprise,
+            Some(&hw),
+            "2026-01-01",
+            "2027-01-01",
+        );
+
+        match LicenseAuthority::validate_license(
+            &license,
+            &hw,
+            "2026-09-28",
+            Some(FeatureFlag::DmisExport),
+        ) {
+            Ok(()) => {
+                println!("✅ LİSANS GEÇERLİ VE AKTİF");
+                println!("   -> Lisans ID: {}", license.license_id);
+                println!("   -> Müşteri: {}", license.customer_name);
+                println!("   -> Paket Seviyesi: {:?}", license.tier);
+                println!(
+                    "   -> USB Donanım Kilidi (Dongle): BAĞLI ({})",
+                    hw.usb_dongle_serial.as_deref().unwrap_or("Yok")
+                );
+                println!("   -> Donanım Parmak İzi: {}", hw.compute_composite_hash());
+                println!("   -> Maksimum CMM Düğümü: {}", license.max_cmm_nodes);
+                println!("   -> Bitiş Tarihi: {}", license.expires_date_iso);
+                println!(
+                    "   -> Çevrimdışı Challenge: {}",
+                    LicenseAuthority::generate_offline_challenge(&hw)
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("❌ LİSANS DOĞRULAMA HATASI: {}", e);
+                std::process::exit(1);
+            }
+        }
     }
 
     let mut step_file = if Path::new("tests/data/valve_block.step").exists() {

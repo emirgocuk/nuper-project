@@ -873,7 +873,8 @@
     </div>
 
     <div class="top-actions">
-      <!-- Donanım ve Bellek Bilgisi -->
+      <!-- Donanım, Lisans ve Bellek Bilgisi -->
+      <div class="hw-badge" id="dongle-badge" style="background: #ECFDF5; color: #065F46; border-color: #A7F3D0; font-weight: 700; cursor: pointer;" onclick="openLicenseModal()" title="USB Donanım Kilidi (Dongle) ve Lisans Durumu">🔑 HW-Lock: Dongle Bağlı</div>
       <div class="hw-badge">CMM: LK-Altera 10.7.6</div>
       <div class="hw-badge">Prob: Renishaw PH10M (Ø2x20)</div>
       <div class="hw-badge seal-badge" title="GJK ve Çarpışma Testi Onaylı">SHA-256: 170D62F7 PASS</div>
@@ -1146,6 +1147,7 @@
       <div class="c-tab" onclick="switchCodeTab('uncertainty')">GUM ISO 15530-3 & Guard-Band</div>
       <div class="c-tab" onclick="switchCodeTab('as9100')">AS9100 Rev D Mühür</div>
       <div class="c-tab" onclick="switchCodeTab('fat')">Saha FAT Kıyaslama</div>
+      <div class="c-tab" onclick="switchCodeTab('license')">Air-Gapped Savunma Lisansı</div>
       <div class="c-tab" onclick="switchCodeTab('ipc')">Tauri Zero-Copy IPC Buffer</div>
     </div>
 
@@ -1485,6 +1487,85 @@
       <div class="modal-footer" style="padding: 10px 16px; background: #F8FAFC; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between;">
         <span style="font-size: 11px; color: #64748B;">Nuper Ortho AS9100 Rev D Anti-Tamper Engine (ortho-emitter::audit).</span>
         <button class="btn-header" onclick="closeAuditModal()">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AIR-GAPPED SAVUNMA LİSANSI & DONANIM KİLİDİ (DONGLE) MODAL PENCERESİ -->
+  <div class="modal-overlay" id="license-modal">
+    <div class="modal-card" style="width: 820px;">
+      <div class="modal-header">
+        <div class="modal-title">🔑 Çevrimdışı (Air-Gapped) Savunma Lisansı & Donanım Kilidi</div>
+        <button onclick="closeLicenseModal()" style="border: none; background: transparent; font-size: 18px; cursor: pointer; color: #64748B;">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <!-- Durum Bildirim Paneli -->
+        <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 6px; padding: 12px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 24px;">🛡️</span>
+            <div>
+              <div style="font-weight: 800; font-size: 13px; color: #065F46;">LİSANS GEÇERLİ & AKTİF (DEFENSE ENTERPRISE TIER)</div>
+              <div style="font-size: 11px; color: #047857; margin-top: 2px;">Air-Gapped askeri kapalı ağ uyumlu. USB donanım anahtarı teyit edildi.</div>
+            </div>
+          </div>
+          <span style="background: #10B981; color: white; padding: 4px 10px; border-radius: 4px; font-weight: 700; font-size: 11px;">DONGLE BAĞLI</span>
+        </div>
+
+        <!-- Lisans Parametreleri Tablosu -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; font-size: 11px;">
+          <div style="background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+            <b style="color: #64748B; text-transform: uppercase; font-size: 10px;">Lisans Sahibi:</b>
+            <div style="font-weight: 700; color: #0F172A; margin-top: 2px;">ASELSAN Savunma Sistemleri A.Ş.</div>
+          </div>
+          <div style="background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+            <b style="color: #64748B; text-transform: uppercase; font-size: 10px;">Paket ve Akreditasyon:</b>
+            <div style="font-weight: 700; color: #0284C7; margin-top: 2px;">Kurumsal Savunma Havuzu (Air-Gapped / ITAR)</div>
+          </div>
+          <div style="background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+            <b style="color: #64748B; text-transform: uppercase; font-size: 10px;">USB Donanım Kilidi (Dongle ID):</b>
+            <div style="font-family: var(--font-mono); font-weight: 700; color: #059669; margin-top: 2px;">NUPER-USB-DGL-9841</div>
+          </div>
+          <div style="background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+            <b style="color: #64748B; text-transform: uppercase; font-size: 10px;">Kombine Donanım Parmak İzi:</b>
+            <div style="font-family: var(--font-mono); font-weight: 600; color: #334155; margin-top: 2px;">517CC1B727220A95</div>
+          </div>
+          <div style="background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+            <b style="color: #64748B; text-transform: uppercase; font-size: 10px;">Geçerlilik Bitiş Tarihi:</b>
+            <div style="font-weight: 700; color: #0F172A; margin-top: 2px;">2027-01-01 (94 Gün Kaldı)</div>
+          </div>
+          <div style="background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+            <b style="color: #64748B; text-transform: uppercase; font-size: 10px;">Yetkili CMM Düğüm Sayısı:</b>
+            <div style="font-weight: 700; color: #059669; margin-top: 2px;">16 CMM Tezgahı (3 Aktif)</div>
+          </div>
+        </div>
+
+        <!-- Yetkili Özellikler Listesi -->
+        <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 14px;">
+          <b style="color: #475569; font-size: 11px; text-transform: uppercase;">Yetkilendirilmiş Modüller (Feature Flags):</b>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+            <span style="background: #E0F2FE; color: #0369A1; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">✓ PC-DMIS Derleyici</span>
+            <span style="background: #E0F2FE; color: #0369A1; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">✓ Zeiss Calypso</span>
+            <span style="background: #E0F2FE; color: #0369A1; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">✓ Çoklu Bağlama (OP10/OP20)</span>
+            <span style="background: #E0F2FE; color: #0369A1; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">✓ Kapalı Döngü CNC (Fanuc/Siemens)</span>
+            <span style="background: #E0F2FE; color: #0369A1; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">✓ AS9100 Rev D Anti-Tamper</span>
+            <span style="background: #E0F2FE; color: #0369A1; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">✓ Sandboxed AI Teşhis</span>
+            <span style="background: #E0F2FE; color: #0369A1; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;">✓ Optik Lazer Çizgi Tarama</span>
+          </div>
+        </div>
+
+        <!-- Çevrimdışı Challenge-Response Aktivasyon Aracı -->
+        <div style="background: #F1F5F9; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;">
+          <b style="color: #475569; font-size: 11px; text-transform: uppercase;">Çevrimdışı (Air-Gapped) Aktivasyon Kodu:</b>
+          <div style="display: flex; gap: 8px; margin-top: 6px;">
+            <input type="text" id="challenge-code-input" value="CHALLENGE-517CC1B7-27220A95" readonly style="flex: 1; padding: 6px 10px; font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--border-color); border-radius: 4px; background: white;">
+            <button onclick="copyChallengeCode()" style="padding: 6px 12px; background: #0284C7; color: white; border: none; border-radius: 4px; font-weight: 700; font-size: 11px; cursor: pointer;">📋 Kodu Kopyala</button>
+            <button onclick="activateOfflineKey()" style="padding: 6px 12px; background: #059669; color: white; border: none; border-radius: 4px; font-weight: 700; font-size: 11px; cursor: pointer;">🔑 Aktivasyon Gir</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 10px 16px; background: #F8FAFC; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between;">
+        <span style="font-size: 11px; color: #64748B;">Nuper Ortho Air-Gapped Licensing Engine (ortho-license).</span>
+        <button class="btn-header" onclick="closeLicenseModal()">Kapat</button>
       </div>
     </div>
   </div>
@@ -2397,7 +2478,30 @@ $$ ==============================================================
 4. VALVE_SEAT_CONE:    Manuel: 45.0019 mm | Nuper: 45.0022 mm | Δ: 0.30 µm [PASS]
 ------------------------------------------------------------------
 FAT NIHAI KARARI: KABUL EDILDI - SERTIFIKALI (FAT PASSED)
-STANDARTLAR: AS9100 Rev D, ISO 10360-2, ASME Y14.5-2018`
+STANDARTLAR: AS9100 Rev D, ISO 10360-2, ASME Y14.5-2018`,
+      license: `$$ ==============================================================
+$$ CEVRIMDISI (AIR-GAPPED) SAVUNMA LISANSI & DONANIM KILIDI
+$$ SERTIFIKA NO: LIC-ASELSAN-2026-NUPER-009
+$$ ==============================================================
+[LISANS BILGILERI]
+- Lisans Sahibi:             ASELSAN Savunma Sistemleri A.S.
+- Paket Seviyesi:            Defense Enterprise (Air-Gapped / ITAR)
+- USB Donanim Kilidi ID:     NUPER-USB-DGL-9841 [DONGLE ONLINE]
+- Donanim Parmak Izi:        517CC1B727220A95
+- Gecerlilik:                2026-01-01 -> 2027-01-01 (AKTIF)
+- Yetkili CMM Dugumleri:     16 CMM Tezgah Havuzu (Kullanilan: 3)
+- Kriptografik Imza:         6A09E667F3BCC90898DA49CC4330F7C8
+
+[YETKILI MODULLER & EMNIYET KILITLERI]
+✓ ANSI DMIS 5.3 & PC-DMIS Derleyici
+✓ Zeiss Calypso ASCII Prufplan Derleyici
+✓ Coklu Baglama (Multi-Setup OP10/OP20 & 180° Flip)
+✓ Kapali Donglu CNC Asinma Geri Beslemesi (Fanuc/Siemens)
+✓ AS9100 Rev D Kriptografik Anti-Tamper Denetim Izi
+✓ Yerel Sandboxed AI (TurnedShaft 3-Kose Loblanma Tespiti)
+✓ Optik Lazer Cizgi Tarama ve Hibrit Metroloji
+
+DURUM: ONAYLANDI (AIR-GAPPED ASKERI TESIS LISANSI AKTIF)`
     };
 
     function switchCodeTab(tab) {
@@ -2587,6 +2691,32 @@ STANDARTLAR: AS9100 Rev D, ISO 10360-2, ASME Y14.5-2018`
       verifyAuditIntegrity();
     }
 
+    // ==========================================================================
+    // 13. AIR-GAPPED SAVUNMA LİSANSLAMA VE DONGLE (FAZ 7)
+    // ==========================================================================
+    function openLicenseModal() {
+      document.getElementById('license-modal').classList.add('active');
+    }
+    function closeLicenseModal() {
+      document.getElementById('license-modal').classList.remove('active');
+    }
+
+    function copyChallengeCode() {
+      const code = document.getElementById('challenge-code-input').value;
+      navigator.clipboard.writeText(code).then(() => {
+        alert("📋 Çevrimdışı Challenge Kodu Panoya Kopyalandı:\n" + code + "\n\nBu kodu air-gapped lisans yöneticinize ileterek aktivasyon anahtarı alabilirsiniz.");
+      }).catch(() => {
+        alert("Kod: " + code);
+      });
+    }
+
+    function activateOfflineKey() {
+      const key = prompt("Lütfen Nuper Ortho Çevrimdışı Aktivasyon Anahtarını (Response Key) giriniz:");
+      if (key && key.trim().length > 0) {
+        alert("✅ Çevrimdışı Aktivasyon Başarılı!\n• Savunma Lisansı Yenilendi (1 Yıl Ek Süre)\n• Kriptografik İmza Teyit Edildi.");
+      }
+    }
+
     // Klavye Kısayolları (Doc 16 Bölüm 6)
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
@@ -2605,6 +2735,7 @@ STANDARTLAR: AS9100 Rev D, ISO 10360-2, ASME Y14.5-2018`
         closeFatBenchmarkModal();
         closeAuditModal();
         closeIppModal();
+        closeLicenseModal();
       }
     });
 

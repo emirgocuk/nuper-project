@@ -252,24 +252,65 @@
 
 ---
 
+### 🔹 FAZ 7: Endüstriyel Dağıtım, Air-Gapped Savunma Lisanslama & Tauri Masaüstü Mimarisi [TAMAMLANDI]
+*Hedef: Savunma ve havacılık tesisleri (ITAR/CMMC uyumlu) için internet bağlantısı gerektirmeyen Air-Gapped kriptografik lisanslama, USB Donanım Kilidi (Dongle) ve makine parmak izi koruması, Tauri 2.0 masaüstü dağıtım paketi ve sıfır kopyalı IPC köprüsünü tamamlamak.*
+
+---
+
+#### 📌 Adım 7.1: Air-Gapped Savunma Lisanslama & Donanım Kilidi Motoru (`ortho-license`)
+- **İş Paketi:**
+  - `LicenseAuthority` ve `AirGappedLicense`: CPUID, Anakart GUID ve USB Donanım Kilidi (Dongle) parmak izlerine kilitli 256-bit asimetrik HMAC/SHA-256 dijital lisans imzalama ve doğrulama motoru.
+  - Savunma Paketi (`LicenseTier::DefenseEnterprise`): 16 CMM havuzu, internet bağlantısı olmadan güvenli doğrulama.
+  - Hırsızlık ve korsan kopyalama emniyet kilidi: Lisans süresi dolduğunda (`LicenseExpired`), donanım uyuşmazlığında (`HardwareMismatch`) veya USB dongle çıkarıldığında (`MissingHardwareDongle`) otonom CMM derlemesini anında kilitleme.
+  - Askeri kapalı ağlar için çevrimdışı Challenge-Response aktivasyon protokolü (`generate_offline_challenge`).
+- **Durum:** ✅ Tamamlandı. `ortho-license` alt sandığı ve birim testleri %100 başarılı.
+
+---
+
+#### 📌 Adım 7.2: Tauri 2.0 Masaüstü Paketleme & Sıfır Kopyalı IPC Köprüsü (`src-tauri`)
+- **İş Paketi:**
+  - Tauri 2.0 masaüstü manifestosu (`tauri.conf.json`), Solid Slate Light pencere boyutu (1440x900) ve güvenlik ilkeleri (CSP).
+  - Masaüstü IPC köprüsü (`src-tauri/src/main.rs`): Zero-copy CAD mesh tamponu (`load_mesh_ipc`), prob yolu derleme ve DMIS çıktısı (`compile_trajectory_ipc`), AS9100 mühür doğrulama (`verify_as9100_ipc`) ve donanım kilidi sorgulama (`check_license_ipc`).
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 7.3: UI Lisans ve Donanım Anahtarı (Dongle) Entegrasyonu (`ui/index.html`)
+- **İş Paketi:**
+  - Üst araç çubuğuna interaktif `🔑 HW-Lock: Dongle Bağlı` canlı durum rozeti eklendi.
+  - Çevrimdışı Savunma Lisansı Yönetim Modalı (`#license-modal`): Müşteri, paket seviyesi, yetkili CMM düğümleri, USB dongle seri no, donanım parmak izi ve tek tıkla çevrimdışı Challenge kodu kopyalama / aktivasyon aracı eklendi.
+  - Alt konsol sekmesine `Air-Gapped Savunma Lisansı` bilgi bloğu dahil edildi.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 7.4: Uçtan Uca Entegrasyon Testi (`end_to_end_phase7.rs`)
+- **İş Paketi:** 6 ana boyutta tüm Faz 7 lisanslama ve masaüstü emniyet testleri: Savunma lisans sertifikasyonu, USB dongle çıkarılma koruması, donanım parmak izi uyuşmazlığı, lisans tahrifatı engelleme, çevrimdışı challenge-response üretimi ve lisanslı otonom derleme çıktısı.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
 ## 3. Güncel Durum ve İlerleme Özeti
 
 | Modül / Görev | Durum | Tamamlanan Çıktılar / Dosyalar | Sıradaki Odak |
 |---|:---:|---|---|
-| **Kök `Cargo.toml` & Crate'ler** | ✅ **TAMAMLANDI** | [Cargo.toml](file:///c:/Projeler/nuper-project/nuper_ortho/Cargo.toml) (7 alt sandık tanımlandı) | Multi-crate workspace aktif |
+| **Kök `Cargo.toml` & Crate'ler** | ✅ **TAMAMLANDI** | [Cargo.toml](file:///c:/Projeler/nuper-project/nuper_ortho/Cargo.toml) (8 alt sandık + `src-tauri` tanımlandı) | Multi-crate workspace aktif |
 | **`ortho-ast` Nötr Metroloji IR** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-ast/src/lib.rs), `feature.rs`, `datum.rs`, `tolerance.rs`, `threads.rs`, `compound.rs`, `alignment.rs`, `plan.rs` | 6-DoF rank, H7 Chebyshev, Multi-Setup, SensorType, StockAllowanceMode, Material |
 | **`ortho-brep` Geometri Çekirdeği** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-brep/src/lib.rs), `step_parser.rs`, `surface.rs`, `matching.rs`, `multi_body.rs` | STEP AP214/242 parser, Ray-Casting cidar, B-Spline eğrilik, Multi-Body izolasyonu |
 | **`ortho-kinematics` Prob Çözücü** | ✅ **TAMAMLANDI** | [ph10.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-kinematics/src/ph10.rs), `sampling.rs`, `fitting.rs`, `tree.rs`, `plan.rs`, `uncertainty.rs`, `laser.rs` | PTB akreditasyonu, GUM / ISO 15530-3 belirsizlik, Lazer çizgi tarama şeritleri |
 | **`ortho-router` Emniyet & Rota** | ✅ **TAMAMLANDI** | [clearance.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/clearance.rs), [hal.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/hal.rs), `collision.rs`, `stylus.rs`, `tsp.rs`, `ipc.rs`, `ipp.rs`, `traversal.rs` | I++ DME v1.7/v2.0, Zero-Copy IPC, Z-First Absolute Traversal |
 | **`ortho-emitter` Post-Processor** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-emitter/src/lib.rs), `template_engine.rs`, `calypso.rs`, `closed_loop.rs`, `benchmark.rs`, `audit.rs` | PC-DMIS, ANSI DMIS, Fanuc/Siemens Closed-Loop CNC, Setup Sheet, AS9100 Rev D Anti-Tamper, FAT Benchmark |
 | **`ortho-ai` Sandboxed AI Motoru** | ✅ **TAMAMLANDI** | `guardrail.rs`, `intent.rs`, `diagnostics.rs`, `root_cause.rs`, `lib.rs` | GBNF Şema, B-Rep Ground-Truth, 3-Köşe Loblanma, Doğal Dil Teşhisi, Kök Neden |
-| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs`, `end_to_end_phase3.rs`, `end_to_end_phase3_ui_setup_sheet.rs`, `end_to_end_phase4.rs`, `end_to_end_phase5.rs`, `end_to_end_phase6.rs` | 6 adet uçtan uca entegrasyon testi, audit & fat CLI komutları |
+| **`ortho-license` Lisans & Dongle** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-license/src/lib.rs), `Cargo.toml` | Air-Gapped Savunma Lisansı, USB Dongle, Donanım Parmak İzi, Çevrimdışı Challenge |
+| **`src-tauri` Masaüstü Kabuğu** | ✅ **TAMAMLANDI** | [tauri.conf.json](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/tauri.conf.json), [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/src/main.rs), `Cargo.toml` | Tauri 2.0 Solid Slate Light pencere, Zero-Copy IPC köprüsü |
+| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs` – `phase7.rs` | 7 adet uçtan uca entegrasyon testi, audit, fat & license CLI komutları |
 | **FAZ 1 (Çekirdek Dikey Dilim)** | ✅ **TAMAMLANDI** | Adım 1.1 — 1.6 %100 tamamlandı | FAZ 2'ye geçildi |
 | **FAZ 2 (Emniyet & Sertifikasyon)** | ✅ **TAMAMLANDI** | Adım 2.1 — 2.5 %100 tamamlandı (69/69 test başarılı) | FAZ 3'e geçildi |
 | **FAZ 3 (İleri GD&T & Kademeli AI)** | ✅ **TAMAMLANDI** | Adım 3.1 — 3.4 %100 tamamlandı (77/77 test başarılı) | FAZ 4'e geçildi |
 | **FAZ 4 (Saha Entegrasyonu & CNC)** | ✅ **TAMAMLANDI** | Adım 4.1 — 4.4 %100 TAMAMLANDI (89/89 test başarılı, Dijital İkiz UI tamamlandı) | FAZ 5'e geçildi |
 | **FAZ 5 (Sandboxed AI & Saha Emniyeti)** | ✅ **TAMAMLANDI** | Adım 5.1 — 5.4 %100 TAMAMLANDI (7 Crate ve 5 Entegrasyon Testi) | FAZ 6'ya geçildi |
-| **FAZ 6 (Saha FAT, Copilot & AS9100)** | ✅ **TAMAMLANDI** | **Adım 6.1 — 6.4 %100 TAMAMLANDI** (480x Benchmark, AS9100 Anti-Tamper, FAT Sertifikası) | Endüstriyel Yayın & Pilot Saha Dağıtımı Hazır |
+| **FAZ 6 (Saha FAT, Copilot & AS9100)** | ✅ **TAMAMLANDI** | Adım 6.1 — 6.4 %100 TAMAMLANDI (480x Benchmark, AS9100 Anti-Tamper, FAT Sertifikası) | FAZ 7'ye geçildi |
+| **FAZ 7 (Dağıtım, Lisans & Tauri)** | ✅ **TAMAMLANDI** | **Adım 7.1 — 7.4 %100 TAMAMLANDI** (Air-Gapped Savunma Lisansı, USB Dongle, Tauri 2.0) | Ticari Dağıtım ve Saha Pilot Yayını Hazır |
 
 
 

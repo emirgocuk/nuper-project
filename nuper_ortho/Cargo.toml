@@ -6,7 +6,9 @@ members = [
     "crates/ortho-router",
     "crates/ortho-emitter",
     "crates/ortho-ai",
+    "crates/ortho-license",
     "crates/ortho-cli",
+    "src-tauri",
 ]
 resolver = "2"
 

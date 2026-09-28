@@ -1,0 +1,20 @@
+[package]
+name = "nuper-ortho-desktop"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+ortho-ast = { path = "../crates/ortho-ast" }
+ortho-brep = { path = "../crates/ortho-brep" }
+ortho-kinematics = { path = "../crates/ortho-kinematics" }
+ortho-router = { path = "../crates/ortho-router" }
+ortho-emitter = { path = "../crates/ortho-emitter" }
+ortho-ai = { path = "../crates/ortho-ai" }
+ortho-license = { path = "../crates/ortho-license" }
+glam.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

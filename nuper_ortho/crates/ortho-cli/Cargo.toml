@@ -16,6 +16,7 @@ ortho-kinematics = { path = "../ortho-kinematics" }
 ortho-router = { path = "../ortho-router" }
 ortho-emitter = { path = "../ortho-emitter" }
 ortho-ai = { path = "../ortho-ai" }
+ortho-license = { path = "../ortho-license" }
 glam.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
