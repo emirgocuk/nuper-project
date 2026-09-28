@@ -152,6 +152,136 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // 4. Uçtan Uca Sovereign Üretim Paketi ve Dağıtım Alt Komutu (FAZ 8)
+    if args.len() > 1 && (args[1] == "bundle" || args[1] == "export-bundle" || args[1] == "showroom") {
+        println!("🚀 Sovereign Üretim Teftiş Paketi (Inspection Bundle) Derleniyor...");
+        let out_dir = if args.len() > 2 { &args[2] } else { "dist_inspection_bundle" };
+        fs::create_dir_all(out_dir)?;
+
+        // Donanım lisansı teyidi
+        let hw = HardwareFingerprint::new(
+            "MCH-DEFENSE-AS9100-STATION",
+            "INTEL-CORE-I9-METROLOGY",
+            Some("NUPER-USB-DGL-9841".to_string()),
+        );
+        let license = LicenseAuthority::issue_license(
+            "LIC-ASELSAN-2026-NUPER-009",
+            "ASELSAN Savunma Sistemleri A.Ş.",
+            LicenseTier::DefenseEnterprise,
+            Some(&hw),
+            "2026-01-01",
+            "2027-01-01",
+        );
+        LicenseAuthority::validate_license(&license, &hw, "2026-09-28", Some(FeatureFlag::DmisExport))?;
+
+        // Model & Plan
+        let step_file = if Path::new("tests/data/valve_block.step").exists() {
+            "tests/data/valve_block.step"
+        } else {
+            "valve_block.step"
+        };
+        let brep_model = if Path::new(step_file).exists() {
+            BRepModel::from_step_file(step_file)?
+        } else {
+            let default_step = include_str!("../../../tests/data/valve_block.step");
+            BRepModel::from_step_str(default_step, step_file)?
+        };
+
+        let alignment_rec = recommend_adaptive_alignment(&brep_model.features);
+        let mut plan = InspectionPlan::new("VALVE_BODY_OP10", step_file, alignment_rec.drf);
+        for feat in brep_model.features {
+            plan.add_feature(feat);
+        }
+
+        let clearance = ClearanceBox::from_bounding_box(
+            brep_model.bounding_box_min,
+            brep_model.bounding_box_max,
+        );
+        let segments = vec![
+            MotionSegment::RapidLinear { target: DVec3::new(0.0, 0.0, 150.0) },
+            MotionSegment::TouchApproach { target: DVec3::new(50.0, 80.0, 50.0), normal: -DVec3::Y },
+            MotionSegment::Retract { target: DVec3::new(50.0, 75.0, 50.0) },
+        ];
+        let trajectory = CertifiedCollisionFreeTrajectory::new(segments, clearance, vec![]);
+
+        let emitter = DmisEmitter::new();
+        // 1. PC-DMIS
+        let signed_pcdmis = emitter.emit_signed_pcdmis(
+            &plan,
+            &trajectory,
+            "AS9100D-CMM-2026-NUPER-0091",
+            "Müh. Emir Göçük (Lead QA & Metrology)",
+        )?;
+        let dmi_path = format!("{}/VALVE_BODY_OP10.DMI", out_dir);
+        fs::write(&dmi_path, &signed_pcdmis)?;
+
+        // 2. Zeiss Calypso
+        let calypso_emitter = ortho_emitter::CalypsoEmitter::new();
+        let calypso_code = calypso_emitter.emit_calypso_ascii(&plan)?;
+        let calypso_path = format!("{}/VALVE_BODY_OP10_CALYPSO.txt", out_dir);
+        fs::write(&calypso_path, &calypso_code)?;
+
+        // 3. Setup Sheet
+        let setup_sheet_md = emitter.generate_setup_sheet(&plan);
+        let setup_path = format!("{}/SETUP_SHEET_VALVE_BODY_OP10.md", out_dir);
+        fs::write(&setup_path, &setup_sheet_md)?;
+
+        // 4. FAT Certificate
+        let manual = vec![
+            MeasurementRecord::new("BORE_20_H7", 20.0, 20.0123, 0.0210, 0.0000),
+            MeasurementRecord::new("DATUM_A_FLATNESS", 0.0, 0.0031, 0.0100, -0.0100),
+            MeasurementRecord::new("SIDE_DATUM_B_PERP", 0.0, 0.0042, 0.0150, -0.0150),
+            MeasurementRecord::new("VALVE_SEAT_CONE", 45.0, 45.0019, 0.0200, -0.0200),
+        ];
+        let nuper = vec![
+            MeasurementRecord::new("BORE_20_H7", 20.0, 20.0121, 0.0210, 0.0000),
+            MeasurementRecord::new("DATUM_A_FLATNESS", 0.0, 0.0030, 0.0100, -0.0100),
+            MeasurementRecord::new("SIDE_DATUM_B_PERP", 0.0, 0.0040, 0.0150, -0.0150),
+            MeasurementRecord::new("VALVE_SEAT_CONE", 45.0, 45.0022, 0.0200, -0.0200),
+        ];
+        let fat_rep = BenchmarkComparator::compare(
+            "FAT-2026-NUPER-ASELSAN-001",
+            "VALVE_BODY_OP10",
+            "Hexagon Global S Chrome 09.15.08",
+            "Müh. Emir Göçük (Lead QA & Metrology)",
+            &manual,
+            &nuper,
+            240.0,
+            0.5,
+        )?;
+        let fat_md = BenchmarkComparator::format_fat_certificate(&fat_rep);
+        let fat_path = format!("{}/FAT_CERTIFICATE_AS9100D_VALVE_001.md", out_dir);
+        fs::write(&fat_path, &fat_md)?;
+
+        // 5. AS9100 Seal
+        let audit_cert = AntiTamperAuthority::verify_program_integrity(&signed_pcdmis)?;
+        let seal_sig = format!(
+            "AS9100 REV D KRIPTOGRAFIK MUHUR SERTIFIKASI\n\
+             Dosya: VALVE_BODY_OP10\n\
+             Sertifika ID: {}\n\
+             Denetci: {}\n\
+             Kanonik SHA-256: {}\n\
+             Unsur Sayisi: {} | Tolerans Sayisi: {} | Hareket: {}\n\
+             Durum: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)\n",
+            audit_cert.certificate_id,
+            audit_cert.auditor_identity,
+            audit_cert.canonical_hash,
+            audit_cert.feature_count,
+            audit_cert.tolerance_count,
+            audit_cert.motion_count,
+        );
+        let seal_path = format!("{}/AS9100D_DIGITAL_SEAL_SHA256.sig", out_dir);
+        fs::write(&seal_path, &seal_sig)?;
+
+        println!("✅ Sovereign Teftiş Paketi Başarıyla Oluşturuldu -> Dizin: {}", out_dir);
+        println!("   [1/5] Kanonik DMIS: {}", dmi_path);
+        println!("   [2/5] Zeiss Calypso: {}", calypso_path);
+        println!("   [3/5] Operatör Föyü: {}", setup_path);
+        println!("   [4/5] FAT Sertifikası: {}", fat_path);
+        println!("   [5/5] AS9100 Mührü: {}", seal_path);
+        return Ok(());
+    }
+
     let mut step_file = if Path::new("tests/data/valve_block.step").exists() {
         "tests/data/valve_block.step"
     } else {

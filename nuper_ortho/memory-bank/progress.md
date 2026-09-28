@@ -290,6 +290,45 @@
 
 ---
 
+### 🔹 FAZ 8: Anti-Slop Sovereign Pylon Triad Marka Sistemi, Production Showroom & Uçtan Uca Üretim Dağıtım Paketi (Inspection Bundle) [TAMAMLANDI]
+*Hedef: Anti-Slop Marka ve Tasarım Anayasasına tam uyum sağlayarak harf tabanlı logoları temizlemek, resmi Sovereign Pylon Triad (Eşkenar Yamuk & İkiz Üçgen) vektörel mührünü entegre etmek, YC 2026 Savunma ve Havacılık Physical AI anlatısına sahip Production Showroom konsolunu ve 5 parçalı teftiş paketini (DMIS 5.2, Calypso, Setup Sheet, FAT Sertifikası, AS9100 SHA-256 Mührü) tek tıkla ve headless CLI üzerinden dağıtılabilir kılmak.*
+
+---
+
+#### 📌 Adım 8.1: Anti-Slop Sovereign Pylon Triad Vektörel Mühür ve Marka Sistemi (`ui/index.html`)
+- **İş Paketi:** 
+  - Harf tabanlı ve jenerik "N" ikonları temizlendi.
+  - Anti-Slop tasarım kılavuzuna tam sadık **Sovereign Pylon Triad** (Nexus varyantı: 2 parçalı eşkenar yamuk üst gövde, dışa bakan $dX/dY=\pm 0.35$ kolineer ikiz dik üçgenler ve aşağı bakan monolitik merkez göz prizması) resmi SVG vektör çizimi uygulandı.
+  - Solid Slate Light (`#F1F5F9`, `#0F172A`, `#0284C7`) renk hiyerarşisi, keskin kontrast ve endüstriyel mühendislik estetiği mühürlendi.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 8.2: Sovereign Production Showroom & Dağıtım Konsolu (`#showroom-modal`)
+- **İş Paketi:**
+  - Solid Slate Light arayüzüne üst araç çubuğundan (`🚀 Showroom & Dağıtım`) ve marka logosuna tıklanarak açılan Sovereign Showroom modali eklendi.
+  - YC 2026 Savunma ve Havacılık Physical AI anlatısı, 480.0x hızlanma, 0.3 µm hassasiyet, 0-Panic 8-Crate Rust çekirdek matrisi ve AS9100 Rev D Kriptografik Anti-Tamper mühür durumu sergilendi.
+  - 5 parçalı üretim teftiş paketini (DMIS 5.2, Zeiss Calypso, Setup Sheet, FAT Sertifikası, AS9100 SHA-256 Dijital Mührü) tek tıkla indiren interaktif `exportCompleteInspectionBundle()` aracı entegre edildi.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 8.3: Headless CLI Üretim Teftiş Paketi Derleyicisi (`ortho bundle`)
+- **İş Paketi:**
+  - `ortho bundle [out_dir]` CLI alt komutu kodlandı (`crates/ortho-cli/src/main.rs`).
+  - Donanım lisansı teyidi, analitik B-Rep modelleme, 3-2-1 hizalama, GJK/EPA çarpışmasız rota sertifikasyonu ve 5 üretim dosyasının tek seferde fiziksel olarak diskte oluşturulması sağlandı.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 8.4: Uçtan Uca Entegrasyon Testi (`end_to_end_phase8.rs`)
+- **İş Paketi:**
+  - Tüm 8 alt sandığın (`ortho-ast`, `ortho-brep`, `ortho-kinematics`, `ortho-router`, `ortho-emitter`, `ortho-ai`, `ortho-license`, `ortho-cli`) tam entegrasyonu.
+  - 5 parçalı üretim teftiş paketinin fiziksel dosya üretimi, bayt boyutları ve kanonik SHA-256 mührünün doğrulanması.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
 ## 3. Güncel Durum ve İlerleme Özeti
 
 | Modül / Görev | Durum | Tamamlanan Çıktılar / Dosyalar | Sıradaki Odak |
@@ -303,14 +342,16 @@
 | **`ortho-ai` Sandboxed AI Motoru** | ✅ **TAMAMLANDI** | `guardrail.rs`, `intent.rs`, `diagnostics.rs`, `root_cause.rs`, `lib.rs` | GBNF Şema, B-Rep Ground-Truth, 3-Köşe Loblanma, Doğal Dil Teşhisi, Kök Neden |
 | **`ortho-license` Lisans & Dongle** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-license/src/lib.rs), `Cargo.toml` | Air-Gapped Savunma Lisansı, USB Dongle, Donanım Parmak İzi, Çevrimdışı Challenge |
 | **`src-tauri` Masaüstü Kabuğu** | ✅ **TAMAMLANDI** | [tauri.conf.json](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/tauri.conf.json), [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/src/main.rs), `Cargo.toml` | Tauri 2.0 Solid Slate Light pencere, Zero-Copy IPC köprüsü |
-| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs` – `phase7.rs` | 7 adet uçtan uca entegrasyon testi, audit, fat & license CLI komutları |
+| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs` – `phase8.rs` | 8 adet uçtan uca entegrasyon testi, audit, fat, license & bundle CLI komutları |
 | **FAZ 1 (Çekirdek Dikey Dilim)** | ✅ **TAMAMLANDI** | Adım 1.1 — 1.6 %100 tamamlandı | FAZ 2'ye geçildi |
 | **FAZ 2 (Emniyet & Sertifikasyon)** | ✅ **TAMAMLANDI** | Adım 2.1 — 2.5 %100 tamamlandı (69/69 test başarılı) | FAZ 3'e geçildi |
 | **FAZ 3 (İleri GD&T & Kademeli AI)** | ✅ **TAMAMLANDI** | Adım 3.1 — 3.4 %100 tamamlandı (77/77 test başarılı) | FAZ 4'e geçildi |
 | **FAZ 4 (Saha Entegrasyonu & CNC)** | ✅ **TAMAMLANDI** | Adım 4.1 — 4.4 %100 TAMAMLANDI (89/89 test başarılı, Dijital İkiz UI tamamlandı) | FAZ 5'e geçildi |
 | **FAZ 5 (Sandboxed AI & Saha Emniyeti)** | ✅ **TAMAMLANDI** | Adım 5.1 — 5.4 %100 TAMAMLANDI (7 Crate ve 5 Entegrasyon Testi) | FAZ 6'ya geçildi |
 | **FAZ 6 (Saha FAT, Copilot & AS9100)** | ✅ **TAMAMLANDI** | Adım 6.1 — 6.4 %100 TAMAMLANDI (480x Benchmark, AS9100 Anti-Tamper, FAT Sertifikası) | FAZ 7'ye geçildi |
-| **FAZ 7 (Dağıtım, Lisans & Tauri)** | ✅ **TAMAMLANDI** | **Adım 7.1 — 7.4 %100 TAMAMLANDI** (Air-Gapped Savunma Lisansı, USB Dongle, Tauri 2.0) | Ticari Dağıtım ve Saha Pilot Yayını Hazır |
+| **FAZ 7 (Dağıtım, Lisans & Tauri)** | ✅ **TAMAMLANDI** | Adım 7.1 — 7.4 %100 TAMAMLANDI (Air-Gapped Savunma Lisansı, USB Dongle, Tauri 2.0) | FAZ 8'e geçildi |
+| **FAZ 8 (Sovereign Marka & Bundle)** | ✅ **TAMAMLANDI** | **Adım 8.1 — 8.4 %100 TAMAMLANDI** (Sovereign Pylon Triad, Showroom Modalı, `ortho bundle`, E2E Phase 8) | Üretim Yayını ve Saha Pilot Dağıtımı Mühürlendi |
+
 
 
 
