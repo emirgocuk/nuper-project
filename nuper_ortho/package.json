@@ -1,0 +1,22 @@
+{
+  "name": "nuper-ortho",
+  "version": "1.0.0",
+  "description": "Nuper Ortho Sovereign Autonomous Metrology System",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "app": "electron ."
+  },
+  "keywords": [
+    "metrology",
+    "cmm",
+    "physical-ai",
+    "cad",
+    "threejs"
+  ],
+  "author": "Nuper Ortho Team",
+  "license": "Proprietary",
+  "dependencies": {
+    "electron": "^44.4.5"
+  }
+}

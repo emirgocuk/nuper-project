@@ -6,10 +6,13 @@ echo =========================================================================
 echo.
 echo Uygulama yerel masaustu penceresinde baslatiliyor...
 
-set HTML_PATH=%~dp0ui\index.html
+set ELECTRON_EXE=%~dp0node_modules\electron\dist\electron.exe
 set EDGE_PATH=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+set HTML_PATH=%~dp0ui\index.html
 
-if exist "%EDGE_PATH%" (
+if exist "%ELECTRON_EXE%" (
+    start "" "%ELECTRON_EXE%" "%~dp0."
+) else if exist "%EDGE_PATH%" (
     start "" "%EDGE_PATH%" --app="file:///%HTML_PATH:\=/%" --window-size=1440,900
 ) else (
     start "" "%HTML_PATH%"

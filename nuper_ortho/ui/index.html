@@ -57,38 +57,97 @@
       user-select: none;
     }
 
-    /* ÜST ARAÇ ÇUBUĞU (TOP BAR - 48px) */
-    header {
-      height: 48px;
-      background: var(--bg-panel);
+    /* BÜTÜNCÜL ENTEGRE MASAÜSTÜ BAŞLIK ÇUBUĞU (INTEGRATED TITLEBAR - 34px) */
+    .app-titlebar {
+      height: 34px;
+      background: #0F172A;
+      color: #F8FAFC;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      user-select: none;
+      -webkit-app-region: drag;
+      border-bottom: 1px solid #1E293B;
+      z-index: 100;
+      flex-shrink: 0;
+    }
+
+    .titlebar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      -webkit-app-region: no-drag;
+    }
+
+    .titlebar-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      -webkit-app-region: no-drag;
+    }
+
+    .titlebar-right {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      -webkit-app-region: no-drag;
+    }
+
+    .win-control-btn {
+      width: 34px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      color: #94A3B8;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .win-control-btn:hover {
+      background: #1E293B;
+      color: #FFFFFF;
+    }
+
+    .win-control-btn.close:hover {
+      background: #DC2626;
+      color: #FFFFFF;
+    }
+
+    /* ÇALIŞMA ARAÇ ŞERİDİ (COMMAND RIBBON - 44px) */
+    .app-ribbon {
+      height: 44px;
+      background: #FFFFFF;
       border-bottom: 1px solid var(--border-color);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 16px;
+      padding: 0 14px;
       z-index: 20;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow-x: auto;
     }
 
-    .brand {
+    .ribbon-left {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-weight: 800;
-      font-size: 15px;
-      letter-spacing: -0.4px;
+      flex-shrink: 0;
     }
 
-    .brand-icon {
-      width: 26px;
-      height: 26px;
-      background: linear-gradient(135deg, #0284C7, #0369A1);
-      border-radius: 6px;
+    .ribbon-right {
       display: flex;
       align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-weight: 800;
-      font-size: 14px;
+      gap: 6px;
+      flex-shrink: 0;
     }
 
     .badge-part {
@@ -100,25 +159,27 @@
       font-weight: 600;
       font-family: var(--font-mono);
       border: 1px solid var(--border-light);
+      white-space: nowrap;
     }
 
     .stepper {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
     }
 
     .step-item {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 12px;
+      gap: 4px;
+      font-size: 11px;
       font-weight: 600;
       color: var(--text-muted);
-      padding: 5px 10px;
-      border-radius: 6px;
+      padding: 4px 8px;
+      border-radius: 5px;
       cursor: pointer;
       transition: background 0.15s ease, color 0.15s ease;
+      white-space: nowrap;
     }
 
     .step-item:hover {
@@ -134,53 +195,44 @@
 
     .step-divider {
       color: #CBD5E1;
-      font-size: 12px;
-    }
-
-    .top-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .hw-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      background: #F8FAFC;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      font-family: var(--font-mono);
       font-size: 11px;
     }
 
-    .seal-badge {
-      background: var(--color-datum-light);
-      color: var(--color-datum);
-      border-color: #A7F3D0;
+    .hw-pill {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      background: #1E293B;
+      color: #CBD5E1;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+
+    .hw-pill.accent {
+      background: #064E3B;
+      color: #6EE7B7;
+      border-color: #059669;
       font-weight: 700;
     }
 
-    .perf-badge {
-      background: #F1F5F9;
-      color: #475569;
-      font-weight: 600;
-    }
-
     .btn-header {
-      padding: 5px 12px;
-      border-radius: 6px;
-      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       border: 1px solid var(--border-color);
       background: #FFFFFF;
       color: var(--text-main);
       transition: all 0.15s ease;
+      white-space: nowrap;
     }
 
     .btn-header:hover {
@@ -872,76 +924,91 @@
 </head>
 <body>
 
-  <!-- Üst Araç Çubuğu (Top Bar) -->
-  <header>
-    <div class="brand" onclick="openShowroomModal()" style="cursor: pointer;" title="Nuper Ortho — Anti-Slop Marka ve Showroom Konsolu">
+  <!-- BÜTÜNCÜL ENTEGRE MASAÜSTÜ BAŞLIK ÇUBUĞU (INTEGRATED APP TITLEBAR) -->
+  <div class="app-titlebar">
+    <div class="titlebar-left">
       <!-- Sovereign Pylon Triad: Resmi Eşkenar Yamuk & İkiz Üçgen Mührü -->
-      <svg width="26" height="26" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+      <svg width="18" height="18" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0; cursor: pointer;" onclick="openShowroomModal()" title="Nuper Ortho Sovereign Pylon Triad">
         <g id="nuper-master-emblem">
-          <polygon points="39,7 47,7 47,44 26,44" fill="#0284C7" />
-          <polygon points="53,7 61,7 74,44 53,44" fill="#0284C7" />
-          <polygon points="53,67 76,50 91,93" fill="#0284C7" />
-          <polygon points="47,67 24,50 9,93" fill="#0284C7" />
-          <polygon points="43,49 57,49 50,64" fill="#0284C7" />
+          <polygon points="39,7 47,7 47,44 26,44" fill="#38BDF8" />
+          <polygon points="53,7 61,7 74,44 53,44" fill="#38BDF8" />
+          <polygon points="53,67 76,50 91,93" fill="#38BDF8" />
+          <polygon points="47,67 24,50 9,93" fill="#38BDF8" />
+          <polygon points="43,49 57,49 50,64" fill="#38BDF8" />
         </g>
       </svg>
-      <span>Nuper Ortho</span>
+      <span style="font-weight: 800; font-size: 13px; letter-spacing: -0.3px; color: #FFFFFF; cursor: pointer;" onclick="openShowroomModal()">NUPER ORTHO™</span>
+      <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">Sovereign Autonomous Metrology</span>
+      <span style="background: #1E293B; color: #38BDF8; font-size: 9px; padding: 1px 6px; border-radius: 3px; font-weight: 700; border: 1px solid #334155;">v1.0.0</span>
+      <span style="background: #064E3B; color: #6EE7B7; font-size: 9px; padding: 1px 6px; border-radius: 3px; font-weight: 700; border: 1px solid #059669;">GOLDEN MASTER PASS</span>
+    </div>
+
+    <!-- Canlı Donanım ve Telemetri Rozetleri -->
+    <div class="titlebar-center">
+      <div class="hw-pill accent" id="dongle-badge" onclick="openLicenseModal()" style="cursor: pointer;" title="USB Donanım Kilidi (Dongle)">
+        <span>🔑 Dongle Bağlı</span>
+      </div>
+      <div class="hw-pill">CMM: LK-Altera 10.7.6</div>
+      <div class="hw-pill">Prob: PH10M (Ø2x20)</div>
+      <div class="hw-pill" style="color: #38BDF8;">SHA-256: 170D62F7</div>
+      <div class="hw-pill" id="ram-indicator">RAM: 112 MB</div>
+      <div class="hw-pill" id="gpu-indicator" style="color: #34D399;">GPU: %0 Boşta</div>
+    </div>
+
+    <!-- Masaüstü Pencere Kontrolleri (Bütüncül Window Controls) -->
+    <div class="titlebar-right">
+      <button class="win-control-btn" onclick="toggleAppFullscreen()" title="Tam Ekran / Masaüstü Modu (F11)">⛶</button>
+      <button class="win-control-btn" onclick="appWindowMinimize()" title="Pencereyi Küçült">─</button>
+      <button class="win-control-btn" onclick="appWindowMaximize()" title="Pencereyi Büyüt / Geri Yükle">▢</button>
+      <button class="win-control-btn close" onclick="appWindowClose()" title="Uygulamayı Kapat">✕</button>
+    </div>
+  </div>
+
+  <!-- KOMUT VE ÇALIŞMA ŞERİDİ (COMMAND RIBBON) -->
+  <header class="app-ribbon">
+    <div class="ribbon-left">
       <span class="badge-part" id="part-name-badge">VALVE_BODY_OP10.step</span>
       <div class="setup-switcher">
         <button class="setup-btn active" id="btn-setup-op10" onclick="switchSetup('OP10')">OP10 (Üst)</button>
         <button class="setup-btn" id="btn-setup-op20" onclick="switchSetup('OP20')">OP20 (180° Flip)</button>
       </div>
-      <span class="badge-part" style="color: #64748B;">ASME Y14.5 / ISO 1101</span>
+
+      <!-- 4 Aşamalı Süreç Kılavuzu (Stepper) -->
+      <div class="stepper">
+        <div class="step-item" id="step-1" onclick="setStep(1)">1. CAD Ingest</div>
+        <div class="step-divider">›</div>
+        <div class="step-item" id="step-2" onclick="setStep(2)">2. Fikstür & 3-2-1</div>
+        <div class="step-divider">›</div>
+        <div class="step-item active" id="step-3" onclick="setStep(3)">3. Rota & GJK</div>
+        <div class="step-divider">›</div>
+        <div class="step-item" id="step-4" onclick="setStep(4)">4. DMIS & Kurulum</div>
+      </div>
     </div>
 
-    <!-- 4 Aşamalı Süreç Kılavuzu (Stepper) -->
-    <div class="stepper">
-      <div class="step-item" id="step-1" onclick="setStep(1)">1. CAD Ingestion</div>
-      <div class="step-divider">›</div>
-      <div class="step-item" id="step-2" onclick="setStep(2)">2. Fikstür & 3-2-1</div>
-      <div class="step-divider">›</div>
-      <div class="step-item active" id="step-3" onclick="setStep(3)">3. Rota & GJK Emniyet</div>
-      <div class="step-divider">›</div>
-      <div class="step-item" id="step-4" onclick="setStep(4)">4. DMIS & Kurulum</div>
-    </div>
-
-    <div class="top-actions">
-      <!-- Donanım, Lisans ve Bellek Bilgisi -->
-      <div class="hw-badge" id="dongle-badge" style="background: #ECFDF5; color: #065F46; border-color: #A7F3D0; font-weight: 700; cursor: pointer;" onclick="openLicenseModal()" title="USB Donanım Kilidi (Dongle) ve Lisans Durumu">🔑 HW-Lock: Dongle Bağlı</div>
-      <div class="hw-badge">CMM: LK-Altera 10.7.6</div>
-      <div class="hw-badge">Prob: Renishaw PH10M (Ø2x20)</div>
-      <div class="hw-badge seal-badge" title="GJK ve Çarpışma Testi Onaylı">SHA-256: 170D62F7 PASS</div>
-      <div class="hw-badge perf-badge" id="ram-indicator">RAM: 112 MB</div>
-      <div class="hw-badge perf-badge" id="gpu-indicator" style="color: #059669;">GPU: %0 Boşta</div>
-
-      <!-- Canlı STEP Yükleme ve B-Rep Ayrıştırıcı Açıcı (FAZ 9) -->
+    <div class="ribbon-right">
+      <!-- İşlem Araçları -->
       <button class="btn-header" id="btn-open-ingestion" onclick="openCadIngestionModal()" style="border-color: #0284C7; color: #0284C7; font-weight: 700;">
         <span>📂 STEP Yükle</span>
       </button>
 
-      <!-- Çift Kanvas Modu Geçişi -->
       <button class="btn-header" id="btn-toggle-dual" onclick="toggleDualCanvas()">
-        <span>📐 Çift Kanvas (2D/3D)</span>
+        <span>📐 Çift Kanvas</span>
       </button>
 
-      <!-- Saha FAT & Benchmark Açıcı -->
+      <button class="btn-header" onclick="openSetupSheetModal()">
+        <span>📋 Kurulum Föyü</span>
+      </button>
+
       <button class="btn-header" id="btn-open-fat" onclick="openFatBenchmarkModal()" style="border-color: #0284C7; color: #0284C7;">
-        <span>🏅 Saha FAT & Copilot</span>
+        <span>🏅 Saha FAT</span>
       </button>
 
-      <!-- AS9100 Anti-Tamper Denetçisi Açıcı -->
       <button class="btn-header" id="btn-open-audit" onclick="openAuditModal()" style="border-color: #059669; color: #059669;">
         <span>🛡️ AS9100 Mühür</span>
       </button>
 
-      <!-- Showroom ve Dağıtım Konsolu Açıcı -->
       <button class="btn-header" id="btn-open-showroom" onclick="openShowroomModal()" style="border-color: #8B5CF6; color: #8B5CF6;">
-        <span>🚀 Showroom & Dağıtım</span>
-      </button>
-
-      <!-- Kurulum Föyü Modalı Açıcı -->
-      <button class="btn-header" onclick="openSetupSheetModal()">
-        <span>📋 Kurulum Föyü</span>
+        <span>🚀 Showroom</span>
       </button>
 
       <!-- Altın Sürüm & Tam Pipeline Sertifikasyonu (FAZ 10 - Golden Master) -->
@@ -1952,6 +2019,72 @@
   </div>
 
   <script>
+    // ==========================================================================
+    // 0. BÜTÜNCÜL ENTEGRE MASAÜSTÜ PENCERE YÖNETİMİ & KONTROLLERİ (DESKTOP WINDOW)
+    // ==========================================================================
+    let electronIpc = null;
+    try {
+      if (typeof window !== 'undefined' && window.require) {
+        electronIpc = window.require('electron').ipcRenderer;
+      }
+    } catch (e) {
+      console.warn("Electron IPC mevcut değil (Web/Tarayıcı modunda çalışıyor):", e);
+    }
+
+    function toggleAppFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+
+    function appWindowMinimize() {
+      if (electronIpc) {
+        electronIpc.send('window-minimize');
+      } else {
+        console.log("Pencere küçültme: Tarayıcı modunda desteklenmez.");
+      }
+    }
+
+    function appWindowMaximize() {
+      if (electronIpc) {
+        electronIpc.send('window-maximize');
+      } else {
+        toggleAppFullscreen();
+      }
+    }
+
+    function appWindowClose() {
+      if (electronIpc) {
+        electronIpc.send('window-close');
+      } else {
+        if (confirm("Nuper Ortho Otonom Metroloji İstasyonunu kapatmak istiyor musunuz?")) {
+          window.close();
+        }
+      }
+    }
+
+    // Başlık çubuğuna çift tıklama ile pencere büyüt / geri yükle
+    window.addEventListener('DOMContentLoaded', () => {
+      const tb = document.querySelector('.app-titlebar');
+      if (tb) {
+        tb.addEventListener('dblclick', (e) => {
+          if (!e.target.closest('.win-control-btn') && !e.target.closest('.titlebar-left') && !e.target.closest('.titlebar-center')) {
+            appWindowMaximize();
+          }
+        });
+      }
+    });
+
+    // Klavye Kısayolları (F11: Tam Ekran, Esc: Modalları Kapat)
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F11') {
+        e.preventDefault();
+        toggleAppFullscreen();
+      }
+    });
+
     // ==========================================================================
     // 1. THREE.JS 3D SCENE & ON-DEMAND ZERO-WASTE RENDER ENGINE (Doc 16)
     // Boşta %0 GPU tüketimi: Yalnızca fare hareketi, animasyon veya durum değişiminde çizilir!
