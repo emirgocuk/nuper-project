@@ -5,6 +5,7 @@ members = [
     "crates/ortho-kinematics",
     "crates/ortho-router",
     "crates/ortho-emitter",
+    "crates/ortho-ai",
     "crates/ortho-cli",
 ]
 resolver = "2"

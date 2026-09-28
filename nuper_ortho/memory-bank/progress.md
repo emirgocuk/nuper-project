@@ -174,22 +174,62 @@
   - AS9100 Rev D Kriptografik SHA-256 denetim izi mührü ve dijital onay bloğu (`ortho-emitter`).
 - **Durum:** ✅ Tamamlandı. Tüm metrolojik standart testleri %100 başarılı.
 
+### 🔹 FAZ 5: Yerel Sandboxed AI, İleri Saha Emniyeti ve Hibrit Metroloji (Optik / Lazer) [TAMAMLANDI]
+*Hedef: Yerel yapay zeka ajanlarını halüsinasyonsuz deterministik gardiyanla (`ortho-ai`) sahaya sürmek, tornalanmış millerde 3-köşe loblanma (odd-point lobing) tespiti, gerçek atölye güvenlik kuralları (döküm payı, alüminyum sıvanması, çok gövdeli montaj izolasyonu, Z-First traversal) ve optik lazer çizgi tarama hibritleşmesini tamamlamak.*
+
+---
+
+#### 📌 Adım 5.1: Yerel Sandboxed AI & Deterministik Gardiyan (`ortho-ai`)
+- **İş Paketi:** 
+  - `DeterministicGuardrail`: GBNF katı JSON şema kısıtı ve B-Rep Ground-Truth çapraz denetimi (halüsinasyonları ve geçersiz toleransları anında bloke etme).
+  - `ManufacturingIntentDetector`: Geometrik topolojiden torna parçası (TurnedShaft) tespiti, 3-köşe loblanma (3-point lobing) riskine karşı $120^\circ$ 7-nokta örnekleme stratejisi ve Chebyshev Minimum Zone önerisi.
+  - `NaturalLanguageDiagnostics`: Prob ve pabuç/parça sürtünme loglarını atölye dilinde net açıklamalara ve çözüm önerilerine dönüştürme.
+  - `RootCauseAnalyzer`: Kapalı döngü ölçüm sapmalarından CNC parça sıfırı kayması (G54), Takım aşınması veya Mengene esnemesi (Clamping Distortion) kök neden teşhisi.
+- **Durum:** ✅ Tamamlandı. `ortho-ai` crate'i yazıldı ve birim testleri %100 başarılı.
+
+---
+
+#### 📌 Adım 5.2: Gerçek Atölye Şartları ve İleri Saha Güvenliği
+- **İş Paketi:** 
+  - `StockAllowanceMode::RawStockCasting`: Kaba döküm/dövme parçalar için genişletilmiş arama ($10\text{ mm}$), yaklaşma ($12\text{ mm}$) ve geri çekilme ($8\text{ mm}$) parametreleri.
+  - `WorkpieceMaterial::Aluminum`: Yakut bilye alüminyum sıvanması (pick-up) uyarısı, Silikon Nitrür ($\text{Si}_3\text{N}_4$) prob reçetesi ve `REQUAL` periyodik kalibrasyon döngüsü.
+  - `ortho-brep::multi_body::MultiBodyFilter`: Çok gövdeli montaj STEP dosyalarında hacim sıralaması ile Primary Workpiece izolasyonu ve cıvata/helikoil montaj elemanı gürültü filtresi.
+  - `ortho-router::traversal::ZFirstTraversal`: Makine tavanına mutlak dikey çekilme, tavanda yatay intikal ve dikey iniş ile sıfır çarpışmalı başlangıç ve güvenli park el sıkışması.
+- **Durum:** ✅ Tamamlandı. Tüm güvenlik kuralları ve algoritmaları doğrulandı.
+
+---
+
+#### 📌 Adım 5.3: Hibrit Metroloji (Optik / Lazer Çizgi Tarama)
+- **İş Paketi:**
+  - `ortho-ast::SensorType::OpticalLaserLine`: Lazer çizgi genişliği, çalışma mesafesi (standoff) ve nokta yoğunluğu parametreleri.
+  - `ortho-kinematics::laser::LaserScanPlanner`: Serbest formlu B-Spline yüzeyler üzerinde kullanıcı tanımlı bindirme oranıyla (%20 overlap) paralel lazer tarama şeritleri (scan stripes) planlama.
+- **Durum:** ✅ Tamamlandı. Lazer şerit ve nokta bulutu planlayıcısı başarıyla doğrulandı.
+
+---
+
+#### 📌 Adım 5.4: Uçtan Uca Entegrasyon Testi (`end_to_end_phase5.rs`)
+- **İş Paketi:** 5 ana boyutta tüm Faz 5 yeteneklerinin entegrasyon testi.
+- **Durum:** ✅ Tamamlandı. `end_to_end_phase5.rs` entegrasyon testi başarıyla mühürlendi.
+
 ---
 
 ## 3. Güncel Durum ve İlerleme Özeti
 
 | Modül / Görev | Durum | Tamamlanan Çıktılar / Dosyalar | Sıradaki Odak |
 |---|:---:|---|---|
-| **Kök `Cargo.toml` & Crate'ler** | ✅ **TAMAMLANDI** | [Cargo.toml](file:///c:/Projeler/nuper-project/nuper_ortho/Cargo.toml) (6 alt sandık tanımlandı) | Multi-crate workspace aktif |
-| **`ortho-ast` Nötr Metroloji IR** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-ast/src/lib.rs), `feature.rs`, `datum.rs`, `tolerance.rs`, `threads.rs`, `compound.rs`, `alignment.rs`, `plan.rs` | 6-DoF rank, H7 Chebyshev, M-diş baypası, Multi-Setup OP10/OP20 |
-| **`ortho-brep` Geometri Çekirdeği** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-brep/src/lib.rs), `step_parser.rs`, `surface.rs`, `matching.rs` | STEP AP214/242 parser, Ray-Casting cidar analizi, B-Spline diferansiyel eğrilik |
-| **`ortho-kinematics` Prob Çözücü** | ✅ **TAMAMLANDI** | [ph10.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-kinematics/src/ph10.rs), `sampling.rs`, `fitting.rs`, `tree.rs`, `plan.rs`, `uncertainty.rs` | PTB akreditasyonu, GUM / ISO 15530-3 belirsizlik, ISO 14253-1 Guard-Banding |
-| **`ortho-router` Emniyet & Rota** | ✅ **TAMAMLANDI** | [clearance.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/clearance.rs), [hal.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/hal.rs), `collision.rs`, `stylus.rs`, `tsp.rs`, `ipc.rs`, `ipp.rs` | I++ DME v1.7/v2.0, Virtual CMM Simülatörü, Zero-Copy Binary IPC |
+| **Kök `Cargo.toml` & Crate'ler** | ✅ **TAMAMLANDI** | [Cargo.toml](file:///c:/Projeler/nuper-project/nuper_ortho/Cargo.toml) (7 alt sandık tanımlandı) | Multi-crate workspace aktif |
+| **`ortho-ast` Nötr Metroloji IR** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-ast/src/lib.rs), `feature.rs`, `datum.rs`, `tolerance.rs`, `threads.rs`, `compound.rs`, `alignment.rs`, `plan.rs` | 6-DoF rank, H7 Chebyshev, Multi-Setup, SensorType, StockAllowanceMode, Material |
+| **`ortho-brep` Geometri Çekirdeği** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-brep/src/lib.rs), `step_parser.rs`, `surface.rs`, `matching.rs`, `multi_body.rs` | STEP AP214/242 parser, Ray-Casting cidar, B-Spline eğrilik, Multi-Body izolasyonu |
+| **`ortho-kinematics` Prob Çözücü** | ✅ **TAMAMLANDI** | [ph10.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-kinematics/src/ph10.rs), `sampling.rs`, `fitting.rs`, `tree.rs`, `plan.rs`, `uncertainty.rs`, `laser.rs` | PTB akreditasyonu, GUM / ISO 15530-3 belirsizlik, Lazer çizgi tarama şeritleri |
+| **`ortho-router` Emniyet & Rota** | ✅ **TAMAMLANDI** | [clearance.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/clearance.rs), [hal.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/hal.rs), `collision.rs`, `stylus.rs`, `tsp.rs`, `ipc.rs`, `ipp.rs`, `traversal.rs` | I++ DME v1.7/v2.0, Zero-Copy IPC, Z-First Absolute Traversal |
 | **`ortho-emitter` Post-Processor** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-emitter/src/lib.rs), `template_engine.rs`, `calypso.rs`, `closed_loop.rs` | PC-DMIS, ANSI DMIS, Fanuc/Siemens Closed-Loop CNC, Setup Sheet, AS9100 SHA-256 |
-| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs`, `end_to_end_phase3.rs`, `end_to_end_phase3_ui_setup_sheet.rs`, `end_to_end_phase4.rs` | 4 adet uçtan uca entegrasyon testi, 89/89 test %100 geçiyor |
+| **`ortho-ai` Sandboxed AI Motoru** | ✅ **TAMAMLANDI** | `guardrail.rs`, `intent.rs`, `diagnostics.rs`, `root_cause.rs`, `lib.rs` | GBNF Şema, B-Rep Ground-Truth, 3-Köşe Loblanma, Doğal Dil Teşhisi, Kök Neden |
+| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs`, `end_to_end_phase3.rs`, `end_to_end_phase3_ui_setup_sheet.rs`, `end_to_end_phase4.rs`, `end_to_end_phase5.rs` | 5 adet uçtan uca entegrasyon testi |
 | **FAZ 1 (Çekirdek Dikey Dilim)** | ✅ **TAMAMLANDI** | Adım 1.1 — 1.6 %100 tamamlandı | FAZ 2'ye geçildi |
 | **FAZ 2 (Emniyet & Sertifikasyon)** | ✅ **TAMAMLANDI** | Adım 2.1 — 2.5 %100 tamamlandı (69/69 test başarılı) | FAZ 3'e geçildi |
 | **FAZ 3 (İleri GD&T & Kademeli AI)** | ✅ **TAMAMLANDI** | Adım 3.1 — 3.4 %100 tamamlandı (77/77 test başarılı) | FAZ 4'e geçildi |
-| **FAZ 4 (Saha Entegrasyonu & CNC)** | ✅ **TAMAMLANDI** | **Adım 4.1 — 4.3 %100 TAMAMLANDI** (89/89 test başarılı) | Tüm fazlar tamamlandı |
+| **FAZ 4 (Saha Entegrasyonu & CNC)** | ✅ **TAMAMLANDI** | Adım 4.1 — 4.4 %100 TAMAMLANDI (89/89 test başarılı, Dijital İkiz UI tamamlandı) | FAZ 5'e geçildi |
+| **FAZ 5 (Sandboxed AI & Saha Emniyeti)** | ✅ **TAMAMLANDI** | **Adım 5.1 — 5.4 %100 TAMAMLANDI** (7 Crate ve 5 Entegrasyon Testi) | Endüstriyel Sürüm Hazır |
+
 
 

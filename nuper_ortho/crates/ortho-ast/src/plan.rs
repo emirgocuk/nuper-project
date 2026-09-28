@@ -219,3 +219,95 @@ pub struct MultiSetupPlan {
     /// Çevirme / fikstürleme operatör yönergeleri
     pub setup_instructions: Vec<String>,
 }
+
+/// Hibrit Metroloji Sensör Tipi (Doc 11 Bölüm 2)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SensorType {
+    /// Dokunmatik Tetiklemeli Prob (Renishaw TP20 vb.)
+    TactileTouchTrigger {
+        stylus_diameter: f64,
+        stem_length: f64,
+    },
+    /// Sürekli Tarama Probu (Renishaw SP25M vb.)
+    TactileContinuousScanning {
+        stylus_diameter: f64,
+        scan_speed_mms: f64,
+    },
+    /// Optik Lazer Çizgi Tarayıcı (Hexagon RS6 / Zeiss LineScan vb.)
+    OpticalLaserLine {
+        stripe_width_mm: f64,
+        standoff_distance_mm: f64,
+        point_density_pts_per_mm: f64,
+    },
+}
+
+impl Default for SensorType {
+    fn default() -> Self {
+        Self::TactileTouchTrigger {
+            stylus_diameter: 2.0,
+            stem_length: 20.0,
+        }
+    }
+}
+
+/// Döküm/Dövme Talaş Payı ve Emniyet Zarfı Modu (Doc 13 Bölüm 1)
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum StockAllowanceMode {
+    /// Hassas işlenmiş bitmiş parça (Standart paylar)
+    FinishMachined,
+    /// Kaba döküm veya dövme parça (Genişletilmiş arama ve yaklaşma zarfı)
+    RawStockCasting {
+        extra_stock_mm: f64,
+        search_distance_mm: f64,
+        approach_distance_mm: f64,
+        retract_distance_mm: f64,
+    },
+}
+
+impl Default for StockAllowanceMode {
+    fn default() -> Self {
+        Self::FinishMachined
+    }
+}
+
+impl StockAllowanceMode {
+    pub fn raw_casting_default(extra_stock: f64) -> Self {
+        Self::RawStockCasting {
+            extra_stock_mm: extra_stock,
+            search_distance_mm: (extra_stock + 7.5).max(10.0),
+            approach_distance_mm: (extra_stock + 9.5).max(12.0),
+            retract_distance_mm: (extra_stock + 5.5).max(8.0),
+        }
+    }
+
+    pub fn is_casting(&self) -> bool {
+        matches!(self, Self::RawStockCasting { .. })
+    }
+}
+
+/// Parça Malzemesi ve Prob Uyumluluk Yönetimi (Doc 13 Bölüm 2)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WorkpieceMaterial {
+    Steel,
+    CastIron,
+    Aluminum6000,
+    Aluminum7000,
+    Titanium,
+    Inconel,
+}
+
+impl WorkpieceMaterial {
+    /// Yakut bilye (Al2O3) kimyasal yapışma / sıvanma (pick-up) riski var mı?
+    pub fn ruby_ball_adhesion_risk(&self) -> bool {
+        matches!(self, Self::Aluminum6000 | Self::Aluminum7000)
+    }
+
+    /// Tavsiye edilen prob ucu malzemesi
+    pub fn recommended_stylus_material(&self) -> &'static str {
+        if self.ruby_ball_adhesion_risk() {
+            "Silikon Nitrür (Si3N4) - Alüminyum sıvanmasını önler"
+        } else {
+            "Sentetik Yakut (Al2O3) - Yüksek aşınma direnci"
+        }
+    }
+}

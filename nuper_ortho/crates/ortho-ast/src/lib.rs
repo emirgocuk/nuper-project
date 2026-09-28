@@ -27,7 +27,9 @@ pub use composite_gdandt::{CompositeTolerance, SingleToleranceZone};
 pub use datum::{DatumFeature, DatumLabel, DatumPrecedence, DatumReferenceFrame};
 pub use error::AstError;
 pub use feature::{FeatureType, GeometricFeature};
-pub use plan::{InspectionPlan, LengthUnit, MultiSetupPlan};
+pub use plan::{
+    InspectionPlan, LengthUnit, MultiSetupPlan, SensorType, StockAllowanceMode, WorkpieceMaterial,
+};
 pub use threads::{
     classify_thread_from_bore, classify_thread_from_callout, ManualGaugeItem, SetupSheetGaugeReport,
     ThreadBypassStrategy, ThreadDiameterKind, ThreadSpecification, ThreadStandard,

@@ -8,6 +8,7 @@ pub mod hal;
 pub mod ipc;
 pub mod ipp;
 pub mod stylus;
+pub mod traversal;
 pub mod tsp;
 
 use glam::DVec3;
@@ -26,6 +27,7 @@ pub use ipp::{
     trajectory_to_ipp_stream, IppCmmSimulator, IppCommand, IppError, IppProtocol, IppResponse,
 };
 pub use stylus::{ReachabilityReport, StylusAssembly, StylusError};
+pub use traversal::{SafeTraversalSequence, ZFirstTraversal};
 pub use tsp::{calculate_total_path_length, optimize_inspection_sequence_2opt};
 
 /// Ayrık hareket segmenti

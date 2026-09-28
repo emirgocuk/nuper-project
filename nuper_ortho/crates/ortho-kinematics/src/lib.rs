@@ -3,11 +3,14 @@
 //! Katman 3: Renishaw PH10/MH20i kafa kinematiği ve ISO 10360 temas noktası örnekleme motoru.
 
 pub mod fitting;
+pub mod laser;
 pub mod ph10;
 pub mod plan;
 pub mod sampling;
 pub mod tree;
 pub mod uncertainty;
+
+pub use laser::{LaserScanPlanner, LaserScanStripe};
 
 pub use fitting::{
     evaluate_composite_position_2d, evaluate_surface_profile, fit_chebyshev_circumscribed_cylinder,

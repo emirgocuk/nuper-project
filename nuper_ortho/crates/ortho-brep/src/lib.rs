@@ -7,6 +7,7 @@
 pub mod drawing;
 pub mod matching;
 pub mod pmi;
+pub mod multi_body;
 pub mod step_parser;
 pub mod surface;
 pub mod tier;
@@ -21,6 +22,7 @@ pub use drawing::{
     ExtractedAnnotation, SheetType, TitleBlock,
 };
 pub use matching::{CuttingPlane, DrawingToStepMatcher, FeatureMatch};
+pub use multi_body::{MultiBodyFilter, SolidBody};
 pub use pmi::{PmiError, StepPmiReader};
 pub use step_parser::StepParser;
 pub use surface::{
