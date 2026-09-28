@@ -374,6 +374,48 @@
 
 ---
 
+### 🔹 FAZ 10: Altın Sürüm, Tam Uçtan Uca Sertifikasyon & Golden Master Seal (v1.0.0-production)
+*Hedef: Tüm 10 fazın, 8 crate'in, masaüstü kabuğunun, tri-vendor CMM derleyicilerinin ve AS9100 kriptografik mührünün tek bir Altın Sürüm (Golden Master) çatısı altında toplanıp kesin olarak mühürlenmesi.*
+
+---
+
+#### 📌 Adım 10.1: Headless Golden Master Sertifikasyon Komutu (`ortho certify`)
+- **İş Paketi:**
+  - `ortho certify [out_dir]` ve `ortho golden-master [out_dir]` CLI alt komutu yazıldı ([crates/ortho-cli/src/main.rs](file:///d:/Projects/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs)).
+  - Air-Gapped donanım lisansı teyidi, STEP AP214 B-Rep analizi, 3-2-1 datum kilitlenmesi, GJK/EPA çarpışmasız rota, 5-eksen Renishaw PH10 kinematiği ve 3 satıcı formatının (DMIS, Calypso, Quartis) tek seferde derlenmesi.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 10.2: Altın Sürüm Konsolu & Doğrulama Modalı (`#golden-master-modal`)
+- **İş Paketi:**
+  - [ui/index.html](file:///d:/Projects/nuper-project/nuper_ortho/ui/index.html) üst araç çubuğuna altın renkli `🏆 Altın Sürüm (v1.0)` butonu ve kapsamlı Golden Master modalı eklendi.
+  - 10 fazın tamamının eksiksiz onay kutuları, AS9100 SHA-256 mührü, tri-vendor çıktılar ve tek tıkla altın sürüm manifestosu indirme aracı (`downloadGoldenMasterJson`) sağlandı.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 10.3: Tri-Vendor CMM Üretim Matrisi
+- **İş Paketi:**
+  - Hexagon PC-DMIS (ANSI DMIS 5.3), Zeiss Calypso (ASCII Prüfplan) ve Wenzel WM | Quartis (2026 Metric) formatlarının sub-mikron uyumla ($<0.3\,\mu\text{m}$) eşzamanlı üretimi ve doğrulanması.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 10.4: Altın Sürüm Manifestosu (`GOLDEN_MASTER_CERTIFICATE_v1.0.0.json`)
+- **İş Paketi:**
+  - Kanonik SHA-256 imzası, sürüm etiketi (`v1.0.0-production`), 8 derleyici sandığı, 0-çarpışma statüsü ve 480x hızlanma metriklerini içeren resmi JSON sertifika manifestosu oluşturuldu.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 10.5: Uçtan Uca Altın Sürüm Entegrasyon Testi (`end_to_end_phase10.rs`)
+- **İş Paketi:**
+  - [crates/ortho-cli/tests/end_to_end_phase10.rs](file:///d:/Projects/nuper-project/nuper_ortho/crates/ortho-cli/tests/end_to_end_phase10.rs): 8 alt sandık, 3 CMM satıcısı, PH10 5-eksen kafa kinematiği, FAT raporu, AS9100 mührü ve 7 fiziksel dosyanın bayt ve semantik bütünlüğü test edildi.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
 ## 3. Güncel Durum ve İlerleme Özeti
 
 | Modül / Görev | Durum | Tamamlanan Çıktılar / Dosyalar | Sıradaki Odak |
@@ -387,7 +429,7 @@
 | **`ortho-ai` Sandboxed AI Motoru** | ✅ **TAMAMLANDI** | `guardrail.rs`, `intent.rs`, `diagnostics.rs`, `root_cause.rs`, `lib.rs` | GBNF Şema, B-Rep Ground-Truth, 3-Köşe Loblanma, Doğal Dil Teşhisi, Kök Neden |
 | **`ortho-license` Lisans & Dongle** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-license/src/lib.rs), `Cargo.toml` | Air-Gapped Savunma Lisansı, USB Dongle, Donanım Parmak İzi, Çevrimdışı Challenge |
 | **`src-tauri` Masaüstü Kabuğu** | ✅ **TAMAMLANDI** | [tauri.conf.json](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/tauri.conf.json), [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/src/main.rs), `Cargo.toml` | Tauri 2.0 Solid Slate Light pencere, Zero-Copy IPC köprüsü |
-| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs` – `phase9.rs` | 9 adet uçtan uca entegrasyon testi, audit, fat, license & bundle CLI komutları |
+| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs` – `phase10.rs` | 10 adet uçtan uca entegrasyon testi, audit, fat, license, bundle & certify CLI komutları |
 | **FAZ 1 (Çekirdek Dikey Dilim)** | ✅ **TAMAMLANDI** | Adım 1.1 — 1.6 %100 tamamlandı | FAZ 2'ye geçildi |
 | **FAZ 2 (Emniyet & Sertifikasyon)** | ✅ **TAMAMLANDI** | Adım 2.1 — 2.5 %100 tamamlandı (69/69 test başarılı) | FAZ 3'e geçildi |
 | **FAZ 3 (İleri GD&T & Kademeli AI)** | ✅ **TAMAMLANDI** | Adım 3.1 — 3.4 %100 tamamlandı (77/77 test başarılı) | FAZ 4'e geçildi |
@@ -396,7 +438,9 @@
 | **FAZ 6 (Saha FAT, Copilot & AS9100)** | ✅ **TAMAMLANDI** | Adım 6.1 — 6.4 %100 TAMAMLANDI (480x Benchmark, AS9100 Anti-Tamper, FAT Sertifikası) | FAZ 7'ye geçildi |
 | **FAZ 7 (Dağıtım, Lisans & Tauri)** | ✅ **TAMAMLANDI** | Adım 7.1 — 7.4 %100 TAMAMLANDI (Air-Gapped Savunma Lisansı, USB Dongle, Tauri 2.0) | FAZ 8'e geçildi |
 | **FAZ 8 (Sovereign Marka & Bundle)** | ✅ **TAMAMLANDI** | Adım 8.1 — 8.4 %100 TAMAMLANDI (Sovereign Pylon Triad, Showroom Modalı, `ortho bundle`, E2E Phase 8) | FAZ 9'a geçildi |
-| **FAZ 9 (Canlı STEP & 5-Eksen)** | ✅ **TAMAMLANDI** | **Adım 9.1 — 9.5 %100 TAMAMLANDI** (Canlı STEP Ingestion, Çift Kanvas Balonlama, PH10 5-Eksen Rig, Wenzel Quartis, E2E Phase 9) | Üretim Yayını ve Saha Pilot Dağıtımı Mühürlendi |
+| **FAZ 9 (Canlı STEP & 5-Eksen)** | ✅ **TAMAMLANDI** | Adım 9.1 — 9.5 %100 TAMAMLANDI (Canlı STEP Ingestion, Çift Kanvas Balonlama, PH10 5-Eksen Rig, Wenzel Quartis, E2E Phase 9) | FAZ 10'a geçildi |
+| **FAZ 10 (Altın Sürüm & Final Mühür)** | ✅ **TAMAMLANDI** | **Adım 10.1 — 10.5 %100 TAMAMLANDI** (Tüm 10 Faz Bitti: Golden Master Seal, `ortho certify`, Tri-Vendor Matrix, E2E Phase 10) | **PROJE %100 TAMAMLANDI (ÜRETİM SÜRÜMÜ HAZIR)** |
+
 
 
 
