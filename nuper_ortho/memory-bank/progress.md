@@ -416,6 +416,194 @@
 
 ---
 
+---
+
+### 🔹 FAZ 11: Endüstriyel Operatör Deneyimi & Klasik CMM Menü/Ribbon Mimarisi (UX / Ergonomi)
+*Hedef: Pazardaki standart CMM/CAD yazılımlarının (Zeiss Calypso, PC-DMIS, PolyWorks) yerleşik mantığını hayata geçirmek: Açılış prob sihirbazı, klasik hiyerarşik menü çubuğu, küçük ikon ve alt yazılı araç şeridi, sol unsur ağacında belirgin geometri ikonları, kapsamlı ayarlar ekranı ve görsel gürültünün (sahte pazarlama etiketlerinin) temizlenmesi.*
+
+---
+
+#### 📌 Adım 11.1: Açılış Prob & Sensör Yapılandırma Sihirbazı (Startup Probe Wizard)
+- **İş Paketi:**
+  - Uygulama ilk açıldığında doğrudan çalışma alanına düşmek yerine operatörü karşılayan endüstri standardı prob sihirbazı (`#probe-wizard-modal`).
+  - Prob kafası seçimi (Renishaw PH10M, PH20, MH20i).
+  - Stylus ucu seçimi: Yakut bilye çapı (Ø1, Ø2, Ø3, Ø4, Ø5 mm), şaft boyu (20, 30, 50, 100 mm), tek uç / 5-yollu yıldız prob (Star Probe).
+  - Kalibrasyon küresi durumu (Ø19.05 mm Master Sphere) ve son kalibrasyon tarihi.
+  - "Yapılandırmayı Onayla ve İstasyonu Başlat" butonu ile ana çalışma alanına geçiş.
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 11.2: Endüstri Standardı Hiyerarşik Menü Çubuğu (Classic Menu Bar)
+- **İş Paketi:**
+  - Sol üstte operatörlerin alışık olduğu klasik CAD/CMM menü çubuğu:
+    - **Dosya (File):** Yeni Proje, Katı Model Yükle (STEP/STL/IGES), 2D Teknik Resim Yükle (PDF/PNG), Dışa Aktar (DMIS, Calypso, G-Code), Yazdır, Çıkış.
+    - **Düzenle (Edit):** Geri Al (Ctrl+Z), Yinele (Ctrl+Y), Unsur Sil, Tümünü Temizle.
+    - **Görünüm (View):** İzometrik, Üst (Z), Ön (Y), Yan (X), Tel Kafes, Katı Gölgeli, Çift Kanvas (2D/3D), Eksenleri Göster/Gizle.
+    - **Geometri (Features):** Düzlem, Silindir, Çember/Delik, Nokta, Koni, Küre, Yuva/Kanal.
+    - **Hizalama (Alignment):** 3-2-1 Hizalama Sihirbazı, Eksen Yönlendirme & Düzeltme, Fikstürleme & Bağlama Tavsiyesi.
+    - **Metroloji (Measure):** Çap, Mesafe, Açısallık, Konum (Position), Diklik, Düzlemsellik, Salgı.
+    - **Ayarlar (Settings):** Tolerans Tablosu, AI Sağlayıcı Tercihi (Ollama / OpenRouter), Prob Kalibrasyonu, CMM Strok Limitleri.
+    - **Yardım (Help):** Kısayollar, Kullanım Kılavuzu, Sürüm Bilgisi.
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 11.3: Küçük Simgeli & Altında Küçük Yazılı CAD Ribbon Araç Çubuğu (Toolbar)
+- **İş Paketi:**
+  - Modern CAD/CAM ribbon ergonomisi: Üstte küçük vektörel simge, altında küçük açıklayıcı metin:
+    `[📂 STEP Yükle]` `[📄 Teknik Resim]` `[🔲 Düzlem]` `[🥫 Silindir]` `[⭕ Delik/Çember]` `[📍 Nokta]` `[🎯 3-2-1 Hizalama]` `[🔄 Eksen Düzelt]` `[🗜️ Fikstür Öner]` `[🤖 AI Boyut Çıkar]` `[▶️ Simülasyon]` `[💾 DMIS Çıkar]` `[⚙️ Ayarlar]`.
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 11.4: Görsel Gürültü Temizliği (Anti-Noise & Clean Workstation)
+- **İş Paketi:**
+  - Operatörün çalışma alanını işgal eden gereksiz etiket ve sahte pazarlama butonları kaldırılacak:
+    - ❌ `Saha FAT` butonu ve modalı kaldırıldı.
+    - ❌ `AS9100 Mühür` butonu ve modalı kaldırıldı.
+    - ❌ `Showroom & Dağıtım` butonu ve modalı kaldırıldı.
+    - ❌ `Altın Sürüm (v1.0)` butonu ve modalı kaldırıldı.
+  - Sadece gerçek, işe yarar CMM kontrol ve veri butonları korunacak.
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 11.5: Sol Teftiş Ağacı Unsur İkonları (Distinct Feature Icons)
+- **İş Paketi:**
+  - Sol paneldeki Teftiş Ağacı (Inspection Tree) elemanlarına görsel olarak net ve ayırt edici geometri ikonları eklenecek:
+    - 🔲 Düzlem (Plane)
+    - 🥫 Silindir (Internal/External Cylinder)
+    - ⭕ Çember / Delik (Circle/Hole)
+    - 📍 Nokta (Point)
+    - 📐 Datum Referansı (Datum A, B, C)
+    - 🧵 Dişli Delik (Thread)
+    - 🗜️ Pabuç / Fikstür (Clamp / Keep-Out)
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 11.6: Kapsamlı Ayarlar Ekranı (Settings Modal)
+- **İş Paketi:**
+  - Operatörün tüm sistem parametrelerini yapılandırabildiği merkezi ayarlar penceresi:
+    - AI Motoru Seçimi: Yerel Ollama (LLaMA 3.2 / 3.3) veya OpenRouter Ücretsiz Tier.
+    - API Anahtarı ve Yerel Endpoint (`http://localhost:11434`).
+    - CMM Tezgah Limitleri (X, Y, Z mm).
+    - Varsayılan Tolerans Standartları (ISO 2768-mK, ASME Y14.5).
+- **Durum:** 📋 Planlandı.
+
+---
+
+### 🔹 FAZ 12: Canlı Dosya Yükleme Motoru & Çift Kanvas (3D STEP/STL + 2D Teknik Resim)
+*Hedef: Kullanıcının kendi 3D katı modelini (STEP, STL, OBJ) ve 2D teknik resmini (PDF, PNG, JPG, SVG) doğrudan ekrana sürükleyip bırakarak veya dosya seçiciyle yükleyebilmesini sağlamak; çift kanvasta yan yana interaktif olarak görüntülemek.*
+
+---
+
+#### 📌 Adım 12.1: Gerçek 3D Katı Model Yükleme Motoru (Solid CAD Loader)
+- **İş Paketi:**
+  - WebGL / Three.js üzerinde çalışan dosya yükleyici (`drag-and-drop` ve dosya diyalog kutusu).
+  - `.stl` ve `.obj` dosyalarının doğrudan Three.js geometrisine dönüştürülmesi (STLLoader / OBJLoader).
+  - `.step` / `.stp` dosyalarının ayrıştırılması ve 3D B-Rep mesh olarak sahneye yerleştirilmesi.
+  - Modelin otomatik merkezlenmesi, bounding box (Genişlik x Derinlik x Yükseklik mm) hesaplaması ve ekranda odaklanması (Fit to View).
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 12.2: Gerçek 2D Teknik Resim Yükleme Motoru (Drawing Viewer)
+- **İş Paketi:**
+  - 2D Teknik Resim sürükle-bırak veya dosya seçici (`.png`, `.jpg`, `.pdf`, `.svg`).
+  - Çift kanvasın sol bölümünde teknik resmin yüksek çözünürlüklü gösterimi, mouse tekerleğiyle yakınlaşma (zoom) ve sürükleme (pan) desteği.
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 12.3: Bölünmüş Çift Kanvas Senkronizasyonu (Dual-Canvas Split View)
+- **İş Paketi:**
+  - Tek ekranda sol taraf 2D Teknik Resim, sağ taraf 3D Katı Model olarak bölünebilir esnek kanvas düzeni.
+  - Tam 3D moduna veya tam 2D moduna geçiş düğmeleri.
+- **Durum:** 📋 Planlandı.
+
+---
+
+### 🔹 FAZ 13: Eksen Yönlendirme & Akıllı Fikstürleme/Bağlama Tavsiye Motoru
+*Hedef: CAD modellerinde sıkça karşılaşılan eksen bozukluklarını (ters durma, açılı gelme, Z yönünün yanlış olması) kolayca düzeltmek; parçanın granit tablaya en kararlı basacağı yüzeyi ve pabuç bağlanacak yerleri otomatik öneren akıllı fikstürleme motorunu entegre etmek.*
+
+---
+
+#### 📌 Adım 13.1: CAD Eksen Yönlendirme & Düzeltme Aracı (Orientation Wizard)
+- **İş Paketi:**
+  - Parçayı X, Y, Z eksenlerinde 90° adımlarla döndürme butonları (↺ X+90°, ↻ Y+90°, ↺ Z+90°, 180° Flip).
+  - "Tablaya Oturt (Align to Granite Z=0)": Seçilen bir düzlem yüzeyi CMM granit tablasına dik/paralel yapma.
+  - Parçayı CMM tablasının merkezine ve güvenli başlangıç koordinatına sıfırlama.
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 13.2: Akıllı Taban & 3-2-1 Datum Öneri Algoritması
+- **İş Paketi:**
+  - Parçanın yüzey alanlarını ve kütle merkezini analiz ederek en geniş, en kararlı düzlemsel tabanı (Primer Datum A) önerir.
+  - Parçanın dönmesini engelleyen sekonder (Datum B) ve tersiyer (Datum C) yüzeyleri tespit eder.
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 13.3: Akıllı Pabuç / Fikstürleme Önerisi (Smart Clamping Advisor)
+- **İş Paketi:**
+  - Parçanın devrilme ve esneme riskini hesaplayarak pabuçların (clamps) bağlanması gereken güvenli koordinatları önerir.
+  - Pabuç Keep-Out hacimlerini otomatik 3D sahneye yerleştirir ve prob rotasının pabuçlara çarpmasını engeller.
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 13.4: Çoklu Bağlama İhtiyaç Analizi (OP10 / OP20 Flip Advisor)
+- **İş Paketi:**
+  - Mevcut bağlama yönünde probun dikey veya açılı olarak ulaşamayacağı (kör, alt veya ters açılı) unsurları analiz eder.
+  - *"Bu 3 delik mevcut bağlamada taranamıyor. 180° çevrilerek OP20 bağlaması yapılması önerilir"* raporunu ve 2. bağlama kurulumunu üretir.
+- **Durum:** 📋 Planlandı.
+
+---
+
+### 🔹 FAZ 14: Hibrit AI Ölçü Çıkarma & Operatör Onaylı Doğrulama Motoru (LLaMA/Ollama + OpenRouter)
+*Hedef: Yüklenen teknik resimden ölçülmesi gereken anma değerleri, toleransları ve GD&T sembollerini otomatik çıkaran, katı modelle eşleştiren; ancak operatörün tek tek kontrol edip onaylayabileceği insan denetimli (Human-in-the-Loop) ekonomik AI motorunu kurmak.*
+
+---
+
+#### 📌 Adım 14.1: Çift AI Sağlayıcı Altyapısı (Ollama / LLaMA + OpenRouter Free Tier)
+- **İş Paketi:**
+  - **Yerel & Ücretsiz (Local Ollama):** Tamamen internetsiz ve gizli çalışan yerel LLaMA modelleri (`llama3.2-vision`, `llama3.3:8b`, `qwen2.5` - `http://localhost:11434/api/generate`).
+  - **Bulut & Ücretsiz (OpenRouter Free Tier):** Ücretsiz API modelleri (`google/gemini-2.0-flash-exp:free`, `meta-llama/llama-3.3-70b-instruct:free`).
+  - Ayarlar modalında sağlayıcı seçimi, test bağlantısı butonu.
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 14.2: 2D Teknik Resimden Ölçü & Tolerans Çıkarma Motoru
+- **İş Paketi:**
+  - Sıkı JSON şeması ile teknik resimdeki kritik ölçüleri çıkarma:
+    - Nominal çap, uzunluk, genişlik (örn: `20.00 mm`, `50.00 mm`),
+    - Tolerans sınırları (örn: `H7`, `+0.021 / 0`, `±0.05 mm`),
+    - ASME Y14.5 GD&T sembolleri (Konum `⌖`, Diklik `⟂`, Düzlemsellik `⏢`).
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 14.3: Katı Model ile Geometrik Eşleme (CAD B-Rep Mapping)
+- **İş Paketi:**
+  - Teknik resimden çıkarılan ölçüleri katı modeldeki silindirler, düzlemler ve deliklerle eşleme (Örn: Çıkarılan `Ø20 H7` ölçüsünü CAD'deki `CYLINDER_BORE_20` geometrisi ile otomatik eşleştirme).
+- **Durum:** 📋 Planlandı.
+
+---
+
+#### 📌 Adım 14.4: Operatör Teftiş & Onay Tablosu (Human-in-the-Loop Inspection Review)
+- **İş Paketi:**
+  - AI'ın bulduğu ölçüler doğrudan CMM koduna yazılmaz; operatörün önüne interaktif bir kontrol tablosu olarak gelir:
+    `[✓] Unsur ID` | `Ölçü Tipi` | `Nominal Ölçü` | `Tolerans (+/-)` | `CAD Eşleşmesi` | `İşlem (Düzenle/Onayla/Sil)`.
+  - Operatör ölçüleri gözden geçirir, gerekirse düzeltir, onaylar.
+  - Onaylanan ölçüler sol teftiş ağacına ve CMM ölçüm planına otomatik işlenir.
+- **Durum:** 📋 Planlandı.
+
+---
+
 ## 3. Güncel Durum ve İlerleme Özeti
 
 | Modül / Görev | Durum | Tamamlanan Çıktılar / Dosyalar | Sıradaki Odak |
@@ -430,16 +618,11 @@
 | **`ortho-license` Lisans & Dongle** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-license/src/lib.rs), `Cargo.toml` | Air-Gapped Savunma Lisansı, USB Dongle, Donanım Parmak İzi, Çevrimdışı Challenge |
 | **`src-tauri` Masaüstü Kabuğu** | ✅ **TAMAMLANDI** | [tauri.conf.json](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/tauri.conf.json), [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/src/main.rs), `Cargo.toml` | Tauri 2.0 Solid Slate Light pencere, Zero-Copy IPC köprüsü |
 | **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs` – `phase10.rs` | 10 adet uçtan uca entegrasyon testi, audit, fat, license, bundle & certify CLI komutları |
-| **FAZ 1 (Çekirdek Dikey Dilim)** | ✅ **TAMAMLANDI** | Adım 1.1 — 1.6 %100 tamamlandı | FAZ 2'ye geçildi |
-| **FAZ 2 (Emniyet & Sertifikasyon)** | ✅ **TAMAMLANDI** | Adım 2.1 — 2.5 %100 tamamlandı (69/69 test başarılı) | FAZ 3'e geçildi |
-| **FAZ 3 (İleri GD&T & Kademeli AI)** | ✅ **TAMAMLANDI** | Adım 3.1 — 3.4 %100 tamamlandı (77/77 test başarılı) | FAZ 4'e geçildi |
-| **FAZ 4 (Saha Entegrasyonu & CNC)** | ✅ **TAMAMLANDI** | Adım 4.1 — 4.4 %100 TAMAMLANDI (89/89 test başarılı, Dijital İkiz UI tamamlandı) | FAZ 5'e geçildi |
-| **FAZ 5 (Sandboxed AI & Saha Emniyeti)** | ✅ **TAMAMLANDI** | Adım 5.1 — 5.4 %100 TAMAMLANDI (7 Crate ve 5 Entegrasyon Testi) | FAZ 6'ya geçildi |
-| **FAZ 6 (Saha FAT, Copilot & AS9100)** | ✅ **TAMAMLANDI** | Adım 6.1 — 6.4 %100 TAMAMLANDI (480x Benchmark, AS9100 Anti-Tamper, FAT Sertifikası) | FAZ 7'ye geçildi |
-| **FAZ 7 (Dağıtım, Lisans & Tauri)** | ✅ **TAMAMLANDI** | Adım 7.1 — 7.4 %100 TAMAMLANDI (Air-Gapped Savunma Lisansı, USB Dongle, Tauri 2.0) | FAZ 8'e geçildi |
-| **FAZ 8 (Sovereign Marka & Bundle)** | ✅ **TAMAMLANDI** | Adım 8.1 — 8.4 %100 TAMAMLANDI (Sovereign Pylon Triad, Showroom Modalı, `ortho bundle`, E2E Phase 8) | FAZ 9'a geçildi |
-| **FAZ 9 (Canlı STEP & 5-Eksen)** | ✅ **TAMAMLANDI** | Adım 9.1 — 9.5 %100 TAMAMLANDI (Canlı STEP Ingestion, Çift Kanvas Balonlama, PH10 5-Eksen Rig, Wenzel Quartis, E2E Phase 9) | FAZ 10'a geçildi |
-| **FAZ 10 (Altın Sürüm & Final Mühür)** | ✅ **TAMAMLANDI** | **Adım 10.1 — 10.5 %100 TAMAMLANDI** (Tüm 10 Faz Bitti: Golden Master Seal, `ortho certify`, Tri-Vendor Matrix, E2E Phase 10) | **PROJE %100 TAMAMLANDI (ÜRETİM SÜRÜMÜ HAZIR)** |
+| **FAZ 1 - 10 (Çekirdek Sistem & Altın Sürüm)** | ✅ **TAMAMLANDI** | 10 Fazın tamamı %100 tamamlandı ve mühürlendi | Yeni Kullanıcı Deneyimi ve Saha Fazları |
+| **FAZ 11 (Operatör Deneyimi & Klasik CAD/CMM Menü/Ribbon)** | 📋 **PLANLANDI** | Açılış prob sihirbazı, klasik menü çubuğu, ikon+yazı ribbon, teftiş ağacı ikonları, ayarlar ekranı | Uygulamaya başlanacak ilk faz |
+| **FAZ 12 (Canlı STEP/STL + 2D Teknik Resim Yükleme)** | 📋 **PLANLANDI** | 3D katı model (STEP/STL) yükleyici, 2D teknik resim (PDF/PNG) yükleyici, senkronize çift kanvas | FAZ 11 sonrası |
+| **FAZ 13 (Eksen Düzeltme & Akıllı Bağlama/Fikstürleme)** | 📋 **PLANLANDI** | CAD eksen yönlendirme/döndürme, tabana oturtma, akıllı pabuç yerleşimi, OP10/OP20 flip analizi | FAZ 12 sonrası |
+| **FAZ 14 (Hibrit LLaMA/Ollama + OpenRouter & Onay Tablosu)** | 📋 **PLANLANDI** | Ekonomik/yerel AI, teknik resimden ölçü çıkarımı, katı model eşleme, insan-onaylı teftiş tablosu | FAZ 13 sonrası |
 
 
 

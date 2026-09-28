@@ -31,22 +31,30 @@ Tüm 8 crate, `src-tauri` masaüstü kabuğu, Three.js Solid Slate Light dijital
 
 ---
 
-## 2. Son Tamamlanan Kritik İşler (FAZ 10)
-1. **Headless Golden Master CLI Aracı (`crates/ortho-cli/src/main.rs`):**
-   - `ortho certify [out_dir]` komutu eklenerek tüm üretim çıktılarının tek seferde mühürlenmesi sağlandı.
-2. **Altın Sürüm Dashboard & Doğrulama Modalı (`ui/index.html`):**
-   - 10 fazın tamamını doğrulayan `🏆 Altın Sürüm (v1.0)` konsolu ve manifestosu entegre edildi.
-3. **Tri-Vendor CMM Üretim Matrisi Doğrulaması:**
-   - PC-DMIS, Zeiss Calypso ve Wenzel WM | Quartis 2026 dialect çıktıları tam uyumla mühürlendi.
-4. **Uçtan Uca Altın Sürüm Entegrasyon Testi (`crates/ortho-cli/tests/end_to_end_phase10.rs`):**
-   - 8 crate'in, 3 satıcının ve 7 üretim dosyasının fiziksel doğrulaması tamamlandı.
+## 1. Anlık Odak Noktası: FAZ 11 — ENDÜSTRİYEL OPERATÖR ERGONOMİSİ & GERÇEK SAHA KULLANILABİLİRLİĞİ
+Kullanıcı geri bildirimi ve gerçek CMM metroloji atölyesi operasyonel gereksinimleri doğrultusunda sistemde 4 yeni majör geliştirme fazı planlandı:
+- **FAZ 11: Endüstriyel Operatör Deneyimi & Klasik CMM Menü/Ribbon Mimarisi (UX / Ergonomi)**
+  - Açılışta Prob & Sensör Yapılandırma Sihirbazı (`#probe-wizard-modal`: PH10M/PH20, Stylus Ø, Şaft boyu, Kalibrasyon durumu).
+  - Klasik Hiyerarşik Menü Çubuğu (`File`, `Edit`, `View`, `Features`, `Alignment`, `Measure`, `Settings`, `Help`).
+  - Küçük Simgeli & Altında Küçük Yazılı CAD Ribbon Araç Çubuğu (`[📂 STEP]`, `[📄 Resim]`, `[🔲 Düzlem]`, `[🥫 Silindir]`, `[🎯 3-2-1]`, `[🔄 Eksen]`, vb.).
+  - Görsel Gürültü Temizliği: `Saha FAT`, `AS9100 Mühür`, `Showroom` ve `Altın Sürüm` gibi sahte pazarlama butonları arayüzden kaldırıldı.
+  - Sol Teftiş Ağacında Belirgin Geometri İkonları (🔲, 🥫, ⭕, 📍, 📐, 🧵, 🗜️).
+  - Kapsamlı Ayarlar Ekranı (Tolerans tablosu, AI sağlayıcı seçimi, CMM limitleri).
+- **FAZ 12: Canlı Dosya Yükleme Motoru & Çift Kanvas (3D STEP/STL + 2D Teknik Resim)**
+  - 3D Katı Model Yükleyici (Gerçek STEP/STL drag-and-drop, Three.js mesh render, bounding box).
+  - 2D Teknik Resim Yükleyici (PDF/PNG/JPG drag-and-drop, zoom/pan kanvası).
+- **FAZ 13: Eksen Yönlendirme & Akıllı Fikstürleme/Bağlama Tavsiye Motoru**
+  - CAD Eksen Düzeltme Aracı (X/Y/Z ±90° rotasyon, Tablaya Hizala Z=0).
+  - Akıllı Taban & 3-2-1 Önerisi; Pabuç Bağlama ve OP10/OP20 180° Ters Çevirme Tavsiyesi.
+- **FAZ 14: Hibrit AI Ölçü Çıkarma & Operatör Onaylı Doğrulama Motoru (LLaMA/Ollama + OpenRouter)**
+  - Yerel & Ücretsiz Ollama (LLaMA 3.2/3.3) veya OpenRouter Ücretsiz Tier seçeneği.
+  - Teknik resimden ölçü ve tolerans çıkarımı, katı model eşleme ve insan onaylı (Human-in-the-Loop) kontrol tablosu.
 
 ---
 
-## 3. Genel Proje Durumu ve Sonraki Adımlar
-- **Tamamlanan Fazlar:** **FAZ 1'den FAZ 10'a KADAR TÜM 10 FAZ %100 EKSİKSİZ TAMAMLANDI!**
-- **Mimari Durum:** 8 Rust alt sandığı, `src-tauri` masaüstü kabuğu, Three.js Solid Slate Light dijital ikiz ön yüzü, Sovereign Pylon Triad marka kimliği, çift kanvas balonlama, print-ready Kurulum Föyü motoru, AS9100 Rev D Anti-Tamper denetçisi, Saha FAT Copilot Benchmark motoru, Air-Gapped savunma lisanslaması, canlı STEP ingestion, 5-eksen kafa kinematiği, Tri-Vendor CMM matrisi ve 10 kapsamlı uçtan uca entegrasyon testi.
-- **Nihai Statü:** **ALTIN SÜRÜM ÜRETİME VE SAHA DAĞITIMINA HAZIR (GOLDEN MASTER RELEASE v1.0.0-production).**
+## 2. Sıradaki Uygulama Adımları
+1. Kullanıcıya hazırlanan detaylı 4 fazlı planı ve mimari çözümleri sunmak.
+2. Kullanıcının onayıyla **FAZ 11 (Operatör Ergonomisi, Açılış Prob Sihirbazı, Klasik Menü/Ribbon, Teftiş İkonları, Ayarlar Ekranı ve Buton Temizliği)** geliştirmesine başlamak.
 
 ---
 
