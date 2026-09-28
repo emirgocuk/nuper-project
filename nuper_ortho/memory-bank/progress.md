@@ -329,6 +329,51 @@
 
 ---
 
+### 🔹 FAZ 9: Canlı STEP CAD Ingestion, 2D/3D Çift Kanvas Balonlama & Dinamik 5-Eksen Kafa Kinematiği
+*Hedef: Kullanıcının kendi STEP CAD modellerini doğrudan web/masaüstü arayüzüne sürükleyip bırakabilmesi, 2D teknik resim balonları ile 3D model arasında çift yönlü cross-highlighting etkileşimi, dinamik Renishaw PH10 5-eksen kafa mafsal kinematiği ve kod satırı adımlaması.*
+
+---
+
+#### 📌 Adım 9.1: Canlı STEP CAD Ingestion & Topolojik B-Rep Telemetrisi (`#cad-ingestion-modal`)
+- **İş Paketi:**
+  - İstemci tarafında çalışan ISO 10303-21 STEP (AP203, AP214, AP242 PMI) sürükle-bırak ayrıştırıcısı (`handleDropStep`, `parseClientStep`).
+  - Hızlı savunma ve havacılık referans modelleri seçicisi: Valve Body (OP10), Impeller Wheel (5-Axis Titanyum), Hydraulic Manifold (Kademeli blok).
+  - Canlı B-Rep topolojik telemetrisi: `ADVANCED_FACE`, silindirik delikler, minimum cidar kalınlığı ray-casting emniyeti ($>2.5\text{ mm}$), ve 3-2-1 datum önerisi (Rank: 6 tam kilitli).
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 9.2: 2D/3D Çift Kanvas Balonlama & Çift Yönlü Çapraz Vurgulama
+- **İş Paketi:**
+  - 2D SVG teknik resim callout balonları (① Datum A, ② Datum B, ③ BORE_20_H7, ④ THREAD_M8, ⑤ AIRFOIL, ⑥ Unresolved Slot) ile 3D B-Rep unsurları arasında çift yönlü dinamik cross-highlighting (`selectFeature` ve `.active-balloon`).
+  - Balon 6 için düşük güven (%65) tespit edildiğinde insan-onayı (Human-in-the-loop) ile onaylama ve mühürleme mekanizması (`confirmBalloonMatch`).
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 9.3: Dinamik 5-Eksen Renishaw PH10 Mafsal Kinematiği & Temas Dalgası
+- **İş Paketi:**
+  - Three.js prob dijital ikizinde sabit kafa ile döner mafsalın ayrılması: `ph10Pivot` 2-eksen (A ve B) kafa rotasyon rig'i ($y=26$ merkez, $y=-46$ yakut bilye ucu ile sıfır sapma).
+  - Prob dokunma anında genişleyen yeşil temas dalgası (`triggerContactRipple`) ve canlı HUD açı telemetrisi (`A0.0° B0.0°` vs `A90.0° B-90.0°`).
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 9.4: Kod Satırından 3D Yola Adımlama & Çapraz CMM Desteği (Wenzel WM | Quartis)
+- **İş Paketi:**
+  - DMIS, Calypso, Wenzel ve I++ konsolunda herhangi bir kod satırına tıklandığında probu ve kamerayı doğrudan hedef koordinatlara odaklayan interaktif `stepToCodeLine` mekanizması.
+  - `ortho-emitter` içinde modern metrik CMM standardı `WenzelEmitter` (`crates/ortho-emitter/src/wenzel.rs`) kodlandı; Wenzel WM | Quartis 2026 formatı konsola eklendi.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
+#### 📌 Adım 9.5: Uçtan Uca Entegrasyon Testi (`end_to_end_phase9.rs`)
+- **İş Paketi:**
+  - STEP AP214/AP242 metin çözümlemesi, 2D/3D balon skorlaması, Renishaw PH10 720-pozisyon açı seçimi, kod adımlama emniyet zarfı denetimi ve Wenzel / PC-DMIS / Calypso çoklu satıcı concordance testi yazıldı.
+- **Durum:** ✅ Tamamlandı.
+
+---
+
 ## 3. Güncel Durum ve İlerleme Özeti
 
 | Modül / Görev | Durum | Tamamlanan Çıktılar / Dosyalar | Sıradaki Odak |
@@ -338,11 +383,11 @@
 | **`ortho-brep` Geometri Çekirdeği** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-brep/src/lib.rs), `step_parser.rs`, `surface.rs`, `matching.rs`, `multi_body.rs` | STEP AP214/242 parser, Ray-Casting cidar, B-Spline eğrilik, Multi-Body izolasyonu |
 | **`ortho-kinematics` Prob Çözücü** | ✅ **TAMAMLANDI** | [ph10.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-kinematics/src/ph10.rs), `sampling.rs`, `fitting.rs`, `tree.rs`, `plan.rs`, `uncertainty.rs`, `laser.rs` | PTB akreditasyonu, GUM / ISO 15530-3 belirsizlik, Lazer çizgi tarama şeritleri |
 | **`ortho-router` Emniyet & Rota** | ✅ **TAMAMLANDI** | [clearance.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/clearance.rs), [hal.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-router/src/hal.rs), `collision.rs`, `stylus.rs`, `tsp.rs`, `ipc.rs`, `ipp.rs`, `traversal.rs` | I++ DME v1.7/v2.0, Zero-Copy IPC, Z-First Absolute Traversal |
-| **`ortho-emitter` Post-Processor** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-emitter/src/lib.rs), `template_engine.rs`, `calypso.rs`, `closed_loop.rs`, `benchmark.rs`, `audit.rs` | PC-DMIS, ANSI DMIS, Fanuc/Siemens Closed-Loop CNC, Setup Sheet, AS9100 Rev D Anti-Tamper, FAT Benchmark |
+| **`ortho-emitter` Post-Processor** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-emitter/src/lib.rs), `template_engine.rs`, `calypso.rs`, `wenzel.rs`, `closed_loop.rs`, `benchmark.rs`, `audit.rs` | PC-DMIS, ANSI DMIS, Wenzel WM \| Quartis, Fanuc/Siemens CNC, Setup Sheet, AS9100 Anti-Tamper |
 | **`ortho-ai` Sandboxed AI Motoru** | ✅ **TAMAMLANDI** | `guardrail.rs`, `intent.rs`, `diagnostics.rs`, `root_cause.rs`, `lib.rs` | GBNF Şema, B-Rep Ground-Truth, 3-Köşe Loblanma, Doğal Dil Teşhisi, Kök Neden |
 | **`ortho-license` Lisans & Dongle** | ✅ **TAMAMLANDI** | [lib.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-license/src/lib.rs), `Cargo.toml` | Air-Gapped Savunma Lisansı, USB Dongle, Donanım Parmak İzi, Çevrimdışı Challenge |
 | **`src-tauri` Masaüstü Kabuğu** | ✅ **TAMAMLANDI** | [tauri.conf.json](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/tauri.conf.json), [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/src-tauri/src/main.rs), `Cargo.toml` | Tauri 2.0 Solid Slate Light pencere, Zero-Copy IPC köprüsü |
-| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs` – `phase8.rs` | 8 adet uçtan uca entegrasyon testi, audit, fat, license & bundle CLI komutları |
+| **`ortho-cli` Derleyici Koşucu** | ✅ **TAMAMLANDI** | [main.rs](file:///c:/Projeler/nuper-project/nuper_ortho/crates/ortho-cli/src/main.rs), `end_to_end_phase2.rs` – `phase9.rs` | 9 adet uçtan uca entegrasyon testi, audit, fat, license & bundle CLI komutları |
 | **FAZ 1 (Çekirdek Dikey Dilim)** | ✅ **TAMAMLANDI** | Adım 1.1 — 1.6 %100 tamamlandı | FAZ 2'ye geçildi |
 | **FAZ 2 (Emniyet & Sertifikasyon)** | ✅ **TAMAMLANDI** | Adım 2.1 — 2.5 %100 tamamlandı (69/69 test başarılı) | FAZ 3'e geçildi |
 | **FAZ 3 (İleri GD&T & Kademeli AI)** | ✅ **TAMAMLANDI** | Adım 3.1 — 3.4 %100 tamamlandı (77/77 test başarılı) | FAZ 4'e geçildi |
@@ -350,7 +395,9 @@
 | **FAZ 5 (Sandboxed AI & Saha Emniyeti)** | ✅ **TAMAMLANDI** | Adım 5.1 — 5.4 %100 TAMAMLANDI (7 Crate ve 5 Entegrasyon Testi) | FAZ 6'ya geçildi |
 | **FAZ 6 (Saha FAT, Copilot & AS9100)** | ✅ **TAMAMLANDI** | Adım 6.1 — 6.4 %100 TAMAMLANDI (480x Benchmark, AS9100 Anti-Tamper, FAT Sertifikası) | FAZ 7'ye geçildi |
 | **FAZ 7 (Dağıtım, Lisans & Tauri)** | ✅ **TAMAMLANDI** | Adım 7.1 — 7.4 %100 TAMAMLANDI (Air-Gapped Savunma Lisansı, USB Dongle, Tauri 2.0) | FAZ 8'e geçildi |
-| **FAZ 8 (Sovereign Marka & Bundle)** | ✅ **TAMAMLANDI** | **Adım 8.1 — 8.4 %100 TAMAMLANDI** (Sovereign Pylon Triad, Showroom Modalı, `ortho bundle`, E2E Phase 8) | Üretim Yayını ve Saha Pilot Dağıtımı Mühürlendi |
+| **FAZ 8 (Sovereign Marka & Bundle)** | ✅ **TAMAMLANDI** | Adım 8.1 — 8.4 %100 TAMAMLANDI (Sovereign Pylon Triad, Showroom Modalı, `ortho bundle`, E2E Phase 8) | FAZ 9'a geçildi |
+| **FAZ 9 (Canlı STEP & 5-Eksen)** | ✅ **TAMAMLANDI** | **Adım 9.1 — 9.5 %100 TAMAMLANDI** (Canlı STEP Ingestion, Çift Kanvas Balonlama, PH10 5-Eksen Rig, Wenzel Quartis, E2E Phase 9) | Üretim Yayını ve Saha Pilot Dağıtımı Mühürlendi |
+
 
 
 

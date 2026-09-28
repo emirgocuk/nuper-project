@@ -3,6 +3,7 @@ pub mod benchmark;
 pub mod calypso;
 pub mod closed_loop;
 pub mod template_engine;
+pub mod wenzel;
 
 use std::fmt::Write;
 use ortho_ast::{
@@ -21,6 +22,7 @@ pub use closed_loop::{
     ClosedLoopEngine, ClosedLoopError, CncControllerType, FeatureDeviation, ToolCompensationMapping,
 };
 pub use template_engine::{TemplateContextData, TemplateEngine, ThermalConfig};
+pub use wenzel::{WenzelEmitter, WenzelError};
 
 #[derive(Error, Debug)]
 pub enum EmitterError {
