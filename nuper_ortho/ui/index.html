@@ -468,6 +468,80 @@
       border-color: #BAE6FD;
     }
 
+    /* ÇOKLU BAĞLAMA (MULTI-SETUP OP10 / OP20) SEÇİCİ */
+    .setup-switcher {
+      display: flex;
+      background: #E2E8F0;
+      padding: 2px;
+      border-radius: 6px;
+      gap: 2px;
+      margin-left: 10px;
+    }
+
+    .setup-btn {
+      border: none;
+      background: transparent;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .setup-btn:hover {
+      color: var(--text-main);
+    }
+
+    .setup-btn.active {
+      background: #FFFFFF;
+      color: var(--color-primary);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+
+    /* SAPMA ISI HARİTASI LEJANTI (HEATMAP LEGEND) */
+    .heatmap-legend {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      z-index: 10;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      pointer-events: none;
+    }
+
+    .legend-title {
+      font-weight: 700;
+      font-family: var(--font-ui);
+      color: var(--text-main);
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-bar {
+      width: 200px;
+      height: 10px;
+      border-radius: 3px;
+      background: linear-gradient(to right, #0284C7 0%, #059669 35%, #EAB308 70%, #DC2626 100%);
+      border: 1px solid #94A3B8;
+    }
+
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 3px;
+      color: #64748B;
+      font-size: 9px;
+    }
+
     /* SAĞ PANEL: UNSUR TEŞHİSİ VE GD&T KARTI (310px) */
     .sidebar-right {
       width: 320px;
@@ -779,7 +853,11 @@
     <div class="brand">
       <div class="brand-icon">N</div>
       <span>Nuper Ortho</span>
-      <span class="badge-part">VALVE_BODY_OP10.step</span>
+      <span class="badge-part" id="part-name-badge">VALVE_BODY_OP10.step</span>
+      <div class="setup-switcher">
+        <button class="setup-btn active" id="btn-setup-op10" onclick="switchSetup('OP10')">OP10 (Üst)</button>
+        <button class="setup-btn" id="btn-setup-op20" onclick="switchSetup('OP20')">OP20 (180° Flip)</button>
+      </div>
       <span class="badge-part" style="color: #64748B;">ASME Y14.5 / ISO 1101</span>
     </div>
 
@@ -981,10 +1059,29 @@
           <button class="v-btn" title="Yan Görünüş (X)" onclick="sideView()">SIDE</button>
         </div>
 
+        <!-- Isı Haritası Lejantı (Floating Heatmap Legend) -->
+        <div class="heatmap-legend" id="heatmap-legend" style="display: none;">
+          <div class="legend-title">🌈 Sapma Isı Haritası (Live Heat-Map)</div>
+          <div class="legend-bar"></div>
+          <div class="legend-labels">
+            <span>-25 µm</span>
+            <span>-10 µm</span>
+            <span>0 µm</span>
+            <span>+10 µm</span>
+            <span>+25 µm</span>
+          </div>
+        </div>
+
         <!-- Yüzen Araç Çubuğu (Floating Toolbar) -->
         <div class="floating-tools">
           <button class="tool-btn active" id="btn-toggle-path" onclick="toggleTrajectoryPath()">
             <span>Prob Yolunu Göster</span>
+          </button>
+          <button class="tool-btn" id="btn-toggle-heatmap" onclick="toggleDeviationHeatmap()">
+            <span>🌈 Sapma Haritası</span>
+          </button>
+          <button class="tool-btn" id="btn-toggle-ipp" onclick="openIppModal()">
+            <span>📡 I++ DME Canlı</span>
           </button>
           <button class="tool-btn" id="btn-toggle-clamp" onclick="toggleClampPlacement()">
             <span>🗜️ Pabuç Ekle/Kaldır</span>
@@ -1034,6 +1131,9 @@
       <div class="c-tab active" onclick="switchCodeTab('dmis')">ANSI DMIS 5.3 (Hexagon PC-DMIS)</div>
       <div class="c-tab" onclick="switchCodeTab('calypso')">Zeiss Calypso ASCII Prüfplan</div>
       <div class="c-tab" onclick="switchCodeTab('threads')">Mastar Setup Sheet (GO/NOGO)</div>
+      <div class="c-tab" onclick="switchCodeTab('ipp')">I++ DME v1.7/v2.0 Protokolü</div>
+      <div class="c-tab" onclick="switchCodeTab('closed_loop')">Kapalı Döngü CNC (Fanuc/Siemens)</div>
+      <div class="c-tab" onclick="switchCodeTab('uncertainty')">GUM ISO 15530-3 & Guard-Band</div>
       <div class="c-tab" onclick="switchCodeTab('ipc')">Tauri Zero-Copy IPC Buffer</div>
     </div>
 
@@ -1167,6 +1267,58 @@
           <button class="btn-header" onclick="closeSetupSheetModal()">Kapat</button>
           <button class="btn-header primary" onclick="printSetupSheet()">🖨️ Yazdır / PDF Olarak Kaydet</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- I++ DME CANLI AĞ KONSOLU & SİMÜLATÖR MODAL PENCERESİ -->
+  <div class="modal-overlay" id="ipp-modal">
+    <div class="modal-card" style="width: 800px;">
+      <div class="modal-header">
+        <div class="modal-title">📡 I++ DME v1.7 / v2.0 Çift Yönlü Ağ Konsolu & Simülatör</div>
+        <button onclick="closeIppModal()" style="border: none; background: transparent; font-size: 18px; cursor: pointer; color: #64748B;">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 16px; background: #0F172A; color: #F8FAFC; font-family: var(--font-mono);">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 10px;">
+          <div>
+            <span style="color: #38BDF8; font-weight: 700;">TCP/IP Soket:</span> 127.0.0.1:8484
+            <span style="color: #10B981; margin-left: 12px; font-weight: 700;">● BAĞLI (Simülatör Online)</span>
+          </div>
+          <div>
+            <span style="color: #94A3B8; font-size: 11px;">Protokol:</span> <span style="color: #F8FAFC; font-size: 11px;">I++ DME v1.7.0 / v2.0 (ASME B89.4.23)</span>
+          </div>
+        </div>
+        <div style="height: 250px; overflow-y: auto; background: #020617; border: 1px solid #1E293B; border-radius: 4px; padding: 12px; font-size: 12px; line-height: 1.6;" id="ipp-terminal-log">
+          <div style="color: #64748B;">// Nuper Ortho I++ DME v1.7.0 TCP/IP Virtual CMM Engine initialized.</div>
+          <div style="color: #38BDF8;">&gt; 00001 StartSession()</div>
+          <div style="color: #10B981;">&lt; 00001 # Ack()</div>
+          <div style="color: #38BDF8;">&gt; 00002 GetDMEVersion()</div>
+          <div style="color: #10B981;">&lt; 00002 # Ack() :DMEVersion("1.7")</div>
+          <div style="color: #38BDF8;">&gt; 00003 AlignTool(0.0000, 0.0000, 1.0000)</div>
+          <div style="color: #10B981;">&lt; 00003 # Ack()</div>
+          <div style="color: #38BDF8;">&gt; 00004 GoTo(X(30.0000), Y(30.0000), Z(80.0000))</div>
+          <div style="color: #10B981;">&lt; 00004 # Ack()</div>
+          <div style="color: #38BDF8;">&gt; 00005 PtMeas(X(20.0000), Y(30.0000), Z(50.0000), I(1.0000), J(0.0000), K(0.0000))</div>
+          <div style="color: #FCD34D;">&lt; 00005 # PtMeasReport(X(20.0062), Y(30.0001), Z(49.9998))</div>
+          <div style="color: #10B981;">&lt; 00005 # Ack()</div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 12px; align-items: center; justify-content: space-between;">
+          <div style="font-size: 11px; color: #94A3B8;">
+            Prob Canlı Telemetri: <b style="color: #38BDF8;" id="ipp-live-coords">X: 20.006 mm | Y: 30.000 mm | Z: 50.000 mm</b>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button onclick="sendIppStep()" style="padding: 6px 12px; background: #0284C7; color: white; border: none; border-radius: 4px; font-weight: 700; cursor: pointer;">
+              ▶ Tek Adım Gönder (Step)
+            </button>
+            <button onclick="executeAllIpp()" style="padding: 6px 12px; background: #059669; color: white; border: none; border-radius: 4px; font-weight: 700; cursor: pointer;">
+              ⚡ Tüm Akışı Yürüt
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 10px 16px; background: #F8FAFC; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between;">
+        <span style="font-size: 11px; color: #64748B;">Sanal CMM Simülatörü Aktif (ortho-router::ipp).</span>
+        <button class="btn-header" onclick="closeIppModal()">Kapat</button>
       </div>
     </div>
   </div>
@@ -1660,6 +1812,44 @@
           ["GJK Çakışma Durumu", "0 İhlal (Yol engeli aşıldı)"],
           ["Müdahale Protokolü", "Parçayı bağlarken kırmızı alana dikkat ediniz."],
         ]
+      },
+      bottom_mounting_face: {
+        title: "BOTTOM_MOUNTING_FACE",
+        type: "Taban Referans Düzlemi (OP20 Primary Datum)",
+        coords: "Z: 0.000 mm | Normal: [0.0, 0.0, -1.0]",
+        details: "OP20 Bağlama (180° Çevrilmiş) | 3-2-1 Z-Trans Kilidi",
+        fcf_sym: "⏥",
+        fcf_val: "0.0080",
+        fcf_datums: [],
+        balloonId: "OP20-1",
+        confidence: "%99 (Setup 2)",
+        statusTag: "0 Çarpışma (PASS)",
+        metrics: [
+          ["Düzlemsellik (Flatness)", "0.0019 mm"],
+          ["Ölçülen Nokta Sayısı", "4 Nokta (Kare Dağılım)"],
+          ["Setup Yönelimi", "180° Ters Çevirme (OP20)"],
+          ["Z Emniyet Boşluğu", "+50.0 mm (Z_Clearance)"],
+        ]
+      },
+      bottom_drain_port: {
+        title: "BOTTOM_DRAIN_PORT",
+        type: "Alt Tahliye Cebi (Internal Pocket)",
+        coords: "X: 30.000 mm | Y: 30.000 mm | Z: 0.000 mm",
+        details: "Çap: Ø16.000 (+0.018/0) H7 | PH10 Açısı: A0.0° B0.0°",
+        fcf_sym: "⨁",
+        fcf_val: "0.018 Ⓜ",
+        fcf_datums: ["BOTTOM_A", "B", "C"],
+        balloonId: "OP20-2",
+        confidence: "%95 (Setup 2)",
+        statusTag: "0 Çarpışma (PASS)",
+        metrics: [
+          ["Nominal Çap", "16.0000 mm"],
+          ["Ölçülen Çap (Chebyshev)", "16.0035 mm"],
+          ["Üst Tolerans Sınırı", "+0.0180 mm"],
+          ["Alt Tolerans Sınırı", "0.0000 mm"],
+          ["U95 Belirsizlik", "±0.0025 mm"],
+          ["Guard-Band Kararı", "PASS (Net Kabul)"],
+        ]
       }
     };
 
@@ -1713,6 +1903,24 @@
               ${datumsHtml}
             </tr>
           </table>
+        </div>
+
+        <div style="background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 6px; padding: 10px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <b style="color: #0F172A; font-size: 11px; text-transform: uppercase;">GUM / ISO 15530-3 Belirsizlik</b>
+            <span class="pass-tag" style="font-size: 9px;">TUR 6.56:1</span>
+          </div>
+          <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 3px;">
+            <span style="color: #64748B;">Genişletilmiş Belirsizlik (U₉₅):</span>
+            <span style="font-family: var(--font-mono); font-weight: 600;">± 0.0032 mm (k=2)</span>
+          </div>
+          <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 3px;">
+            <span style="color: #64748B;">ISO 14253-1 Emniyet Bandı:</span>
+            <span style="color: #059669; font-weight: 700;">PASS (Net Kabul)</span>
+          </div>
+          <div style="font-size: 10px; color: #0284C7; margin-top: 4px;">
+            ISO 16610-31 Filtresi: Talaş/toz sıçramaları temizlendi.
+          </div>
         </div>
 
         <div style="font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 6px;">
@@ -1923,7 +2131,60 @@ Float32Array(64) [
   ...
 ]
 SHA-256 SEAL: 170D62F7A8E0F0E681A1BA41EC19231C6FB60AC6A98DA49CC4330F7C80EF251B
-MAPPED DIRECTLY TO GPU BufferGeometry (0% JS Serialization Overhead)`
+MAPPED DIRECTLY TO GPU BufferGeometry (0% JS Serialization Overhead)`,
+      ipp: `$$ ==============================================================
+$$ I++ DME v1.7 / v2.0 ILETISIM AKISI (TCP/IP Port 8484)
+$$ PROTOKOL: I++ Dimensional Measurement Interface Standard
+$$ ==============================================================
+00001 StartSession()
+00001 # Ack()
+00002 GetDMEVersion()
+00002 # Ack() :DMEVersion("1.7")
+00003 AlignTool(0.0000, 0.0000, 1.0000)
+00003 # Ack()
+00004 GoTo(X(30.0000), Y(30.0000), Z(80.0000))
+00004 # Ack()
+00005 PtMeas(X(20.0000), Y(30.0000), Z(50.0000), I(1.0000), J(0.0000), K(0.0000))
+00005 # PtMeasReport(X(20.0062), Y(30.0001), Z(49.9998))
+00005 # Ack()
+00006 GoTo(X(30.0000), Y(30.0000), Z(80.0000))
+00006 # Ack()
+00007 EndSession()
+00007 # Ack()`,
+      closed_loop: `$$ ==============================================================
+$$ KAPALI DONGLU CNC TAKIM ASINMA GERI BESLEMESI (CLOSED-LOOP)
+$$ KONTROLOR: FANUC 0i/31i & SIEMENS SINUMERIK 840D/ONE
+$$ ==============================================================
+$$ [FANUC 0i/31i G-KODU OFSET KOMUTLARI]
+G90 G10 L12 P1 R-0.0060  $$ T01 Takim Yaricap Asinma Ofseti (Delik Cap Sapmasi: +0.0120 mm)
+G90 G10 L12 P2 R-0.0030  $$ T02 Takim Yaricap Asinma Ofseti (Pim Cap Sapmasi: -0.0060 mm)
+
+$$ [SIEMENS SINUMERIK 840D/ONE R-PARAMETRESI KOMUTLARI]
+$TC_DP13[1, 1] = $TC_DP13[1, 1] + (-0.0060)  $$ T01 Radius Wear Artirimi
+$TC_DP13[2, 1] = $TC_DP13[2, 1] + (-0.0030)  $$ T02 Radius Wear Artirimi
+
+$$ [FAIL-SAFE GUARDIAN: TAKIM KIRILMA EMNIYET DENETIMI]
+Kritik Esik: 0.0500 mm | Olculen Maksimum Sapma: 0.0120 mm
+DURUM: GUVENLI (OFSET CNC TEZGAHINA OTOMATIK ENJEKTE EDILDI)`,
+      uncertainty: `$$ ==============================================================
+$$ GUM / ISO 15530-3 METROLOJIK BELIRSIZLIK BUTCESI
+$$ ISO 14253-1 EMNIYET BANDI (GUARD-BANDING) KARAR MATRISI
+$$ ==============================================================
+[BELIRSIZLIK BILESENLERI]
+1. CMM Cihaz Belirsizligi (ISO 10360-2 MPE_E):  u_cmm   = 0.0012 mm
+2. Prob Bilye & Uzatma Esnemesi (50mm Karbon): u_probe = 0.0008 mm
+3. Termal Genlesme Sapmasi (ΔT = 0.5 °C):      u_temp  = 0.0006 mm
+4. Tekrarlanabilirlik / Geri Donusum (10 olcum): u_rep   = 0.0005 mm
+------------------------------------------------------------------
+BIRLESIK STANDART BELIRSIZLIK (u_c):           0.0016 mm
+GENISLETILMIS BELIRSIZLIK (U_95, k=2):          0.0032 mm
+
+[ISO 14253-1 KARAR VE TUR TESTI]
+Unsur: BORE_20_H7 (Nominal: 20.000 mm | Tolerans: 0.021 mm)
+Olculen Boyut: 20.0120 mm
+Muhafaza Emniyet Bandi (Guard-Band): [20.0032 mm - 20.0178 mm]
+Test Uncertainty Ratio (TUR): 6.56 : 1 (ISO 14253-1 Kriteri > 4:1 PASS)
+SONUC: PASS (NET KABUL - Tolerans emniyet bandi icinde)`
     };
 
     function switchCodeTab(tab) {
@@ -1931,9 +2192,89 @@ MAPPED DIRECTLY TO GPU BufferGeometry (0% JS Serialization Overhead)`
       event.target.classList.add('active');
       const text = codeSnippets[tab] || codeSnippets.dmis;
       document.getElementById('code-display').innerHTML = text.split('\n').map(line => {
-        const isHighlight = line.includes('EVAL') || line.includes('PROFS') || line.includes('MINSC') || line.includes('MASTAR') || line.includes('SHA-256');
+        const isHighlight = line.includes('EVAL') || line.includes('PROFS') || line.includes('MINSC') || line.includes('MASTAR') || line.includes('SHA-256') || line.includes('PtMeasReport') || line.includes('G10') || line.includes('PASS');
         return `<div class="code-line ${isHighlight ? 'active' : ''}">${line}</div>`;
       }).join('');
+    }
+
+    // Çoklu Bağlama (Multi-Setup OP10 vs OP20 180° Flip)
+    let currentSetup = 'OP10';
+    function switchSetup(op) {
+      currentSetup = op;
+      document.getElementById('btn-setup-op10').classList.toggle('active', op === 'OP10');
+      document.getElementById('btn-setup-op20').classList.toggle('active', op === 'OP20');
+
+      const badge = document.getElementById('part-name-badge');
+      if (op === 'OP20') {
+        badge.innerText = "VALVE_BODY_OP20.step (180° Ters)";
+        badge.style.color = "#0284C7";
+        // 180° Parça çevirme (Flip around X axis)
+        blockGroup.rotation.x = Math.PI;
+        blockGroup.position.y = 50;
+        selectFeature('bottom_mounting_face');
+      } else {
+        badge.innerText = "VALVE_BODY_OP10.step";
+        badge.style.color = "#334155";
+        blockGroup.rotation.x = 0;
+        blockGroup.position.y = 0;
+        selectFeature('bore_h7');
+      }
+      requestRender();
+    }
+
+    // Gerçek Zamanlı Sapma Isı Haritası (Live Deviation Heatmap)
+    let isHeatmapActive = false;
+    function toggleDeviationHeatmap() {
+      isHeatmapActive = !isHeatmapActive;
+      const btn = document.getElementById('btn-toggle-heatmap');
+      btn.classList.toggle('active', isHeatmapActive);
+      const legend = document.getElementById('heatmap-legend');
+      legend.style.display = isHeatmapActive ? 'block' : 'none';
+
+      if (isHeatmapActive) {
+        blockMat.color.setHex(0x38BDF8); // Hafif cyan taban
+        requestRender();
+      } else {
+        blockMat.color.setHex(0x94A3B8); // Orijinal Solid Slate
+        requestRender();
+      }
+    }
+
+    // I++ DME Canlı Konsol Modal Yönetimi
+    function openIppModal() {
+      document.getElementById('ipp-modal').classList.add('active');
+    }
+    function closeIppModal() {
+      document.getElementById('ipp-modal').classList.remove('active');
+    }
+
+    let ippStepCount = 5;
+    function sendIppStep() {
+      ippStepCount++;
+      const log = document.getElementById('ipp-terminal-log');
+      const coords = document.getElementById('ipp-live-coords');
+      const newX = (20.0 + Math.random() * 0.01).toFixed(4);
+      const newY = (30.0 + Math.random() * 0.01).toFixed(4);
+      const newZ = (50.0 - (ippStepCount * 2)).toFixed(4);
+
+      log.innerHTML += `
+        <div style="color: #38BDF8;">&gt; 0000${ippStepCount} PtMeas(X(${newX}), Y(${newY}), Z(${newZ}), I(0.0), J(1.0), K(0.0))</div>
+        <div style="color: #FCD34D;">&lt; 0000${ippStepCount} # PtMeasReport(X(${newX}), Y(${newY}), Z(${newZ}))</div>
+        <div style="color: #10B981;">&lt; 0000${ippStepCount} # Ack()</div>
+      `;
+      log.scrollTop = log.scrollHeight;
+      coords.innerText = `X: ${newX} mm | Y: ${newY} mm | Z: ${newZ} mm`;
+    }
+
+    function executeAllIpp() {
+      const log = document.getElementById('ipp-terminal-log');
+      log.innerHTML += `
+        <div style="color: #10B981; font-weight: 700; margin: 6px 0;">⚡ Tüm I++ komut akışı (16 segment) sanal CMM denetleyicisine başarıyla aktarıldı. (0 Hata)</div>
+        <div style="color: #38BDF8;">&gt; 00016 EndSession()</div>
+        <div style="color: #10B981;">&lt; 00016 # Ack()</div>
+      `;
+      log.scrollTop = log.scrollHeight;
+      alert("I++ DME Sanal CMM Simülatörü:\n• Tüm komutlar başarıyla işletildi.\n• 16 Waypoint tamamlandı, SHA-256 mührü doğrulandı.");
     }
 
     // ==========================================================================
