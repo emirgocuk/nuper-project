@@ -3,3 +3,7 @@ target/
 *.bk
 node_modules/
 package-lock.json
+/test_assets/
+test_assets/
+/scratch/
+scratch/

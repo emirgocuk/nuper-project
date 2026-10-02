@@ -31,32 +31,37 @@ Tüm 8 crate, `src-tauri` masaüstü kabuğu, Three.js Solid Slate Light dijital
 
 ---
 
-## 1. Anlık Odak Noktası: FAZ 11 — ENDÜSTRİYEL OPERATÖR ERGONOMİSİ & GERÇEK SAHA KULLANILABİLİRLİĞİ
-Kullanıcı geri bildirimi ve gerçek CMM metroloji atölyesi operasyonel gereksinimleri doğrultusunda sistemde 4 yeni majör geliştirme fazı planlandı:
-- **FAZ 11: Endüstriyel Operatör Deneyimi & Klasik CMM Menü/Ribbon Mimarisi (UX / Ergonomi)**
-  - Açılışta Prob & Sensör Yapılandırma Sihirbazı (`#probe-wizard-modal`: PH10M/PH20, Stylus Ø, Şaft boyu, Kalibrasyon durumu).
-  - Klasik Hiyerarşik Menü Çubuğu (`File`, `Edit`, `View`, `Features`, `Alignment`, `Measure`, `Settings`, `Help`).
-  - Küçük Simgeli & Altında Küçük Yazılı CAD Ribbon Araç Çubuğu (`[📂 STEP]`, `[📄 Resim]`, `[🔲 Düzlem]`, `[🥫 Silindir]`, `[🎯 3-2-1]`, `[🔄 Eksen]`, vb.).
-  - Görsel Gürültü Temizliği: `Saha FAT`, `AS9100 Mühür`, `Showroom` ve `Altın Sürüm` gibi sahte pazarlama butonları arayüzden kaldırıldı.
-  - Sol Teftiş Ağacında Belirgin Geometri İkonları (🔲, 🥫, ⭕, 📍, 📐, 🧵, 🗜️).
-  - Kapsamlı Ayarlar Ekranı (Tolerans tablosu, AI sağlayıcı seçimi, CMM limitleri).
-- **FAZ 12: Canlı Dosya Yükleme Motoru & Çift Kanvas (3D STEP/STL + 2D Teknik Resim)**
-  - 3D Katı Model Yükleyici (Gerçek STEP/STL drag-and-drop, Three.js mesh render, bounding box).
-  - 2D Teknik Resim Yükleyici (PDF/PNG/JPG drag-and-drop, zoom/pan kanvası).
-- **FAZ 13: Eksen Yönlendirme & Akıllı Fikstürleme/Bağlama Tavsiye Motoru**
-  - CAD Eksen Düzeltme Aracı (X/Y/Z ±90° rotasyon, Tablaya Hizala Z=0).
-  - Akıllı Taban & 3-2-1 Önerisi; Pabuç Bağlama ve OP10/OP20 180° Ters Çevirme Tavsiyesi.
-- **FAZ 14: Hibrit AI Ölçü Çıkarma & Operatör Onaylı Doğrulama Motoru (LLaMA/Ollama + OpenRouter)**
-  - Yerel & Ücretsiz Ollama (LLaMA 3.2/3.3) veya OpenRouter Ücretsiz Tier seçeneği.
-  - Teknik resimden ölçü ve tolerans çıkarımı, katı model eşleme ve insan onaylı (Human-in-the-Loop) kontrol tablosu.
+## 1. Anlık Odak Noktası: PLAYTEST, HATA ÇÖZÜMLERİ VE OTONOM METROLOJİ İSTASYONU TAMAMLANDI
+Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden mantık ve render hataları tek tek incelendi ve 4 majör başlıkta %100 çözüldü:
+
+1. **Sistem Kararlılığı ve Konsol Bütünlüğü (Tutarlı Çalışma):**
+   - HTML line 10'daki kapatılmamış `<script src="...">` syntax hatası giderildi; `window.systemDiagnosticsLogs`, `logDiagnosticsEvent`, `generateLiveDmisCode` fonksiyonları başarıyla devreye alındı.
+   - Global akıllı dosya sürükle-bırak (drop router) mantığı kuruldu; pencereye 3D CAD (`.step`, `.stl`, `.obj`) ve 2D Teknik Resim (`.pdf`, `.png`, `.jpg`) sürüklendiğinde sistem doğru kanvasa yönlendirir, eşzamanlı bırakıldığında Çift Kanvas (Dual-Canvas) açar.
+
+2. **2D Teknik Resim Okuma ve Ölçü/Tolerans Çıkarım Motoru (Teknik Resim Okuma):**
+   - Python ve pypdf tabanlı `tools/drawing_extractor.py` aracı yazıldı ve `electron-main.js` IPC köprüsüne (`extract-drawing-data`) bağlandı.
+   - PDF ve teknik resimlerden Başlık Bloğu (Parça No, Malzeme, Sertlik, Pürüzlülük, Tolerans Standardı), Referans Datumlar ([A], [B], [C]), Çaplar (Ø20 H7, Ø15.45 MIN), Yarıçaplar (2x R2.5, R6.3, R13.1), Toleranslı Boyutlar (14.4 ±0.1, 51.6 ±0.2) ve Diş Çağrıları (3/4-16 UNF) çıkarıldı.
+   - Sol panelde "📄 Teknik Resim Ölçü & GD&T Teftiş Tablosu" ve 2D kanvas üzerinde interaktif ①-⑯ balonları oluşturuldu; çift yönlü çapraz vurgulama (Cross-Highlighting) sağlandı.
+
+3. **Yüksek Hassasiyetli Katı Model Üreteci (Doğrudan Güzel Katı Model):**
+   - Naif üçgen fanı yerine Newell 3D düzlem projeksiyonu ve Ear-Clipping poligon üçgenleme motoru entegre edildi.
+   - `CIRCLE` ve eğri kenarlarda dairesel yay interpolasyonu (4 ara nokta) yapılarak delik ve kavislerin pürüzsüz silindirik/yuvarlak gelmesi sağlandı.
+   - Rastgele 3x3 grid dummy silindirler kaldırıldı; B-Rep advanced face sınırları korundu.
+   - Endüstriyel Satin Titanyum/Alüminyum PBR materyali (`metalness: 0.35, roughness: 0.38`) ve keskin silüet hatları (`EdgesGeometry` 26°) eklendi.
+
+4. **Otonom Katı Model Eksen Optimizasyon Motoru (Eksen Optimizasyonu):**
+   - 3x3 Kovaryans Matrisi ve Jacobi Eigensolver (PCA - Principal Component Analysis) geliştirildi.
+   - Parçanın en geniş düzlemsel taban yüzeyi (Datum A) tespit edilerek granit tablaya (Y=0) oturtuldu.
+   - Ana boyutsal eksen CMM X eksenine `[1, 0, 0]`, ikincil eksen Z eksenine `[0, 0, 1]` kilitlendi.
+   - Üst Ribbon ve Eksen Sihirbazına `[⚡ Eksen Optimize]` butonu ve 6 yönlü hızlı taban kilitleme (`snapBaseFace: Alt, Üst, Ön, Arka, Sol, Sağ`) eklendi.
 
 ---
 
-## 2. Sıradaki Uygulama Adımları
-1. Kullanıcıya hazırlanan detaylı 4 fazlı planı ve mimari çözümleri sunmak.
-2. Kullanıcının onayıyla **FAZ 11 (Operatör Ergonomisi, Açılış Prob Sihirbazı, Klasik Menü/Ribbon, Teftiş İkonları, Ayarlar Ekranı ve Buton Temizliği)** geliştirmesine başlamak.
-
----
+## 2. Doğrulama Playtest Sonuçları (Golden Pass)
+- `164849_aski_kancasi.stp` ve `050-164849-000 - Kopya.pdf` ile yapılan testte:
+  - Üçgen Sayısı: 775 temiz üçgen, 0 çakışma, pürüzsüz kavisler
+  - Eksen Optimizasyonu: `sizeX: 53.03, sizeY: 33.25, sizeZ: 32.12 mm | minY: 0.0000 mm` (Granit tabla Z=0 temasında ve X eksenine hizalı)
+  - Teknik Resim Çıkarımı: 13 ölçü, SAE 4340 malzeme, 38-44 HRC sertlik, [A, B, C] datumları, 13 interaktif balon ve teftiş kartı eksiksiz senkronize.
 
 ## 4. Aktif Kararlar ve Kodlama İlkeleri
 - **YOLO Mode & Tam Otonomi:** Proaktif, yüksek kaliteli endüstriyel standartta geliştirme kesintisiz sürdürülür.

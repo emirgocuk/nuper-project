@@ -1,21 +1,34 @@
 @echo off
+setlocal
+cd /d "%~dp0"
 title Nuper Ortho - Otonom Metroloji Istasyonu
+
 echo =========================================================================
 echo    NUPER ORTHO -- SOVEREIGN AUTONOMOUS METROLOGY SYSTEM (v1.0)
 echo =========================================================================
 echo.
-echo Uygulama yerel masaustu penceresinde baslatiliyor...
+echo Uygulama baslatiliyor...
 
-set ELECTRON_EXE=%~dp0node_modules\electron\dist\electron.exe
-set EDGE_PATH=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
-set HTML_PATH=%~dp0ui\index.html
+set "ROOT_DIR=%~dp0"
+if "%ROOT_DIR:~-1%"=="\" set "ROOT_DIR=%ROOT_DIR:~0,-1%"
+
+set "ELECTRON_EXE=%ROOT_DIR%\node_modules\electron\dist\electron.exe"
 
 if exist "%ELECTRON_EXE%" (
-    start "" "%ELECTRON_EXE%" "%~dp0."
-) else if exist "%EDGE_PATH%" (
-    start "" "%EDGE_PATH%" --app="file:///%HTML_PATH:\=/%" --window-size=1440,900
-) else (
-    start "" "%HTML_PATH%"
+    start "" "%ELECTRON_EXE%" "%ROOT_DIR%"
+    goto :done
 )
 
-exit
+:: Electron dist bulunamazsa npx ile baslat
+where npx >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    start "" npx electron "%ROOT_DIR%"
+    goto :done
+)
+
+:: Son alternatif tarayici modu
+start "" "%ROOT_DIR%\ui\index.html"
+
+:done
+exit /b 0
+

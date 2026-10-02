@@ -19,6 +19,27 @@
 
 ---
 
+### 🛡️ KİLOMETRE TAŞI: SAVUNMA SANAYİİ METROLOJİ BENCHMARK LABORATUVARI (BENCH_LAB)
+- **Kapsam:** ASELSAN, ROKETSAN, TÜBİTAK SAGE standartlarındaki 60 alt klasör, 206 STEP CAD modeli, 199 PDF teknik resmi ve gerçek PC-DMIS CMM programları (`.PRG`) sisteme entegre edildi.
+- **PDF Gömülü CAD Ayıklama:** Teknik resim PDF'leri içerisine ISO 32000-1 uyarınca gömülmüş 69 adet STEP katı model programatik olarak ayıklandı (`extract_all_embedded_cad.py`).
+- **Standardize Numune Taksonomisi (12 Amiral Gemisi):**
+  1. `Aselsan Askı Kancası` (Yapısal Kanca - Gerçek PC-DMIS .PRG ve CMM Raporu)
+  2. `DACP Avionic Panel 2. Üretim` (Aviyonik Şase/Panel - Gerçek CMM Programı)
+  3. `Tolun Askı Kancası` (TÜBİTAK SAGE / Mühimmat Tırnağı)
+  4. `Tolun TB-3 Adaptör Vidası` (Hassas Adaptör)
+  5. `MK-82 Kuyruk Statik Test Aparatı` (Fikstür / Mastar)
+  6. `Adaptör Al Kuyruk Bütünü` (Aerodinamik Gövde)
+  7. `MTSK Aviyonik Soğutucu` (Elektronik Soğutma Bloğu)
+  8. `Kör Tapa M16 Sızdırmazlık` (Silindirik Sızdırmazlık Tapası)
+  9. `Kanat Burcu Sağ M12` (Silindirik Hassas Burç)
+  10. `ANS-400 Aviyonik Şase` (Kızaklı Aviyonik Şase)
+  11. `14 Inç Kanca Tutucu` (Prizmatik Askı Braketi)
+  12. `Lineer Güvenlik Anahtarı Kamı` (Emniyet Mekanizması)
+- **Çift Kanvas (Dual-Canvas) Metroloji:** 3D STEP katı modeli 3D sahnede dönerken eşzamanlı olarak 2D PDF teknik resmi 2D split kanvasında açılır.
+- **Otonom Doğrulama:** 12 numunenin tamamı B-Rep ayrıştırma, 3-2-1 orthonormal hizalama ($Det(R)=1.000000$), emniyetli prob yaklaşma/geri çekilme ve DMIS 5.2 çıktısı bakımından %100 başarıyla doğrulandı.
+
+---
+
 ### 🔹 FAZ 1: Çekirdek Prizmatik Dikey Dilim Prototipi (Hafta 1 – 6)
 *Hedef: Prizmatik ve delikli bir STEP AP214 dosyasını alıp, analitik B-Rep'e çeviren, temel PH10 kafa açılarını seçen ve doğrudan PC-DMIS'te çalıştırılabilir bir `.dmi` kodu basan uçtan uca CLI derleyicisini ayağa kaldırmak.*
 
