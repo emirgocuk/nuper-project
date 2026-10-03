@@ -644,7 +644,7 @@
 | **FAZ 12 (Canlı STEP/STL + 2D Teknik Resim Yükleme)** | ✅ **TAMAMLANDI** | Three.js STLLoader/OBJLoader ile gerçek 3D dosya yükleme, bounding box hesabı, otomatik kamera odaklama, 2D PNG/JPG/SVG teknik resim görüntüleyici (zoom/pan), PDF yönlendirme | `f3295ad` |
 | **FAZ 13 (Eksen Düzeltme & Akıllı Bağlama/Fikstürleme)** | ✅ **TAMAMLANDI** | X/Y/Z ±90° eksen döndürme sihirbazı, tablaya oturtma (Z=0), merkeze alma, akıllı fikstür önerisi (3 destek + 2 pabuç + Lift-Hop), OP20 flip erişilebilirlik analizi | `ea3b2ee` |
 | **FAZ 14 (Hibrit LLaMA/Ollama + OpenRouter & Onay Tablosu)** | ✅ **TAMAMLANDI** | Yerel Ollama (http://localhost:11434) + OpenRouter Free Tier bağlantısı, teknik resimden ölçü çıkarma, 7 sütunlu insan-onaylı teftiş tablosu, onaylanan ölçülerin sol ağaca ve DMIS planına aktarımı | `38358d6` |
-| **Geliştirme Altyapısı & Darboğaz Önleme Altyapısı** | 🚀 **GRANÜLER UYGULAMA DEVREDE** | [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md), [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) | 5 Fazlı Granüler Adım Adım İlerleme Modeli |
+| **Geliştirme Altyapısı & Darboğaz Önleme Altyapısı** | ✅ **5 FAZ %100 TAMAMLANDI VE MÜHÜRLENDİ** | [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md), [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) | 5 Faz ve Tüm Ara Fazlar %100 Doğrulandı |
 
 ---
 
@@ -669,7 +669,7 @@
 | | **4.3 Hızlı Dev Modu & Kanıt** | `?mock=true` ile 1 saniyede açılış ve mock test doğrulaması | `MockDevMode.test.ts`, `package.json` | Vitest mock test (3 test PASS) | ✅ **Tamamlandı** |
 | **FAZ 5** | **5.1 scratch/ Analizi & Taşıma** | Çalışan script mantıklarının kalıcı unit testlere aktarılması | `test_step_parser.py`, `tools/tests/` | Pytest (4 test PASS) & check:all | ✅ **Tamamlandı** |
 | | **5.2 SQLite Golden Benchmark** | 12 numune ve standartların SQLite üzerinden regresyon testi | `test_golden_benchmarks.py`, `benchmarks.db` | Pytest (4 test PASS) | ✅ **Tamamlandı** |
-| | **5.3 scratch/ Tasfiyesi & Büyük Kanıt**| `scratch/` arşivlenmesi/temizliği ve tam pipeline mühürlenmesi | `.gitignore`, `package.json` | `npm run check:all` tam yeşil logu | 🟡 **Aktif (Sıradaki)** |
+| | **5.3 scratch/ Tasfiyesi & Büyük Kanıt**| `scratch/` arşivlenmesi/temizliği ve tam pipeline mühürlenmesi | `.gitignore`, `package.json` | `npm run check:all` tam yeşil logu | ✅ **Tamamlandı** |
 
 
 

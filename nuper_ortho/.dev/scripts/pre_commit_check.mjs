@@ -26,8 +26,10 @@ try {
     }
   }
 
-  // 3. scratch/ klasörü koruması
-  const scratchStaged = stagedFiles.filter(f => f.replace(/\\/g, '/').includes('/scratch/') || f.replace(/\\/g, '/').startsWith('scratch/'));
+  // 3. scratch/ klasörü koruması (Sadece yeni ekleme veya düzenlemeleri engelle, silmeye/tasfiyeye izin ver)
+  const stagedAddedModified = execSync('git diff --cached --diff-filter=ACM --name-only', { cwd: rootDir, encoding: 'utf8' }).trim();
+  const addedModifiedFiles = stagedAddedModified ? stagedAddedModified.split(/\r?\n/) : [];
+  const scratchStaged = addedModifiedFiles.filter(f => f.replace(/\\/g, '/').includes('/scratch/') || f.replace(/\\/g, '/').startsWith('scratch/'));
   if (scratchStaged.length > 0) {
     console.error(`\n❌ [KURAL 2 İHLALİ] scratch/ klasöründeki geçici dosyalar commitlenemez!`);
     console.error('  Stage edilmiş scratch dosyaları:');

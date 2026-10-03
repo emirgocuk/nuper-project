@@ -80,11 +80,12 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
 - **Geliştirme Altyapısı 5 Fazlı Yol Haritası ve Granüler Yürütme Protokolü:**
   - [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) ve [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) doğrultusunda 5 ana faz alt adımlara (ara fazlara) bölündü.
   - **Kritik Kural:** Her alt adım için terminal kanıtı (execution proof) sunulmadan bir sonrakine geçilmez; tek adımda en fazla 3 dosya değiştirilir; ölü kod doğrudan silinir.
-  - **Aktif Faz:** **FAZ 5 (Regresyon Temizliği, Golden Benchmarks & scratch/ Tasfiyesi)** $\longrightarrow$ **Ara Faz 5.3 (scratch/ Tasfiyesi ve Büyük Birleşik Doğrulama: Altın Mühür)**.
+  - **Aktif Faz:** **FAZ 5 (Regresyon Temizliği, Golden Benchmarks & scratch/ Tasfiyesi) — %100 TAMAMLANDI**.
   - **Tamamlanan Alt Adımlar:**
     - Ara Faz 5.1 (B-Rep varlık ayrıştırıcı kalıcı `test_step_parser.py` testine dönüştürüldü).
     - Ara Faz 5.2 (`benchmarks.db` SQLite veritabanındaki 12 amiral gemisi savunma modeli, toleransları ve ASME/ISO standartları kalıcı `test_golden_benchmarks.py` regresyon testine bağlandı; Pytest 8/8 PASS).
-  - **Sıradaki Adım:** `scratch/` klasörünün arşivlenmesi/.gitignore'a alınması ve `npm run check:all` ile tam pipeline yeşil kanıtının teslimi.
+    - Ara Faz 5.3 (`scratch/` klasörünün git takibinden çıkarılması, dist yoksayma, `npm run check:all` ile tam pipeline yeşil kanıtının teslimi ve Altın Mühür).
+  - **Tüm 5 Altyapı Fazı (Faz 1-5):** %100 eksiksiz tamamlandı ve mühürlendi. Sistem geliştirici darboğazlarından tamamen arındırıldı.
 
 
 
