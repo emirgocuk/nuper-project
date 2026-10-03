@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SceneCleaner } from './utils/SceneCleaner';
+import { SimulationController } from './SimulationController';
 
 export interface CADViewerOptions {
   antialias?: boolean;
@@ -7,17 +8,13 @@ export interface CADViewerOptions {
   enableEdges?: boolean;
 }
 
-/**
- * Nuper Ortho — Modüler 3D CAD Görüntüleyici (CADViewer)
- * Three.js sahnesi, kamera, endüstriyel PBR Satin Titanyum materyali,
- * EdgesGeometry ve SceneCleaner ile sıfır VRAM sızıntılı yaşam döngüsü.
- */
 export class CADViewer {
   private container: HTMLElement | null = null;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer | null = null;
   private modelGroup: THREE.Group;
+  private simulationController: SimulationController;
   private animationFrameId: number | null = null;
   private isDestroyed = false;
 
@@ -31,7 +28,21 @@ export class CADViewer {
     this.modelGroup = new THREE.Group();
     this.scene.add(this.modelGroup);
 
+    this.simulationController = new SimulationController();
+
     this.setupLights();
+  }
+
+  public getSimulationController(): SimulationController {
+    return this.simulationController;
+  }
+
+  public setSpeedMultiplier(speed: number): void {
+    this.simulationController.setSpeedMultiplier(speed);
+  }
+
+  public getSpeedMultiplier(): number {
+    return this.simulationController.getSpeedMultiplier();
   }
 
   private setupLights(): void {
