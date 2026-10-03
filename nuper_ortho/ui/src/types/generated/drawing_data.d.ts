@@ -23,6 +23,8 @@ export interface DrawingExtractionResult {
   dimensions: {
     id: number;
     balloon: string;
+    page?: number;
+    datum_reference?: string;
     type: string;
     type_label: string;
     icon?: string;
