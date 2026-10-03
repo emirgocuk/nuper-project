@@ -984,30 +984,56 @@ FEATURES:
     /* ORTA BÖLÜM: ÇİFT KANVAS / 3D VIEWPORT */
     .center-workspace {
       flex: 1;
-      display: flex;
-      position: relative;
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      width: 100% !important;
+      height: 100% !important;
+      position: relative !important;
       background: var(--bg-canvas);
-      overflow: hidden;
+      overflow: hidden !important;
     }
 
     /* 2D Çizim Kanvası (Çift Kanvas Modu: Zorunlu Bölünmüş Görünüm / 3D Sahne ile %50-%50) */
-    .canvas-2d-pane {
+    .canvas-2d-pane,
+    #dual-canvas-2d {
       display: flex !important;
-      flex: 1 1 50% !important;
-      width: 50% !important;
-      min-width: 400px !important;
-      max-width: 60% !important;
-      height: 100%;
+      width: 100% !important;
+      height: 100% !important;
+      min-width: 300px !important;
       background: #FFFFFF;
       border-right: 2px solid var(--border-color);
-      flex-direction: column;
-      position: relative;
-      overflow: hidden;
+      flex-direction: column !important;
+      position: relative !important;
+      overflow: hidden !important;
       z-index: 10;
+      visibility: visible !important;
     }
 
     .canvas-2d-pane.active {
       display: flex !important;
+    }
+
+    #drawing-viewer-container {
+      display: flex !important;
+      flex: 1;
+      width: 100% !important;
+      height: calc(100% - 36px) !important;
+      min-width: 300px !important;
+      position: relative !important;
+      overflow: auto;
+      background: #FAFAFA;
+      visibility: visible !important;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #drawing-viewport-canvas {
+      width: 100% !important;
+      height: 100% !important;
+      min-width: 500px !important;
+      min-height: 500px !important;
+      display: block !important;
+      object-fit: contain !important;
     }
 
     .pane-toolbar {
@@ -1034,19 +1060,22 @@ FEATURES:
     }
 
     /* 3D Üç Boyutlu Viewport (%50-%50 Yan Yana Bölünmüş Görünüm) */
-    .viewport-3d-pane {
+    .viewport-3d-pane,
+    #cad-viewport {
       display: flex !important;
-      flex: 1 1 50% !important;
-      width: 50% !important;
-      min-width: 400px !important;
-      position: relative;
-      height: 100%;
+      width: 100% !important;
+      height: 100% !important;
+      min-width: 300px !important;
+      position: relative !important;
+      visibility: visible !important;
+      overflow: hidden !important;
     }
 
     #webgl-canvas {
-      width: 100%;
-      height: 100%;
-      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      position: relative !important;
+      display: block !important;
     }
 
     /* Viewport Üzerindeki Bilgi Paneli (Zero Blur - Solid Slate) */
@@ -1587,15 +1616,16 @@ FEATURES:
     #drawing-viewer-container {
       display: flex !important;
       flex: 1;
-      width: 50%;
+      width: 100% !important;
       min-width: 400px;
-      height: calc(100% - 36px);
+      height: calc(100% - 36px) !important;
       position: relative;
       overflow: auto;
       cursor: grab;
       background: #FAFAFA;
       align-items: center;
       justify-content: center;
+      visibility: visible !important;
     }
     #drawing-viewer-container:active { cursor: grabbing; }
     #drawing-viewer-container img,
@@ -2140,22 +2170,22 @@ FEATURES:
     </aside>
 
     <!-- Orta Bölüm: Çift Kanvas / 3D Dijital İkiz Görünümü -->
-    <main class="center-workspace">
+    <main class="center-workspace" style="display: grid !important; grid-template-columns: 1fr 1fr !important; width: 100% !important; height: calc(100vh - 150px) !important; overflow: hidden !important;">
 
       <!-- 2D Teknik Resim Kanvası (Çift Kanvas Modu: Zorunlu Bölünmüş Görünüm / %50-%50) -->
-      <section class="canvas-2d-pane active" id="dual-canvas-2d" style="display: flex; flex: 1 1 50%; width: 50%; min-width: 400px;">
-        <div class="pane-toolbar">
-          <span>2D Teknik Resim & Balon Eşleme (Drawing PDF / Sheet 1)</span>
+      <section class="canvas-2d-pane active" id="dual-canvas-2d" style="display: flex !important; width: 100% !important; height: 100% !important; min-width: 300px !important; visibility: visible !important; flex-direction: column !important; position: relative !important; overflow: hidden !important;">
+        <div class="pane-toolbar" style="height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: #F8FAFC; border-bottom: 1px solid var(--border-color);">
+          <span>2D Teknik Resim & Balon Eşleme (Drawing PDF / Sayfa 2)</span>
           <span style="font-size: 10px; color: var(--color-datum);" id="drawing-pane-status">Gerçek PDF Görüntüleyici</span>
         </div>
-        <div id="drawing-viewer-container" style="display: flex; flex: 1; width: 100%; height: calc(100% - 36px); min-width: 400px; position: relative; overflow: auto; background: #FAFAFA;">
-          <canvas id="drawing-viewport-canvas" class="drawing-pdf-canvas" style="display: block; width: 100%; height: 100%;"></canvas>
+        <div id="drawing-viewer-container" style="display: flex !important; flex: 1; width: 100% !important; height: calc(100% - 36px) !important; min-width: 300px !important; position: relative !important; overflow: auto; background: #FAFAFA; visibility: visible !important; align-items: center; justify-content: center;">
+          <canvas id="drawing-viewport-canvas" class="drawing-pdf-canvas" style="display: block !important; width: 100% !important; height: 100% !important; min-width: 500px !important; min-height: 500px !important; object-fit: contain !important;"></canvas>
         </div>
       </section>
 
       <!-- 3D Three.js Viewport (%50-%50 Bölünmüş Görünüm) -->
-      <section class="viewport-3d-pane" style="display: flex; flex: 1 1 50%; width: 50%; min-width: 400px;">
-        <div id="webgl-canvas"></div>
+      <section class="viewport-3d-pane" id="cad-viewport" style="display: flex !important; width: 100% !important; height: 100% !important; min-width: 300px !important; position: relative !important; visibility: visible !important; overflow: hidden !important;">
+        <div id="webgl-canvas" style="width: 100% !important; height: 100% !important; position: relative !important; display: block !important;"></div>
                 <!-- Birleşik Metroloji & CAD Telemetri Paneli (Unified Zero-Blur HUD) -->
         <div class="canvas-overlay-hud" id="unified-metro-hud" style="top: 12px; left: 12px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 4px 14px rgba(0,0,0,0.08); min-width: 280px;">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px;">
@@ -3996,6 +4026,14 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
     // Başlangıçta Otomatik Model Yükleme ve Konfigürasyon
     window.addEventListener('load', () => {
       sessionStorage.setItem('probe_configured', 'true');
+
+      if (typeof generateDynamicProbeTrajectory === 'function') {
+        generateDynamicProbeTrajectory();
+      }
+      if (typeof syncSimControllerWaypoints === 'function') {
+        syncSimControllerWaypoints();
+      }
+
       setTimeout(async () => {
         try {
           const lastFile = localStorage.getItem('last_cad_filename') || "ROLE BAGLANTI PARCA_AA (1).stp";
@@ -4003,9 +4041,24 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
             await loadCitadelCad(lastFile);
           }
         } catch (e) {
-          console.warn("Otomatik model yükleme:", e);
+          // Sessiz geçiş
         }
-      }, 200);
+      }, 100);
+
+      setTimeout(() => {
+        if (typeof generateDynamicProbeTrajectory === 'function') {
+          generateDynamicProbeTrajectory();
+        }
+        if (typeof syncSimControllerWaypoints === 'function') {
+          syncSimControllerWaypoints();
+        }
+        if (window.nuperApp) {
+          const sim = window.nuperApp.getCADViewer().getSimulationController();
+          sim.setSpeedMultiplier(5.0);
+          sim.play();
+          window.isSimulating = true;
+        }
+      }, 250);
     });
 
     // ==========================================================================
@@ -4512,6 +4565,7 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
       syncSimControllerWaypoints();
     }
 
+    window.isSimulating = true;
     function syncSimControllerWaypoints() {
       if (window.nuperApp && trajectoryPoints && trajectoryPoints.length > 0) {
         const simCtrl = window.nuperApp.getCADViewer().getSimulationController();
@@ -4523,6 +4577,7 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
         if (typeof probeGroup !== 'undefined') {
           simCtrl.bindProbeObject(probeGroup, new THREE.Vector3(0, 20, 0));
         }
+        simCtrl.setSpeedMultiplier(5.0);
         simCtrl.onUpdate((state) => {
           if (typeof requestRender === 'function') requestRender();
           if (typeof ph10Pivot !== 'undefined' && ph10Pivot) {
@@ -4543,8 +4598,19 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
             });
           }
         });
+        window.isSimulating = true;
+        simCtrl.play();
       }
     }
+    window.syncSimControllerWaypoints = syncSimControllerWaypoints;
+    window.startSimulation = function() {
+      if (window.nuperApp) {
+        const sim = window.nuperApp.getCADViewer().getSimulationController();
+        sim.setSpeedMultiplier(5.0);
+        sim.play();
+        window.isSimulating = true;
+      }
+    };
 
     function updateGpuBadge() {
       const gpuEl = document.getElementById('gpu-indicator');

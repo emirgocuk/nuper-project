@@ -44,6 +44,13 @@ function getNodeFs(): NodeFs | null {
       return null;
     }
   }
+  if (typeof require === 'function') {
+    try {
+      return (require as unknown as (mod: string) => NodeFs)('fs');
+    } catch {
+      return null;
+    }
+  }
   if (typeof globalThis !== 'undefined' && typeof (globalThis as unknown as { require?: (mod: string) => NodeFs }).require === 'function') {
     try {
       return (globalThis as unknown as { require: (mod: string) => NodeFs }).require('fs');
@@ -62,6 +69,13 @@ function getNodePath(): NodePath | null {
       return null;
     }
   }
+  if (typeof require === 'function') {
+    try {
+      return (require as unknown as (mod: string) => NodePath)('path');
+    } catch {
+      return null;
+    }
+  }
   if (typeof globalThis !== 'undefined' && typeof (globalThis as unknown as { require?: (mod: string) => NodePath }).require === 'function') {
     try {
       return (globalThis as unknown as { require: (mod: string) => NodePath }).require('path');
@@ -70,6 +84,29 @@ function getNodePath(): NodePath | null {
     }
   }
   return null;
+}
+
+function setupPdfWorker(): void {
+  const pdf = (pdfjsLib as unknown as { default?: typeof pdfjsLib }).default || pdfjsLib;
+  if (!pdf || !pdf.GlobalWorkerOptions) return;
+  if (!pdf.GlobalWorkerOptions.workerSrc) {
+    const fs = getNodeFs();
+    const path = getNodePath();
+    if (fs && path) {
+      try {
+        const localWorker = path.resolve('node_modules/pdfjs-dist/build/pdf.worker.js');
+        if (fs.existsSync(localWorker)) {
+          if (typeof window !== 'undefined' && typeof (window as unknown as { require?: unknown }).require !== 'function') {
+            pdf.GlobalWorkerOptions.workerSrc = 'file:///' + localWorker.replace(/\\/g, '/');
+          } else {
+            pdf.GlobalWorkerOptions.workerSrc = localWorker;
+          }
+          return;
+        }
+      } catch {}
+    }
+    pdf.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
 }
 
 function resolvePdfPath(targetPath: string): string {
@@ -81,6 +118,11 @@ function resolvePdfPath(targetPath: string): string {
       const base = path.resolve('test_assets');
       if (fs.existsSync(base)) {
         const direct = path.join(base, 'KPT - 3051 Gobek Bagı Olugu', 'GOBEK BAGI OLUGU_TR_AB.pdf');
+        if (fs.existsSync(direct)) return direct;
+      }
+      const parentBase = path.resolve(__dirname, '..', '..', '..', '..', 'test_assets');
+      if (fs.existsSync(parentBase)) {
+        const direct = path.join(parentBase, 'KPT - 3051 Gobek Bagı Olugu', 'GOBEK BAGI OLUGU_TR_AB.pdf');
         if (fs.existsSync(direct)) return direct;
       }
     } catch {
@@ -139,6 +181,7 @@ export class DrawingCanvas {
 
   public async loadPdf(source: string | Uint8Array | ArrayBuffer): Promise<void> {
     this.disableMockSvg();
+    setupPdfWorker();
     const pdf = (pdfjsLib as unknown as { default?: typeof pdfjsLib }).default || pdfjsLib;
     const getDocument = pdf.getDocument || pdfjsLib.getDocument;
 

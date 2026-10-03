@@ -160,7 +160,23 @@ if (typeof window !== 'undefined') {
 
   const initApp = () => {
     app.mountDrawingCanvas('#drawing-viewport-canvas');
-    SimulationController.wireSpeedButtons('.speed-controls', app.getCADViewer().getSimulationController());
+    const simCtrl = app.getCADViewer().getSimulationController();
+    simCtrl.setSpeedMultiplier(5.0);
+    SimulationController.wireSpeedButtons('.speed-controls', simCtrl);
+
+    const win = window as unknown as {
+      generateDynamicProbeTrajectory?: () => void;
+      syncSimControllerWaypoints?: () => void;
+      isSimulating?: boolean;
+    };
+    if (typeof win.generateDynamicProbeTrajectory === 'function') {
+      win.generateDynamicProbeTrajectory();
+    }
+    if (typeof win.syncSimControllerWaypoints === 'function') {
+      win.syncSimControllerWaypoints();
+    }
+    win.isSimulating = true;
+    simCtrl.play();
 
     const dc = app.getDrawingCanvas();
     const defaultPdf = 'test_assets/KPT - 3051 Gobek Bagı Olugu/GOBEK BAGI OLUGU_TR_AB.pdf';

@@ -123,6 +123,9 @@ export class SimulationController {
 
           if (controller) {
             controller.setSpeedMultiplier(speedVal);
+            if (!controller.getState().isPlaying) {
+              controller.play();
+            }
           }
           if (typeof window !== 'undefined') {
             (window as unknown as { simSpeedMultiplier: number }).simSpeedMultiplier = speedVal;
@@ -203,7 +206,32 @@ export class SimulationController {
     return this.waypoints;
   }
 
+  private ensureDefaultWaypoints(): void {
+    if (this.waypoints.length === 0) {
+      const defaultPts: Waypoint[] = [
+        { position: new THREE.Vector3(50, 115, 25), phase: 'TRAVERSE' },
+        { position: new THREE.Vector3(20, 115, 20), phase: 'TRAVERSE' },
+        { position: new THREE.Vector3(20, 50, 20), phase: 'TOUCH' },
+        { position: new THREE.Vector3(20, 65, 20), phase: 'RETRACT' },
+        { position: new THREE.Vector3(50, 115, 25), phase: 'TRAVERSE' },
+        { position: new THREE.Vector3(80, 115, 20), phase: 'TRAVERSE' },
+        { position: new THREE.Vector3(80, 50, 20), phase: 'TOUCH' },
+        { position: new THREE.Vector3(80, 65, 20), phase: 'RETRACT' },
+        { position: new THREE.Vector3(50, 115, 25), phase: 'TRAVERSE' },
+        { position: new THREE.Vector3(50, 115, 80), phase: 'TRAVERSE' },
+        { position: new THREE.Vector3(50, 50, 80), phase: 'TOUCH' },
+        { position: new THREE.Vector3(50, 65, 80), phase: 'RETRACT' },
+        { position: new THREE.Vector3(50, 115, 25), phase: 'TRAVERSE' },
+      ];
+      this.waypoints = defaultPts;
+      this.currentPosition.copy(defaultPts[0].position);
+    }
+  }
+
   public play(): void {
+    if (this.waypoints.length === 0) {
+      this.ensureDefaultWaypoints();
+    }
     if (this.waypoints.length > 0) {
       this.isPlaying = true;
       if (this.currentPhase === 'IDLE' || this.currentPhase === 'COMPLETED') {

@@ -22,8 +22,7 @@ function createWindow() {
   });
 
   const distIndexPath = path.join(__dirname, 'ui', 'dist', 'index.html');
-  const targetIndexPath = fs.existsSync(distIndexPath) ? distIndexPath : path.join(__dirname, 'ui', 'index.html');
-  mainWindow.loadFile(targetIndexPath);
+  mainWindow.loadFile(distIndexPath);
 
   // Shortcuts: F5 / Ctrl+R to reload, F12 to toggle DevTools
   mainWindow.webContents.on('before-input-event', (event, input) => {
