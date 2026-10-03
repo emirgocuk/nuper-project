@@ -22,6 +22,12 @@ export default defineConfig({
     outDir: path.resolve(__dirname, 'ui/dist'),
     emptyOutDir: true,
     target: 'esnext',
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'ui/index.html'),
+        app: path.resolve(__dirname, 'ui/src/main.ts')
+      }
+    }
   }
 });

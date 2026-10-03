@@ -1,10 +1,10 @@
 import { CoordinateAdapter, type PDFPoint, type CanvasPoint } from './adapters/CoordinateAdapter';
 
 export interface BalloonItem {
-  id: string;
-  nominal: number;
-  tolerance: { upper: number; lower: number };
-  bbox: [number, number, number, number];
+  id: string | number;
+  nominal?: number;
+  tolerance?: unknown;
+  bbox?: [number, number, number, number];
   pageHeight: number;
   confirmed?: boolean;
 }
@@ -59,6 +59,7 @@ export class DrawingCanvas {
 
     // Balonları çiz
     for (const b of this.balloons) {
+      if (!b.bbox) continue;
       const pdfPt: PDFPoint = { x: b.bbox[0], y: b.bbox[1], pageHeight: b.pageHeight };
       const canvasPt: CanvasPoint = CoordinateAdapter.pdfToCanvas(pdfPt, this.zoom);
 
@@ -79,7 +80,7 @@ export class DrawingCanvas {
       ctx.font = `bold ${Math.max(10, 11 * this.zoom)}px Inter, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(b.id, canvasPt.x, canvasPt.y);
+      ctx.fillText(String(b.id), canvasPt.x, canvasPt.y);
     }
 
     ctx.restore();
