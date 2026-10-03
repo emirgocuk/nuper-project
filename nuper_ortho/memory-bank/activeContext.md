@@ -80,11 +80,13 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
 - **Geliştirme Altyapısı 5 Fazlı Yol Haritası ve Granüler Yürütme Protokolü:**
   - [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) ve [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) doğrultusunda 5 ana faz alt adımlara (ara fazlara) bölündü.
   - **Kritik Kural:** Her alt adım için terminal kanıtı (execution proof) sunulmadan bir sonrakine geçilmez; tek adımda en fazla 3 dosya değiştirilir; ölü kod doğrudan silinir.
-  - **Aktif Faz:** **FAZ 4 (Mock IPC & İzole Tarayıcı Geliştirme Modu)** $\longrightarrow$ **Ara Faz 4.3 (Hızlı Geliştirme Modu ve Test Kanıtı)**.
-  - **Tamamlanan Alt Adımlar:**
-    - Ara Faz 4.1 (MockIpcProvider.ts ve birim testi tamamlandı).
-    - Ara Faz 4.2 (.dev/mocks/ altında aski_kancasi.json ve avionic_panel.json şemaya uygun test verileri üretildi).
-  - **Sıradaki Adım:** `package.json` dev:mock ve `?mock=true` hızlı açılış modunun test doğrulaması.
+  - **Aktif Faz:** **FAZ 5 (Regresyon Temizliği, Golden Benchmarks & scratch/ Tasfiyesi)** $\longrightarrow$ **Ara Faz 5.1 (scratch/ Analizi ve Kalıcı Test Taşınması)**.
+  - **Tamamlanan Fazlar:**
+    - **FAZ 1:** Sözleşmeler ve Tip Otomasyonu (SSOT Schemas, Codegen, TypeScript `.d.ts` & Python Pydantic).
+    - **FAZ 2:** Görev Koşucusu & Geliştirme Kafesi (Task Runner, Pre-Commit Hook Kalkanı, AGENTS.md Protokolü).
+    - **FAZ 3:** Frontend Modülerleştirme & Three.js Bellek Temizliği (SceneCleaner, geometry.worker, CADViewer, DrawingCanvas, Vite bundle).
+    - **FAZ 4:** Mock IPC & İzole Tarayıcı Geliştirme Modu (Ara Faz 4.1 MockIpcProvider.ts, Ara Faz 4.2 .dev/mocks/*.json, Ara Faz 4.3 npm run dev:mock & MockDevMode.test.ts).
+  - **Sıradaki Adım:** FAZ 5 / Ara Faz 5.1 (`scratch/` script analizleri ve kalıcı testlere taşınması).
 
 
 

@@ -7,7 +7,7 @@
     "start": "electron .",
     "app": "electron .",
     "dev": "concurrently -k \"vite\" \"electron .\"",
-    "dev:mock": "vite",
+    "dev:mock": "vite --mode mock",
     "build": "vite build",
     "codegen": "node scripts/codegen.mjs",
     "check:types": "tsc --noEmit",
@@ -19,7 +19,8 @@
     "test:rust": "cargo check --workspace",
     "test:fast": "cargo check --workspace && python -m pytest tools/tests -q",
     "check:all": "npm run check:types && npm run test:ui && npm run test:python && npm run test:rust",
-    "test:all": "npm run check:types && npm run test:ui && npm run test:python && npm run test:rust"
+    "test:all": "npm run check:types && npm run test:ui && npm run test:python && npm run test:rust",
+    "prepare": "husky"
   },
   "keywords": [
     "metrology",
