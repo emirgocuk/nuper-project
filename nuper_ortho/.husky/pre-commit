@@ -1,0 +1,7 @@
+#!/bin/sh
+# Nuper Ortho Git Pre-Commit Hook
+if [ -d "nuper_ortho" ]; then
+  cd nuper_ortho || exit 1
+fi
+
+npm run precommit
