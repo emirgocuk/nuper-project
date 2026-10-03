@@ -118,17 +118,10 @@ function createWindow() {
   // Extract Metrology Data & Dimensions from 2D Drawing
   ipcMain.handle('extract-drawing-data', async (event, targetPath) => {
     try {
-      let resolved = path.resolve(targetPath);
-      if (!fs.existsSync(resolved)) {
-        const testPath = path.resolve(__dirname, 'test_assets', targetPath);
-        if (fs.existsSync(testPath)) resolved = testPath;
-      }
-      if (!fs.existsSync(resolved)) return null;
-
       const { execFile } = require('child_process');
       const scriptPath = path.join(__dirname, 'tools', 'drawing_extractor.py');
       return new Promise((resolve) => {
-        execFile('python', [scriptPath, resolved], { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+        execFile('python', [scriptPath, targetPath], { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
           if (err) {
             console.warn('drawing_extractor.py failed, error:', err);
             resolve(null);

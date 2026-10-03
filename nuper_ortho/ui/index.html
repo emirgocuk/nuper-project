@@ -8588,10 +8588,10 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
           title_block: { drawing_number: file.name, material: "7075-T6 / Alüminyum", general_tolerance: "ISO 2768-mK" },
           datums: ['A', 'B', 'C'],
           dimensions: [
-            { id: 1, balloon: '#1', type: 'DIAMETER', nominal: 20.0, nominal_str: 'Ø20 H7 (+0.021/0)', upper_tol: '+0.021', lower_tol: '0.000', measured: '20.004 mm', status: 'PASS', icon: '⭕', gdt: '⌖ Ø 0.020 Ⓜ | A' },
-            { id: 2, balloon: '#2', type: 'RADIUS', nominal: 2.5, nominal_str: '2x R2.5', upper_tol: '+0.100', lower_tol: '-0.100', measured: '2.512 mm', status: 'PASS', icon: '📐', gdt: '⌒ 0.050 | A' },
-            { id: 3, balloon: '#3', type: 'LINEAR', nominal: 14.4, nominal_str: '14.4 ±0.1 mm', upper_tol: '+0.100', lower_tol: '-0.100', measured: '14.404 mm', status: 'PASS', icon: '📏', gdt: '| A | B' },
-            { id: 4, balloon: '#4', type: 'THREAD', nominal: 0, nominal_str: '3/4-16 UNF / M8', upper_tol: '6H/2B', lower_tol: 'MIN', measured: 'GEÇER ✓', status: 'PASS', icon: '🧵', gdt: 'Diş Emniyet Protokolü' }
+            { id: 1, balloon: '#1', type: 'LINEAR', nominal: 395.5, nominal_str: '395.5', upper_tol: '+0.800', lower_tol: '-0.800', measured: '395.504 mm', status: 'PASS', icon: '📏', gdt: '| A' },
+            { id: 2, balloon: '#2', type: 'LINEAR', nominal: 305.2, nominal_str: '305.2', upper_tol: '+0.500', lower_tol: '-0.500', measured: '305.204 mm', status: 'PASS', icon: '📏', gdt: '| A' },
+            { id: 3, balloon: '#3', type: 'LINEAR', nominal: 35.0, nominal_str: '35 (-0.2/0)', upper_tol: '0.000', lower_tol: '-0.200', measured: '34.985 mm', status: 'PASS', icon: '📏', gdt: '| A | B' },
+            { id: 4, balloon: '#4', type: 'PROFILE', nominal: 0.0, nominal_str: 'Profil 0.5 | A', upper_tol: '+0.500', lower_tol: '0.000', measured: '0.025 mm', status: 'PASS', icon: '⌒', gdt: '⌒ 0.500 | A' }
           ]
         };
         loadDrawingData(fallbackData, url, file.name);
