@@ -662,8 +662,8 @@
 | | **2.3 Ajan Protokolü & Kanıt** | `AGENTS.md` katı kuralları ve birleşik test çalıştırması | `AGENTS.md` | `npm run check:all` terminal logu | ✅ **Tamamlandı** |
 | **FAZ 3** | **3.1 SceneCleaner** | WebGL VRAM ve Three.js özyinelemeli kaynak temizleme | `SceneCleaner.ts`, `SceneCleaner.test.ts` | Vitest disposal testi (6 test PASS) | ✅ **Tamamlandı** |
 | | **3.2 Web Worker** | Jacobi PCA ve Earclip için arka plan Web Worker katmanı (16 ms kuralı) | `geometry.worker.ts`, `geometry.worker.test.ts` | Worker transfer testi (3 test PASS) | ✅ **Tamamlandı** |
-| | **3.3 CAD Modülleri** | Three.js sahnesi ve kamera kontrollerinin bağımsız TS modüllerine taşınması | `CADViewer.ts`, `DrawingCanvas.ts` | Modül derleme kontrolü | 🟡 **Aktif (Sıradaki)** |
-| | **3.4 Vite Build Kanıtı** | Vite bundle derlemesinin 0 hatayla üretilmesinin kanıtı | `vite.config.mjs`, `ui/src/main.ts` | `npm run build` (0 error) | 📋 *Planlandı* |
+| | **3.3 CAD Modülleri** | Three.js sahnesi ve kamera kontrollerinin bağımsız TS modüllerine taşınması | `CADViewer.ts`, `DrawingCanvas.ts` | Modül tip ve derleme kontrolü | ✅ **Tamamlandı** |
+| | **3.4 Vite Build Kanıtı** | Vite bundle derlemesinin 0 hatayla üretilmesinin kanıtı | `vite.config.mjs`, `ui/src/main.ts` | `npm run build` (0 error) | 🟡 **Aktif (Sıradaki)** |
 | **FAZ 4** | **4.1 Mock IPC Provider** | Standart tarayıcıda Electron `ipcRenderer` simülasyonu | `MockIpcProvider.ts` | Headless IPC testi | 📋 *Planlandı* |
 | | **4.2 Statik Numuneler** | Askı Kancası ve Avionic Panel için gerçekçi test verileri | `.dev/mocks/*.json` | JSON Schema validasyonu | 📋 *Planlandı* |
 | | **4.3 Hızlı Dev Modu & Kanıt** | `?mock=true` ile 1 saniyede açılış ve mock test doğrulaması | `MockIpcProvider.test.ts`, `package.json` | Vitest mock test PASS logu | 📋 *Planlandı* |

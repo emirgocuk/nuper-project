@@ -80,11 +80,12 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
 - **Geliştirme Altyapısı 5 Fazlı Yol Haritası ve Granüler Yürütme Protokolü:**
   - [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) ve [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) doğrultusunda 5 ana faz alt adımlara (ara fazlara) bölündü.
   - **Kritik Kural:** Her alt adım için terminal kanıtı (execution proof) sunulmadan bir sonrakine geçilmez; tek adımda en fazla 3 dosya değiştirilir; ölü kod doğrudan silinir.
-  - **Aktif Faz:** **FAZ 3 (Frontend Modülerleştirme & Three.js Bellek Temizliği)** $\longrightarrow$ **Ara Faz 3.3 (CAD & Çizim Modüllerinin Ayrıştırılması)**.
+  - **Aktif Faz:** **FAZ 3 (Frontend Modülerleştirme & Three.js Bellek Temizliği)** $\longrightarrow$ **Ara Faz 3.4 (Vite Yapılandırması ve Production Bundle Doğrulaması)**.
   - **Tamamlanan Alt Adımlar:**
-    - Ara Faz 3.1 (SceneCleaner.ts yazıldı, 6 birim testi %100 PASS aldı).
-    - Ara Faz 3.2 (geometry.worker.ts arka plan Web Worker katmanı yazıldı, 3 birim testi %100 PASS aldı; 16 ms / 60 FPS kuralı sağlandı).
-  - **Sıradaki Adım:** `ui/src/modules/cad/` ve `ui/src/modules/drawing/` modüler bileşenlerinin yapılandırılması ve Vite build doğrulaması.
+    - Ara Faz 3.1 (SceneCleaner.ts ve birim testi tamamlandı).
+    - Ara Faz 3.2 (geometry.worker.ts ve birim testi tamamlandı).
+    - Ara Faz 3.3 (CADViewer.ts ve DrawingCanvas.ts modülleri yazıldı; 3D Three.js ve 2D Canvas mantıkları monolitik yapıdan bağımsız modüllere aktarıldı).
+  - **Sıradaki Adım:** Vite derleme kontrolü (`npm run build`) ile 0 hatayla bundle üretiminin kanıtlanması.
 
 
 
