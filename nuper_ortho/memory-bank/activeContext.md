@@ -80,11 +80,10 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
 - **Geliştirme Altyapısı 5 Fazlı Yol Haritası ve Granüler Yürütme Protokolü:**
   - [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) ve [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) doğrultusunda 5 ana faz alt adımlara (ara fazlara) bölündü.
   - **Kritik Kural:** Her alt adım için terminal kanıtı (execution proof) sunulmadan bir sonrakine geçilmez; tek adımda en fazla 3 dosya değiştirilir; ölü kod doğrudan silinir.
-  - **Aktif Faz:** **FAZ 3 (Frontend Modülerleştirme & Three.js Bellek Temizliği)** $\longrightarrow$ **Ara Faz 3.1 (SceneCleaner: WebGL VRAM & Geometri Temizleme Motoru)**.
-  - **Tamamlanan Fazlar:**
-    - **FAZ 1:** Sözleşmeler ve Tip Otomasyonu (SSOT Schemas, Codegen, TypeScript `.d.ts` & Python Pydantic).
-    - **FAZ 2:** Görev Koşucusu & Geliştirme Kafesi (Ara Faz 2.1 Task Runner, Ara Faz 2.2 Git Pre-Commit Hook Kalkanı, Ara Faz 2.3 AGENTS.md Protokolü ve `npm run check:all` ile tam yeşil test doğrulaması).
-  - **Sıradaki Adım:** FAZ 3 / Ara Faz 3.1 (`SceneCleaner.ts` ve Vitest bellek temizleme testi).
+  - **Aktif Faz:** **FAZ 3 (Frontend Modülerleştirme & Three.js Bellek Temizliği)** $\longrightarrow$ **Ara Faz 3.2 (Ağır Matematik Web Worker Katmanı: geometry.worker.ts)**.
+  - **Tamamlanan Alt Adımlar:**
+    - Ara Faz 3.1 (SceneCleaner.ts yazıldı, 6 birim testi %100 PASS aldı; WebGL VRAM, geometri, materyal ve context loss temizliği doğrulandı).
+  - **Sıradaki Adım:** `geometry.worker.ts` Web Worker entegrasyonu ve transfer testi.
 
 
 
