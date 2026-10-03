@@ -990,16 +990,16 @@ FEATURES:
       overflow: hidden;
     }
 
-    /* 2D Çizim Kanvası (Çift Kanvas Modu Açıkken Sol Yarı) */
+    /* 2D Çizim Kanvası (Çift Kanvas Modu: Zorunlu Bölünmüş Görünüm / 3D Sahne ile %50-%50) */
     .canvas-2d-pane {
+      display: flex !important;
+      flex: 1 1 50% !important;
       width: 50% !important;
-      flex: 0 0 50% !important;
-      min-width: 380px !important;
+      min-width: 400px !important;
       max-width: 60% !important;
       height: 100%;
       background: #FFFFFF;
       border-right: 2px solid var(--border-color);
-      display: none;
       flex-direction: column;
       position: relative;
       overflow: hidden;
@@ -1033,9 +1033,12 @@ FEATURES:
       justify-content: center;
     }
 
-    /* 3D Üç Boyutlu Viewport */
+    /* 3D Üç Boyutlu Viewport (%50-%50 Yan Yana Bölünmüş Görünüm) */
     .viewport-3d-pane {
-      flex: 1;
+      display: flex !important;
+      flex: 1 1 50% !important;
+      width: 50% !important;
+      min-width: 400px !important;
       position: relative;
       height: 100%;
     }
@@ -1352,6 +1355,38 @@ FEATURES:
       background: var(--color-primary-dark);
     }
 
+    .speed-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: #E2E8F0;
+      padding: 2px 4px;
+      border-radius: 6px;
+      margin-left: 2px;
+      margin-right: 4px;
+    }
+    .speed-controls button {
+      background: transparent;
+      border: none;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #475569;
+      padding: 2px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: var(--font-mono);
+      line-height: 1.4;
+    }
+    .speed-controls button:hover {
+      background: #CBD5E1;
+      color: #0F172A;
+    }
+    .speed-controls button.active {
+      background: #0284C7;
+      color: #FFFFFF;
+    }
+
     .progress-slider {
       width: 320px;
       accent-color: var(--color-primary);
@@ -1550,17 +1585,22 @@ FEATURES:
 
     /* FAZ 12: 2D TEKNIK RESIM KANVASI (GERÇEK DOSYA GORUNTULEME) */
     #drawing-viewer-container {
+      display: flex !important;
+      flex: 1;
+      width: 50%;
+      min-width: 400px;
+      height: calc(100% - 36px);
       position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
+      overflow: auto;
       cursor: grab;
       background: #FAFAFA;
+      align-items: center;
+      justify-content: center;
     }
     #drawing-viewer-container:active { cursor: grabbing; }
     #drawing-viewer-container img,
     #drawing-viewer-container canvas {
-      position: absolute;
+      position: relative;
       transform-origin: 0 0;
       max-width: none;
     }
@@ -2102,62 +2142,19 @@ FEATURES:
     <!-- Orta Bölüm: Çift Kanvas / 3D Dijital İkiz Görünümü -->
     <main class="center-workspace">
 
-      <!-- 2D Teknik Resim Kanvası (Çift Kanvas Modu) -->
-      <section class="canvas-2d-pane" id="dual-canvas-2d">
+      <!-- 2D Teknik Resim Kanvası (Çift Kanvas Modu: Zorunlu Bölünmüş Görünüm / %50-%50) -->
+      <section class="canvas-2d-pane active" id="dual-canvas-2d" style="display: flex; flex: 1 1 50%; width: 50%; min-width: 400px;">
         <div class="pane-toolbar">
           <span>2D Teknik Resim & Balon Eşleme (Drawing PDF / Sheet 1)</span>
           <span style="font-size: 10px; color: var(--color-datum);" id="drawing-pane-status">Gerçek PDF Görüntüleyici</span>
         </div>
-        <div id="drawing-viewer-container" style="width: 100%; height: calc(100% - 32px); position: relative; overflow: hidden; background: #FAFAFA; display: none;"></div>
-        <div class="svg-drawing-container" id="drawing-svg-area">
-          <!-- 2D Teknik Resim Vektör Çizimi -->
-          <svg width="460" height="340" viewBox="0 0 460 340" style="border: 1px solid #E2E8F0; background: #FFF;">
-            <!-- Dış Çerçeve ve Başlık Bloğu (Title Block) -->
-            <rect x="20" y="20" width="420" height="300" fill="none" stroke="#0F172A" stroke-width="1.5"/>
-            <rect x="240" y="260" width="200" height="60" fill="none" stroke="#0F172A" stroke-width="1"/>
-            <text x="250" y="280" font-size="11" font-family="sans-serif" font-weight="700">VALVE BODY OP10</text>
-            <text x="250" y="296" font-size="9" font-family="sans-serif" fill="#64748B">REV 3.2 | MAT: 7075-T6 | ISO 2768-mK</text>
-            <text x="250" y="310" font-size="9" font-family="sans-serif" fill="#0284C7">NUPER ORTHO AI CAD/BREP MATCHED</text>
-
-            <!-- Parça Üst Görünüş Çizimi -->
-            <rect x="70" y="50" width="180" height="180" fill="#F8FAFC" stroke="#0F172A" stroke-width="2"/>
-            
-            <!-- Datum A (Üst Yüzey) İkaz Çizgisi -->
-            <line x1="70" y1="50" x2="250" y2="50" stroke="#059669" stroke-width="3"/>
-            <!-- Datum B (Ön Yüzey) Çizgisi -->
-            <line x1="70" y1="230" x2="250" y2="230" stroke="#3B82F6" stroke-width="3"/>
-            <!-- Datum C (Sol Yüzey) Çizgisi -->
-            <line x1="70" y1="50" x2="70" y2="230" stroke="#EAB308" stroke-width="3"/>
-
-            <!-- BORE_20_H7 İç Delik -->
-            <circle cx="160" cy="140" r="32" fill="#E0F2FE" stroke="#0284C7" stroke-width="2"/>
-            <circle cx="160" cy="140" r="1.5" fill="#0284C7"/>
-            <line x1="160" y1="100" x2="160" y2="180" stroke="#94A3B8" stroke-dasharray="3,3"/>
-            <line x1="120" y1="140" x2="200" y2="140" stroke="#94A3B8" stroke-dasharray="3,3"/>
-
-            <!-- M8 Dişli Delik -->
-            <circle cx="215" cy="85" r="14" fill="#F5F3FF" stroke="#8B5CF6" stroke-width="1.5"/>
-            <circle cx="215" cy="85" r="17" fill="none" stroke="#8B5CF6" stroke-dasharray="4,2"/>
-
-            <!-- Airfoil Serbest Eğrisi -->
-            <path d="M 90 80 Q 130 65 170 85 T 230 115" fill="none" stroke="#EC4899" stroke-width="2.5"/>
-
-            <!-- Unresolved Slot (Bekleyen Kanal) -->
-            <rect x="85" y="180" width="40" height="18" rx="9" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5" stroke-dasharray="2,2"/>
-          </svg>
-
-          <!-- 2D Balonlar (Callout Overlays) -->
-          <div class="balloon matched" id="balloon-1" style="left: 170px; top: 38px;" title="Balon 1: Datum A" onclick="selectFeature('datum_a')">1</div>
-          <div class="balloon matched" id="balloon-2" style="left: 170px; top: 245px;" title="Balon 2: Datum B" onclick="selectFeature('datum_b')">2</div>
-          <div class="balloon matched" id="balloon-3" style="left: 175px; top: 150px;" title="Balon 3: BORE_20_H7" onclick="selectFeature('bore_h7')">3</div>
-          <div class="balloon matched" id="balloon-4" style="left: 235px; top: 75px;" title="Balon 4: THREAD_M8" onclick="selectFeature('thread_m8')">4</div>
-          <div class="balloon matched" id="balloon-5" style="left: 130px; top: 65px;" title="Balon 5: AIRFOIL" onclick="selectFeature('airfoil')">5</div>
-          <div class="balloon unmatched" id="balloon-6" style="left: 95px; top: 200px;" title="Balon 6: Doğrulama Bekliyor (%65)" onclick="selectFeature('unresolved_slot')">6</div>
+        <div id="drawing-viewer-container" style="display: flex; flex: 1; width: 100%; height: calc(100% - 36px); min-width: 400px; position: relative; overflow: auto; background: #FAFAFA;">
+          <canvas id="drawing-viewport-canvas" class="drawing-pdf-canvas" style="display: block; width: 100%; height: 100%;"></canvas>
         </div>
       </section>
 
-      <!-- 3D Three.js Viewport -->
-      <section class="viewport-3d-pane">
+      <!-- 3D Three.js Viewport (%50-%50 Bölünmüş Görünüm) -->
+      <section class="viewport-3d-pane" style="display: flex; flex: 1 1 50%; width: 50%; min-width: 400px;">
         <div id="webgl-canvas"></div>
                 <!-- Birleşik Metroloji & CAD Telemetri Paneli (Unified Zero-Blur HUD) -->
         <div class="canvas-overlay-hud" id="unified-metro-hud" style="top: 12px; left: 12px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 4px 14px rgba(0,0,0,0.08); min-width: 280px;">
@@ -2234,8 +2231,14 @@ FEATURES:
   <footer class="timeline-drawer">
     <div class="timeline-bar">
       <div class="player-controls">
-        <button class="play-btn" id="play-pause-btn" onclick="toggleSimulation()">▶</button>
-        <input type="range" class="progress-slider" id="time-slider" min="0" max="100" value="0" oninput="seekSimulation(this.value)">
+        <button class="play-btn" id="play-pause-btn">▶</button>
+        <div class="speed-controls">
+          <button data-speed="0.5">0.5x</button>
+          <button data-speed="1.0">1x</button>
+          <button data-speed="2.0">2x</button>
+          <button data-speed="5.0" class="active">5x</button>
+        </div>
+        <input type="range" class="progress-slider" id="time-slider" min="0" max="100" value="0">
         <span class="timeline-time" id="time-display">00:00 / 00:34</span>
       </div>
       <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: flex; gap: 14px;">
@@ -3193,8 +3196,6 @@ FEATURES:
     let uploadedMeshGroup = null;
     let modelRotation = { x: 0, y: 0, z: 0, zOffset: 0 };
     let totalWaypoints = 1;
-    let animProgress = 0.0;
-    let isPlaying = false;
     let activeFeatureKey = 'bore_h7';
     var featureDatabase = window.featureDatabase = window.featureDatabase || {};
     let currentUploadedCad = {
@@ -3975,8 +3976,8 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
     }
 
     function togglePlay() {
-      if (typeof toggleSimulation === 'function') {
-        toggleSimulation();
+      if (window.nuperApp) {
+        window.nuperApp.getCADViewer().getSimulationController().togglePlay();
       }
     }
     function openAxisOrientModal() {
@@ -4507,104 +4508,49 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
         scene.add(dotMesh);
         window.touchPointMeshes.push(dotMesh);
       });
+
+      syncSimControllerWaypoints();
     }
 
-    function simLoop() {
-      if (isPlaying) {
-        animProgress += 0.0035;
-        if (animProgress > 1.0) animProgress = 0.0;
-        document.getElementById('time-slider').value = Math.floor(animProgress * 100);
-        updateProbePosition();
-        requestRender();
-        requestAnimationFrame(simLoop);
-      }
-    }
-
-    function updateProbePosition() {
-      if (trajectoryPoints.length < 2) return;
-      totalWaypoints = Math.max(1, trajectoryPoints.length - 1);
-      const totalDistIndex = animProgress * totalWaypoints;
-      const currentIndex = Math.floor(totalDistIndex);
-      const nextIndex = Math.min(currentIndex + 1, totalWaypoints);
-      const alpha = totalDistIndex - currentIndex;
-
-      const p1 = trajectoryPoints[currentIndex];
-      const p2 = trajectoryPoints[nextIndex];
-      if (!p1 || !p2) return;
-
-      const currentPos = new THREE.Vector3().lerpVectors(p1, p2, alpha);
-      // Bilye ucunu hedef noktaya oturtmak için kafa montaj ofseti (+20 mm)
-      probeGroup.position.set(currentPos.x, currentPos.y + 20, currentPos.z);
-
-      // 5-Eksen Kafa Açı Kinematiği İnterpolasyonu (PH10 A/B Rotasyonu)
-      if (ph10Pivot) {
-        if (p1.y > p2.y + 2) {
-          // Dalış
-          ph10Pivot.rotation.x = 0;
-          ph10Pivot.rotation.y = 0;
-        } else if (p1.distanceTo(p2) > 8) {
-          ph10Pivot.rotation.x = Math.sin(alpha * Math.PI) * 0.12;
-        } else {
-          ph10Pivot.rotation.x *= 0.92;
-          ph10Pivot.rotation.y *= 0.92;
+    function syncSimControllerWaypoints() {
+      if (window.nuperApp && trajectoryPoints && trajectoryPoints.length > 0) {
+        const simCtrl = window.nuperApp.getCADViewer().getSimulationController();
+        const waypoints = trajectoryPoints.map((p, idx) => ({
+          position: p.clone(),
+          phase: (idx % 4 === 2 ? 'TOUCH' : (idx % 4 === 3 ? 'RETRACT' : 'TRAVERSE'))
+        }));
+        simCtrl.setWaypoints(waypoints);
+        if (typeof probeGroup !== 'undefined') {
+          simCtrl.bindProbeObject(probeGroup, new THREE.Vector3(0, 20, 0));
         }
-      }
-
-      // Dokunma Anında Temas Dalgası & Canlı Unsur Bildirimi (Touch Ripple Trigger)
-      touchPoints.forEach(tp => {
-        if (currentPos.distanceTo(tp.pos) < 2.5 && alpha > 0.8) {
-          triggerContactRipple(tp.pos.x, tp.pos.y, tp.pos.z);
-          const fName = document.getElementById('hud-feature-name');
-          if (fName && tp.label) {
-            fName.innerText = tp.label;
+        simCtrl.onUpdate((state) => {
+          if (typeof requestRender === 'function') requestRender();
+          if (typeof ph10Pivot !== 'undefined' && ph10Pivot) {
+            ph10Pivot.rotation.x *= 0.95;
+            ph10Pivot.rotation.y *= 0.95;
           }
-        }
-      });
-
-      // Canlı HUD Telemetrisi
-      const hudCoords = document.getElementById('hud-feature-coords');
-      if (hudCoords) {
-        hudCoords.innerText = `Prob: X: ${currentPos.x.toFixed(2)} mm | Y: ${currentPos.y.toFixed(2)} mm | Z: ${currentPos.z.toFixed(2)} mm | A: ${(ph10Pivot.rotation.x * 57.3).toFixed(1)}° B: ${(ph10Pivot.rotation.y * 57.3).toFixed(1)}°`;
-      }
-
-      // Canlı Kod Satırı Senkronizasyonu (G-Code / DMIS Path Sync)
-      const codeLines = document.querySelectorAll('.code-line');
-      if (codeLines.length > 0) {
-        const activeLineIdx = Math.min(Math.floor(animProgress * Math.min(codeLines.length, 25)), codeLines.length - 1);
-        codeLines.forEach((cl, idx) => {
-          cl.classList.toggle('active', idx === activeLineIdx);
+          if (typeof touchPoints !== 'undefined' && touchPoints.length > 0) {
+            touchPoints.forEach(tp => {
+              if (state.currentPosition.distanceTo(tp.pos) < 2.5) {
+                if (typeof triggerContactRipple === 'function') {
+                  triggerContactRipple(tp.pos.x, tp.pos.y, tp.pos.z);
+                }
+                const fName = document.getElementById('hud-feature-name');
+                if (fName && tp.label) {
+                  fName.innerText = tp.label;
+                }
+              }
+            });
+          }
         });
       }
-
-      const sec = Math.floor(animProgress * 34);
-      document.getElementById('time-display').innerText = `00:${sec < 10 ? '0' + sec : sec} / 00:34`;
-    }
-
-    function toggleSimulation() {
-      isPlaying = !isPlaying;
-      document.getElementById('play-pause-btn').innerText = isPlaying ? '⏸' : '▶';
-      if (isPlaying) {
-        document.getElementById('gpu-indicator').innerText = "GPU: %12 Aktif";
-        document.getElementById('gpu-indicator').style.color = "#0284C7";
-        simLoop();
-      } else {
-        updateGpuBadge();
-      }
-    }
-
-    function seekSimulation(val) {
-      isPlaying = false;
-      document.getElementById('play-pause-btn').innerText = '▶';
-      animProgress = val / 100.0;
-      updateProbePosition();
-      requestRender();
-      updateGpuBadge();
     }
 
     function updateGpuBadge() {
-      if (!isPlaying) {
-        document.getElementById('gpu-indicator').innerText = "GPU: %0 Boşta";
-        document.getElementById('gpu-indicator').style.color = "#059669";
+      const gpuEl = document.getElementById('gpu-indicator');
+      if (gpuEl) {
+        gpuEl.innerText = "GPU: %0 Boşta";
+        gpuEl.style.color = "#059669";
       }
     }
 
@@ -4900,20 +4846,8 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
       const activeNode = document.getElementById(`node-${key}`);
       if (activeNode) activeNode.classList.add('active');
 
-      // 2D Balon Çift Yönlü Vurgulama (Cross-Highlighting)
-      const balloonMap = {
-        'datum_a': 'balloon-1',
-        'datum_b': 'balloon-2',
-        'bore_h7': 'balloon-3',
-        'thread_m8': 'balloon-4',
-        'airfoil': 'balloon-5',
-        'unresolved_slot': 'balloon-6'
-      };
-      document.querySelectorAll('.balloon').forEach(b => b.classList.remove('active-balloon'));
-      const targetBalloonId = balloonMap[key];
-      if (targetBalloonId) {
-        const balloonEl = document.getElementById(targetBalloonId);
-        if (balloonEl) balloonEl.classList.add('active-balloon');
+      if (window.nuperApp) {
+        window.nuperApp.getDrawingCanvas().selectBalloon(key);
       }
 
       requestRender();
@@ -4945,7 +4879,7 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
     // ==========================================================================
     // 8. ÇİFT KANVAS MODU (DUAL CANVAS 2D/3D SPLIT VIEW)
     // ==========================================================================
-    let isDualCanvas = false;
+    let isDualCanvas = true;
     function toggleDualCanvas() {
       isDualCanvas = !isDualCanvas;
       const pane2d = document.getElementById('dual-canvas-2d');
@@ -7354,7 +7288,7 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
         e.preventDefault();
-        toggleSimulation();
+        togglePlay();
       } else if (e.key === 'f' || e.key === 'F') {
         focusCurrentFeature();
       } else if (e.key === '1') {
@@ -7590,7 +7524,6 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
     }
 
     // --- 2D Teknik Resim Görüntüleme (PNG / JPG / SVG) ---
-    let drawingState = { scale: 1, panX: 0, panY: 0, dragging: false, lastX: 0, lastY: 0 };
 
     function handleDrawingFileUpload(event) {
       const file = event.target.files[0];
@@ -8365,12 +8298,10 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
       if (!isDualCanvas) toggleDualCanvas();
 
       const container = document.getElementById('drawing-viewer-container');
-      const svgArea = document.getElementById('drawing-svg-area');
       const paneTitle = document.querySelector('#dual-canvas-2d .pane-toolbar span');
       const paneStatus = document.getElementById('drawing-pane-status');
 
       if (!container) return;
-      if (svgArea) svgArea.style.display = 'none';
       container.style.display = 'block';
 
       if (paneTitle) paneTitle.innerText = '2D Teknik Resim: ' + filename;
@@ -8391,27 +8322,14 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
         }
       }
 
-      container.innerHTML = `
-        <div style="position: relative; width: 100%; height: 100%; overflow: hidden;" id="drawing-inner-wrapper">
-          ${isPdfFile 
-            ? `<iframe id="pdf-drawing-frame" src="${finalUrl}#toolbar=0&navpanes=0" style="width: 100%; height: 100%; border: none; background: #FFFFFF;"></iframe>`
-            : `<img src="${srcUrlOrBase64}" style="max-width: 100%; max-height: 100%; draggable: false;" id="loaded-drawing-img">`
+      if (window.nuperApp) {
+        const dc = window.nuperApp.getDrawingCanvas();
+        if (dc) {
+          dc.mount('#drawing-viewport-canvas');
+          if (finalUrl) {
+            dc.loadPdf(finalUrl);
           }
-          <!-- İnteraktif Balon Katmanı (Callout Overlay Layer) -->
-          <div id="drawing-balloon-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
-          
-          <div class="drawing-toolbar" style="position: absolute; bottom: 8px; right: 8px; z-index: 50; display: flex; gap: 4px;">
-            <button class="btn-header" style="background:#0284C7; color:#fff; font-size:10px; font-weight:700;" onclick="switchSidebarTab('drawing')">📋 Ölçü Tablosunu Gör</button>
-            <button class="btn-header" style="background:#0F172A; color:#fff; font-size:10px;" onclick="window.open('${finalUrl}', '_blank')">🔍 Ayrı Pencerede Aç</button>
-            <button class="btn-header" style="background:#FFF; color:#334155; font-size:10px;" onclick="resetDrawingView()">↺ Orijinal</button>
-          </div>
-        </div>
-      `;
-
-      if (!isPdfFile) {
-        const img = document.getElementById('loaded-drawing-img');
-        drawingState = { scale: 1, panX: 0, panY: 0, dragging: false, lastX: 0, lastY: 0 };
-        setupDrawingPanZoom(container, img);
+        }
       }
     }
 
@@ -8475,30 +8393,18 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
         });
       }
 
-      // İnteraktif Balonları Çizim Üzerine Yerleştir
       if (balloonOverlay) {
         balloonOverlay.innerHTML = '';
-        const stepAngle = (2 * Math.PI) / Math.max(1, dims.length);
-        dims.forEach((d, idx) => {
-          const marker = document.createElement('div');
-          marker.className = 'drawing-balloon-marker';
-          marker.id = `marker-balloon-${d.id}`;
-          marker.innerText = d.balloon ? d.balloon.replace('#', '') : (idx + 1);
-          marker.style.pointerEvents = 'auto';
-
-          // Çizim etrafına dağıt
-          const posX = 15 + Math.round(70 * (0.5 + 0.42 * Math.cos(idx * stepAngle)));
-          const posY = 15 + Math.round(70 * (0.5 + 0.42 * Math.sin(idx * stepAngle)));
-          marker.style.left = posX + '%';
-          marker.style.top = posY + '%';
-
-          marker.onclick = (e) => {
-            e.stopPropagation();
-            selectDrawingDimension(d);
-          };
-
-          balloonOverlay.appendChild(marker);
-        });
+      }
+      if (window.nuperApp) {
+        window.nuperApp.loadDrawingData(data);
+        const dc = window.nuperApp.getDrawingCanvas();
+        if (dc) {
+          dc.mount('#drawing-viewport-canvas');
+          if (fileUrlOrBase64) {
+            dc.loadPdf(fileUrlOrBase64);
+          }
+        }
       }
 
       showToast(`📄 ${filename} İncelendi: ${dims.length} Ölçü ve Tolerans Çıkarıldı!`);
@@ -8610,20 +8516,13 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
     };
 
     function resetDrawingView() {
-      const container = document.getElementById('drawing-viewer-container');
-      const svgArea = document.getElementById('drawing-svg-area');
-      const paneTitle = document.querySelector('#dual-canvas-2d .pane-toolbar span');
-      const paneStatus = document.getElementById('drawing-pane-status');
-
-      if (container) {
-        container.innerHTML = '';
-        container.style.display = 'none';
+      if (window.nuperApp) {
+        const dc = window.nuperApp.getDrawingCanvas();
+        if (dc) {
+          dc.disableMockSvg();
+          dc.render();
+        }
       }
-      if (svgArea) {
-        svgArea.style.display = 'block';
-      }
-      if (paneTitle) paneTitle.innerText = '2D Teknik Resim & Balon Eşleme (Drawing PDF / Sheet 1)';
-      if (paneStatus) paneStatus.innerText = '5/6 Eşleşti (%83)';
     }
 
     async function runAutomatedBenchmarkSuite() {
@@ -8680,58 +8579,7 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
     }
 
 
-    function setupDrawingPanZoom(container, img) {
-      container.addEventListener('wheel', function(e) {
-        e.preventDefault();
-        const factor = e.deltaY < 0 ? 1.1 : 0.9;
-        drawingState.scale *= factor;
-        drawingState.scale = Math.max(0.2, Math.min(drawingState.scale, 8));
-        img.style.transform = 'translate(' + drawingState.panX + 'px, ' + drawingState.panY + 'px) scale(' + drawingState.scale + ')';
-      });
 
-      container.addEventListener('mousedown', function(e) {
-        drawingState.dragging = true;
-        drawingState.lastX = e.clientX;
-        drawingState.lastY = e.clientY;
-        container.style.cursor = 'grabbing';
-      });
-
-      container.addEventListener('mousemove', function(e) {
-        if (!drawingState.dragging) return;
-        drawingState.panX += e.clientX - drawingState.lastX;
-        drawingState.panY += e.clientY - drawingState.lastY;
-        drawingState.lastX = e.clientX;
-        drawingState.lastY = e.clientY;
-        img.style.transform = 'translate(' + drawingState.panX + 'px, ' + drawingState.panY + 'px) scale(' + drawingState.scale + ')';
-      });
-
-      container.addEventListener('mouseup', function() {
-        drawingState.dragging = false;
-        container.style.cursor = 'grab';
-      });
-
-      container.addEventListener('mouseleave', function() {
-        drawingState.dragging = false;
-        container.style.cursor = 'grab';
-      });
-    }
-
-    function drawingZoom(factor) {
-      drawingState.scale *= factor;
-      drawingState.scale = Math.max(0.2, Math.min(drawingState.scale, 8));
-      const img = document.querySelector('#drawing-viewer-container img');
-      if (img) {
-        img.style.transform = 'translate(' + drawingState.panX + 'px, ' + drawingState.panY + 'px) scale(' + drawingState.scale + ')';
-      }
-    }
-
-    function drawingReset() {
-      drawingState = { scale: 1, panX: 0, panY: 0, dragging: false, lastX: 0, lastY: 0 };
-      const img = document.querySelector('#drawing-viewer-container img');
-      if (img) {
-        img.style.transform = 'translate(0px, 0px) scale(1)';
-      }
-    }
 
     // trigger2dUpload fonksiyonunu güncelle
     trigger2dUpload = function() {
@@ -9397,5 +9245,6 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
     </div>
   </div>
 
+  <script type="module" src="./src/main.ts"></script>
 </body>
 </html>

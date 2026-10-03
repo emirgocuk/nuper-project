@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CADViewer } from './modules/cad/CADViewer';
+import { SimulationController } from './modules/cad/SimulationController';
 import { DrawingCanvas } from './modules/drawing/DrawingCanvas';
 import { InspectionTable } from './modules/inspection/InspectionTable';
 import { IpcClient, type SelectedCadFile, type SelectedDrawingFile, type BenchmarkSpecimenSuite } from './modules/ipc/IpcClient';
@@ -145,9 +146,39 @@ export class NuperApp {
     this.drawingCanvas.destroy();
     this.inspectionTable.clear();
   }
+
+  public mountDrawingCanvas(containerOrSelector: HTMLElement | string = '#drawing-viewport-canvas'): void {
+    this.drawingCanvas.mount(containerOrSelector);
+  }
 }
 
 if (typeof window !== 'undefined') {
-  (window as unknown as { nuperApp: NuperApp }).nuperApp = new NuperApp();
+  const app = new NuperApp();
+  (window as unknown as { nuperApp: NuperApp; DrawingCanvas: typeof DrawingCanvas; SimulationController: typeof SimulationController }).nuperApp = app;
+  (window as unknown as { DrawingCanvas: typeof DrawingCanvas }).DrawingCanvas = DrawingCanvas;
+  (window as unknown as { SimulationController: typeof SimulationController }).SimulationController = SimulationController;
+
+  const initApp = () => {
+    app.mountDrawingCanvas('#drawing-viewport-canvas');
+    SimulationController.wireSpeedButtons('.speed-controls', app.getCADViewer().getSimulationController());
+
+    const dc = app.getDrawingCanvas();
+    const defaultPdf = 'test_assets/KPT - 3051 Gobek Bagı Olugu/GOBEK BAGI OLUGU_TR_AB.pdf';
+    dc.loadPdf(defaultPdf)
+      .then(() => {
+        dc.setActivePage(2);
+        void dc.render();
+      })
+      .catch(() => {
+        void dc.render();
+      });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+  } else {
+    initApp();
+  }
 }
+
 

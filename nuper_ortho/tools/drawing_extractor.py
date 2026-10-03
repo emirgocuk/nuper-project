@@ -123,6 +123,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "overall_length_395_5",
                 "gdt": "| A",
+                "bbox": [409.0, 748.4, 464.3, 776.8],
             },
             {
                 "id": 2,
@@ -140,6 +141,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "dist_305_2",
                 "gdt": "| A",
+                "bbox": [408.1, 262.9, 464.6, 291.5],
             },
             {
                 "id": 3,
@@ -157,6 +159,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "width_35",
                 "gdt": "| A | B",
+                "bbox": [407.7, 472.1, 464.5, 523.6],
             },
             {
                 "id": 4,
@@ -174,6 +177,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "hole_4x_dia_2_5",
                 "gdt": "⌖ Ø 0.100 | A | B",
+                "bbox": [637.2, 562.7, 654.8, 569.9],
             },
             {
                 "id": 5,
@@ -191,6 +195,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "pin_2x_dia_6",
                 "gdt": "⌖ Ø 0.150 | A | B",
+                "bbox": [605.2, 244.3, 619.4, 251.6],
             },
             {
                 "id": 6,
@@ -208,6 +213,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "profile_surf_0_5",
                 "gdt": "⌒ 0.500 | A",
+                "bbox": [222.1, 293.2, 277.3, 301.7],
             },
             {
                 "id": 7,
@@ -225,6 +231,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "detay_m_spacing_36_5",
                 "gdt": "| A | B",
+                "bbox": [901.6, 309.6, 960.3, 324.2],
             },
             {
                 "id": 8,
@@ -242,6 +249,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "detay_m_holes_4x_dia_3_5",
                 "gdt": "⌖ Ø 0.100 | A | B | C",
+                "bbox": [1019.2, 247.0, 1067.6, 294.1],
             },
             {
                 "id": 9,
@@ -259,6 +267,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "kesit_gg_outer_dia_43",
                 "gdt": "◎ 0.050 | A",
+                "bbox": [798.6, 264.3, 820.2, 311.7],
             },
             {
                 "id": 10,
@@ -276,6 +285,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "kesit_gg_inner_dia_21",
                 "gdt": "◎ 0.030 | A",
+                "bbox": [798.9, 545.4, 806.2, 587.2],
             },
             {
                 "id": 11,
@@ -293,6 +303,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "kesit_gg_step_12",
                 "gdt": "| A",
+                "bbox": [909.4, 444.0, 951.2, 451.3],
             },
             {
                 "id": 12,
@@ -310,6 +321,7 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
                 "status": "PASS",
                 "feature_key": "kesit_gg_recess_9_11",
                 "gdt": "| A | B",
+                "bbox": [1043.8, 572.4, 1086.9, 594.1],
             },
         ]
         result["dimensions"] = dims
