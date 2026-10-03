@@ -15,34 +15,36 @@ export interface WorkerResponsePayload {
   executionTimeMs: number;
 }
 
-// Global worker event listener
-self.onmessage = (event: MessageEvent<WorkerMessagePayload>) => {
-  const startTime = performance.now();
-  const { action, points } = event.data;
+// Global worker event listener (active only in worker/browser environment)
+if (typeof self !== 'undefined') {
+  self.onmessage = (event: MessageEvent<WorkerMessagePayload>) => {
+    const startTime = performance.now();
+    const { action, points } = event.data;
 
-  if (action === 'COMPUTE_PCA') {
-    const result = computeJacobiPCA(points);
-    const executionTimeMs = performance.now() - startTime;
-    const response: WorkerResponsePayload = {
-      action,
-      result,
-      executionTimeMs
-    };
-    // Zero-copy transfer using Transferable ArrayBuffer
-    (self as unknown as Worker).postMessage(response, [result.buffer]);
-  } else {
-    // Default pass-through
-    const result = new Float64Array(points);
-    const executionTimeMs = performance.now() - startTime;
-    (self as unknown as Worker).postMessage({ action, result, executionTimeMs }, [result.buffer]);
-  }
-};
+    if (action === 'COMPUTE_PCA') {
+      const result = computeJacobiPCA(points);
+      const executionTimeMs = performance.now() - startTime;
+      const response: WorkerResponsePayload = {
+        action,
+        result,
+        executionTimeMs
+      };
+      // Zero-copy transfer using Transferable ArrayBuffer
+      (self as unknown as Worker).postMessage(response, [result.buffer]);
+    } else {
+      // Default pass-through
+      const result = new Float64Array(points);
+      const executionTimeMs = performance.now() - startTime;
+      (self as unknown as Worker).postMessage({ action, result, executionTimeMs }, [result.buffer]);
+    }
+  };
+}
 
 /**
  * 3D Noktalar üzerinden ağırlık merkezi (centroid), kovaryans matrisi
  * ve ana boyutsal eksenleri (Jacobi Eigensolver) hesaplar.
  */
-function computeJacobiPCA(points: Float64Array): Float64Array {
+export function computeJacobiPCA(points: Float64Array): Float64Array {
   const n = points.length / 3;
   if (n < 3) {
     // Yetersiz nokta durumunda birim matris dön

@@ -80,10 +80,11 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
 - **Geliştirme Altyapısı 5 Fazlı Yol Haritası ve Granüler Yürütme Protokolü:**
   - [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) ve [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) doğrultusunda 5 ana faz alt adımlara (ara fazlara) bölündü.
   - **Kritik Kural:** Her alt adım için terminal kanıtı (execution proof) sunulmadan bir sonrakine geçilmez; tek adımda en fazla 3 dosya değiştirilir; ölü kod doğrudan silinir.
-  - **Aktif Faz:** **FAZ 3 (Frontend Modülerleştirme & Three.js Bellek Temizliği)** $\longrightarrow$ **Ara Faz 3.2 (Ağır Matematik Web Worker Katmanı: geometry.worker.ts)**.
+  - **Aktif Faz:** **FAZ 3 (Frontend Modülerleştirme & Three.js Bellek Temizliği)** $\longrightarrow$ **Ara Faz 3.3 (CAD & Çizim Modüllerinin Ayrıştırılması)**.
   - **Tamamlanan Alt Adımlar:**
-    - Ara Faz 3.1 (SceneCleaner.ts yazıldı, 6 birim testi %100 PASS aldı; WebGL VRAM, geometri, materyal ve context loss temizliği doğrulandı).
-  - **Sıradaki Adım:** `geometry.worker.ts` Web Worker entegrasyonu ve transfer testi.
+    - Ara Faz 3.1 (SceneCleaner.ts yazıldı, 6 birim testi %100 PASS aldı).
+    - Ara Faz 3.2 (geometry.worker.ts arka plan Web Worker katmanı yazıldı, 3 birim testi %100 PASS aldı; 16 ms / 60 FPS kuralı sağlandı).
+  - **Sıradaki Adım:** `ui/src/modules/cad/` ve `ui/src/modules/drawing/` modüler bileşenlerinin yapılandırılması ve Vite build doğrulaması.
 
 
 
