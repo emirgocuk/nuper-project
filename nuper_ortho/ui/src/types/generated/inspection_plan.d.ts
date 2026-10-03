@@ -12,16 +12,22 @@ export interface InspectionPlanPayload {
   drawing_reference?: string;
   audit_hash: string;
   items: {
+    order: number;
     item_id: string;
-    balloon_id: number;
-    feature_key: string;
+    feature_id?: string;
+    balloon_id?: number;
+    type: "DATUM_PRIMARY" | "DATUM_SECONDARY" | "DATUM_TERTIARY" | "GEOMETRIC_TOL" | "LINEAR_DIM";
+    datum_reference?: string[];
+    priority: "MANDATORY" | "STANDARD" | "LEAN_FILTERED";
+    feature_key?: string;
     characteristic?: string;
-    nominal: number;
-    upper_tol: number;
-    lower_tol: number;
+    nominal?: number;
+    nominal_str?: string;
+    upper_tol?: number;
+    lower_tol?: number;
     measured?: number;
     status: "PASS" | "WARN" | "FAIL" | "SUSPECT" | "PENDING";
-    operator_approved: boolean;
+    operator_approved?: boolean;
     approval_timestamp?: string;
     [k: string]: unknown;
   }[];

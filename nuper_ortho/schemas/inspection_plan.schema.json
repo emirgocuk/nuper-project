@@ -14,13 +14,28 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["item_id", "balloon_id", "feature_key", "nominal", "upper_tol", "lower_tol", "status", "operator_approved"],
+        "required": ["item_id", "order", "type", "priority", "status"],
         "properties": {
+          "order": { "type": "integer" },
           "item_id": { "type": "string" },
+          "feature_id": { "type": "string" },
           "balloon_id": { "type": "integer" },
+          "type": {
+            "type": "string",
+            "enum": ["DATUM_PRIMARY", "DATUM_SECONDARY", "DATUM_TERTIARY", "GEOMETRIC_TOL", "LINEAR_DIM"]
+          },
+          "datum_reference": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["MANDATORY", "STANDARD", "LEAN_FILTERED"]
+          },
           "feature_key": { "type": "string" },
           "characteristic": { "type": "string" },
           "nominal": { "type": "number" },
+          "nominal_str": { "type": "string" },
           "upper_tol": { "type": "number" },
           "lower_tol": { "type": "number" },
           "measured": { "type": "number" },
