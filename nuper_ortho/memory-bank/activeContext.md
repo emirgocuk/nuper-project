@@ -80,8 +80,9 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
 - **Geliştirme Altyapısı 5 Fazlı Yol Haritası ve Granüler Yürütme Protokolü:**
   - [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) ve [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) doğrultusunda 5 ana faz alt adımlara (ara fazlara) bölündü.
   - **Kritik Kural:** Her alt adım için terminal kanıtı (execution proof) sunulmadan bir sonrakine geçilmez; tek adımda en fazla 3 dosya değiştirilir; ölü kod doğrudan silinir.
-  - **Aktif Faz:** **FAZ 1 (Sözleşmeler ve Tip Otomasyonu)** $\longrightarrow$ **Ara Faz 1.3 (Model Doğrulama & Fiili Terminal Kanıtı)**.
-  - **Sıradaki Adım:** `npm run codegen` terminal çıktısı ve üretilen `.d.ts` / Python model dosyalarının disk kanıtının kullanıcıya sunulması, onay alındıktan sonra **FAZ 2 (Görev Koşucusu & Geliştirme Kafesi)** aşamasına geçilmesi.
+  - **Aktif Faz:** **FAZ 2 (Görev Koşucusu & Geliştirme Kafesi)** $\longrightarrow$ **Ara Faz 2.2 (Git Pre-Commit Kalkanı: Monolit & Scratch Blokajı)**.
+  - **Tamamlanan Alt Adım:** Ara Faz 2.1 (Standart Görev Koşucusu Betikleri: `check:types`, `test:python`, `test:fast`, `check:all` yapılandırıldı ve test edildi).
+  - **Sıradaki Adım:** `.dev/scripts/pre_commit_check.mjs` ve Git Hook kalkanının doğrulanması, `npm run precommit` terminal kanıtı.
 
 
 

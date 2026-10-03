@@ -10,14 +10,16 @@
     "dev:mock": "vite",
     "build": "vite build",
     "codegen": "node scripts/codegen.mjs",
+    "check:types": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "precommit": "node .dev/scripts/pre_commit_check.mjs",
     "test:ui": "vitest run",
     "test:visual": "playwright test",
-    "test:fast": "cargo check --workspace && python -m pytest tools/tests",
-    "test:python": "python -m pytest tools/tests",
-    "test:all": "npm run typecheck && npm run test:ui && npm run test:fast && npm run test:python",
-    "check:all": "npm run codegen && npm run typecheck && npm run test:ui && cargo check --workspace"
+    "test:python": "python -m pytest tools/tests -q",
+    "test:rust": "cargo check --workspace",
+    "test:fast": "cargo check --workspace && python -m pytest tools/tests -q",
+    "check:all": "npm run check:types && npm run test:ui && npm run test:python && npm run test:rust",
+    "test:all": "npm run check:types && npm run test:ui && npm run test:python && npm run test:rust"
   },
   "keywords": [
     "metrology",
