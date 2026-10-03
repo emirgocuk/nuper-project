@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="./src/modules/inspection/utils/inspection_bridge.js"></script>
   <script>
     // ==========================================================================
     // CANLI METROLOJİ TEŞHİS, HATA RAPORLAMA VE DOĞRULAMA MOTORU (DIAGNOSTICS)
@@ -8569,11 +8570,11 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
       const ext = file.name.split('.').pop().toLowerCase();
       showToast(`⏳ ${file.name} taranıyor ve ölçüler çıkarılıyor...`);
 
-      if (electronIpc && file.path) {
+      if (electronIpc && (file.path || file.name)) {
         try {
-          let extracted = await electronIpc.invoke('extract-drawing-data', file.path);
-          if (extracted && extracted.dimensions) {
-            loadDrawingData(extracted, file.path, file.name);
+          let extracted = await electronIpc.invoke('extract-drawing-data', file.path || file.name);
+          if (extracted && extracted.dimensions && extracted.dimensions.length > 0) {
+            loadDrawingData(extracted, file.path || file.name, file.name);
             return;
           }
         } catch (e) {
@@ -8587,12 +8588,7 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
         const fallbackData = {
           title_block: { drawing_number: file.name, material: "7075-T6 / Alüminyum", general_tolerance: "ISO 2768-mK" },
           datums: ['A', 'B', 'C'],
-          dimensions: [
-            { id: 1, balloon: '#1', type: 'LINEAR', nominal: 395.5, nominal_str: '395.5', upper_tol: '+0.800', lower_tol: '-0.800', measured: '395.504 mm', status: 'PASS', icon: '📏', gdt: '| A' },
-            { id: 2, balloon: '#2', type: 'LINEAR', nominal: 305.2, nominal_str: '305.2', upper_tol: '+0.500', lower_tol: '-0.500', measured: '305.204 mm', status: 'PASS', icon: '📏', gdt: '| A' },
-            { id: 3, balloon: '#3', type: 'LINEAR', nominal: 35.0, nominal_str: '35 (-0.2/0)', upper_tol: '0.000', lower_tol: '-0.200', measured: '34.985 mm', status: 'PASS', icon: '📏', gdt: '| A | B' },
-            { id: 4, balloon: '#4', type: 'PROFILE', nominal: 0.0, nominal_str: 'Profil 0.5 | A', upper_tol: '+0.500', lower_tol: '0.000', measured: '0.025 mm', status: 'PASS', icon: '⌒', gdt: '⌒ 0.500 | A' }
-          ]
+          dimensions: (window.gobekAllDimensions || [])
         };
         loadDrawingData(fallbackData, url, file.name);
       } else {
