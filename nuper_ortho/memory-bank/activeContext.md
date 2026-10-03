@@ -80,12 +80,10 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
 - **Geliştirme Altyapısı 5 Fazlı Yol Haritası ve Granüler Yürütme Protokolü:**
   - [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) ve [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) doğrultusunda 5 ana faz alt adımlara (ara fazlara) bölündü.
   - **Kritik Kural:** Her alt adım için terminal kanıtı (execution proof) sunulmadan bir sonrakine geçilmez; tek adımda en fazla 3 dosya değiştirilir; ölü kod doğrudan silinir.
-  - **Aktif Faz:** **FAZ 4 (Mock IPC & İzole Tarayıcı Geliştirme Modu)** $\longrightarrow$ **Ara Faz 4.1 (Mock IPC Sağlayıcısı ve Tarayıcı Polyfill'i)**.
-  - **Tamamlanan Fazlar:**
-    - **FAZ 1:** Sözleşmeler ve Tip Otomasyonu (SSOT Schemas, Codegen, TypeScript `.d.ts` & Python Pydantic).
-    - **FAZ 2:** Görev Koşucusu & Geliştirme Kafesi (Task Runner, Pre-Commit Hook Kalkanı, AGENTS.md Protokolü).
-    - **FAZ 3:** Frontend Modülerleştirme & Three.js Bellek Temizliği (Ara Faz 3.1 SceneCleaner.ts, Ara Faz 3.2 geometry.worker.ts, Ara Faz 3.3 CADViewer.ts & DrawingCanvas.ts, Ara Faz 3.4 Vite build ile 0 hatayla bundle üretimi).
-  - **Sıradaki Adım:** FAZ 4 / Ara Faz 4.1 (`MockIpcProvider.ts` ve headless birim testi).
+  - **Aktif Faz:** **FAZ 4 (Mock IPC & İzole Tarayıcı Geliştirme Modu)** $\longrightarrow$ **Ara Faz 4.2 (Statik Numuneler: .dev/mocks/)**.
+  - **Tamamlanan Alt Adımlar:**
+    - Ara Faz 4.1 (MockIpcProvider.ts yazıldı, MockIpcProvider.test.ts 5 kanallı headless birim testi %100 PASS aldı).
+  - **Sıradaki Adım:** `.dev/mocks/` klasörüne 2 adet statik test numunesi (Askı Kancası ve Avionic Panel JSON/Mesh verileri) yerleştirilmesi ve şema validasyonu.
 
 
 

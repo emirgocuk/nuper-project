@@ -664,8 +664,8 @@
 | | **3.2 Web Worker** | Jacobi PCA ve Earclip için arka plan Web Worker katmanı (16 ms kuralı) | `geometry.worker.ts`, `geometry.worker.test.ts` | Worker transfer testi (3 test PASS) | ✅ **Tamamlandı** |
 | | **3.3 CAD Modülleri** | Three.js sahnesi ve kamera kontrollerinin bağımsız TS modüllerine taşınması | `CADViewer.ts`, `DrawingCanvas.ts` | Modül tip ve derleme kontrolü | ✅ **Tamamlandı** |
 | | **3.4 Vite Build Kanıtı** | Vite bundle derlemesinin 0 hatayla üretilmesinin kanıtı | `vite.config.mjs`, `ui/src/main.ts` | `npm run build` (0 error, 268ms) | ✅ **Tamamlandı** |
-| **FAZ 4** | **4.1 Mock IPC Provider** | Standart tarayıcıda Electron `ipcRenderer` simülasyonu | `MockIpcProvider.ts` | Headless IPC testi | 🟡 **Aktif (Sıradaki)** |
-| | **4.2 Statik Numuneler** | Askı Kancası ve Avionic Panel için gerçekçi test verileri | `.dev/mocks/*.json` | JSON Schema validasyonu | 📋 *Planlandı* |
+| **FAZ 4** | **4.1 Mock IPC Provider** | Standart tarayıcıda Electron `ipcRenderer` simülasyonu | `MockIpcProvider.ts`, `MockIpcProvider.test.ts` | Headless IPC testi (5 kanal PASS) | ✅ **Tamamlandı** |
+| | **4.2 Statik Numuneler** | Askı Kancası ve Avionic Panel için gerçekçi test verileri | `.dev/mocks/*.json` | JSON Schema validasyonu | 🟡 **Aktif (Sıradaki)** |
 | | **4.3 Hızlı Dev Modu & Kanıt** | `?mock=true` ile 1 saniyede açılış ve mock test doğrulaması | `MockIpcProvider.test.ts`, `package.json` | Vitest mock test PASS logu | 📋 *Planlandı* |
 | **FAZ 5** | **5.1 scratch/ Analizi & Taşıma** | Çalışan script mantıklarının kalıcı unit testlere aktarılması | `tools/tests/`, `tests/` | Pytest PASS çıktısı | 📋 *Planlandı* |
 | | **5.2 SQLite Golden Benchmark** | 12 numune ve standartların SQLite üzerinden regresyon testi | `test_assets/benchmarks.db` | SQLite MCP sorgu doğrulaması | 📋 *Planlandı* |
