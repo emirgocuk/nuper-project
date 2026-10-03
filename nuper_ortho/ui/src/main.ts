@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CADViewer } from './modules/cad/CADViewer';
 import { DrawingCanvas } from './modules/drawing/DrawingCanvas';
+import { InspectionTable } from './modules/inspection/InspectionTable';
 import { IpcClient, type SelectedCadFile, type SelectedDrawingFile, type BenchmarkSpecimenSuite } from './modules/ipc/IpcClient';
 import { PRECISION, isEqual } from './modules/core/math/precision';
 import type { DrawingExtractionResult } from './types/generated/drawing_data';
@@ -8,12 +9,18 @@ import type { DrawingExtractionResult } from './types/generated/drawing_data';
 export class NuperApp {
   private cadViewer: CADViewer;
   private drawingCanvas: DrawingCanvas;
+  private inspectionTable: InspectionTable;
   private ipcClient: IpcClient;
 
   constructor() {
     this.cadViewer = new CADViewer();
     this.drawingCanvas = new DrawingCanvas();
+    this.inspectionTable = new InspectionTable();
     this.ipcClient = IpcClient.getInstance();
+
+    this.inspectionTable.onSelectionChange((row) => {
+      this.drawingCanvas.selectBalloon(row ? String(row.id) : null);
+    });
   }
 
   public getCADViewer(): CADViewer {
@@ -22,6 +29,10 @@ export class NuperApp {
 
   public getDrawingCanvas(): DrawingCanvas {
     return this.drawingCanvas;
+  }
+
+  public getInspectionTable(): InspectionTable {
+    return this.inspectionTable;
   }
 
   public getIpcClient(): IpcClient {
@@ -33,6 +44,8 @@ export class NuperApp {
   }
 
   public loadDrawingData(data: DrawingExtractionResult): void {
+    this.inspectionTable.setExtractionResult(data);
+
     if (data.dimensions) {
       this.drawingCanvas.setBalloons(
         data.dimensions.map((dim) => ({
@@ -114,6 +127,7 @@ export class NuperApp {
   public destroy(): void {
     this.cadViewer.destroy();
     this.drawingCanvas.destroy();
+    this.inspectionTable.clear();
   }
 }
 
