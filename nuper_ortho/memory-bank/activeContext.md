@@ -80,10 +80,11 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
 - **Geliştirme Altyapısı 5 Fazlı Yol Haritası ve Granüler Yürütme Protokolü:**
   - [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) ve [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) doğrultusunda 5 ana faz alt adımlara (ara fazlara) bölündü.
   - **Kritik Kural:** Her alt adım için terminal kanıtı (execution proof) sunulmadan bir sonrakine geçilmez; tek adımda en fazla 3 dosya değiştirilir; ölü kod doğrudan silinir.
-  - **Aktif Faz:** **FAZ 4 (Mock IPC & İzole Tarayıcı Geliştirme Modu)** $\longrightarrow$ **Ara Faz 4.2 (Statik Numuneler: .dev/mocks/)**.
+  - **Aktif Faz:** **FAZ 4 (Mock IPC & İzole Tarayıcı Geliştirme Modu)** $\longrightarrow$ **Ara Faz 4.3 (Hızlı Geliştirme Modu ve Test Kanıtı)**.
   - **Tamamlanan Alt Adımlar:**
-    - Ara Faz 4.1 (MockIpcProvider.ts yazıldı, MockIpcProvider.test.ts 5 kanallı headless birim testi %100 PASS aldı).
-  - **Sıradaki Adım:** `.dev/mocks/` klasörüne 2 adet statik test numunesi (Askı Kancası ve Avionic Panel JSON/Mesh verileri) yerleştirilmesi ve şema validasyonu.
+    - Ara Faz 4.1 (MockIpcProvider.ts ve birim testi tamamlandı).
+    - Ara Faz 4.2 (.dev/mocks/ altında aski_kancasi.json ve avionic_panel.json şemaya uygun test verileri üretildi).
+  - **Sıradaki Adım:** `package.json` dev:mock ve `?mock=true` hızlı açılış modunun test doğrulaması.
 
 
 
