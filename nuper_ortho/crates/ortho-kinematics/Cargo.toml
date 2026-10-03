@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 ortho-ast = { path = "../ortho-ast" }
+ortho-brep = { path = "../ortho-brep" }
 glam.workspace = true
 approx.workspace = true
 serde.workspace = true

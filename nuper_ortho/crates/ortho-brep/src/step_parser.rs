@@ -240,6 +240,19 @@ impl StepParser {
         nums
     }
 
+    /// Bir varlık argümanı içindeki ilk tırnaklı metni ('NAME') ayıklar
+    pub fn extract_quoted_name(text: &str) -> Option<String> {
+        if let Some(start) = text.find('\'') {
+            if let Some(end) = text[start + 1..].find('\'') {
+                let name = text[start + 1..start + 1 + end].trim();
+                if !name.is_empty() {
+                    return Some(name.to_string());
+                }
+            }
+        }
+        None
+    }
+
     /// Bir ADVANCED_FACE'in sınır köşe noktalarını (boundary polygon) çözer
     pub fn resolve_boundary_polygon(&self, face_entity: &StepEntity) -> Vec<DVec3> {
         let mut polygon = Vec::new();
@@ -343,6 +356,7 @@ impl StepParser {
                 if let Some(&surf_id) = refs.last() {
                     if let Some(surf_entity) = self.entities.get(&surf_id) {
                         let is_reversed = entity.raw_args.contains(".F.");
+                        let raw_name = Self::extract_quoted_name(&entity.raw_args);
 
                         match surf_entity.name.as_str() {
                             "PLANE" => {
@@ -352,7 +366,7 @@ impl StepParser {
                                         self.resolve_axis2_placement_3d(place_id)
                                     {
                                         let final_normal = if is_reversed { -normal } else { normal };
-                                        let name = format!("PLANE_{}", feature_id_counter);
+                                        let name = raw_name.clone().unwrap_or_else(|| format!("PLANE_{}", feature_id_counter));
 
                                         // Sınır poligonu varsa ağırlık merkezini ve alanı ondan türet
                                         let (centroid, area) = if boundary_poly.len() >= 3 {
@@ -398,11 +412,13 @@ impl StepParser {
                                         let diameter = radius * 2.0;
 
                                         let is_internal = is_reversed;
-                                        let name = if is_internal {
-                                            format!("BORE_{:.0}", diameter)
-                                        } else {
-                                            format!("PIN_{:.0}", diameter)
-                                        };
+                                        let name = raw_name.unwrap_or_else(|| {
+                                            if is_internal {
+                                                format!("BORE_{:.0}", diameter)
+                                            } else {
+                                                format!("PIN_{:.0}", diameter)
+                                            }
+                                        });
 
                                         // Derinlik hesabı: sınır poligonunun eksen üzerindeki aralığı
                                         let depth = if boundary_poly.len() >= 2 {

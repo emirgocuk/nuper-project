@@ -55,7 +55,7 @@ impl MultiBodyFilter {
             .iter()
             .filter(|f| {
                 // Alanı veya boyutu küçük mikro pahları/gürültüleri filtrele
-                f.surface_area >= min_feature_size_mm * min_feature_size_mm
+                f.area >= min_feature_size_mm * min_feature_size_mm
             })
             .cloned()
             .collect()

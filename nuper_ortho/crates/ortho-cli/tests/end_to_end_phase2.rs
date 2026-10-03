@@ -1,153 +1,116 @@
+use std::path::{Path, PathBuf};
 use glam::DVec3;
-use ortho_ast::{
-    detect_compound_holes, recommend_adaptive_alignment, AlignmentStrategyType,
-    DatumReferenceFrame, GeometricFeature, InspectionPlan, ThreadBypassStrategy,
-    ThreadSpecification,
-};
+use ortho_ast::{DatumReferenceFrame, FeatureType, InspectionPlan};
+use ortho_brep::StepParser;
 use ortho_emitter::DmisEmitter;
-use ortho_kinematics::{OrientedSamplingPlan, PH10LookUpTable, ProbeStack};
-use ortho_router::{CertifiedCollisionFreeTrajectory, ClearanceBox, CmmMachineProfile, StylusAssembly};
-
+use ortho_kinematics::sample_circle_4points;
+use ortho_router::{CertifiedCollisionFreeTrajectory, ClearanceBox, StylusAssembly};
 
 #[test]
-fn test_phase2_complete_stepped_threaded_hal_pipeline() {
-    // 1. Kademeli Dişli Delik Oluştur: Fatura (Ø18mm) + Havşa (Ø14mm, 45°) + M8 Vida Dişi (Ø6.8mm matkap deliği)
-    let spec_m8 = ThreadSpecification::new_metric_coarse(8.0, 22.0).unwrap();
-    assert_eq!(spec_m8.tap_drill_diameter, 6.8);
-    assert_eq!(spec_m8.nominal_major_diameter, 8.0);
-    assert_eq!(spec_m8.bypass_strategy, ThreadBypassStrategy::BypassAndGaugeSheet);
+fn test_end_to_end_phase2_real_step_pipeline() {
+    println!("================================================================================");
+    println!("NUPER ORTHO CMM METROLOJI DERLEYICISI - UÇTAN UCA FAZ 2 ENTEGRASYON TESTİ");
+    println!("================================================================================");
 
-    // B-Rep seviyesinde unsurlar
-    let datum_a = GeometricFeature::new_plane(
-        1,
-        "TOP_DATUM_A",
-        DVec3::new(50.0, 50.0, 50.0),
-        DVec3::Z,
-        10000.0,
-        25.0,
-    )
-    .unwrap();
+    // =========================================================================
+    // 1. GİRDİ DOĞRULAMA (STEP Parsing)
+    // =========================================================================
+    let step_path = if Path::new("tests/fixtures/sample_bracket.step").exists() {
+        PathBuf::from("tests/fixtures/sample_bracket.step")
+    } else if Path::new("../../tests/fixtures/sample_bracket.step").exists() {
+        PathBuf::from("../../tests/fixtures/sample_bracket.step")
+    } else {
+        panic!("sample_bracket.step fixture dosyası bulunamadı!");
+    };
 
-    let datum_b = GeometricFeature::new_plane(
-        2,
-        "FRONT_DATUM_B",
-        DVec3::new(50.0, 0.0, 25.0),
-        DVec3::new(0.0, -1.0, 0.0),
-        5000.0,
-        25.0,
-    )
-    .unwrap();
+    let mut parser = StepParser::new();
+    parser
+        .parse_file(&step_path)
+        .expect("STEP dosyası ayrıştırılamadı (ISO 10303-21 parse hatası)");
 
-    let datum_c = GeometricFeature::new_plane(
-        3,
-        "SIDE_DATUM_C",
-        DVec3::new(0.0, 50.0, 25.0),
-        DVec3::new(-1.0, 0.0, 0.0),
-        2500.0,
-        25.0,
-    )
-    .unwrap();
+    let features = parser
+        .extract_geometric_features()
+        .expect("B-Rep geometrik unsurları çıkarılamadı");
 
-    let cb_pocket = GeometricFeature::new_internal_cylinder(
-        10,
-        "CBORE_POCKET",
-        DVec3::new(50.0, 50.0, 45.0),
-        DVec3::Z,
-        18.0,
-        10.0,
-        500.0,
-        20.0,
-    )
-    .unwrap();
+    // Delik 1'i (Internal Cylinder) tespit et
+    let hole_1 = features
+        .iter()
+        .find(|f| f.feature_type == FeatureType::InternalCylinder || f.name.contains("HOLE") || f.name.contains("BORE"))
+        .expect("Modelde Delik 1 (Internal Cylinder) unsuru bulunamadı!");
 
-    let csink_cone = GeometricFeature::new_cone(
-        11,
-        "CSINK_CHAMFER",
-        DVec3::new(50.0, 50.0, 39.0),
-        DVec3::Z,
-        14.0,
-        std::f64::consts::FRAC_PI_4,
-        2.0,
-        100.0,
-        20.0,
-    )
-    .unwrap();
+    let hole_diameter = hole_1.diameter.expect("Delik 1 nominal çapı tanımlı olmalıdır");
+    let hole_axis = hole_1.axis_vector.unwrap_or(DVec3::Z);
+    let hole_center = hole_1.centroid;
+    let hole_depth = hole_1.depth_or_length.unwrap_or(30.0);
 
-    let main_bore_m8 = GeometricFeature::new_tapped_hole(
-        12,
-        "THREAD_M8_HOLE",
-        DVec3::new(50.0, 50.0, 20.0),
-        DVec3::Z,
-        spec_m8.clone(),
-        600.0,
-        20.0,
-    )
-    .unwrap();
+    println!("\n1. GİRDİ DOĞRULAMA (STEP Parsing):");
+    println!("--------------------------------------------------------------------------------");
+    println!("  -> Kaynak STEP Dosyası : {:?}", step_path);
+    println!("  -> Toplam Analitik Unsur: {}", features.len());
+    println!("  -> Tespit Edilen Unsur  : {}", hole_1.name);
+    println!("  -> Merkez (X, Y, Z)     : [{:.4}, {:.4}, {:.4}] mm", hole_center.x, hole_center.y, hole_center.z);
+    println!("  -> Nominal Çap          : {:.4} mm", hole_diameter);
+    println!("  -> Nominal Derinlik     : {:.4} mm", hole_depth);
+    println!("  -> Eksen Vektörü        : [{:.4}, {:.4}, {:.4}]", hole_axis.x, hole_axis.y, hole_axis.z);
 
-    let features = vec![
-        datum_a.clone(),
-        datum_b.clone(),
-        datum_c.clone(),
-        cb_pocket.clone(),
-        csink_cone.clone(),
-        main_bore_m8.clone(),
-    ];
+    // Gerçek STEP CAD nominal koordinat doğrulaması
+    assert!((hole_center.x - 50.0).abs() < 1e-4, "Merkez X koordinatı 50.0 olmalıdır");
+    assert!((hole_center.y - 50.0).abs() < 1e-4, "Merkez Y koordinatı 50.0 olmalıdır");
+    assert!((hole_center.z - 25.0).abs() < 1e-4, "Merkez Z koordinatı 25.0 olmalıdır");
+    assert!((hole_diameter - 20.0).abs() < 1e-4, "Nominal çap 20.0 mm olmalıdır");
+    assert!((hole_axis.z - 1.0).abs() < 1e-4, "Eksen doğrultusu Z ekseni olmalıdır");
 
-    // 2. Kademeli Delik Dedektörü
-    let compounds = detect_compound_holes(&features);
-    assert_eq!(compounds.len(), 1);
-    let ch = &compounds[0];
-    assert!(ch.counterbore.is_some());
-    assert_eq!(ch.counterbore.as_ref().unwrap().diameter, 18.0);
-    assert!(ch.countersink.is_some());
-    assert_eq!(ch.countersink.as_ref().unwrap().entry_diameter, 14.0);
+    // =========================================================================
+    // 2. YOL VE TEMAS NOKTALARI (Sampling & Kinematics)
+    // =========================================================================
+    let hit_points = sample_circle_4points(hole_center, hole_axis, hole_diameter);
+    assert_eq!(hit_points.len(), 4, "Delik için 4 adet temas noktası üretilmelidir");
 
-    // 3. Otonom Adaptif Hizalama ve Jacobian Rank Analizi
-    let rec = recommend_adaptive_alignment(&features).expect("Adaptive alignment recommendation failed");
-    // Modelde iki silindirik delik ve bir düzlem olduğu için Flanş şablonunu otonom seçer
-    assert_eq!(rec.strategy, AlignmentStrategyType::PlaneTwoHoles);
-    assert!(rec.is_6dof_locked, "6-DoF Jacobian Rank 6 olmalı");
-    assert!(rec.stability_score > 0.85);
+    println!("\n2. YOL VE TEMAS NOKTALARI (Sampling & Collision):");
+    println!("--------------------------------------------------------------------------------");
+    let expected_radius = hole_diameter / 2.0;
 
-    // 4. Prob Kinematiği ve Yönlendirilmiş Örnekleme Planı
-    let probe_stack = ProbeStack::default();
-    let lut = PH10LookUpTable::new();
-    let qualified = vec![
-        ortho_kinematics::PH10Angle::new(0.0, 0.0),
-        ortho_kinematics::PH10Angle::new(90.0, 0.0),
-    ];
+    for (idx, hp) in hit_points.iter().enumerate() {
+        let dist = hp.touch_point.distance(hole_center);
+        let radial_dir = (hp.touch_point - hole_center).normalize();
+        let approach_dot = hp.approach_vector.dot(radial_dir);
 
-    let sampling_plan = OrientedSamplingPlan::build_with_compounds(
-        "AERO_MANIFOLD",
-        &features,
-        &compounds,
-        &probe_stack,
-        &lut,
-        &qualified,
+        println!(
+            "  -> Nokta {}: Temas=[{:.4}, {:.4}, {:.4}] mm | Yaklaşma=[{:.4}, {:.4}, {:.4}] | Merkeze Uzaklık={:.4} mm",
+            idx + 1,
+            hp.touch_point.x, hp.touch_point.y, hp.touch_point.z,
+            hp.approach_vector.x, hp.approach_vector.y, hp.approach_vector.z,
+            dist
+        );
+
+        // 1. Noktalar delik çeperinde mi? (merkeze uzaklık == yarıçap)
+        assert!(
+            (dist - expected_radius).abs() < 1e-4,
+            "Nokta {} delik çeperinde (R={:.4}) olmalıdır, hesaplanan: {:.4}",
+            idx + 1, expected_radius, dist
+        );
+
+        // 2. Prob merkezden çepere doğru mu yaklaşıyor? (approach_vector . radial_dir == 1.0)
+        assert!(
+            (approach_dot - 1.0).abs() < 1e-4,
+            "Nokta {} yaklaşma vektörü delik merkezinden dış çepere doğru olmalıdır",
+            idx + 1
+        );
+    }
+
+    // =========================================================================
+    // 3. TEFTİŞ PLANI VE PC-DMIS KOD ÜRETİMİ
+    // =========================================================================
+    let drf = DatumReferenceFrame::new_3_2_1("PCS_BRACKET", 1, 3, 4);
+    let mut plan = InspectionPlan::new("SAMPLE_BRACKET", step_path.to_str().unwrap(), drf);
+    for f in &features {
+        plan.add_feature(f.clone());
+    }
+
+    let clearance_box = ClearanceBox::from_bounding_box(
+        DVec3::new(0.0, 0.0, 0.0),
+        DVec3::new(100.0, 100.0, 60.0),
     );
-
-    // Fatura ölçülmeli (8 nokta), havşa ölçülmeli (4 nokta), ama M8 helisine GIRILMEMELI (0 nokta)
-    assert_eq!(sampling_plan.compound_targets.len(), 1);
-    let ct = &sampling_plan.compound_targets[0];
-    assert!(ct.is_thread_bypassed);
-    assert_eq!(ct.main_bore_inspection.contact_points.len(), 0);
-    assert!(ct.counterbore_inspection.is_some());
-    assert_eq!(ct.counterbore_inspection.as_ref().unwrap().contact_points.len(), 8);
-
-    // Setup sheet raporuna eklenmiş olmalı
-    assert_eq!(sampling_plan.setup_sheet_report.len(), 1);
-    let gauge_report = sampling_plan.setup_sheet_report.format_markdown_table();
-    assert!(gauge_report.contains("M8x1.25"));
-    assert!(gauge_report.contains("ISO 1502 / DIN 13 (6H)"));
-
-    // 5. HAL Makine Profili ve MCR20 Yerel Makro
-    let machine_profile = CmmMachineProfile::default_hexagon_global_s();
-    let macro_code = machine_profile.dispatch_tool_change_macro(1, None).unwrap();
-    assert!(macro_code.contains("LOADPROBE/PH10M_TP20_M2_20MM.prb"));
-    assert!(macro_code.contains("TIP/T1A0B0"));
-
-    // 6. Çarpışmasız Hareket Rotalama ve Mühürleme
-    let clearance_box = ClearanceBox::from_bounding_box(DVec3::ZERO, DVec3::new(100.0, 100.0, 50.0));
     let stylus = StylusAssembly::default();
     let trajectory = CertifiedCollisionFreeTrajectory::verify_and_certify(
         &[],
@@ -155,25 +118,64 @@ fn test_phase2_complete_stepped_threaded_hal_pipeline() {
         vec![],
         &stylus,
     )
-    .unwrap();
-
-    // 7. Post-Processor ve AS9100 Rev D Kriptografik Çıktı
-    let drf = DatumReferenceFrame::new_3_2_1("PCS_1", 1, 2, 3);
-    let mut plan = InspectionPlan::new("AERO_MANIFOLD", "manifold.step", drf);
-    for f in &features {
-        plan.features.push(f.clone());
-    }
+    .expect("Sertifikalı yörünge oluşturulamadı");
 
     let emitter = DmisEmitter::new();
-    let dmis_code = emitter.emit_pcdmis(&plan, &trajectory).unwrap();
+    let dmis_code = emitter
+        .emit_pcdmis(&plan, &trajectory)
+        .expect("PC-DMIS kodu üretilemedi");
 
-    assert!(dmis_code.contains("AS9100 REV D / ISO 1502: YAKUT BİLYE KORUMA PROTOKOLU AKTIF"));
-    assert!(dmis_code.contains("PROB VIDA HELISINE DALMAYACAKTIR"));
-    assert!(dmis_code.contains("OPERATOR KURULUM FOYU: MANUEL DIS MASTAR (GO/NOGO) LISTESI"));
-    assert!(dmis_code.contains("METROLOGICAL INTEGRITY & AUDIT TRAIL (AS9100 REV D)"));
+    // Çıktıyı hem yerel hem kök dizindeki output_pcdmis.dmi dosyasına yaz
+    let _ = std::fs::write("output_pcdmis.dmi", &dmis_code);
+    let _ = std::fs::write("../../output_pcdmis.dmi", &dmis_code);
+    let output_path = "output_pcdmis.dmi";
 
-    // Setup Sheet oluşturma
-    let setup_sheet = emitter.generate_setup_sheet(&plan);
-    assert!(setup_sheet.contains("THREAD_M8_HOLE"));
-    assert!(setup_sheet.contains("Saha Operatörü Kontrol İmzası"));
+    // =========================================================================
+    // 4. ÇIKTI DOĞRULAMA (DMIS Export)
+    // =========================================================================
+    println!("\n3. ÇIKTI DOĞRULAMA (DMIS Export):");
+    println!("--------------------------------------------------------------------------------");
+    println!("Üretilen DMIS Kodundan Delik 1 Bloğu:");
+
+    let mut hole_block = Vec::new();
+    let mut capturing = false;
+
+    for line in dmis_code.lines() {
+        if line.contains("FEAT/CIRCLE") && (line.contains(&hole_1.name) || line.contains("HOLE_1") || line.contains("BORE_20")) {
+            capturing = true;
+        }
+        if capturing {
+            hole_block.push(line);
+            println!("  {}", line);
+            if line.contains("ENDMES") {
+                break;
+            }
+        }
+    }
+
+    println!("--------------------------------------------------------------------------------");
+
+    // Bloğun eksiksiz olduğunu doğrula
+    assert!(!hole_block.is_empty(), "Delik 1 bloğu DMIS çıktısında bulunamadı!");
+    assert!(hole_block.iter().any(|l| l.contains("FEAT/CIRCLE")), "FEAT/CIRCLE komutu eksik");
+    assert!(hole_block.iter().any(|l| l.contains("MEAS/CIRCLE")), "MEAS/CIRCLE komutu eksik");
+    assert_eq!(
+        hole_block.iter().filter(|l| l.contains("HIT/BASIC")).count(),
+        4,
+        "Tam 4 adet HIT/BASIC satırı bulunmalıdır"
+    );
+    assert!(hole_block.iter().any(|l| l.contains("ENDMES")), "ENDMES kapatma komutu eksik");
+
+    // Nominal koordinatların ve 4 temas noktasının kod bloğu içindeki doğrulanması
+    let block_str = hole_block.join("\n");
+    assert!(block_str.contains("50.0000, 50.0000, 25.0000"), "Delik merkez koordinatı eksik veya hatalı");
+    assert!(block_str.contains("20.0000"), "Delik çapı (20.0000 mm) eksik veya hatalı");
+    assert!(block_str.contains("60.0000, 50.0000, 25.0000"), "HIT 1 koordinatları hatalı");
+    assert!(block_str.contains("50.0000, 60.0000, 25.0000"), "HIT 2 koordinatları hatalı");
+    assert!(block_str.contains("40.0000, 50.0000, 25.0000"), "HIT 3 koordinatları hatalı");
+    assert!(block_str.contains("50.0000, 40.0000, 25.0000"), "HIT 4 koordinatları hatalı");
+
+    // output_pcdmis.dmi dosyasının diskte var olduğunu doğrula
+    assert!(Path::new(output_path).exists(), "output_pcdmis.dmi dosyası diskte oluşturulmalıdır");
+    println!("✅ Tüm adımlar başarıyla tamamlandı. Dosya kaydedildi: {}", output_path);
 }

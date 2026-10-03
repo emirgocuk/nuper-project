@@ -120,6 +120,37 @@ pub fn sample_cylinder_2level(
     points
 }
 
+/// Dairesel / silindirik delikler için çeperde 90 derece aralıklı 4 temas noktası (PC-DMIS MEAS/CIRCLE)
+pub fn sample_circle_4points(
+    center: DVec3,
+    axis: DVec3,
+    diameter: f64,
+) -> Vec<SamplingPoint> {
+    let axis_norm = axis.normalize();
+    let radius = diameter / 2.0;
+
+    let (u, v) = if axis_norm.z.abs() > 0.999 {
+        (DVec3::X, DVec3::Y)
+    } else {
+        let ref_dir = DVec3::Z;
+        let u = ref_dir.cross(axis_norm).normalize();
+        let v = axis_norm.cross(u).normalize();
+        (u, v)
+    };
+
+    let mut points = Vec::with_capacity(4);
+    for i in 0..4 {
+        let angle = (i as f64) * std::f64::consts::FRAC_PI_2;
+        let radial_dir = u * angle.cos() + v * angle.sin();
+        let touch_pos = center + radial_dir * radius;
+        // İç delik için yüzey normali merkeze bakar (-radial_dir)
+        // Prob yaklaşma vektörü merkezden çepere doğrudur: approach_vector = radial_dir
+        let surface_normal = -radial_dir;
+        points.push(SamplingPoint::new(touch_pos, surface_normal));
+    }
+    points
+}
+
 /// Dış silindirik miller / faturalar / pimler için 2 seviyeli 8 temas noktası (4 x 2)
 pub fn sample_external_cylinder(
     centroid: DVec3,

@@ -26,7 +26,7 @@ pub fn load_mesh_ipc(step_path: &str) -> Result<BinaryMeshPacket, String> {
     let brep = if std::path::Path::new(step_path).exists() {
         BRepModel::from_step_file(step_path).map_err(|e| e.to_string())?
     } else {
-        let default_step = include_str!("../../../tests/data/valve_block.step");
+        let default_step = include_str!("../../tests/data/valve_block.step");
         BRepModel::from_step_str(default_step, step_path).map_err(|e| e.to_string())?
     };
 

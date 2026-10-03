@@ -6,7 +6,7 @@
 
 use std::fmt::Write;
 use ortho_ast::{
-    FeatureType, FittingAlgorithm, InspectionPlan, ProfileZoneDisposition, ToleranceType,
+    FeatureType, FittingAlgorithm, InspectionPlan, ToleranceType,
 };
 use ortho_router::CertifiedCollisionFreeTrajectory;
 use thiserror::Error;
@@ -110,7 +110,7 @@ impl WenzelEmitter {
                         writeln!(out, "    DIAMETER({:.3})", dia)?;
                     }
                 }
-                FeatureType::FreeformSurface => {
+                FeatureType::FreeformBSpline => {
                     writeln!(out, "  FEATURE '{}' = SURFACE_FREEFORM(CAD_BREP)", feature.name)?;
                     writeln!(
                         out,
@@ -134,12 +134,11 @@ impl WenzelEmitter {
                 .map(|f| f.name.as_str())
                 .unwrap_or("UNKNOWN_FEATURE");
 
-            let method_str = match tol.fitting_algorithm {
-                FittingAlgorithm::ChebyshevMinMax => "METHOD(CHEBYSHEV)",
-                FittingAlgorithm::LeastSquaresGaussian => "METHOD(GAUSSIAN)",
+            let method_str = match tol.recommended_fitting {
+                FittingAlgorithm::GaussLeastSquares => "METHOD(GAUSSIAN)",
                 FittingAlgorithm::MinimumZone => "METHOD(MINIMUM_ZONE)",
-                FittingAlgorithm::MaximumInscribed => "METHOD(MAX_INSCRIBED)",
-                FittingAlgorithm::MinimumCircumscribed => "METHOD(MIN_CIRCUMSCRIBED)",
+                FittingAlgorithm::ChebyshevMaximumInscribed => "METHOD(MAX_INSCRIBED)",
+                FittingAlgorithm::ChebyshevMinimumCircumscribed => "METHOD(MIN_CIRCUMSCRIBED)",
             };
 
             match tol.tolerance_type {
@@ -157,14 +156,14 @@ impl WenzelEmitter {
                         feat_name, tol.upper_tolerance, tol.lower_tolerance, method_str
                     )?;
                 }
-                ToleranceType::TruePosition => {
+                ToleranceType::Position => {
                     writeln!(
                         out,
                         "  EVALUATE POSITION('{}') TOL({:.4}) DATUM(DATUM_A) {}",
                         feat_name, tol.upper_tolerance, method_str
                     )?;
                 }
-                ToleranceType::SurfaceProfile => {
+                ToleranceType::ProfileOfSurface => {
                     writeln!(
                         out,
                         "  EVALUATE PROFILE('{}') TOL({:.4}) {}",

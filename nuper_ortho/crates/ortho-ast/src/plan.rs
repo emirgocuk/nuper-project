@@ -63,6 +63,11 @@ impl InspectionPlan {
         }
     }
 
+    /// Yeni bir geometrik unsur ekler
+    pub fn add_feature(&mut self, feature: GeometricFeature) {
+        self.features.push(feature);
+    }
+
     /// AST ağacının tüm tutarlılık kurallarını doğrular
     pub fn validate(&self) -> Result<(), AstError> {
         // 1. Tüm unsurların fiziksel geçerliliğini denetle

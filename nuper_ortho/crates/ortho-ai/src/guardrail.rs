@@ -17,7 +17,7 @@ pub enum GuardrailError {
 
     #[error("B-Rep Geometrik Gerçeklik Hatası: AI tarafından önerilen unsur ({feature_id}) CAD modelinde bulunamadı veya boyutu tutarsız")]
     GroundTruthMismatch {
-        feature_id: usize,
+        feature_id: u32,
         expected: String,
         found_in_brep: String,
     },
@@ -29,7 +29,7 @@ pub enum GuardrailError {
 /// AI tarafından çıkarılan ham GD&T yapılandırılmış önerisi
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AiGdtExtraction {
-    pub feature_id: usize,
+    pub feature_id: u32,
     pub feature_type_hint: String,
     pub tolerance_type: String,
     pub tolerance_value_mm: f64,
@@ -40,7 +40,7 @@ pub struct AiGdtExtraction {
 /// Gardiyan tarafından doğrulanmış ve sertifikalanmış öneri
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ValidatedGdtExtraction {
-    pub feature_id: usize,
+    pub feature_id: u32,
     pub tolerance_type: String,
     pub tolerance_value_mm: f64,
     pub datum_precedence: Vec<String>,

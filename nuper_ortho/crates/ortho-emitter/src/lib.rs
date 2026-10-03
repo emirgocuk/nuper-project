@@ -58,6 +58,68 @@ impl DmisEmitter {
         self
     }
 
+    /// PC-DMIS uyumlu daire / delik ölçüm bloğu (FEAT/CIRCLE, MEAS/CIRCLE, HIT/BASIC..., ENDMES)
+    pub fn emit_circle_block(
+        &self,
+        feature_name: &str,
+        center: glam::DVec3,
+        axis: glam::DVec3,
+        diameter: f64,
+        hit_points: &[ortho_kinematics::SamplingPoint],
+    ) -> String {
+        let mut out = String::new();
+        let axis_norm = axis.normalize();
+        let _ = writeln!(
+            out,
+            "F({}) = FEAT/CIRCLE,INNER,CART, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}",
+            feature_name,
+            center.x, center.y, center.z,
+            axis_norm.x, axis_norm.y, axis_norm.z,
+            diameter
+        );
+        let _ = writeln!(out, "MEAS/CIRCLE, F({}), {}", feature_name, hit_points.len());
+        for p in hit_points {
+            let _ = writeln!(
+                out,
+                "  HIT/BASIC, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}",
+                p.touch_point.x, p.touch_point.y, p.touch_point.z,
+                p.approach_vector.x, p.approach_vector.y, p.approach_vector.z
+            );
+        }
+        let _ = writeln!(out, "ENDMES");
+        out
+    }
+
+    /// PC-DMIS uyumlu düzlem ölçüm bloğu (FEAT/PLANE, MEAS/PLANE, HIT/BASIC..., ENDMES)
+    pub fn emit_plane_block(
+        &self,
+        feature_name: &str,
+        centroid: glam::DVec3,
+        normal: glam::DVec3,
+        hit_points: &[ortho_kinematics::SamplingPoint],
+    ) -> String {
+        let mut out = String::new();
+        let norm = normal.normalize();
+        let _ = writeln!(
+            out,
+            "F({}) = FEAT/PLANE,CART, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}",
+            feature_name,
+            centroid.x, centroid.y, centroid.z,
+            norm.x, norm.y, norm.z
+        );
+        let _ = writeln!(out, "MEAS/PLANE, F({}), {}", feature_name, hit_points.len());
+        for p in hit_points {
+            let _ = writeln!(
+                out,
+                "  HIT/BASIC, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}",
+                p.touch_point.x, p.touch_point.y, p.touch_point.z,
+                p.approach_vector.x, p.approach_vector.y, p.approach_vector.z
+            );
+        }
+        let _ = writeln!(out, "ENDMES");
+        out
+    }
+
     /// AS9100 Rev D Kriptografik Denetim Mührü ile imzalanmış PC-DMIS programı üretir
     pub fn emit_signed_pcdmis(
         &self,
@@ -202,35 +264,15 @@ impl DmisEmitter {
 
             match feature.feature_type {
                 FeatureType::Plane => {
-                    writeln!(
-                        out,
-                        "F({}) = FEAT/PLANE,CART, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}",
-                        feature.name,
-                        feature.centroid.x,
-                        feature.centroid.y,
-                        feature.centroid.z,
-                        feature.normal_vector.x,
-                        feature.normal_vector.y,
-                        feature.normal_vector.z
-                    )?;
+                    let span = (feature.area.sqrt() / 2.0).clamp(5.0, 50.0);
+                    let pts = ortho_kinematics::sample_plane_grid(feature.centroid, feature.normal_vector, span);
+                    out.push_str(&self.emit_plane_block(&feature.name, feature.centroid, feature.normal_vector, &pts));
                 }
                 FeatureType::InternalCylinder => {
-                    let d = feature.diameter.unwrap_or(10.0);
-                    let l = feature.depth_or_length.unwrap_or(20.0);
+                    let d = feature.diameter.unwrap_or(20.0);
                     let axis = feature.axis_vector.unwrap_or(glam::DVec3::Z);
-                    writeln!(
-                        out,
-                        "F({}) = FEAT/CYLNDR,IN,CART, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}",
-                        feature.name,
-                        feature.centroid.x,
-                        feature.centroid.y,
-                        feature.centroid.z,
-                        axis.x,
-                        axis.y,
-                        axis.z,
-                        d,
-                        l
-                    )?;
+                    let pts = ortho_kinematics::sample_circle_4points(feature.centroid, axis, d);
+                    out.push_str(&self.emit_circle_block(&feature.name, feature.centroid, axis, d, &pts));
                 }
                 FeatureType::FreeformBSpline => {
                     writeln!(out, "F({}) = FEAT/GSURF,CART", feature.name)?;

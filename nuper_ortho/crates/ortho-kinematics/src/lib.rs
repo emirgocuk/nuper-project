@@ -21,7 +21,7 @@ pub use fitting::{
 pub use ph10::{AngleSelectionResult, ManualIndexCluster, PH10Angle, PH10LookUpTable};
 pub use plan::{CompoundFeatureInspection, OrientedFeatureInspection, OrientedSamplingPlan};
 pub use sampling::{
-    sample_annular_step_face, sample_cone_flank, sample_countersink_chamfer_for_center,
+    sample_annular_step_face, sample_circle_4points, sample_cone_flank, sample_countersink_chamfer_for_center,
     sample_cylinder_2level, sample_external_cylinder, sample_freeform_feature_grid,
     sample_freeform_surface_adaptive, sample_plane_grid, sample_plane_with_margin, sample_sphere,
     sample_thread_locator_pin, SamplingPoint, SurfaceEvalSample,

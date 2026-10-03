@@ -5,7 +5,19 @@
   "main": "electron-main.js",
   "scripts": {
     "start": "electron .",
-    "app": "electron ."
+    "app": "electron .",
+    "dev": "concurrently -k \"vite\" \"electron .\"",
+    "dev:mock": "vite",
+    "build": "vite build",
+    "codegen": "node scripts/codegen.mjs",
+    "typecheck": "tsc --noEmit",
+    "precommit": "node .dev/scripts/pre_commit_check.mjs",
+    "test:ui": "vitest run",
+    "test:visual": "playwright test",
+    "test:fast": "cargo check --workspace && python -m pytest tools/tests",
+    "test:python": "python -m pytest tools/tests",
+    "test:all": "npm run typecheck && npm run test:ui && npm run test:fast && npm run test:python",
+    "check:all": "npm run codegen && npm run typecheck && npm run test:ui && cargo check --workspace"
   },
   "keywords": [
     "metrology",
@@ -18,5 +30,18 @@
   "license": "Proprietary",
   "dependencies": {
     "electron": "^44.4.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.4",
+    "@types/three": "^0.186.0",
+    "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
+    "husky": "^9.1.7",
+    "json-schema-to-typescript": "^16.0.0",
+    "three": "^0.186.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
   }
 }

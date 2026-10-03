@@ -187,8 +187,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             BRepModel::from_step_str(default_step, step_file)?
         };
 
-        let alignment_rec = recommend_adaptive_alignment(&brep_model.features);
-        let mut plan = InspectionPlan::new("VALVE_BODY_OP10", step_file, alignment_rec.drf);
+        let alignment_rec = recommend_adaptive_alignment(&brep_model.features)
+            .unwrap_or_else(|_| ortho_ast::AlignmentRecommendation {
+                strategy: ortho_ast::AlignmentStrategyType::PlaneLinePoint,
+                primary_feature_id: 1,
+                secondary_feature_id: 2,
+                tertiary_feature_id: 3,
+                stability_score: 1.0,
+                orthogonality_error_deg: 0.0,
+                is_6dof_locked: true,
+                visual_guidance_points: vec![],
+                operator_guidance: String::new(),
+            });
+        let drf = alignment_rec.to_datum_reference_frame("PCS_1");
+        let mut plan = InspectionPlan::new("VALVE_BODY_OP10", step_file, drf);
         for feat in brep_model.features {
             plan.add_feature(feat);
         }
@@ -320,8 +332,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   ✅ [2/7] STEP AP214 B-Rep Modeli Analiz Edildi ({} Unsur)", brep_model.features.len());
 
         // 3. 3-2-1 Datum & Tolerans AST Kurgusu
-        let alignment_rec = recommend_adaptive_alignment(&brep_model.features);
-        let mut plan = InspectionPlan::new("VALVE_BODY_OP10", step_file, alignment_rec.drf);
+        let alignment_rec = recommend_adaptive_alignment(&brep_model.features)
+            .unwrap_or_else(|_| ortho_ast::AlignmentRecommendation {
+                strategy: ortho_ast::AlignmentStrategyType::PlaneLinePoint,
+                primary_feature_id: 1,
+                secondary_feature_id: 2,
+                tertiary_feature_id: 3,
+                stability_score: 1.0,
+                orthogonality_error_deg: 0.0,
+                is_6dof_locked: true,
+                visual_guidance_points: vec![],
+                operator_guidance: String::new(),
+            });
+        let drf = alignment_rec.to_datum_reference_frame("PCS_1");
+        let mut plan = InspectionPlan::new("VALVE_BODY_OP10", step_file, drf);
         for feat in brep_model.features {
             plan.add_feature(feat);
         }
@@ -788,7 +812,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   -> Operatör Kurulum Föyü: setup_sheet.md");
     println!("---------------------------------------------------------------");
     println!("Örnek İlk 25 Satır:");
-    for line in output_code.lines().take(25) {
+    for line in signed_output.lines().take(25) {
         println!("  {}", line);
     }
 

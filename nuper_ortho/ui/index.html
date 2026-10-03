@@ -4371,12 +4371,13 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
       // 1. GUVENLI HOME KONUMU
       trajectoryPoints.push(homePos.clone());
 
-      // 2. DATUM [A] TEMAS NOKTALARI (Taban Baglama Yuzeyi Z=0 / Y=0, ISO 1101 Duzlemsellik [⏥ 0.010])
+      // 2. DATUM [A] TEMAS NOKTALARI (Üst Düzlem Ölçümü & Düzlemsellik [⏥ 0.010])
+      const probeTargetY = (maxY > minY + 1.0) ? maxY : minY;
       const dAPts = [
-        new THREE.Vector3(minX + size.x * 0.22, minY, minZ + size.z * 0.25),
-        new THREE.Vector3(maxX - size.x * 0.22, minY, minZ + size.z * 0.25),
-        new THREE.Vector3(maxX - size.x * 0.22, minY, maxZ - size.z * 0.25),
-        new THREE.Vector3(minX + size.x * 0.22, minY, maxZ - size.z * 0.25)
+        new THREE.Vector3(minX + size.x * 0.22, probeTargetY, minZ + size.z * 0.25),
+        new THREE.Vector3(maxX - size.x * 0.22, probeTargetY, minZ + size.z * 0.25),
+        new THREE.Vector3(maxX - size.x * 0.22, probeTargetY, maxZ - size.z * 0.25),
+        new THREE.Vector3(minX + size.x * 0.22, probeTargetY, maxZ - size.z * 0.25)
       ];
       dAPts.forEach((pt, idx) => {
         trajectoryPoints.push(new THREE.Vector3(pt.x, clearanceY, pt.z));
@@ -6100,10 +6101,305 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
           name: h.name
         }));
 
-        finalSzX = 55.0; finalSzY = 9.5; finalSzZ = 36.0;
-      } else {
-        // Fallback generic STEP parser
-        // ...
+        finalSzX = 55.0; finalSzY = 9.5; finalSzZ = 36.0;      } else {
+        // ==============================================================
+        // GENERIC ISO 10303-21 STEP (AP203 / AP214 / AP242) B-REP PARSER
+        // ==============================================================
+        const ptRegex = /#([0-9]+)\s*=\s*CARTESIAN_POINT\s*\(\s*(?:'[^']*'|\$)\s*,\s*\(\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*\)\s*\)/g;
+        const points = new Map();
+        let m;
+        while ((m = ptRegex.exec(stepText)) !== null) {
+          points.set(m[1], [parseFloat(m[2]), parseFloat(m[3]), parseFloat(m[4])]);
+        }
+
+        const vpRegex = /#([0-9]+)\s*=\s*VERTEX_POINT\s*\(\s*(?:'[^']*'|\$)\s*,\s*#([0-9]+)\s*\)/g;
+        const vpoints = new Map();
+        while ((m = vpRegex.exec(stepText)) !== null) {
+          const p = points.get(m[2]);
+          if (p) vpoints.set(m[1], p);
+        }
+
+        const dirRegex = /#([0-9]+)\s*=\s*DIRECTION\s*\(\s*(?:'[^']*'|\$)\s*,\s*\(\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*\)\s*\)/g;
+        const directions = new Map();
+        while ((m = dirRegex.exec(stepText)) !== null) {
+          directions.set(m[1], [parseFloat(m[2]), parseFloat(m[3]), parseFloat(m[4])]);
+        }
+
+        const a2Regex = /#([0-9]+)\s*=\s*AXIS2_PLACEMENT_3D\s*\(\s*(?:'[^']*'|\$)\s*,\s*#([0-9]+)\s*,\s*#([0-9]+)\s*,\s*#([0-9]+)\s*\)/g;
+        const placements = new Map();
+        while ((m = a2Regex.exec(stepText)) !== null) {
+          placements.set(m[1], {
+            origin: points.get(m[2]),
+            axis: directions.get(m[3]),
+            ref: directions.get(m[4])
+          });
+        }
+
+        const circleRegex = /#([0-9]+)\s*=\s*CIRCLE\s*\(\s*(?:'[^']*'|\$)\s*,\s*#([0-9]+)\s*,\s*([-\d.eE+]+)\s*\)/g;
+        const circles = new Map();
+        while ((m = circleRegex.exec(stepText)) !== null) {
+          circles.set(m[1], {
+            placement: placements.get(m[2]),
+            radius: parseFloat(m[3])
+          });
+        }
+
+        const ecRegex = /#([0-9]+)\s*=\s*EDGE_CURVE\s*\(\s*(?:'[^']*'|\$)\s*,\s*#([0-9]+)\s*,\s*#([0-9]+)\s*,\s*#([0-9]+)\s*,\s*\.(T|F)\.\s*\)/g;
+        const edges = new Map();
+        while ((m = ecRegex.exec(stepText)) !== null) {
+          edges.set(m[1], {
+            start: m[2],
+            end: m[3],
+            curveId: m[4],
+            sameSense: m[5] === 'T'
+          });
+        }
+
+        const oeRegex = /#([0-9]+)\s*=\s*ORIENTED_EDGE\s*\(\s*(?:'[^']*'|\$)\s*,\s*\*\s*,\s*\*\s*,\s*#([0-9]+)\s*,\s*\.(T|F)\.\s*\)/g;
+        const orientedEdges = new Map();
+        while ((m = oeRegex.exec(stepText)) !== null) {
+          orientedEdges.set(m[1], { edgeId: m[2], sense: m[3] === 'T' });
+        }
+
+        const elRegex = /#([0-9]+)\s*=\s*EDGE_LOOP\s*\(\s*(?:'[^']*'|\$)\s*,\s*\(([^)]+)\)\s*\)/g;
+        const loopMap = new Map();
+        while ((m = elRegex.exec(stepText)) !== null) {
+          loopMap.set(m[1], m[2].split(',').map(s => s.trim().replace('#', '')));
+        }
+
+        function sampleLoop(loopId) {
+          const oeIds = loopMap.get(loopId);
+          if (!oeIds) return [];
+          const pts = [];
+          oeIds.forEach(oeId => {
+            const oe = orientedEdges.get(oeId);
+            if (!oe) return;
+            const e = edges.get(oe.edgeId);
+            if (!e) return;
+            const vStart = vpoints.get(e.start);
+            const vEnd = vpoints.get(e.end);
+            if (!vStart || !vEnd) return;
+
+            const circ = circles.get(e.curveId);
+            if (circ && circ.placement && circ.placement.origin) {
+              const center = circ.placement.origin;
+              const r = circ.radius;
+              let axis = circ.placement.axis || [0, 1, 0];
+              let lenA = Math.hypot(...axis) || 1;
+              axis = [axis[0]/lenA, axis[1]/lenA, axis[2]/lenA];
+              let ref = circ.placement.ref;
+              if (!ref) ref = Math.abs(axis[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1];
+              const dot = ref[0]*axis[0] + ref[1]*axis[1] + ref[2]*axis[2];
+              let u = [ref[0] - dot*axis[0], ref[1] - dot*axis[1], ref[2] - dot*axis[2]];
+              let lenU = Math.hypot(...u) || 1;
+              u = [u[0]/lenU, u[1]/lenU, u[2]/lenU];
+              const v = [
+                axis[1]*u[2] - axis[2]*u[1],
+                axis[2]*u[0] - axis[0]*u[2],
+                axis[0]*u[1] - axis[1]*u[0]
+              ];
+              const dx = vStart[0] - vEnd[0], dy = vStart[1] - vEnd[1], dz = vStart[2] - vEnd[2];
+              const dist = Math.hypot(dx, dy, dz);
+              if (dist < 0.001) {
+                for (let k = 0; k < 24; k++) {
+                  const theta = (2 * Math.PI * k) / 24;
+                  const cosT = Math.cos(theta), sinT = Math.sin(theta);
+                  pts.push([
+                    center[0] + r * (cosT * u[0] + sinT * v[0]),
+                    center[1] + r * (cosT * u[1] + sinT * v[1]),
+                    center[2] + r * (cosT * u[2] + sinT * v[2])
+                  ]);
+                }
+              } else {
+                const pA = oe.sense ? vStart : vEnd;
+                const pB = oe.sense ? vEnd : vStart;
+                pts.push(pA);
+                const vA = [pA[0] - center[0], pA[1] - center[1], pA[2] - center[2]];
+                const vB = [pB[0] - center[0], pB[1] - center[1], pB[2] - center[2]];
+                for (let step = 1; step <= 4; step++) {
+                  const t = step / 5.0;
+                  const ix = (1 - t) * vA[0] + t * vB[0];
+                  const iy = (1 - t) * vA[1] + t * vB[1];
+                  const iz = (1 - t) * vA[2] + t * vB[2];
+                  const len = Math.hypot(ix, iy, iz) || 1;
+                  pts.push([center[0] + (ix / len) * r, center[1] + (iy / len) * r, center[2] + (iz / len) * r]);
+                }
+              }
+            } else {
+              const p = oe.sense ? vStart : vEnd;
+              pts.push(p);
+            }
+          });
+          return pts;
+        }
+
+        function earClip2D(pts) {
+          const n = pts.length;
+          if (n < 3) return [];
+          if (n === 3) return [0, 1, 2];
+
+          let a = 0;
+          for (let i = 0; i < n; i++) {
+            const p1 = pts[i], p2 = pts[(i + 1) % n];
+            a += (p1[0] * p2[1] - p2[0] * p1[1]);
+          }
+          const indices = [];
+          for (let i = 0; i < n; i++) indices.push(i);
+          if (a < 0) indices.reverse();
+
+          function isConvex(p0, p1, p2) {
+            return (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p1[1] - p0[1]) * (p2[0] - p0[0]) >= 0;
+          }
+          function inTriangle(px, py, ax, ay, bx, by, cx, cy) {
+            const v0x = cx - ax, v0y = cy - ay;
+            const v1x = bx - ax, v1y = by - ay;
+            const v2x = px - ax, v2y = py - ay;
+            const dot00 = v0x * v0x + v0y * v0y;
+            const dot01 = v0x * v1x + v0y * v1y;
+            const dot02 = v0x * v2x + v0y * v2y;
+            const dot11 = v1x * v1x + v1y * v1y;
+            const dot12 = v1x * v2x + v1y * v2y;
+            const invDenom = 1 / (dot00 * dot11 - dot01 * dot01 + 1e-10);
+            const u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+            const v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+            return (u >= 0) && (v >= 0) && (u + v <= 1);
+          }
+
+          const triangles = [];
+          let count = indices.length;
+          let iters = 0;
+          while (count > 2 && iters < count * 3) {
+            iters++;
+            let earFound = false;
+            for (let i = 0; i < count; i++) {
+              const prev = indices[(i + count - 1) % count];
+              const curr = indices[i];
+              const next = indices[(i + 1) % count];
+              const pPrev = pts[prev], pCurr = pts[curr], pNext = pts[next];
+
+              if (!isConvex(pPrev, pCurr, pNext)) continue;
+
+              let hasInside = false;
+              for (let j = 0; j < count; j++) {
+                if (j === (i + count - 1) % count || j === i || j === (i + 1) % count) continue;
+                const testPt = pts[indices[j]];
+                if (inTriangle(testPt[0], testPt[1], pPrev[0], pPrev[1], pCurr[0], pCurr[1], pNext[0], pNext[1])) {
+                  hasInside = true; break;
+                }
+              }
+              if (!hasInside) {
+                triangles.push(prev, curr, next);
+                indices.splice(i, 1);
+                count--;
+                earFound = true;
+                break;
+              }
+            }
+            if (!earFound) {
+              for (let k = 1; k < count - 1; k++) {
+                triangles.push(indices[0], indices[k], indices[k + 1]);
+              }
+              break;
+            }
+          }
+          return triangles;
+        }
+
+        const triPositions = [];
+        const triNormals = [];
+        const detectedHoles = [];
+
+        circles.forEach((circ, cId) => {
+          if (circ.placement && circ.placement.origin && circ.radius > 0.5 && circ.radius < 50.0) {
+            detectedHoles.push({
+              center: [circ.placement.origin[0], circ.placement.origin[1], circ.placement.origin[2]],
+              radius: circ.radius,
+              name: `DELİK_Ø${(circ.radius * 2).toFixed(2)}`
+            });
+          }
+        });
+
+        for (let loopId of loopMap.keys()) {
+          const pts = sampleLoop(loopId);
+          if (pts.length < 3) continue;
+
+          let nx = 0, ny = 0, nz = 0;
+          for (let i = 0; i < pts.length; i++) {
+            const c = pts[i], next = pts[(i + 1) % pts.length];
+            nx += (c[1] - next[1]) * (c[2] + next[2]);
+            ny += (c[2] - next[2]) * (c[0] + next[0]);
+            nz += (c[0] - next[0]) * (c[1] + next[1]);
+          }
+          const len = Math.hypot(nx, ny, nz) || 1;
+          nx /= len; ny /= len; nz /= len;
+
+          let ux = 0, uy = 1, uz = 0;
+          if (Math.abs(ny) > 0.9) { ux = 1; uy = 0; uz = 0; }
+          let tx = ny * uz - nz * uy;
+          let ty = nz * ux - nx * uz;
+          let tz = nx * uy - ny * ux;
+          const tlen = Math.hypot(tx, ty, tz) || 1;
+          tx /= tlen; ty /= tlen; tz /= tlen;
+          const vx = ny * tz - nz * ty;
+          const vy = nz * tx - nx * tz;
+          const vz = nx * ty - ny * tx;
+
+          const pts2D = pts.map(p => [
+            (p[0] - pts[0][0]) * tx + (p[1] - pts[0][1]) * ty + (p[2] - pts[0][2]) * tz,
+            (p[0] - pts[0][0]) * vx + (p[1] - pts[0][1]) * vy + (p[2] - pts[0][2]) * vz
+          ]);
+
+          const tris = earClip2D(pts2D);
+          for (let k = 0; k < tris.length; k += 3) {
+            const pA = pts[tris[k]], pB = pts[tris[k+1]], pC = pts[tris[k+2]];
+            triPositions.push(pA[0], pA[1], pA[2]);
+            triPositions.push(pB[0], pB[1], pB[2]);
+            triPositions.push(pC[0], pC[1], pC[2]);
+            triNormals.push(nx, ny, nz);
+            triNormals.push(nx, ny, nz);
+            triNormals.push(nx, ny, nz);
+          }
+        }
+
+        if (triPositions.length === 0) {
+          let minX = Infinity, minY = Infinity, minZ = Infinity;
+          let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+          points.forEach(p => {
+            minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+            minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+            minZ = Math.min(minZ, p[2]); maxZ = Math.max(maxZ, p[2]);
+          });
+          const sx = Math.max(10, maxX - minX), sy = Math.max(10, maxY - minY), sz = Math.max(10, maxZ - minZ);
+          const boxG = new THREE.BoxGeometry(sx, sy, sz);
+          const boxM = new THREE.MeshStandardMaterial({ color: 0x94A3B8, metalness: 0.35, roughness: 0.38 });
+          const bMesh = new THREE.Mesh(boxG, boxM);
+          uploadedMeshGroup.add(bMesh);
+        } else {
+          const solidGeo = new THREE.BufferGeometry();
+          solidGeo.setAttribute('position', new THREE.Float32BufferAttribute(triPositions, 3));
+          solidGeo.setAttribute('normal', new THREE.Float32BufferAttribute(triNormals, 3));
+
+          const solidMat = new THREE.MeshStandardMaterial({
+            color: 0x94A3B8,
+            metalness: 0.35,
+            roughness: 0.38,
+            side: THREE.DoubleSide
+          });
+          const solidMesh = new THREE.Mesh(solidGeo, solidMat);
+          solidMesh.userData = { featureKey: 'step_solid_body' };
+          uploadedMeshGroup.add(solidMesh);
+
+          const edgesGeo = new THREE.EdgesGeometry(solidGeo, 24);
+          const edgesMat = new THREE.LineBasicMaterial({ color: 0x0F172A, linewidth: 1.5 });
+          const edgeLines = new THREE.LineSegments(edgesGeo, edgesMat);
+          uploadedMeshGroup.add(edgeLines);
+
+          selectableMeshes.push(solidMesh);
+        }
+
+        scene.add(uploadedMeshGroup);
+        uploadedMeshGroup.userData.datumANormal = new THREE.Vector3(0, -1, 0);
+        uploadedMeshGroup.userData.detectedHoles = detectedHoles;
       }
 
       // Tabanı kesinlikle granit tablaya (Y=0) ve merkez eksenine (X=0, Z=0) oturt
@@ -8082,8 +8378,14 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
       const isPdfFile = isPdf || (typeof filename === 'string' && filename.toLowerCase().endsWith('.pdf'));
 
       let finalUrl = srcUrlOrBase64;
-      if (isPdfFile) {
-        if (!(typeof srcUrlOrBase64 === 'string' && (srcUrlOrBase64.startsWith('data:') || srcUrlOrBase64.startsWith('file:') || srcUrlOrBase64.startsWith('http')))) {
+      if (isPdfFile && typeof srcUrlOrBase64 === 'string') {
+        if (srcUrlOrBase64.startsWith('data:') || srcUrlOrBase64.startsWith('http:') || srcUrlOrBase64.startsWith('https:') || srcUrlOrBase64.startsWith('blob:')) {
+          finalUrl = srcUrlOrBase64;
+        } else if (srcUrlOrBase64.startsWith('file:')) {
+          finalUrl = srcUrlOrBase64;
+        } else if (/^[a-zA-Z]:[\\/]/.test(srcUrlOrBase64) || srcUrlOrBase64.startsWith('/') || srcUrlOrBase64.includes('\\') || srcUrlOrBase64.toLowerCase().endsWith('.pdf')) {
+          finalUrl = 'file:///' + srcUrlOrBase64.replace(/\\/g, '/');
+        } else {
           finalUrl = 'data:application/pdf;base64,' + srcUrlOrBase64;
         }
       }
