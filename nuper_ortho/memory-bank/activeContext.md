@@ -80,10 +80,11 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
 - **Geliştirme Altyapısı 5 Fazlı Yol Haritası ve Granüler Yürütme Protokolü:**
   - [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) ve [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) doğrultusunda 5 ana faz alt adımlara (ara fazlara) bölündü.
   - **Kritik Kural:** Her alt adım için terminal kanıtı (execution proof) sunulmadan bir sonrakine geçilmez; tek adımda en fazla 3 dosya değiştirilir; ölü kod doğrudan silinir.
-  - **Aktif Faz:** **FAZ 5 (Regresyon Temizliği, Golden Benchmarks & scratch/ Tasfiyesi)** $\longrightarrow$ **Ara Faz 5.2 (SQLite Golden Benchmark Regresyon Testi)**.
+  - **Aktif Faz:** **FAZ 5 (Regresyon Temizliği, Golden Benchmarks & scratch/ Tasfiyesi)** $\longrightarrow$ **Ara Faz 5.3 (scratch/ Tasfiyesi ve Büyük Birleşik Doğrulama: Altın Mühür)**.
   - **Tamamlanan Alt Adımlar:**
-    - Ara Faz 5.1 (`scratch/test_brep.py` B-Rep varlık çözümleme mantığı kalıcı `tools/tests/test_step_parser.py` testine taşındı; Pytest 4/4 PASS ve `check:all` doğrulandı).
-  - **Sıradaki Adım:** `benchmarks.db` SQLite veritabanı üzerinden 10+ numuneyi referans alan Golden Benchmark regresyon testinin kurulması.
+    - Ara Faz 5.1 (B-Rep varlık ayrıştırıcı kalıcı `test_step_parser.py` testine dönüştürüldü).
+    - Ara Faz 5.2 (`benchmarks.db` SQLite veritabanındaki 12 amiral gemisi savunma modeli, toleransları ve ASME/ISO standartları kalıcı `test_golden_benchmarks.py` regresyon testine bağlandı; Pytest 8/8 PASS).
+  - **Sıradaki Adım:** `scratch/` klasörünün arşivlenmesi/.gitignore'a alınması ve `npm run check:all` ile tam pipeline yeşil kanıtının teslimi.
 
 
 
