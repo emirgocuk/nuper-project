@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SceneCleaner } from './utils/SceneCleaner';
 import { SimulationController } from './SimulationController';
+import { SetupPrep, type BoundingBoxEnvelope, type SetupPrepOptions } from './utils/SetupPrep';
 
 export interface CADViewerOptions {
   antialias?: boolean;
@@ -14,6 +15,7 @@ export class CADViewer {
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer | null = null;
   private modelGroup: THREE.Group;
+  private currentGeometry: THREE.BufferGeometry | null = null;
   private simulationController: SimulationController;
   private animationFrameId: number | null = null;
   private isDestroyed = false;
@@ -79,10 +81,10 @@ export class CADViewer {
   public setModelGeometry(geometry: THREE.BufferGeometry): void {
     if (this.isDestroyed) return;
 
-    // Önceki modeli SceneCleaner ile VRAM sızıntısı olmadan temizle
+    this.currentGeometry = geometry;
+
     SceneCleaner.disposeNode(this.modelGroup);
 
-    // Endüstriyel Satin Titanyum PBR Materyali
     const material = new THREE.MeshStandardMaterial({
       color: 0x94a3b8,
       metalness: 0.35,
@@ -92,7 +94,6 @@ export class CADViewer {
     const mesh = new THREE.Mesh(geometry, material);
     this.modelGroup.add(mesh);
 
-    // Keskin CAD silüet hatları (26 derece eşik)
     const edges = new THREE.EdgesGeometry(geometry, 26);
     const lineMaterial = new THREE.LineBasicMaterial({ color: 0x334155, linewidth: 1 });
     const edgeLines = new THREE.LineSegments(edges, lineMaterial);
@@ -100,6 +101,21 @@ export class CADViewer {
 
     this.fitCameraToModel();
     this.render();
+  }
+
+  public applySetupOrientation(options: SetupPrepOptions): BoundingBoxEnvelope | null {
+    if (!this.currentGeometry || this.isDestroyed) return null;
+
+    const matrix = SetupPrep.create5AxisSetupMatrix(this.currentGeometry, options);
+    SetupPrep.applyTransformation(this.currentGeometry, matrix);
+    this.setModelGeometry(this.currentGeometry);
+
+    return SetupPrep.computeBoundingBoxEnvelope(this.currentGeometry);
+  }
+
+  public getBoundingBoxEnvelope(): BoundingBoxEnvelope | null {
+    if (!this.currentGeometry) return null;
+    return SetupPrep.computeBoundingBoxEnvelope(this.currentGeometry);
   }
 
   public fitCameraToModel(): void {
