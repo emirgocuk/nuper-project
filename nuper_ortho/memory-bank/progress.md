@@ -659,8 +659,8 @@
 | | **1.3 Model Doğrulama & Kanıt** | Terminalde `npm run codegen` çalıştırılması, üretilen dosyaların diskte teyidi | `ui/src/types/generated/`, `tools/models/` | `npm run codegen` terminal logu | ✅ **Tamamlandı** |
 | **FAZ 2** | **2.1 Task Runner** | Standart betikler (`check:types`, `test:python`, `test:fast`, `check:all`) | `package.json` | Betik yapılandırması & test logu | ✅ **Tamamlandı** |
 | | **2.2 Git Pre-Commit** | `ui/index.html` (10 satır) ve `scratch/*` commit kalkanı | `.dev/scripts/pre_commit_check.mjs`, `.husky/pre-commit` | `npm run precommit` logu | ✅ **Tamamlandı** |
-| | **2.3 Ajan Protokolü & Kanıt** | `AGENTS.md` katı kuralları ve birleşik test çalıştırması | `AGENTS.md` | `npm run check:all` terminal logu | 🟡 **Aktif (Sıradaki)** |
-| **FAZ 3** | **3.1 SceneCleaner** | WebGL VRAM ve Three.js özyinelemeli kaynak temizleme | `SceneCleaner.ts` | Vitest disposal testi | 📋 *Planlandı* |
+| | **2.3 Ajan Protokolü & Kanıt** | `AGENTS.md` katı kuralları ve birleşik test çalıştırması | `AGENTS.md` | `npm run check:all` terminal logu | ✅ **Tamamlandı** |
+| **FAZ 3** | **3.1 SceneCleaner** | WebGL VRAM ve Three.js özyinelemeli kaynak temizleme | `SceneCleaner.ts` | Vitest disposal testi | 🟡 **Aktif (Sıradaki)** |
 | | **3.2 Web Worker** | Jacobi PCA ve Earclip için arka plan Web Worker katmanı (16 ms kuralı) | `geometry.worker.ts` | Worker transfer testi | 📋 *Planlandı* |
 | | **3.3 CAD Modülleri** | Three.js sahnesi ve kamera kontrollerinin bağımsız TS modüllerine taşınması | `CADViewer.ts`, `DrawingCanvas.ts` | Modül derleme kontrolü | 📋 *Planlandı* |
 | | **3.4 Vite Build Kanıtı** | Vite bundle derlemesinin 0 hatayla üretilmesinin kanıtı | `vite.config.mjs`, `ui/src/main.ts` | `npm run build` (0 error) | 📋 *Planlandı* |

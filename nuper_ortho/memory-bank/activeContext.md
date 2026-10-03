@@ -80,11 +80,12 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
 - **Geliştirme Altyapısı 5 Fazlı Yol Haritası ve Granüler Yürütme Protokolü:**
   - [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) ve [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) doğrultusunda 5 ana faz alt adımlara (ara fazlara) bölündü.
   - **Kritik Kural:** Her alt adım için terminal kanıtı (execution proof) sunulmadan bir sonrakine geçilmez; tek adımda en fazla 3 dosya değiştirilir; ölü kod doğrudan silinir.
-  - **Aktif Faz:** **FAZ 2 (Görev Koşucusu & Geliştirme Kafesi)** $\longrightarrow$ **Ara Faz 2.3 (AI Ajan Protokolü: AGENTS.md ve Tam Sistem Doğrulaması)**.
-  - **Tamamlanan Alt Adımlar:**
-    - Ara Faz 2.1 (Standart Görev Koşucusu Betikleri: `check:types`, `test:python`, `test:fast`, `check:all`).
-    - Ara Faz 2.2 (Git Pre-Commit Kalkanı: `.husky/pre-commit` ve `.dev/scripts/pre_commit_check.mjs` ile `ui/index.html` >10 satır ve `scratch/` commit blokajı).
-  - **Sıradaki Adım:** `AGENTS.md` katı kurallarının doğrulanması ve `npm run check:all` ile tüm boru hattının PASS kanıtının sunulması.
+  - **Aktif Faz:** **FAZ 3 (Frontend Modülerleştirme & Three.js Bellek Temizliği)** $\longrightarrow$ **Ara Faz 3.1 (SceneCleaner: WebGL VRAM & Geometri Temizleme Motoru)**.
+  - **Tamamlanan Fazlar:**
+    - **FAZ 1:** Sözleşmeler ve Tip Otomasyonu (SSOT Schemas, Codegen, TypeScript `.d.ts` & Python Pydantic).
+    - **FAZ 2:** Görev Koşucusu & Geliştirme Kafesi (Ara Faz 2.1 Task Runner, Ara Faz 2.2 Git Pre-Commit Hook Kalkanı, Ara Faz 2.3 AGENTS.md Protokolü ve `npm run check:all` ile tam yeşil test doğrulaması).
+  - **Sıradaki Adım:** FAZ 3 / Ara Faz 3.1 (`SceneCleaner.ts` ve Vitest bellek temizleme testi).
+
 
 
 
