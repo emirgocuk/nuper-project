@@ -1,26 +1,19 @@
+import * as THREE from 'three';
 import { CADViewer } from './modules/cad/CADViewer';
 import { DrawingCanvas } from './modules/drawing/DrawingCanvas';
-import { MockIpcProvider } from './modules/ipc/MockIpcProvider';
+import { IpcClient, type SelectedCadFile, type SelectedDrawingFile, type BenchmarkSpecimenSuite } from './modules/ipc/IpcClient';
 import { PRECISION, isEqual } from './modules/core/math/precision';
 import type { DrawingExtractionResult } from './types/generated/drawing_data';
 
-/**
- * Nuper Ortho — Modüler Frontend Giriş Noktası (Application Entry Point)
- * CADViewer, DrawingCanvas, Mock IPC ve merkezi matematik çekirdeğini birleştirir.
- */
 export class NuperApp {
   private cadViewer: CADViewer;
   private drawingCanvas: DrawingCanvas;
-  private isMockMode: boolean;
+  private ipcClient: IpcClient;
 
   constructor() {
     this.cadViewer = new CADViewer();
     this.drawingCanvas = new DrawingCanvas();
-    this.isMockMode = typeof window !== 'undefined' && new URLSearchParams(window.location?.search).get('mock') === 'true';
-
-    if (this.isMockMode) {
-      MockIpcProvider.initialize();
-    }
+    this.ipcClient = IpcClient.getInstance();
   }
 
   public getCADViewer(): CADViewer {
@@ -31,22 +24,91 @@ export class NuperApp {
     return this.drawingCanvas;
   }
 
+  public getIpcClient(): IpcClient {
+    return this.ipcClient;
+  }
+
   public checkPrecision(a: number, b: number): boolean {
     return isEqual(a, b, PRECISION.EPSILON_LINEAR);
   }
 
-  public loadSampleData(data: DrawingExtractionResult): void {
+  public loadDrawingData(data: DrawingExtractionResult): void {
     if (data.dimensions) {
       this.drawingCanvas.setBalloons(
         data.dimensions.map((dim) => ({
           id: dim.id,
           nominal: dim.nominal,
-          tolerance: dim.tolerance,
+          tolerance: `${dim.lower_tol}/${dim.upper_tol}`,
           bbox: dim.bbox,
           pageHeight: 595.28,
+          confirmed: dim.status === 'PASS',
         }))
       );
     }
+  }
+
+  public loadSampleData(data: DrawingExtractionResult): void {
+    this.loadDrawingData(data);
+  }
+
+  public async openAndLoadCadFile(): Promise<SelectedCadFile | null> {
+    const cadFile = await this.ipcClient.selectCadFile();
+    if (cadFile) {
+      const sx = cadFile.metadata?.bbox?.size?.[0] ?? 50;
+      const sy = cadFile.metadata?.bbox?.size?.[1] ?? 30;
+      const sz = cadFile.metadata?.bbox?.size?.[2] ?? 20;
+      const geometry = new THREE.BoxGeometry(sx, sy, sz);
+      this.cadViewer.setModelGeometry(geometry);
+    }
+    return cadFile;
+  }
+
+  public async openAndLoadDrawingFile(): Promise<DrawingExtractionResult | null> {
+    const drawingFile: SelectedDrawingFile | null = await this.ipcClient.selectDrawingFile();
+    if (!drawingFile) {
+      return null;
+    }
+    const result = await this.ipcClient.extractDrawingData(drawingFile.filePath);
+    if (result) {
+      this.loadDrawingData(result);
+    }
+    return result;
+  }
+
+  public async loadBenchmark(specimenIndex: number | string): Promise<BenchmarkSpecimenSuite | null> {
+    const suite = await this.ipcClient.loadBenchmarkSpecimen(specimenIndex);
+    if (!suite) {
+      return null;
+    }
+
+    if (suite.cad) {
+      const sx = suite.cad.metadata?.bbox?.size?.[0] ?? 50;
+      const sy = suite.cad.metadata?.bbox?.size?.[1] ?? 30;
+      const sz = suite.cad.metadata?.bbox?.size?.[2] ?? 20;
+      const geometry = new THREE.BoxGeometry(sx, sy, sz);
+      this.cadViewer.setModelGeometry(geometry);
+    }
+
+    if (suite.drawing?.filePath) {
+      const extracted = await this.ipcClient.extractDrawingData(suite.drawing.filePath);
+      if (extracted) {
+        this.loadDrawingData(extracted);
+      }
+    }
+
+    return suite;
+  }
+
+  public minimize(): void {
+    this.ipcClient.minimizeWindow();
+  }
+
+  public maximize(): void {
+    this.ipcClient.maximizeWindow();
+  }
+
+  public close(): void {
+    this.ipcClient.closeWindow();
   }
 
   public destroy(): void {
@@ -55,7 +117,7 @@ export class NuperApp {
   }
 }
 
-// Global bootstrap for browser / electron environment
 if (typeof window !== 'undefined') {
   (window as unknown as { nuperApp: NuperApp }).nuperApp = new NuperApp();
 }
+
