@@ -19,7 +19,13 @@ export class NuperApp {
     this.ipcClient = IpcClient.getInstance();
 
     this.inspectionTable.onSelectionChange((row) => {
-      this.drawingCanvas.selectBalloon(row ? String(row.id) : null);
+      if (row) {
+        this.drawingCanvas.selectBalloon(String(row.id));
+        this.cadViewer.highlightFeature(row.feature_key);
+      } else {
+        this.drawingCanvas.selectBalloon(null);
+        this.cadViewer.highlightFeature(undefined);
+      }
     });
   }
 
@@ -43,13 +49,23 @@ export class NuperApp {
     return isEqual(a, b, PRECISION.EPSILON_LINEAR);
   }
 
+  public mountInspectionPanel(container: HTMLElement): void {
+    this.inspectionTable.mount(container);
+  }
+
+  public selectInspectionItem(id: number | null): void {
+    this.inspectionTable.selectRow(id);
+  }
+
   public loadDrawingData(data: DrawingExtractionResult): void {
     this.inspectionTable.setExtractionResult(data);
+    this.drawingCanvas.setTotalPages(data.page_count || 1);
 
     if (data.dimensions) {
       this.drawingCanvas.setBalloons(
         data.dimensions.map((dim) => ({
           id: dim.id,
+          page: dim.page || 1,
           nominal: dim.nominal,
           tolerance: `${dim.lower_tol}/${dim.upper_tol}`,
           bbox: dim.bbox,

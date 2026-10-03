@@ -19,6 +19,8 @@ export class CADViewer {
   private simulationController: SimulationController;
   private animationFrameId: number | null = null;
   private isDestroyed = false;
+  private highlightedFeatureKey: string | null = null;
+  private highlightGroup: THREE.Group;
 
   constructor(options: CADViewerOptions = {}) {
     this.scene = new THREE.Scene();
@@ -29,6 +31,9 @@ export class CADViewer {
 
     this.modelGroup = new THREE.Group();
     this.scene.add(this.modelGroup);
+
+    this.highlightGroup = new THREE.Group();
+    this.scene.add(this.highlightGroup);
 
     this.simulationController = new SimulationController();
 
@@ -153,6 +158,39 @@ export class CADViewer {
     return this.modelGroup;
   }
 
+  public highlightFeature(featureKey?: string): void {
+    this.highlightedFeatureKey = featureKey || null;
+    SceneCleaner.disposeNode(this.highlightGroup);
+
+    if (featureKey && this.currentGeometry) {
+      const box = new THREE.Box3().setFromBufferAttribute(
+        this.currentGeometry.attributes.position as THREE.BufferAttribute
+      );
+      const helper = new THREE.Box3Helper(box, new THREE.Color(0x0284c7));
+      this.highlightGroup.add(helper);
+
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const radius = Math.min(size.x, size.y, size.z) * 0.2 || 4;
+      const sphereGeo = new THREE.SphereGeometry(radius, 12, 12);
+      const sphereMat = new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.7,
+      });
+      const marker = new THREE.Mesh(sphereGeo, sphereMat);
+      marker.position.copy(center);
+      this.highlightGroup.add(marker);
+    }
+
+    this.render();
+  }
+
+  public getHighlightedFeature(): string | null {
+    return this.highlightedFeatureKey;
+  }
+
   public destroy(): void {
     this.isDestroyed = true;
     if (this.animationFrameId !== null) {
@@ -160,7 +198,8 @@ export class CADViewer {
       this.animationFrameId = null;
     }
 
-    // Sahnedeki tüm modelleri temizle
+    // Sahnedeki tüm modelleri ve vurguları temizle
+    SceneCleaner.disposeNode(this.highlightGroup);
     SceneCleaner.disposeNode(this.modelGroup);
     SceneCleaner.disposeNode(this.scene);
 
