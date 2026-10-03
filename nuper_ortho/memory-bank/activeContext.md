@@ -68,4 +68,22 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
 - **Fail-Safe & Typestate:** `CertifiedCollisionFreeTrajectory` asla by-pass edilmez; tüm çıktılar SHA-256 mührü taşır.
 - **Sıfır Panik (No Panics):** Kütüphane kodlarında `unwrap()` ve `expect()` yasaktır; `thiserror` tabanlı açık tipler kullanılır.
 - **Sıfır İsraf Performans:** On-Demand render, GPU boştayken %0 yük, 80-150 MB RAM sınırı.
+- **Geliştirme Altyapısı ve Darboğaz Önleme Kuralları:** [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) kurumsal seviyede güncellendi:
+  - 420 KB monolitik `ui/index.html` dosyasına kod yığma yasağı ve modüler frontend yapısı (Vite + HMR).
+  - Şemalar tek doğruluk kaynağı (`schemas/*.json`) ve otomatik `npm run codegen` (TypeScript, Python, Rust senkronu).
+  - Three.js VRAM yaşam döngüsü & `SceneCleaner` ile bellek sızıntılarının önlenmesi.
+  - 16 ms kuralı ve ağır hesaplamaların (Earclip, Jacobi PCA) Web Worker'lara taşınması (60 FPS garantisi).
+  - Playwright Canvas snapshot ile 2D balonlama ve 3D kamera görsel regresyon testleri.
+  - Sınır katmanı adaptörleri (`adapters/`) ve `EPSILON_LINEAR = 1e-4`, `EPSILON_ANGULAR = 1e-3` hassasiyet kuralı.
+  - Husky git-hook'ları ile `ui/index.html` ve `scratch/*` commit blokajı.
+  - AI Ajan Guardrail protokolü (atomik değişiklik limiti $\le 3$, saf util fonksiyon kuralı, doğrudan temiz silme).
+- **Geliştirme Altyapısı 5 Fazlı Yol Haritası ve Granüler Yürütme Protokolü:**
+  - [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md) ve [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) doğrultusunda 5 ana faz alt adımlara (ara fazlara) bölündü.
+  - **Kritik Kural:** Her alt adım için terminal kanıtı (execution proof) sunulmadan bir sonrakine geçilmez; tek adımda en fazla 3 dosya değiştirilir; ölü kod doğrudan silinir.
+  - **Aktif Faz:** **FAZ 1 (Sözleşmeler ve Tip Otomasyonu)** $\longrightarrow$ **Ara Faz 1.3 (Model Doğrulama & Fiili Terminal Kanıtı)**.
+  - **Sıradaki Adım:** `npm run codegen` terminal çıktısı ve üretilen `.d.ts` / Python model dosyalarının disk kanıtının kullanıcıya sunulması, onay alındıktan sonra **FAZ 2 (Görev Koşucusu & Geliştirme Kafesi)** aşamasına geçilmesi.
+
+
+
+
 

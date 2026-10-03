@@ -84,3 +84,18 @@ Başlangıç ve bitiş hareketlerinde çapraz iniş kazalarını önlemek için:
 
 ### G. Dişli Delik Koruması ve Kurulum Föyü Entegrasyonu
 Vida dişli deliklere ($\text{M-Thread}$) yakut bilye daldırılmaz; kaza riski elenir ve Setup Sheet üzerine otomatik geçer/geçmez tampon diş mastarı talimatı basılır.
+
+---
+
+## 4. Geliştirme Altyapısı ve Kodlama Desenleri (Dev Infrastructure Patterns)
+
+Detaylar için bakınız: [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md)
+
+1. **Tek Doğruluk Kaynağı ve Otomatik Codegen:** Şemalar (`schemas/*.json`) merkezidir; TypeScript (`ipc.d.ts`), Python (`models/`) ve Rust tipleri `npm run codegen` ile üretilir. El ile tip senkronizasyonu yasaktır.
+2. **WebGL Kaynak Yaşam Döngüsü (`SceneCleaner`):** Üçgen ağlar, geometriler ve materyaller sahneden çıkarılırken `.dispose()` çağrısı zorunludur. VRAM ve WebGL context sızıntıları izole edilir.
+3. **16 ms Kuralı ve Web Worker İzolasyonu:** Earclip, Jacobi PCA gibi ağır algoritmalar `ui/src/workers/` içinde koşturulur; UI ana iş parçacığı asla 60 FPS altına düşürülmez.
+4. **Sınır Katmanı Adaptörleri (Boundary Adapters):** CAD ($Z$-yukarı), Three.js ($Y$-yukarı) ve PDF (sol-üst) koordinat farklılıkları çekirdeğe sızdırılmaz; `ui/src/adapters/` sınırında dönüştürülür. Doğrusal eşitliklerde `EPSILON_LINEAR = 1e-4`, açısalda `EPSILON_ANGULAR = 1e-3` kullanılır.
+5. **Headless Görsel Regresyon:** 2D Balonlama ve 3D kamera projeksiyonu Playwright canvas snapshot testleri ile korunur.
+6. **Pre-Commit / Pre-Push Kalkanı:** Husky git hook'ları ile `ui/index.html`'e satır ekleme ve `scratch/*` commit'leri otomatik engellenir.
+7. **AI Ajan Koruma Protokolü:** Tek prompt'ta maksimum 3 modül değişikliği limiti; yeni fonksiyonların `utils/` altında saf (pure) ve birim testli yazılması; ölü kodun yoruma alınmadan doğrudan silinmesi.
+

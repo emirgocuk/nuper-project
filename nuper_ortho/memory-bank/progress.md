@@ -644,6 +644,36 @@
 | **FAZ 12 (Canlı STEP/STL + 2D Teknik Resim Yükleme)** | ✅ **TAMAMLANDI** | Three.js STLLoader/OBJLoader ile gerçek 3D dosya yükleme, bounding box hesabı, otomatik kamera odaklama, 2D PNG/JPG/SVG teknik resim görüntüleyici (zoom/pan), PDF yönlendirme | `f3295ad` |
 | **FAZ 13 (Eksen Düzeltme & Akıllı Bağlama/Fikstürleme)** | ✅ **TAMAMLANDI** | X/Y/Z ±90° eksen döndürme sihirbazı, tablaya oturtma (Z=0), merkeze alma, akıllı fikstür önerisi (3 destek + 2 pabuç + Lift-Hop), OP20 flip erişilebilirlik analizi | `ea3b2ee` |
 | **FAZ 14 (Hibrit LLaMA/Ollama + OpenRouter & Onay Tablosu)** | ✅ **TAMAMLANDI** | Yerel Ollama (http://localhost:11434) + OpenRouter Free Tier bağlantısı, teknik resimden ölçü çıkarma, 7 sütunlu insan-onaylı teftiş tablosu, onaylanan ölçülerin sol ağaca ve DMIS planına aktarımı | `38358d6` |
+| **Geliştirme Altyapısı & Darboğaz Önleme Altyapısı** | 🚀 **GRANÜLER UYGULAMA DEVREDE** | [developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md), [AGENTS.md](file:///d:/Projects/nuper-project/nuper_ortho/AGENTS.md) | 5 Fazlı Granüler Adım Adım İlerleme Modeli |
+
+---
+
+### 🛡️ Kurumsal Geliştirme Altyapısı Granüler Yol Haritası (Execution Proof Modeli)
+
+> **Kural:** Her faz bağımsız bir iş paketidir. Bir alt adımın fiili terminal çıktısı (execution proof) doğrulanmadan kesinlikle bir sonrakine geçilemez. Her adımda en fazla 3 dosya değiştirilebilir.
+
+| Faz No | Alt Adım / Kod | Görev ve Kapsam | İlgili Dosyalar (Maks 3) | Zorunlu Terminal Kanıtı | Durum |
+|---|---|---|---|---|:---:|
+| **FAZ 1** | **1.1 Şemalar (SSOT)** | `drawing_data`, `cad_metadata`, `inspection_plan` JSON Draft-07 şemaları | `schemas/*.json` | Şema validasyonu | ✅ **Tamamlandı** |
+| | **1.2 Codegen Betiği** | JSON Schema'dan TS `.d.ts` ve Python Pydantic üretici script | `scripts/codegen.mjs`, `package.json` | Script sözdizim kontrolü | ✅ **Tamamlandı** |
+| | **1.3 Model Doğrulama & Kanıt** | Terminalde `npm run codegen` çalıştırılması, üretilen dosyaların diskte teyidi | `ui/src/types/generated/`, `tools/models/` | `npm run codegen` terminal logu | ✅ **Tamamlandı** |
+| **FAZ 2** | **2.1 Task Runner** | Standart betikler (`check:types`, `test:python`, `test:fast`, `check:all`) | `package.json` | Betik yapılandırması | 🟡 **Aktif (Sıradaki)** |
+| | **2.2 Git Pre-Commit** | `ui/index.html` (10 satır) ve `scratch/*` commit kalkanı | `.dev/scripts/pre_commit_check.mjs` | `npm run precommit` | 📋 *Sıradaki* |
+| | **2.3 Ajan Protokolü & Kanıt** | `AGENTS.md` katı kuralları ve birleşik test çalıştırması | `AGENTS.md` | `npm run check:all` terminal logu | 📋 *Sıradaki* |
+| **FAZ 3** | **3.1 SceneCleaner** | WebGL VRAM ve Three.js özyinelemeli kaynak temizleme | `SceneCleaner.ts` | Vitest disposal testi | 📋 *Planlandı* |
+| | **3.2 Web Worker** | Jacobi PCA ve Earclip için arka plan Web Worker katmanı (16 ms kuralı) | `geometry.worker.ts` | Worker transfer testi | 📋 *Planlandı* |
+| | **3.3 CAD Modülleri** | Three.js sahnesi ve kamera kontrollerinin bağımsız TS modüllerine taşınması | `CADViewer.ts`, `DrawingCanvas.ts` | Modül derleme kontrolü | 📋 *Planlandı* |
+| | **3.4 Vite Build Kanıtı** | Vite bundle derlemesinin 0 hatayla üretilmesinin kanıtı | `vite.config.mjs`, `ui/src/main.ts` | `npm run build` (0 error) | 📋 *Planlandı* |
+| **FAZ 4** | **4.1 Mock IPC Provider** | Standart tarayıcıda Electron `ipcRenderer` simülasyonu | `MockIpcProvider.ts` | Headless IPC testi | 📋 *Planlandı* |
+| | **4.2 Statik Numuneler** | Askı Kancası ve Avionic Panel için gerçekçi test verileri | `.dev/mocks/*.json` | JSON Schema validasyonu | 📋 *Planlandı* |
+| | **4.3 Hızlı Dev Modu & Kanıt** | `?mock=true` ile 1 saniyede açılış ve mock test doğrulaması | `MockIpcProvider.test.ts`, `package.json` | Vitest mock test PASS logu | 📋 *Planlandı* |
+| **FAZ 5** | **5.1 scratch/ Analizi & Taşıma** | Çalışan script mantıklarının kalıcı unit testlere aktarılması | `tools/tests/`, `tests/` | Pytest PASS çıktısı | 📋 *Planlandı* |
+| | **5.2 SQLite Golden Benchmark** | 12 numune ve standartların SQLite üzerinden regresyon testi | `test_assets/benchmarks.db` | SQLite MCP sorgu doğrulaması | 📋 *Planlandı* |
+| | **5.3 scratch/ Tasfiyesi & Büyük Kanıt**| `scratch/` arşivlenmesi/temizliği ve tam pipeline mühürlenmesi | `.gitignore`, `package.json` | `npm run check:all` tam yeşil logu | 📋 *Planlandı* |
+
+
+
+
 
 
 

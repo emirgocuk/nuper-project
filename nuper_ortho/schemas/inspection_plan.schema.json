@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InspectionPlanPayload",
+  "type": "object",
+  "required": ["plan_id", "part_number", "items", "audit_hash"],
+  "properties": {
+    "plan_id": { "type": "string" },
+    "created_at": { "type": "string" },
+    "part_number": { "type": "string" },
+    "cad_reference": { "type": "string" },
+    "drawing_reference": { "type": "string" },
+    "audit_hash": { "type": "string" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["item_id", "balloon_id", "feature_key", "nominal", "upper_tol", "lower_tol", "status", "operator_approved"],
+        "properties": {
+          "item_id": { "type": "string" },
+          "balloon_id": { "type": "integer" },
+          "feature_key": { "type": "string" },
+          "characteristic": { "type": "string" },
+          "nominal": { "type": "number" },
+          "upper_tol": { "type": "number" },
+          "lower_tol": { "type": "number" },
+          "measured": { "type": "number" },
+          "status": { "type": "string", "enum": ["PASS", "WARN", "FAIL", "SUSPECT", "PENDING"] },
+          "operator_approved": { "type": "boolean" },
+          "approval_timestamp": { "type": "string" }
+        }
+      }
+    }
+  }
+}

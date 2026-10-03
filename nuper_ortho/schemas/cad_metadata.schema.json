@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CadMetadata",
+  "type": "object",
+  "required": ["model_name", "file_format", "vertex_count", "triangle_count", "bbox"],
+  "properties": {
+    "model_name": { "type": "string" },
+    "file_path": { "type": "string" },
+    "file_format": { "type": "string", "enum": ["step", "stp", "stl", "obj"] },
+    "file_size_bytes": { "type": "integer" },
+    "vertex_count": { "type": "integer" },
+    "triangle_count": { "type": "integer" },
+    "bbox": {
+      "type": "object",
+      "required": ["min", "max", "size"],
+      "properties": {
+        "min": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+        "max": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+        "size": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "feature_type"],
+        "properties": {
+          "id": { "type": "string" },
+          "feature_type": { "type": "string", "enum": ["PLANE", "INTERNAL_CYLINDER", "EXTERNAL_CYLINDER", "CONE", "SPHERE", "FREEFORM"] },
+          "nominal_dimension": { "type": "number" },
+          "center": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "normal": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "area_or_length": { "type": "number" }
+        }
+      }
+    },
+    "alignment": {
+      "type": "object",
+      "properties": {
+        "base_plane_detected": { "type": "boolean" },
+        "table_clearance_min_z": { "type": "number" },
+        "orientation_matrix": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 9,
+          "maxItems": 9
+        }
+      }
+    }
+  }
+}

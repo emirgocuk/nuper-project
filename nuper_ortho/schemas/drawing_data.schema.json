@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DrawingExtractionResult",
+  "type": "object",
+  "required": ["success", "filename", "title_block", "datums", "dimensions"],
+  "properties": {
+    "success": { "type": "boolean" },
+    "error": { "type": "string" },
+    "filename": { "type": "string" },
+    "page_count": { "type": "integer" },
+    "raw_text_length": { "type": "integer" },
+    "title_block": {
+      "type": "object",
+      "required": ["part_number", "material", "hardness", "roughness", "general_tolerance", "drawing_number"],
+      "properties": {
+        "part_number": { "type": "string" },
+        "material": { "type": "string" },
+        "hardness": { "type": "string" },
+        "roughness": { "type": "string" },
+        "general_tolerance": { "type": "string" },
+        "drawing_number": { "type": "string" }
+      }
+    },
+    "datums": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "balloon", "type", "type_label", "nominal", "nominal_str", "upper_tol", "lower_tol", "measured", "deviation", "status"],
+        "properties": {
+          "id": { "type": "integer" },
+          "balloon": { "type": "string" },
+          "type": { "type": "string" },
+          "type_label": { "type": "string" },
+          "icon": { "type": "string" },
+          "nominal": { "type": "number" },
+          "nominal_str": { "type": "string" },
+          "upper_tol": { "type": "string" },
+          "lower_tol": { "type": "string" },
+          "measured": { "type": "string" },
+          "deviation": { "type": "string" },
+          "status": { "type": "string", "enum": ["PASS", "WARN", "FAIL", "UNMEASURED"] },
+          "feature_key": { "type": "string" },
+          "gdt": { "type": "string" },
+          "bbox": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 4,
+            "maxItems": 4
+          }
+        }
+      }
+    }
+  }
+}

@@ -48,13 +48,15 @@ The Memory Bank consists of core files and optional context files, all in Markdo
    - Known issues
    - Evolution of project decisions
 
-### Additional Context
+### Additional Context & Rules
 Create additional files/folders within memory-bank/ when they help organize:
 - Complex feature documentation
 - Integration specifications
 - API documentation
 - Testing strategies
 - Deployment procedures
+- `developmentInfrastructureRules.md`: Geliştirme altyapısı kurulum planı, darboğaz önleme kuralları, modüler UI mimarisi, IPC şema sözleşmeleri ve test standartları.
+
 
 ## Documentation Updates
 
