@@ -1,4 +1,19 @@
-$$ ==============================================================
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Nuper Ortho — Göbek Bağı Oluğu 2-Bağlama (OP10 / OP20) PC-DMIS & ANSI DMIS 5.3 Program Üretici
+Prob Konfigürasyonu: Ø2x20 + 20mm Extender (40mm Efektif Boy) & Uzun Prob (Ø2x30 + 50mm Extender)
+Standartlar: ASME Y14.5-2018 / ISO 1101 / ISO 2768-m / ASME B1.13M Metric
+"""
+
+import os
+import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
+def generate_gobek_pcdmis_dmis() -> str:
+    return """$$ ==============================================================
 $$ NUPER ORTHO SOVEREIGN METROLOGY SYSTEM — PC-DMIS / ANSI DMIS 5.3
 $$ PARCA NO    : 10153669
 $$ PARCA ADI   : KPT - 3051 GOBEK BAGI OLUGU
@@ -321,3 +336,30 @@ $$ SERTIFIKALI TEFTIS VE KALITE DENETIM RAPORU
 $$ 12/12 DOGRULANMIS UNSUR: ASME B1.13M & ISO 2768-m GECER
 $$ STATUS: CERTIFIED_COLLISION_FREE (OP10 / OP20 2-SETUP PASS)
 $$ ==============================================================
+"""
+
+def main():
+    content = generate_gobek_pcdmis_dmis()
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    
+    # 1. Root output_pcdmis.dmi
+    root_dmi = os.path.join(root_dir, "output_pcdmis.dmi")
+    with open(root_dmi, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"✓ Yazıldı: {root_dmi}")
+
+    # 2. Asset directory target
+    asset_dir = os.path.join(root_dir, "test_assets", "KPT - 3051 Gobek Bagı Olugu")
+    if os.path.exists(asset_dir):
+        dmi_path = os.path.join(asset_dir, "GOBEK_BAGI_OLUGU_PCDMIS_OP10_OP20.dmi")
+        with open(dmi_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"✓ Yazıldı: {dmi_path}")
+        
+        prg_path = os.path.join(asset_dir, "GOBEK_BAGI_OLUGU_PCDMIS_OP10_OP20.prg")
+        with open(prg_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"✓ Yazıldı: {prg_path}")
+
+if __name__ == "__main__":
+    main()
