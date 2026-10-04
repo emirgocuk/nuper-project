@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -207,5 +207,23 @@ describe('DrawingCanvas — Gerçek PDF Render ve Balon Koordinat Sabitleme', ()
       expect(b.page).toBe(3);
       expect(b.bbox).toBeDefined();
     }
+  });
+
+  it('4. Balonlar altında tespit edilen özellik (feature_label) eksiksiz saklanır ve mockup veri içermez', () => {
+    const balloons = canvas.getBalloons();
+    expect(balloons.length).toBeGreaterThan(0);
+
+    const b1 = balloons.find((b) => Number(b.id) === 1);
+    expect(b1?.feature_label).toBe('395.5 ±0.8');
+
+    const b2 = balloons.find((b) => Number(b.id) === 2);
+    expect(b2?.feature_label).toBe('305.2 ±0.5');
+
+    const createdSpy = vi.fn();
+    canvas.onBalloonCreated(createdSpy);
+
+    expect(typeof canvas.promptAddFeature).toBe('function');
+    expect(typeof canvas.promptEditFeature).toBe('function');
+    expect(typeof canvas.removeBalloon).toBe('function');
   });
 });

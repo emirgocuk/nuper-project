@@ -1,5 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { FeatureDefinitionModal, type DefinedFeatureData } from '../inspection/utils/FeatureDefinitionModal';
 
 export interface BalloonItem {
   id: string | number;
@@ -9,21 +10,22 @@ export interface BalloonItem {
   bbox?: [number, number, number, number];
   pageHeight?: number;
   confirmed?: boolean;
+  feature_label?: string;
 }
 
 export const DEFAULT_GOBEK_BALLOONS: BalloonItem[] = [
-  { id: 1, page: 2, nominal: 395.5, tolerance: '+0.800/-0.800', bbox: [409.0, 748.4, 464.3, 776.8], pageHeight: 595.28, confirmed: true },
-  { id: 2, page: 2, nominal: 305.2, tolerance: '+0.500/-0.500', bbox: [408.1, 262.9, 464.6, 291.5], pageHeight: 595.28, confirmed: true },
-  { id: 3, page: 2, nominal: 35.0, tolerance: '0.000/-0.200', bbox: [407.7, 472.1, 464.5, 523.6], pageHeight: 595.28, confirmed: true },
-  { id: 4, page: 2, nominal: 2.5, tolerance: '+0.100/0.000', bbox: [637.2, 562.7, 654.8, 569.9], pageHeight: 595.28, confirmed: true },
-  { id: 5, page: 2, nominal: 6.0, tolerance: '+0.500/0.000', bbox: [605.2, 244.3, 619.4, 251.6], pageHeight: 595.28, confirmed: true },
-  { id: 6, page: 2, nominal: 0.0, tolerance: '+0.500/0.000', bbox: [222.1, 293.2, 277.3, 301.7], pageHeight: 595.28, confirmed: true },
-  { id: 7, page: 3, nominal: 36.5, tolerance: '+0.100/-0.100', bbox: [901.6, 309.6, 960.3, 324.2], pageHeight: 595.28, confirmed: true },
-  { id: 8, page: 3, nominal: 3.5, tolerance: '+0.200/0.000', bbox: [1019.2, 247.0, 1067.6, 294.1], pageHeight: 595.28, confirmed: true },
-  { id: 9, page: 3, nominal: 43.0, tolerance: '+0.500/0.000', bbox: [798.6, 264.3, 820.2, 311.7], pageHeight: 595.28, confirmed: true },
-  { id: 10, page: 3, nominal: 21.0, tolerance: '+0.250/0.000', bbox: [798.9, 545.4, 806.2, 587.2], pageHeight: 595.28, confirmed: true },
-  { id: 11, page: 3, nominal: 12.0, tolerance: '+0.500/-0.500', bbox: [909.4, 444.0, 951.2, 451.3], pageHeight: 595.28, confirmed: true },
-  { id: 12, page: 3, nominal: 9.11, tolerance: '0.000/-0.250', bbox: [1043.8, 572.4, 1086.9, 594.1], pageHeight: 595.28, confirmed: true }
+  { id: 1, page: 2, nominal: 395.5, tolerance: '+0.800/-0.800', bbox: [409.0, 748.4, 464.3, 776.8], pageHeight: 595.28, confirmed: true, feature_label: '395.5 ±0.8' },
+  { id: 2, page: 2, nominal: 305.2, tolerance: '+0.500/-0.500', bbox: [408.1, 262.9, 464.6, 291.5], pageHeight: 595.28, confirmed: true, feature_label: '305.2 ±0.5' },
+  { id: 3, page: 2, nominal: 35.0, tolerance: '0.000/-0.200', bbox: [407.7, 472.1, 464.5, 523.6], pageHeight: 595.28, confirmed: true, feature_label: '35 0/-0.2' },
+  { id: 4, page: 2, nominal: 2.5, tolerance: '+0.100/0.000', bbox: [637.2, 562.7, 654.8, 569.9], pageHeight: 595.28, confirmed: true, feature_label: '2.5 +0.1/0' },
+  { id: 5, page: 2, nominal: 6.0, tolerance: '+0.500/0.000', bbox: [605.2, 244.3, 619.4, 251.6], pageHeight: 595.28, confirmed: true, feature_label: '6 +0.5/0' },
+  { id: 6, page: 2, nominal: 0.0, tolerance: '+0.500/0.000', bbox: [222.1, 293.2, 277.3, 301.7], pageHeight: 595.28, confirmed: true, feature_label: '0 +0.5/0' },
+  { id: 7, page: 3, nominal: 36.5, tolerance: '+0.100/-0.100', bbox: [901.6, 309.6, 960.3, 324.2], pageHeight: 595.28, confirmed: true, feature_label: '36.5 ±0.1' },
+  { id: 8, page: 3, nominal: 3.5, tolerance: '+0.200/0.000', bbox: [1019.2, 247.0, 1067.6, 294.1], pageHeight: 595.28, confirmed: true, feature_label: '3.5 +0.2/0' },
+  { id: 9, page: 3, nominal: 43.0, tolerance: '+0.500/0.000', bbox: [798.6, 264.3, 820.2, 311.7], pageHeight: 595.28, confirmed: true, feature_label: '43 +0.5/0' },
+  { id: 10, page: 3, nominal: 21.0, tolerance: '+0.250/0.000', bbox: [798.9, 545.4, 806.2, 587.2], pageHeight: 595.28, confirmed: true, feature_label: '21 +0.25/0' },
+  { id: 11, page: 3, nominal: 12.0, tolerance: '+0.500/-0.500', bbox: [909.4, 444.0, 951.2, 451.3], pageHeight: 595.28, confirmed: true, feature_label: '12 ±0.5' },
+  { id: 12, page: 3, nominal: 9.11, tolerance: '0.000/-0.250', bbox: [1043.8, 572.4, 1086.9, 594.1], pageHeight: 595.28, confirmed: true, feature_label: '9.11 0/-0.25' }
 ];
 
 interface NodeFs {
@@ -149,11 +151,128 @@ export class DrawingCanvas {
   private pageChangeListeners: Array<(page: number) => void> = [];
   private pageControlsContainer: HTMLElement | null = null;
   private pdfDoc: PDFDocumentProxy | null = null;
+  private balloonCreatedListeners: Array<(b: BalloonItem) => void> = [];
+  private balloonUpdatedListeners: Array<(b: BalloonItem) => void> = [];
 
   public initialize(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this.attachCanvasContextMenu();
     this.disableMockSvg();
+  }
+
+  private attachCanvasContextMenu(): void {
+    if (!this.canvas) return;
+
+    this.canvas.addEventListener('contextmenu', (e: MouseEvent) => {
+      e.preventDefault();
+      const rect = this.canvas!.getBoundingClientRect?.() || { left: 0, top: 0 };
+      const clickX = (e.clientX - rect.left - this.panX) / this.zoom;
+      const clickY = (e.clientY - rect.top - this.panY) / this.zoom;
+
+      const hitBalloon = this.getBalloonsForActivePage().find((b) => {
+        const pt = this.getBalloonPosition(b);
+        const dist = Math.hypot(pt.x + this.panX - (e.clientX - rect.left), pt.y + this.panY - (e.clientY - rect.top));
+        return dist <= 28 * this.zoom;
+      });
+
+      FeatureDefinitionModal.getInstance().showContextMenu({
+        clientX: e.clientX,
+        clientY: e.clientY,
+        canvasX: clickX,
+        canvasY: clickY,
+        page: this.activePage,
+        existingItem: hitBalloon
+          ? { id: Number(hitBalloon.id), balloon: `#${hitBalloon.id}`, nominal_str: hitBalloon.feature_label || `${hitBalloon.nominal}` }
+          : null,
+        onAdd: (coords) => this.promptAddFeature(coords.x, coords.y, coords.page),
+        onEdit: (id) => this.promptEditFeature(id),
+        onDelete: (id) => this.removeBalloon(id),
+      });
+    });
+  }
+
+  public onBalloonCreated(cb: (b: BalloonItem) => void): () => void {
+    this.balloonCreatedListeners.push(cb);
+    return () => {
+      this.balloonCreatedListeners = this.balloonCreatedListeners.filter((listener) => listener !== cb);
+    };
+  }
+
+  public onBalloonUpdated(cb: (b: BalloonItem) => void): () => void {
+    this.balloonUpdatedListeners.push(cb);
+    return () => {
+      this.balloonUpdatedListeners = this.balloonUpdatedListeners.filter((listener) => listener !== cb);
+    };
+  }
+
+  public promptAddFeature(canvasX: number, canvasY: number, page: number = this.activePage): void {
+    const existingIds = this.balloons.map((b) => Number(b.id)).filter((id) => !isNaN(id));
+    const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+
+    FeatureDefinitionModal.getInstance().openModal({
+      canvasX,
+      canvasY,
+      page,
+      nextId,
+      onSave: (data: DefinedFeatureData) => {
+        const newBalloon: BalloonItem = {
+          id: data.id || nextId,
+          page: data.page || page,
+          nominal: data.nominal,
+          tolerance: `${data.lower_tol}/${data.upper_tol}`,
+          bbox: [canvasX, canvasY, canvasX + 40, canvasY + 20],
+          pageHeight: 595.28,
+          confirmed: true,
+          feature_label: data.nominal_str,
+        };
+
+        this.balloons.push(newBalloon);
+        this.selectBalloon(String(newBalloon.id));
+        void this.render();
+
+        for (const cb of this.balloonCreatedListeners) {
+          cb(newBalloon);
+        }
+      },
+    });
+  }
+
+  public promptEditFeature(id: number | string): void {
+    const balloon = this.balloons.find((b) => String(b.id) === String(id));
+    if (!balloon) return;
+    const pt = this.getBalloonPosition(balloon);
+
+    FeatureDefinitionModal.getInstance().openModal({
+      canvasX: pt.x / this.zoom,
+      canvasY: pt.y / this.zoom,
+      page: balloon.page || this.activePage,
+      nextId: Number(balloon.id),
+      existingData: {
+        id: Number(balloon.id),
+        balloon: `#${balloon.id}`,
+        nominal: balloon.nominal,
+        nominal_str: balloon.feature_label || (balloon.nominal !== undefined ? `${balloon.nominal}` : ''),
+      },
+      onSave: (data: DefinedFeatureData) => {
+        balloon.nominal = data.nominal;
+        balloon.tolerance = `${data.lower_tol}/${data.upper_tol}`;
+        balloon.feature_label = data.nominal_str;
+        void this.render();
+
+        for (const cb of this.balloonUpdatedListeners) {
+          cb(balloon);
+        }
+      },
+    });
+  }
+
+  public removeBalloon(id: number | string): void {
+    this.balloons = this.balloons.filter((b) => String(b.id) !== String(id));
+    if (this.selectedBalloonId === String(id)) {
+      this.selectedBalloonId = null;
+    }
+    void this.render();
   }
 
   public disableMockSvg(): void {
@@ -405,6 +524,22 @@ export class DrawingCanvas {
     group.style.gap = '6px';
     group.style.alignItems = 'center';
 
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-add-feature';
+    addBtn.style.padding = '5px 10px';
+    addBtn.style.background = '#0284c7';
+    addBtn.style.color = '#ffffff';
+    addBtn.style.border = 'none';
+    addBtn.style.borderRadius = '4px';
+    addBtn.style.fontSize = '11px';
+    addBtn.style.fontWeight = '600';
+    addBtn.style.cursor = 'pointer';
+    addBtn.innerText = '➕ Unsur Ekle';
+    addBtn.addEventListener('click', () => {
+      this.promptAddFeature(400, 250, this.activePage);
+    });
+    group.appendChild(addBtn);
+
     const pageCount = Math.max(3, this.totalPages);
     for (let p = 1; p <= pageCount; p++) {
       const btn = document.createElement('button');
@@ -479,6 +614,36 @@ export class DrawingCanvas {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(String(b.id), balloonPt.x, balloonPt.y);
+
+      // Feature characteristic badge under balloon circle
+      const labelText = b.feature_label || (b.nominal !== undefined && b.nominal !== null ? `${b.nominal}` : '');
+      if (labelText) {
+        const badgeY = balloonPt.y + 22 * this.zoom;
+        ctx.font = `600 ${Math.max(9, 10 * this.zoom)}px 'JetBrains Mono', Inter, monospace`;
+        const metrics = ctx.measureText(labelText);
+        const paddingX = 6 * this.zoom;
+        const badgeWidth = metrics.width + paddingX * 2;
+        const badgeHeight = 16 * this.zoom;
+        const badgeX = balloonPt.x - badgeWidth / 2;
+        const radius = 4 * this.zoom;
+
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(badgeX, badgeY - badgeHeight / 2, badgeWidth, badgeHeight, radius);
+        } else {
+          ctx.rect(badgeX, badgeY - badgeHeight / 2, badgeWidth, badgeHeight);
+        }
+        ctx.fillStyle = isSelected ? 'rgba(2, 132, 199, 0.95)' : 'rgba(15, 23, 42, 0.90)';
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = isSelected ? '#38bdf8' : '#334155';
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelText, balloonPt.x, badgeY);
+      }
     }
 
     ctx.restore();

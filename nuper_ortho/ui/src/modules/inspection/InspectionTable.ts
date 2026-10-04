@@ -174,6 +174,28 @@ export class InspectionTable {
     };
   }
 
+  public addRow(row: InspectionTableRow): void {
+    const existingIdx = this.rows.findIndex((r) => r.id === row.id);
+    if (existingIdx >= 0) {
+      this.rows[existingIdx] = row;
+    } else {
+      this.rows.push(row);
+    }
+    if (this.container) {
+      this.render();
+    }
+  }
+
+  public removeRow(id: number): void {
+    this.rows = this.rows.filter((r) => r.id !== id);
+    if (this.selectedId === id) {
+      this.selectedId = this.rows.length > 0 ? this.rows[0].id : null;
+    }
+    if (this.container) {
+      this.render();
+    }
+  }
+
   public clear(): void {
     this.rows = [];
     this.selectedId = null;

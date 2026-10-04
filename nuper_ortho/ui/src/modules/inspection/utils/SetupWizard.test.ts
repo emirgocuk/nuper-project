@@ -430,4 +430,51 @@ describe('SetupWizard — Sıfır Durum ve Beyaz Temalı Işık Masası Modalı'
     const timeDisplay = mockDoc.getElementById('time-display');
     expect(timeDisplay?.innerText).toBe('00:00 / 00:34');
   });
+
+  it('Kullanıcı sağ tık veya buton ile yeni unsur tanımlayabilir ve balon altında gerçek özellik gösterilir', () => {
+    wizard = new SetupWizard();
+    wizard.handleTeknikResimClick();
+
+    expect(typeof wizard.promptAddFeature).toBe('function');
+    expect(typeof wizard.promptEditFeature).toBe('function');
+    expect(typeof wizard.removeFeature).toBe('function');
+    expect(typeof wizard.findBalloonNear).toBe('function');
+
+    // Boşken yeni unsur ekleme
+    wizard.promptAddFeature(550, 320, 1);
+    const modalEl = mockDoc.getElementById('modal-feature-definition');
+    expect(modalEl).toBeDefined();
+
+    // Manuel ekleme simülasyonu
+    const initialCount = wizard.getDimensions().length;
+    const nextId = initialCount + 1;
+    wizard.getDimensions().push({
+      id: nextId,
+      balloon: `#${nextId}`,
+      page: 1,
+      type: 'DIAMETER',
+      type_label: 'Silindirik Çap',
+      nominal: 86.0,
+      nominal_str: 'Ø86 ±0.5',
+      upper_tol: '+0.500',
+      lower_tol: '-0.500',
+      measured: '',
+      deviation: '',
+      status: 'UNMEASURED',
+      datum_reference: '[A]',
+      bbox: [550, 320, 590, 340],
+    });
+
+    const coords = wizard.getBalloonStageCoords(wizard.getDimensions()[wizard.getDimensions().length - 1]);
+    expect(coords.cx).toBe(550);
+    expect(coords.cy).toBe(320);
+
+    const hit = wizard.findBalloonNear(552, 321, 1, 10);
+    expect(hit).not.toBeNull();
+    expect(hit?.nominal_str).toBe('Ø86 ±0.5');
+
+    // Unsur silme
+    wizard.removeFeature(nextId);
+    expect(wizard.getDimensions().some((d) => d.id === nextId)).toBe(false);
+  });
 });

@@ -12,6 +12,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { matchCadWithDrawing, type CadDrawingMatchResult } from './CadDrawingMatcher';
 import type { CadMetadata } from '../../../types/generated/cad_metadata';
 import type { DrawingExtractionResult } from '../../../types/generated/drawing_data';
+import { FeatureDefinitionModal, type DefinedFeatureData } from './FeatureDefinitionModal';
 
 export interface SetupWizardOptions {
   onConfirm?: (dimensions: InspectionDimension[]) => void;
@@ -388,37 +389,8 @@ export class SetupWizard {
       }
       this.totalPages = 1;
       this.activePage = 1;
-      this.dimensions = [
-        {
-          id: 1,
-          balloon: '#1',
-          page: 1,
-          type: 'LINEAR',
-          type_label: 'Referans Görsel Boyutu',
-          icon: '📏',
-          nominal: 100.0,
-          nominal_str: '100.0 ±0.1',
-          upper_tol: '+0.100',
-          lower_tol: '-0.100',
-          measured: '100.002 mm',
-          deviation: '+0.002 mm',
-          status: 'PASS',
-          feature_key: 'img_dim_1',
-          gdt: '| A',
-          bbox: [200, 200, 300, 220],
-        },
-      ];
-      this.balloons = [
-        {
-          id: 1,
-          page: 1,
-          nominal: 100.0,
-          tolerance: '+0.100/-0.100',
-          bbox: [200, 200, 300, 220],
-          pageHeight: 595.28,
-          confirmed: true,
-        },
-      ];
+      this.dimensions = [];
+      this.balloons = [];
       this.renderDrawingAuditModal();
       return;
     }
@@ -606,6 +578,9 @@ export class SetupWizard {
             <button class="audit-upload-btn" id="btn-audit-upload-file" title="Teknik Resim PDF veya Çizim Yükle">
               📁 PDF / Çizim Yükle
             </button>
+            <button class="audit-upload-btn" id="btn-audit-add-feature" style="background:#0284C7;color:#FFF;border-color:#0369A1;" title="Yeni Metroloji Unsuru / Ölçü Tanımla (veya çizime sağ tıklayın)">
+              ➕ Unsur Ekle
+            </button>
             <input type="file" id="audit-drawing-input-internal" accept=".pdf,.png,.jpg,.jpeg,.svg" style="display: none;" />
             <span class="audit-file-name-badge ${this.hasLoadedDrawing ? 'loaded' : 'empty'}" id="audit-file-badge">
               ${this.hasLoadedDrawing ? '📄 ' + (this.loadedFileName || 'Teknik_Resim.pdf') : 'Henüz Dosya Yüklenmedi'}
@@ -693,42 +668,21 @@ export class SetupWizard {
   private renderDrawingStageContent(page: number): string {
     const pageDims = this.dimensions.filter((d) => (d.page || 1) === page);
 
-    const balloonCoordsP2: Record<number, { cx: number; cy: number }> = {
-      1: { cx: 620, cy: 110 },
-      2: { cx: 580, cy: 460 },
-      3: { cx: 340, cy: 260 },
-      4: { cx: 880, cy: 230 },
-      5: { cx: 280, cy: 300 },
-      6: { cx: 820, cy: 420 },
-    };
-
-    const balloonCoordsP3: Record<number, { cx: number; cy: number }> = {
-      7: { cx: 340, cy: 230 },
-      8: { cx: 480, cy: 380 },
-      9: { cx: 820, cy: 190 },
-      10: { cx: 820, cy: 330 },
-      11: { cx: 940, cy: 430 },
-      12: { cx: 1010, cy: 260 },
-    };
-
-    const coordsMap = page === 2 ? balloonCoordsP2 : balloonCoordsP3;
-
     const balloonNodes = pageDims
       .map((d) => {
-        let cx = 400;
-        let cy = 250;
-        if (d.bbox && d.bbox.length >= 2) {
-          cx = Math.round(d.bbox[0] * 1.25);
-          cy = Math.round(d.bbox[1] * 1.25);
-        } else if (coordsMap[d.id]) {
-          cx = coordsMap[d.id].cx;
-          cy = coordsMap[d.id].cy;
-        }
+        const pt = this.getBalloonStageCoords(d);
+        const cx = pt.cx;
+        const cy = pt.cy;
 
         const isSel = d.id === this.selectedId;
         const stroke = isSel ? '#D97706' : '#0284C7';
         const fill = isSel ? 'rgba(217, 119, 6, 0.22)' : 'rgba(2, 132, 199, 0.15)';
         const text = isSel ? '#B45309' : '#0284C7';
+
+        const labelText = d.nominal_str || (d.nominal !== undefined && d.nominal !== null ? `${d.nominal}` : '');
+        const badgeWidth = Math.max(54, labelText.length * 7.5 + 14);
+        const badgeX = cx - badgeWidth / 2;
+        const badgeY = cy + 22;
 
         return `
           <g class="audit-balloon-node ${isSel ? 'active' : ''}" data-balloon-id="${d.id}" style="cursor: pointer;">
@@ -736,6 +690,20 @@ export class SetupWizard {
             <text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="${isSel ? '12.5' : '11'}" font-weight="800" font-family="'JetBrains Mono', monospace" fill="${text}">
               ${d.balloon}
             </text>
+            ${
+              labelText
+                ? `
+            <g class="audit-balloon-badge" style="pointer-events: none;">
+              <rect x="${badgeX}" y="${badgeY}" width="${badgeWidth}" height="18" rx="4"
+                    fill="${isSel ? '#0284C7' : '#0F172A'}" opacity="0.94" stroke="${isSel ? '#38BDF8' : '#334155'}" stroke-width="1"/>
+              <text x="${cx}" y="${badgeY + 12}" text-anchor="middle" font-size="9.5" font-weight="700"
+                    font-family="'JetBrains Mono', monospace" fill="#FFFFFF">
+                ${labelText}
+              </text>
+            </g>
+            `
+                : ''
+            }
             <circle cx="${cx}" cy="${cy}" r="28" fill="transparent"/>
           </g>
         `;
@@ -823,41 +791,40 @@ export class SetupWizard {
     const isP2 = page === 2;
     const pageDims = this.dimensions.filter((d) => (d.page || 1) === page);
 
-    const balloonCoordsP2: Record<number, { cx: number; cy: number }> = {
-      1: { cx: 620, cy: 110 },
-      2: { cx: 580, cy: 460 },
-      3: { cx: 340, cy: 260 },
-      4: { cx: 880, cy: 230 },
-      5: { cx: 280, cy: 300 },
-      6: { cx: 820, cy: 420 },
-    };
-
-    const balloonCoordsP3: Record<number, { cx: number; cy: number }> = {
-      7: { cx: 340, cy: 230 },
-      8: { cx: 480, cy: 380 },
-      9: { cx: 820, cy: 190 },
-      10: { cx: 820, cy: 330 },
-      11: { cx: 940, cy: 430 },
-      12: { cx: 1010, cy: 260 },
-    };
-
-    const coordsMap = isP2 ? balloonCoordsP2 : balloonCoordsP3;
-
     const balloonNodes = pageDims
       .map((d) => {
-        const coords = coordsMap[d.id] || { cx: 400, cy: 250 };
+        const pt = this.getBalloonStageCoords(d);
         const isSel = d.id === this.selectedId;
         const stroke = isSel ? '#D97706' : '#0284C7';
         const fill = isSel ? 'rgba(217, 119, 6, 0.18)' : 'rgba(2, 132, 199, 0.12)';
         const text = isSel ? '#B45309' : '#0284C7';
 
+        const labelText = d.nominal_str || (d.nominal !== undefined && d.nominal !== null ? `${d.nominal}` : '');
+        const badgeWidth = Math.max(54, labelText.length * 7.5 + 14);
+        const badgeX = pt.cx - badgeWidth / 2;
+        const badgeY = pt.cy + 22;
+
         return `
           <g class="audit-balloon-node ${isSel ? 'active' : ''}" data-balloon-id="${d.id}" style="cursor: pointer;">
-            <circle cx="${coords.cx}" cy="${coords.cy}" r="${isSel ? '22' : '18'}" fill="${fill}" stroke="${stroke}" stroke-width="${isSel ? '3' : '2'}"/>
-            <text x="${coords.cx}" y="${coords.cy + 4}" text-anchor="middle" font-size="${isSel ? '12.5' : '11'}" font-weight="800" font-family="'JetBrains Mono', monospace" fill="${text}">
+            <circle cx="${pt.cx}" cy="${pt.cy}" r="${isSel ? '22' : '18'}" fill="${fill}" stroke="${stroke}" stroke-width="${isSel ? '3' : '2'}"/>
+            <text x="${pt.cx}" y="${pt.cy + 4}" text-anchor="middle" font-size="${isSel ? '12.5' : '11'}" font-weight="800" font-family="'JetBrains Mono', monospace" fill="${text}">
               ${d.balloon}
             </text>
-            <circle cx="${coords.cx}" cy="${coords.cy}" r="28" fill="transparent"/>
+            ${
+              labelText
+                ? `
+            <g class="audit-balloon-badge" style="pointer-events: none;">
+              <rect x="${badgeX}" y="${badgeY}" width="${badgeWidth}" height="18" rx="4"
+                    fill="${isSel ? '#0284C7' : '#0F172A'}" opacity="0.94" stroke="${isSel ? '#38BDF8' : '#334155'}" stroke-width="1"/>
+              <text x="${pt.cx}" y="${badgeY + 12}" text-anchor="middle" font-size="9.5" font-weight="700"
+                    font-family="'JetBrains Mono', monospace" fill="#FFFFFF">
+                ${labelText}
+              </text>
+            </g>
+            `
+                : ''
+            }
+            <circle cx="${pt.cx}" cy="${pt.cy}" r="28" fill="transparent"/>
           </g>
         `;
       })
@@ -1066,6 +1033,33 @@ export class SetupWizard {
         window.addEventListener('mousemove', onMouseMove);
         window.addEventListener('mouseup', onMouseUp);
       }
+
+      viewport.addEventListener('contextmenu', (e: MouseEvent) => {
+        e.preventDefault();
+        const stage = document.getElementById('audit-canvas-stage');
+        const rect = (stage || viewport).getBoundingClientRect?.() || { left: 0, top: 0 };
+        const canvasX = Math.round((e.clientX - rect.left) / this.zoom);
+        const canvasY = Math.round((e.clientY - rect.top) / this.zoom);
+
+        const hitDim = this.findBalloonNear(canvasX, canvasY, this.activePage, 35);
+
+        FeatureDefinitionModal.getInstance().showContextMenu({
+          clientX: e.clientX,
+          clientY: e.clientY,
+          canvasX,
+          canvasY,
+          page: this.activePage,
+          existingItem: hitDim ? { id: hitDim.id, balloon: hitDim.balloon, nominal_str: hitDim.nominal_str } : null,
+          onAdd: (coords) => this.promptAddFeature(coords.x, coords.y, coords.page),
+          onEdit: (id) => this.promptEditFeature(id),
+          onDelete: (id) => this.removeFeature(id),
+        });
+      });
+
+      const addFeatureBtn = modalEl.querySelector('#btn-audit-add-feature');
+      addFeatureBtn?.addEventListener('click', () => {
+        this.promptAddFeature(500, 350, this.activePage);
+      });
     }
 
     modalEl.querySelectorAll<HTMLElement>('.audit-balloon-node').forEach((node) => {
@@ -1076,7 +1070,178 @@ export class SetupWizard {
           this.selectDimension(parseInt(idAttr, 10));
         }
       });
+      node.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        const idAttr = node.getAttribute('data-balloon-id');
+        if (idAttr) {
+          this.promptEditFeature(parseInt(idAttr, 10));
+        }
+      });
     });
+  }
+
+  public getBalloonStageCoords(d: InspectionDimension): { cx: number; cy: number } {
+    if (d.bbox && d.bbox.length >= 2) {
+      if (this.pdfDoc) {
+        return { cx: Math.round(d.bbox[0] * 1.25), cy: Math.round(d.bbox[1] * 1.25) };
+      }
+      return { cx: Math.round(d.bbox[0]), cy: Math.round(d.bbox[1]) };
+    }
+    const coordsMapP2: Record<number, { cx: number; cy: number }> = {
+      1: { cx: 620, cy: 110 },
+      2: { cx: 580, cy: 460 },
+      3: { cx: 340, cy: 260 },
+      4: { cx: 880, cy: 230 },
+      5: { cx: 280, cy: 300 },
+      6: { cx: 820, cy: 420 },
+    };
+    const coordsMapP3: Record<number, { cx: number; cy: number }> = {
+      7: { cx: 340, cy: 230 },
+      8: { cx: 480, cy: 380 },
+      9: { cx: 820, cy: 190 },
+      10: { cx: 820, cy: 330 },
+      11: { cx: 940, cy: 430 },
+      12: { cx: 1010, cy: 260 },
+    };
+    const coordsMap = (d.page || 1) === 2 ? coordsMapP2 : coordsMapP3;
+    return coordsMap[d.id] || { cx: 400, cy: 250 };
+  }
+
+  public findBalloonNear(x: number, y: number, page: number, maxDist: number = 35): InspectionDimension | null {
+    const pageDims = this.dimensions.filter((d) => (d.page || 1) === page);
+    for (const d of pageDims) {
+      const pt = this.getBalloonStageCoords(d);
+      const dist = Math.hypot(pt.cx - x, pt.cy - y);
+      if (dist <= maxDist) {
+        return d;
+      }
+    }
+    return null;
+  }
+
+  public promptAddFeature(canvasX: number, canvasY: number, page: number = this.activePage): void {
+    const existingIds = this.dimensions.map((d) => d.id);
+    const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+
+    FeatureDefinitionModal.getInstance().openModal({
+      canvasX,
+      canvasY,
+      page,
+      nextId,
+      onSave: (data: DefinedFeatureData) => {
+        const storedBbox: [number, number, number, number] = this.pdfDoc
+          ? [Math.round(canvasX / 1.25), Math.round(canvasY / 1.25), Math.round(canvasX / 1.25) + 40, Math.round(canvasY / 1.25) + 20]
+          : [canvasX, canvasY, canvasX + 40, canvasY + 20];
+
+        const newDim: InspectionDimension = {
+          id: data.id || nextId,
+          balloon: data.balloon || `#${data.id || nextId}`,
+          page: data.page || page,
+          type: data.type,
+          type_label: data.type_label,
+          icon: data.icon,
+          nominal: data.nominal,
+          nominal_str: data.nominal_str,
+          upper_tol: data.upper_tol,
+          lower_tol: data.lower_tol,
+          measured: '',
+          deviation: '',
+          status: 'UNMEASURED',
+          feature_key: `feat_${data.id || nextId}_${data.nominal}`.replace(/[^a-zA-Z0-9_]/g, '_'),
+          datum_reference: data.datum_reference,
+          bbox: storedBbox,
+        };
+
+        this.dimensions.push(newDim);
+        this.balloons.push({
+          id: newDim.id,
+          page: newDim.page,
+          nominal: newDim.nominal,
+          tolerance: `${newDim.lower_tol}/${newDim.upper_tol}`,
+          bbox: storedBbox,
+          pageHeight: 595.28,
+          confirmed: true,
+          feature_label: newDim.nominal_str,
+        });
+
+        this.selectedId = newDim.id;
+        this.renderDrawingAuditModal();
+
+        const win = (typeof window !== 'undefined' ? window : {}) as unknown as {
+          nuperApp?: { getDrawingCanvas: () => { setBalloons: (b: unknown[]) => void } };
+        };
+        if (win.nuperApp) {
+          win.nuperApp.getDrawingCanvas().setBalloons(this.balloons);
+        }
+      },
+    });
+  }
+
+  public promptEditFeature(id: number): void {
+    const dim = this.dimensions.find((d) => d.id === id);
+    if (!dim) return;
+    const pt = this.getBalloonStageCoords(dim);
+
+    FeatureDefinitionModal.getInstance().openModal({
+      canvasX: pt.cx,
+      canvasY: pt.cy,
+      page: dim.page || this.activePage,
+      nextId: dim.id,
+      existingData: {
+        id: dim.id,
+        balloon: dim.balloon,
+        type: dim.type,
+        type_label: dim.type_label,
+        nominal: dim.nominal,
+        nominal_str: dim.nominal_str,
+        upper_tol: dim.upper_tol,
+        lower_tol: dim.lower_tol,
+        datum_reference: dim.datum_reference,
+        description: dim.type_label,
+      },
+      onSave: (data: DefinedFeatureData) => {
+        dim.type = data.type;
+        dim.type_label = data.type_label;
+        dim.icon = data.icon;
+        dim.nominal = data.nominal;
+        dim.nominal_str = data.nominal_str;
+        dim.upper_tol = data.upper_tol;
+        dim.lower_tol = data.lower_tol;
+        dim.datum_reference = data.datum_reference;
+
+        const balloon = this.balloons.find((b) => b.id === id);
+        if (balloon) {
+          balloon.nominal = data.nominal;
+          balloon.tolerance = `${data.lower_tol}/${data.upper_tol}`;
+          balloon.feature_label = data.nominal_str;
+        }
+
+        this.renderDrawingAuditModal();
+
+        const win = (typeof window !== 'undefined' ? window : {}) as unknown as {
+          nuperApp?: { getDrawingCanvas: () => { setBalloons: (b: unknown[]) => void } };
+        };
+        if (win.nuperApp) {
+          win.nuperApp.getDrawingCanvas().setBalloons(this.balloons);
+        }
+      },
+    });
+  }
+
+  public removeFeature(id: number): void {
+    this.dimensions = this.dimensions.filter((d) => d.id !== id);
+    this.balloons = this.balloons.filter((b) => b.id !== id);
+    if (this.selectedId === id) {
+      this.selectedId = this.dimensions.length > 0 ? this.dimensions[0].id : null;
+    }
+    this.renderDrawingAuditModal();
+
+    const win = (typeof window !== 'undefined' ? window : {}) as unknown as {
+      nuperApp?: { getDrawingCanvas: () => { setBalloons: (b: unknown[]) => void } };
+    };
+    if (win.nuperApp) {
+      win.nuperApp.getDrawingCanvas().setBalloons(this.balloons);
+    }
   }
 
   private applyStageTransform(): void {

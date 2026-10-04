@@ -31,6 +31,25 @@ export class NuperApp {
         this.cadViewer.highlightFeature(undefined);
       }
     });
+
+    this.drawingCanvas.onBalloonCreated((b) => {
+      this.inspectionTable.addRow({
+        id: Number(b.id),
+        balloon: `#${b.id}`,
+        page: b.page || 1,
+        type: 'LINEAR',
+        type_label: b.feature_label || 'Ölçü',
+        icon: '📏',
+        nominal: b.nominal || 0,
+        nominal_str: b.feature_label || `${b.nominal || 0}`,
+        upper_tol: '',
+        lower_tol: '',
+        measured: '',
+        deviation: '',
+        status: 'UNMEASURED',
+        datum_reference: '',
+      });
+    });
   }
 
   public getCADViewer(): CADViewer {
@@ -75,6 +94,7 @@ export class NuperApp {
           bbox: dim.bbox,
           pageHeight: 595.28,
           confirmed: dim.status === 'PASS',
+          feature_label: dim.nominal_str || (dim.nominal !== undefined && dim.nominal !== null ? `${dim.nominal}` : ''),
         }))
       );
     }

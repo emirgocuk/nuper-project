@@ -6,7 +6,7 @@ from .tolerance import resolve_iso_fit, parse_symmetric_tolerance, parse_bilater
 def parse_diameter_callouts(text: str) -> List[Dict[str, Any]]:
     results = []
     pattern = re.compile(
-        r"(?:(\d+)\s*x\s*)?(?:[Ø\u00d8]|DIA|CAP)\s*([0-9]+(?:\.[0-9]+)?)\s*(?:(H[678]|g6|f7|js7)|(MIN|MAKS|MAX)|(?:\(\s*([+-]?[0-9\.]+)\s*(?:/|\s+)\s*([+-]?[0-9\.]+)\s*\))|(?:[±\+]\s*([0-9\.]+)))?",
+        r"(?:(\d+)\s*x\s*)?(?:[Ø\u00d8@]|DIA|CAP)\s*([0-9]+(?:\.[0-9]+)?)\s*(?:(H[678]|g6|f7|js7)|(MIN|MAKS|MAX)|(?:\(\s*([+-]?[0-9\.]+)\s*(?:/|\s+)\s*([+-]?[0-9\.]+)\s*\))|(?:[±\+]\s*([0-9\.]+)))?",
         re.IGNORECASE,
     )
     for m in pattern.finditer(text):
@@ -76,6 +76,8 @@ def parse_radius_callouts(text: str) -> List[Dict[str, Any]]:
 
 def parse_linear_callouts(text: str) -> List[Dict[str, Any]]:
     results = []
+    seen = set()
+
     pattern = re.compile(
         r"([0-9]{1,4}(?:\.[0-9]+)?)\s*(?:([±\+]\s*[0-9]+(?:\.[0-9]+)?(?:\s*[\/\-]\s*[-+]?[0-9]+(?:\.[0-9]+)?)?)|(\(\s*[-+]?[0-9\.]+\s*[\/\s]+\s*[-+]?[0-9\.]+\s*\)))"
     )
@@ -103,12 +105,48 @@ def parse_linear_callouts(text: str) -> List[Dict[str, Any]]:
             if len(parts) >= 2:
                 upper, lower = parse_bilateral_tolerance(parts[0], parts[1])
 
+        nom_str = f"{val} {tol_str}".strip()
+        seen.add(nom_str)
         results.append({
             "type": "LINEAR",
             "quantity": 1,
             "nominal": val,
-            "nominal_str": f"{val} {tol_str}".strip(),
+            "nominal_str": nom_str,
             "upper_tol": upper,
             "lower_tol": lower,
         })
+
+    # Referans ölçüler: (291.9)
+    ref_pattern = re.compile(r"\(\s*([0-9]{1,4}(?:\.[0-9]+)?)\s*\)")
+    for m in ref_pattern.finditer(text):
+        val = float(m.group(1))
+        nom_str = f"({val})"
+        if nom_str not in seen and 2.0 <= val <= 3000.0:
+            seen.add(nom_str)
+            results.append({
+                "type": "LINEAR",
+                "quantity": 1,
+                "nominal": val,
+                "nominal_str": nom_str,
+                "upper_tol": "",
+                "lower_tol": "",
+            })
+
+    # Pah ölçüleri: 3 x45°, 1 x45*
+    chamfer_pattern = re.compile(r"(?:(\d+)\s*x\s*)?([0-9]+(?:\.[0-9]+)?)\s*x\s*45[°\*\^]?", re.IGNORECASE)
+    for m in chamfer_pattern.finditer(text):
+        cnt = m.group(1) or ""
+        val = float(m.group(2))
+        nom_str = f"{cnt}x {val} x45°" if cnt else f"{val} x45°"
+        if nom_str not in seen:
+            seen.add(nom_str)
+            results.append({
+                "type": "CHAMFER",
+                "quantity": int(cnt) if cnt else 1,
+                "nominal": val,
+                "nominal_str": nom_str,
+                "upper_tol": "",
+                "lower_tol": "",
+            })
+
     return results

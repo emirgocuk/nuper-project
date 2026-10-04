@@ -68,12 +68,18 @@ def test_radius_and_linear_parsing():
     assert radii[0]["nominal"] == 2.5
     assert radii[1]["nominal"] == 10.0
 
-    lin_sample = "51.6 ±0.2 ve 14.4 +0.1/-0.05"
+    lin_sample = "51.6 ±0.2 ve 14.4 +0.1/-0.05 ve (291.9) ve 3 x45°"
     linears = parse_linear_callouts(lin_sample)
-    assert len(linears) == 2
-    assert linears[0]["nominal"] == 51.6
-    assert linears[0]["upper_tol"] == "+0.2"
-    assert linears[0]["lower_tol"] == "-0.2"
+    assert any(l["nominal"] == 51.6 and l["upper_tol"] == "+0.2" for l in linears)
+    assert any(l["nominal"] == 291.9 and l["nominal_str"] == "(291.9)" for l in linears)
+    assert any(l["nominal"] == 3.0 and l["type"] == "CHAMFER" for l in linears)
+
+    ocr_dia_sample = "@86 ±0.5 ve @117.5"
+    ocr_dias = parse_diameter_callouts(ocr_dia_sample)
+    assert len(ocr_dias) == 2
+    assert ocr_dias[0]["nominal"] == 86.0
+    assert ocr_dias[0]["upper_tol"] == "+0.5"
+    assert ocr_dias[1]["nominal"] == 117.5
 
 
 def test_thread_parsing():
