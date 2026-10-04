@@ -40,6 +40,8 @@
           "lower_tol": { "type": "number" },
           "measured": { "type": "number" },
           "status": { "type": "string", "enum": ["PASS", "WARN", "FAIL", "SUSPECT", "PENDING"] },
+          "op": { "type": "string" },
+          "op_reason": { "type": "string" },
           "operator_approved": { "type": "boolean" },
           "approval_timestamp": { "type": "string" }
         }

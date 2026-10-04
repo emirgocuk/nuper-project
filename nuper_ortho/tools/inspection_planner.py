@@ -90,6 +90,8 @@ def generate_inspection_plan(
                     lower_tol=-0.005,
                     measured=0.0,
                     status=Status.PASS,
+                    op="OP10",
+                    op_reason=f"3-2-1 hizalama referansı: {desc}",
                     operator_approved=True,
                 )
             )
@@ -196,6 +198,8 @@ def generate_inspection_plan(
                 lower_tol=lower_tol_val,
                 measured=nominal_val,
                 status=Status.PASS,
+                op=dim.get("op", "OP10"),
+                op_reason=dim.get("op_reason", "Standart prob bağlaması."),
                 operator_approved=False,
             )
         )

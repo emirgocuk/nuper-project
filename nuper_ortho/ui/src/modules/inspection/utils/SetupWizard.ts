@@ -296,7 +296,17 @@ export class SetupWizard {
     });
   }
 
-  public handleTeknikResimClick(): void {
+  public async handleTeknikResimClick(): Promise<void> {
+    const app = this.appInstance as { openAndLoadDrawingFile?: () => Promise<unknown> } | null;
+    if (app && typeof app.openAndLoadDrawingFile === 'function') {
+      try {
+        const res = await app.openAndLoadDrawingFile();
+        if (res) {
+          this.openDrawingAuditModal();
+          return;
+        }
+      } catch {}
+    }
     this.openDrawingAuditModal();
   }
 
@@ -418,6 +428,8 @@ export class SetupWizard {
         deviation?: string;
         status?: 'PASS' | 'WARN' | 'FAIL' | 'UNMEASURED' | string;
         gdt?: string;
+        op?: string;
+        op_reason?: string;
         bbox?: [number, number, number, number];
       }>;
     },
@@ -445,6 +457,8 @@ export class SetupWizard {
         deviation: d.deviation || '0.000',
         status: (d.status as 'PASS' | 'WARN' | 'FAIL' | 'UNMEASURED') || 'PASS',
         gdt: d.gdt || 'ASME Y14.5',
+        op: d.op || 'OP10',
+        op_reason: d.op_reason || 'Standart üst bağlama (Z- probu).',
         bbox: d.bbox,
       }));
 
@@ -630,7 +644,7 @@ export class SetupWizard {
           <div class="nuper-audit-footer-left">
             ${
               this.hasLoadedDrawing && selectedDim
-                ? `<span>Aktif Unsur: <b style="color:#0284C7;">${selectedDim.balloon} [${selectedDim.type_label || selectedDim.nominal_str}]</b> • Nominal: <b>${selectedDim.nominal_str}</b> • Tol: <b>${selectedDim.lower_tol}/${selectedDim.upper_tol}</b> • Datum: <b>${selectedDim.datum_reference || '[A]'}</b></span>`
+                ? `<span>Aktif Unsur: <b style="color:#0284C7;">${selectedDim.balloon} [${selectedDim.type_label || selectedDim.nominal_str}]</b> • Nominal: <b>${selectedDim.nominal_str}</b> • Tol: <b>${selectedDim.lower_tol}/${selectedDim.upper_tol}</b> • Datum: <b>${selectedDim.datum_reference || '[A]'}</b> • Kurulum: <span class="audit-op-badge" style="background:${selectedDim.op === 'OP20' ? '#D97706' : '#0284C7'};color:#FFF;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;" title="${selectedDim.op_reason || ''}">${selectedDim.op || 'OP10'}</span> <i style="color:#64748B;">(${selectedDim.op_reason || 'Z- probu ile OP10'})</i></span>`
                 : `<span>Lütfen incelemek için bir teknik resim yükleyin veya balona tıklayın.</span>`
             }
           </div>
@@ -679,7 +693,8 @@ export class SetupWizard {
         const fill = isSel ? 'rgba(217, 119, 6, 0.22)' : 'rgba(2, 132, 199, 0.15)';
         const text = isSel ? '#B45309' : '#0284C7';
 
-        const labelText = d.nominal_str || (d.nominal !== undefined && d.nominal !== null ? `${d.nominal}` : '');
+        const opTag = d.op ? ` [${d.op}]` : '';
+        const labelText = (d.nominal_str || (d.nominal !== undefined && d.nominal !== null ? `${d.nominal}` : '')) + opTag;
         const badgeWidth = Math.max(54, labelText.length * 7.5 + 14);
         const badgeX = cx - badgeWidth / 2;
         const badgeY = cy + 22;
@@ -799,7 +814,8 @@ export class SetupWizard {
         const fill = isSel ? 'rgba(217, 119, 6, 0.18)' : 'rgba(2, 132, 199, 0.12)';
         const text = isSel ? '#B45309' : '#0284C7';
 
-        const labelText = d.nominal_str || (d.nominal !== undefined && d.nominal !== null ? `${d.nominal}` : '');
+        const opTag = d.op ? ` [${d.op}]` : '';
+        const labelText = (d.nominal_str || (d.nominal !== undefined && d.nominal !== null ? `${d.nominal}` : '')) + opTag;
         const badgeWidth = Math.max(54, labelText.length * 7.5 + 14);
         const badgeX = pt.cx - badgeWidth / 2;
         const badgeY = pt.cy + 22;

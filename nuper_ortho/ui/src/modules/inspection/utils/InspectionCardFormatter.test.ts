@@ -42,6 +42,8 @@ describe('InspectionCardFormatter (Pure Utility)', () => {
       status: 'PASS',
       featureKey: 'detay_m_holes_4x_dia_3_5',
       selected: true,
+      op: 'OP10',
+      op_reason: 'Dikey Z probu ile taranabilir.',
     };
 
     const cardHtml = InspectionCardFormatter.renderCardHtml(card);
@@ -50,6 +52,8 @@ describe('InspectionCardFormatter (Pure Utility)', () => {
     expect(cardHtml).toContain('Kare Flanş Bağlantı Delikleri');
     expect(cardHtml).toContain('+0.2 / 0');
     expect(cardHtml).toContain('[A|B|C]');
+    expect(cardHtml).toContain('OP10');
+    expect(cardHtml).toContain('Dikey Z probu ile taranabilir.');
     expect(cardHtml).toContain('active');
 
     const listHtml = InspectionCardFormatter.renderListContainerHtml([card]);

@@ -19,6 +19,8 @@ export interface InspectionTableRow {
   gdt?: string;
   datum_reference: string;
   selected?: boolean;
+  op?: string;
+  op_reason?: string;
 }
 
 export interface InspectionSummary {
@@ -66,6 +68,8 @@ export class InspectionTable {
         gdt: dim.gdt,
         datum_reference: datumRef,
         selected: dim.id === this.selectedId,
+        op: dim.op,
+        op_reason: dim.op_reason,
       };
     });
 
@@ -98,6 +102,8 @@ export class InspectionTable {
       status: row.status,
       featureKey: row.feature_key,
       selected: row.selected,
+      op: row.op,
+      op_reason: row.op_reason,
     }));
   }
 

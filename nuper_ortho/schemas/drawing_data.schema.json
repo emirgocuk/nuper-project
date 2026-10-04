@@ -71,6 +71,8 @@
           },
           "feature_key": { "type": "string" },
           "gdt": { "type": "string" },
+          "op": { "type": "string" },
+          "op_reason": { "type": "string" },
           "bbox": {
             "type": "array",
             "items": { "type": "number" },

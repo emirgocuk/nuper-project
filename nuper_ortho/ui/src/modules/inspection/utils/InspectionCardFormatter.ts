@@ -14,6 +14,8 @@ export interface FormattedInspectionCard {
   status: 'PASS' | 'WARN' | 'FAIL' | 'UNMEASURED';
   featureKey?: string;
   selected?: boolean;
+  op?: string;
+  op_reason?: string;
 }
 
 export class InspectionCardFormatter {
@@ -94,6 +96,10 @@ export class InspectionCardFormatter {
     const activeClass = card.selected ? ' active' : '';
     const statusClass = ` status-${card.status.toLowerCase()}`;
 
+    const opBadge = card.op
+      ? `<span class="card-op-badge ${card.op.toLowerCase()}" title="${card.op_reason || card.op}">${card.op}</span>`
+      : '';
+
     return `
       <div class="inspection-card${activeClass}${statusClass}" data-id="${card.id}" data-page="${card.page}">
         <div class="card-left-badge">
@@ -103,7 +109,10 @@ export class InspectionCardFormatter {
         <div class="card-main-content">
           <div class="card-header-row">
             <span class="card-title">${card.featureTitle}</span>
-            <span class="card-datum-badge">${card.datumReference}</span>
+            <div class="card-header-badges">
+              ${opBadge}
+              <span class="card-datum-badge">${card.datumReference}</span>
+            </div>
           </div>
           <div class="card-details-row">
             <div class="detail-item">

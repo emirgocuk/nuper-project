@@ -58,6 +58,8 @@ export interface DrawingExtractionResult {
     };
     feature_key?: string;
     gdt?: string;
+    op?: string;
+    op_reason?: string;
     /**
      * @minItems 4
      * @maxItems 4

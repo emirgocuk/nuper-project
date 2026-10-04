@@ -7,6 +7,7 @@ import { IpcClient, type SelectedCadFile, type SelectedDrawingFile, type Benchma
 import { PRECISION, isEqual } from './modules/core/math/precision';
 import type { DrawingExtractionResult } from './types/generated/drawing_data';
 import { SetupWizard } from './modules/inspection/utils/SetupWizard';
+import { AiStatusIndicator } from './modules/core/utils/AiStatusIndicator';
 
 export class NuperApp {
   private cadViewer: CADViewer;
@@ -129,6 +130,8 @@ export class NuperApp {
     const result = await this.ipcClient.extractDrawingData(drawingFile.filePath);
     if (result) {
       this.loadDrawingData(result);
+      this.setupWizard.setExtractedData(result, drawingFile.name);
+      this.setupWizard.openDrawingAuditModal();
     }
     return result;
   }
@@ -240,6 +243,8 @@ if (typeof window !== 'undefined') {
     });
 
     wizard.startWorkflow();
+    void AiStatusIndicator.mountOrUpdateBadge();
+    setInterval(() => void AiStatusIndicator.mountOrUpdateBadge(), 15000);
   };
 
   if (document.readyState === 'loading') {

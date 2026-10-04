@@ -27,6 +27,8 @@ export interface InspectionPlanPayload {
     lower_tol?: number;
     measured?: number;
     status: "PASS" | "WARN" | "FAIL" | "SUSPECT" | "PENDING";
+    op?: string;
+    op_reason?: string;
     operator_approved?: boolean;
     approval_timestamp?: string;
     [k: string]: unknown;

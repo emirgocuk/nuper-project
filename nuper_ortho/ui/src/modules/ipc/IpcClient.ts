@@ -166,12 +166,12 @@ export class IpcClient {
     return result;
   }
 
-  public async extractDrawingData(filePath: string): Promise<DrawingExtractionResult | null> {
+  public async extractDrawingData(filePath: string, stepPath?: string): Promise<DrawingExtractionResult | null> {
     const ipc = this.ensureIpc();
     if (!ipc) {
       return null;
     }
-    const result = (await ipc.invoke('extract-drawing-data', filePath)) as DrawingExtractionResult | null;
+    const result = (await ipc.invoke('extract-drawing-data', filePath, stepPath)) as DrawingExtractionResult | null;
     if (result && typeof result.success === 'boolean' && Array.isArray(result.dimensions)) {
       return result;
     }
