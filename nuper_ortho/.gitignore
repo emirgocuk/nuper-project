@@ -10,3 +10,7 @@ scratch/
 dist/
 ui/dist/
 artifacts/
+.ocr_cache/
+tools/.ocr_cache/
+__pycache__/
+*.pyc

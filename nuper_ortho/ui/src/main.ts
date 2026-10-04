@@ -6,18 +6,21 @@ import { InspectionTable } from './modules/inspection/InspectionTable';
 import { IpcClient, type SelectedCadFile, type SelectedDrawingFile, type BenchmarkSpecimenSuite } from './modules/ipc/IpcClient';
 import { PRECISION, isEqual } from './modules/core/math/precision';
 import type { DrawingExtractionResult } from './types/generated/drawing_data';
+import { SetupWizard } from './modules/inspection/utils/SetupWizard';
 
 export class NuperApp {
   private cadViewer: CADViewer;
   private drawingCanvas: DrawingCanvas;
   private inspectionTable: InspectionTable;
   private ipcClient: IpcClient;
+  private setupWizard: SetupWizard;
 
   constructor() {
     this.cadViewer = new CADViewer();
     this.drawingCanvas = new DrawingCanvas();
     this.inspectionTable = new InspectionTable();
     this.ipcClient = IpcClient.getInstance();
+    this.setupWizard = new SetupWizard(this);
 
     this.inspectionTable.onSelectionChange((row) => {
       if (row) {
@@ -75,6 +78,8 @@ export class NuperApp {
         }))
       );
     }
+
+    this.setupWizard.setExtractedData(data);
   }
 
   public loadSampleData(data: DrawingExtractionResult): void {
@@ -84,6 +89,9 @@ export class NuperApp {
   public async openAndLoadCadFile(): Promise<SelectedCadFile | null> {
     const cadFile = await this.ipcClient.selectCadFile();
     if (cadFile) {
+      if (cadFile.metadata) {
+        this.setupWizard.setCadMetadata(cadFile.metadata);
+      }
       const sx = cadFile.metadata?.bbox?.size?.[0] ?? 50;
       const sy = cadFile.metadata?.bbox?.size?.[1] ?? 30;
       const sz = cadFile.metadata?.bbox?.size?.[2] ?? 20;
@@ -112,6 +120,9 @@ export class NuperApp {
     }
 
     if (suite.cad) {
+      if (suite.cad.metadata) {
+        this.setupWizard.setCadMetadata(suite.cad.metadata);
+      }
       const sx = suite.cad.metadata?.bbox?.size?.[0] ?? 50;
       const sy = suite.cad.metadata?.bbox?.size?.[1] ?? 30;
       const sz = suite.cad.metadata?.bbox?.size?.[2] ?? 20;
@@ -141,10 +152,15 @@ export class NuperApp {
     this.ipcClient.closeWindow();
   }
 
+  public getSetupWizard(): SetupWizard {
+    return this.setupWizard;
+  }
+
   public destroy(): void {
     this.cadViewer.destroy();
     this.drawingCanvas.destroy();
     this.inspectionTable.clear();
+    this.setupWizard.destroy();
   }
 
   public mountDrawingCanvas(containerOrSelector: HTMLElement | string = '#drawing-viewport-canvas'): void {
@@ -154,9 +170,10 @@ export class NuperApp {
 
 if (typeof window !== 'undefined') {
   const app = new NuperApp();
-  (window as unknown as { nuperApp: NuperApp; DrawingCanvas: typeof DrawingCanvas; SimulationController: typeof SimulationController }).nuperApp = app;
+  (window as unknown as { nuperApp: NuperApp; DrawingCanvas: typeof DrawingCanvas; SimulationController: typeof SimulationController; SetupWizard: typeof SetupWizard }).nuperApp = app;
   (window as unknown as { DrawingCanvas: typeof DrawingCanvas }).DrawingCanvas = DrawingCanvas;
   (window as unknown as { SimulationController: typeof SimulationController }).SimulationController = SimulationController;
+  (window as unknown as { SetupWizard: typeof SetupWizard }).SetupWizard = SetupWizard;
 
   const initApp = () => {
     app.mountDrawingCanvas('#drawing-viewport-canvas');
@@ -168,26 +185,41 @@ if (typeof window !== 'undefined') {
       generateDynamicProbeTrajectory?: () => void;
       syncSimControllerWaypoints?: () => void;
       isSimulating?: boolean;
+      openAiInspectionModal?: () => void;
+      trigger2dUpload?: () => void;
+      setupWizard?: SetupWizard;
     };
-    if (typeof win.generateDynamicProbeTrajectory === 'function') {
-      win.generateDynamicProbeTrajectory();
-    }
-    if (typeof win.syncSimControllerWaypoints === 'function') {
-      win.syncSimControllerWaypoints();
-    }
-    win.isSimulating = true;
-    simCtrl.play();
+    win.isSimulating = false;
+    simCtrl.pause();
 
-    const dc = app.getDrawingCanvas();
-    const defaultPdf = 'test_assets/KPT - 3051 Gobek Bagı Olugu/GOBEK BAGI OLUGU_TR_AB.pdf';
-    dc.loadPdf(defaultPdf)
-      .then(() => {
-        dc.setActivePage(2);
-        void dc.render();
-      })
-      .catch(() => {
-        void dc.render();
+    const wizard = app.getSetupWizard();
+    win.setupWizard = wizard;
+    win.openAiInspectionModal = () => {
+      wizard.handleTeknikResimClick();
+    };
+    (win as unknown as { trigger2dUpload?: () => void }).trigger2dUpload = () => {
+      wizard.handleTeknikResimClick();
+    };
+
+    const drawingBtns = document.querySelectorAll(
+      'button[onclick*="trigger2dUpload"], .dropdown-row[onclick*="trigger2dUpload"], button[title*="2D PDF"]'
+    );
+    drawingBtns.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        wizard.handleTeknikResimClick();
       });
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        wizard.handleTeknikResimClick();
+      }
+    });
+
+    wizard.startWorkflow();
   };
 
   if (document.readyState === 'loading') {

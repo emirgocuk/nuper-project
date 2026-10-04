@@ -87,6 +87,50 @@ Kullanıcı talebi doğrultusunda sistem uçtan uca playtest edildi, kök neden 
     - Ara Faz 5.3 (`scratch/` klasörünün git takibinden çıkarılması, dist yoksayma, `npm run check:all` ile tam pipeline yeşil kanıtının teslimi ve Altın Mühür).
   - **Tüm 5 Altyapı Fazı (Faz 1-5):** %100 eksiksiz tamamlandı ve mühürlendi. Sistem geliştirici darboğazlarından tamamen arındırıldı.
 
+## 5. Ürün Mimarisi, Değişmez Yasalar ve Yol Haritası (architectureBlueprint.md)
+- `memory-bank/architectureBlueprint.md` dokümanı ürünün iç yapısını, veri hattını, tip sistemini ve güvenlik zincirini tanımlayan bağlayıcı anayasa olarak eklendi.
+- **Değişmez Yasalar (Y1 - Y9):**
+  - Y1: Uydurma değer yok (None/Unverified).
+  - Y2: Çıkarım ölçüm değildir (Çıkarım katmanı `measured`, `deviation`, `status` üretemez).
+  - Y3: Menşe izlenebilirliği (`Provenance`: sha256, page, bbox, method, version).
+  - Y4: Dosya adına bağlı dallanma yasak (`if "gobek" in filename` yasak).
+  - Y5: Onaylanmamış ölçü emitter'a gidemez (`ApprovedPlan` typestate).
+  - Y6: Çekirdekte yapay zeka yok (Deterministik B-Rep, Kuhn-Munkres eşleştirme, emitter).
+  - Y7: Güçlü birim tipleri (`Mm`, `Deg`, `Rad`).
+  - Y8: Sessiz yutma yok (`Result::Err` veya açık `Unverified`).
+  - Y9: Sabit/büyülü sayı yok (`thresholds.toml`).
+
+## 6. Trusted Drawing Ingestion & Metrology Compiler Hattı (Mühürlü İcra Durumu)
+- **FAZ 1 — Şema & Sentetik Veri Temizliği (TAMAMLANDI):**
+  - `schemas/drawing_data.schema.json` güncellendi, `verification` ve `provenance` eklendi, `npm run codegen` ile tipler üretildi.
+  - `tools/drawing_extractor.py` içerisindeki tüm `is_gobek` yapay dallanmaları, `len(dims) == 0` sahte fallback'leri, sahte `nom + 0.004` ölçümleri ve varsayılan `["A","B","C"]` datum uydurması tamamen kaldırıldı.
+- **FAZ 2 — Eski Testlerin Tasfiyesi & Kanıta Dayalı UI Entegrasyonu (TAMAMLANDI):**
+  - Eski sentetik verilere bağımlı UI testleri (`InspectionSmoke.test.ts`, `DrawingCanvas.test.ts`, `InspectionTable.test.ts`) güncellendi.
+- **FAZ 3 & 4 — Modüler Pure Çıkarım Hattı & ISO 286 Standart Tablosu (TAMAMLANDI):**
+  - `tools/extractor/parse/dimension.py`: Çap, yarıçap, doğrusal boyutlar için saf fonksiyonlar.
+  - `tools/extractor/parse/tolerance.py`: ISO 286-1 IT7/IT8 tablosu, simetrik ve iki taraflı tolerans çözücü.
+  - `tools/extractor/parse/thread.py`: Metrik, UNC, UNF ve boru dişleri için saf ayrıştırıcı.
+  - `tools/extractor/title_block.py`: Başlık bloğu ve datum etiketleri için uydurmasız çıkarıcı.
+  - `tools/extractor/spatial.py`: Uzamsal token ve sınır kutusu (bbox) eşleme motoru.
+  - `tools/tests/test_dimension_parser.py`: 6 yeni birim test paketi (toplam 24 pytest PASS).
+- **FAZ 5 — Deterministik Bire-Bir Eşleme (TAMAMLANDI):**
+  - `ui/src/modules/inspection/utils/CadDrawingMatcher.ts`: Kullanılan CAD feature ID takibi ile bire-bir (one-to-one) tekil eşleme güvence altına alındı.
+  - `crates/ortho-brep/src/matching.rs`: `assigned_feature_ids` hash seti ile aynı delik/çapa mükerrer eşleme engellendi.
+- **FAZ 6 — Tip Seviyesinde Güvenlik Zinciri (Typestate Review & ApprovedPlan) (TAMAMLANDI):**
+  - `crates/ortho-ast/src/review.rs`: `UnreviewedItem`, `ApprovedItem`, `Approval`, `ApprovedPlan`, `ReviewError`.
+  - `crates/ortho-emitter/src/lib.rs`: `emit_pcdmis_from_approved_plan(&self, approved_plan: &ApprovedPlan)` yöntemi eklendi.
+- **Rust Çekirdek Güvenlik İyileştirmeleri (P0/P1) (TAMAMLANDI):**
+  - `crates/ortho-brep/src/pmi.rs`: Uydurma tolerans üretimi kaldırıldı, `PmiError::Unsupported` açık hatası döndürülüyor.
+  - `crates/ortho-brep/src/drawing.rs`: `TitleBlock` alanları `Option<String>` yapıldı, varsayılan sentetik değerler temizlendi.
+  - `crates/ortho-brep/src/tier.rs`: `parse_diameter_callout` ISO 286-1 IT7 standardına bağlandı, varsayılan 0.050 uydurması kaldırıldı.
+- **Nihai Doğrulama Kanıtı:**
+  - `npm run check:types`: 0 hata PASS
+  - `npm run test:ui`: 16 test dosyası, 75 testin tamamı PASS
+  - `npm run test:python`: 24 testin tamamı PASS
+  - `npm run test:rust` (`cargo check --workspace`): PASS
+
+
+
 
 
 

@@ -46,41 +46,56 @@ def test_drawing_extractor_basic_metrology():
     validated = DrawingExtractionResult.model_validate(data)
     assert validated.success is True
     assert len(validated.dimensions) > 0
-    assert validated.dimensions[0].status.value == "PASS"
+
+    # Y2 & Invariant: Drawing parser must emit UNMEASURED, no fake measurements
+    for dim in validated.dimensions:
+        assert dim.status.value == "UNMEASURED"
+        assert dim.measured == ""
+        assert dim.deviation == ""
 
 
-def test_drawing_extractor_empty_text():
+def test_drawing_extractor_empty_text_zero_fabrication():
+    """Invariant: Boş input -> sıfır fabricated characteristic."""
     data = parse_text_to_metrology("", 0, "empty.pdf")
     validated = DrawingExtractionResult.model_validate(data)
     assert validated.success is True
     assert validated.filename == "empty.pdf"
-    assert len(validated.dimensions) == 4
+    assert len(validated.dimensions) == 0
+    assert len(validated.datums) == 0
+    assert validated.title_block.material == ""
+    assert validated.title_block.roughness == ""
+    assert validated.title_block.general_tolerance == ""
 
 
-def test_gobek_bagi_olugu_multipage_and_metric_filter():
+def test_filename_cannot_alter_behavior():
+    """Invariant Y4: Dosya adı davranışı değiştiremez. 'gobek' veya '3051' sahte veri tetikleyemez."""
+    data = parse_text_to_metrology("", 0, "KPT_3051_gobek_bagi_olugu.pdf", "path/to/3051_gobek.pdf")
+    validated = DrawingExtractionResult.model_validate(data)
+    assert validated.success is True
+    assert len(validated.dimensions) == 0
+    assert len(validated.datums) == 0
+    assert validated.title_block.material == ""
+
+
+def test_gobek_bagi_olugu_real_extraction():
+    """Gerçek PDF dosyasından uydurmasız, deterministik ayıklama."""
     data = extract_from_pdf("test_assets/GOBEK_BAGI_OLUGU_TR_AB.pdf")
     assert data["success"] is True
     assert data["page_count"] == 3
-    assert "ISO 2768-m" in data["title_block"]["general_tolerance"]
-    assert "ASME B1.13M" in data["title_block"]["general_tolerance"]
 
     dims = data["dimensions"]
-    assert len(dims) >= 12
+    assert len(dims) > 0
 
-    # Hallucination Guard: No UNF or UNC threads allowed
+    # Tüm ayıklanan ölçüler UNMEASURED olmalı, sentetik PASS veya measured içermemeli
     for d in dims:
-        nom_str = str(d.get("nominal_str", ""))
-        assert "UNF" not in nom_str
-        assert "UNC" not in nom_str
-
-    # Sayfa 2 ve Sayfa 3 boyutları doğrulanır
-    page_numbers = {d.get("page") for d in dims}
-    assert 2 in page_numbers
-    assert 3 in page_numbers
+        assert d["status"] == "UNMEASURED"
+        assert d["measured"] == ""
+        assert d["deviation"] == ""
 
     # Pydantic şema doğrulaması
     validated = DrawingExtractionResult.model_validate(data)
     assert validated.success is True
-    assert len(validated.dimensions) == 12
+    assert len(validated.dimensions) == len(dims)
+
 
 

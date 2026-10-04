@@ -11,6 +11,7 @@ pub mod datum;
 pub mod error;
 pub mod feature;
 pub mod plan;
+pub mod review;
 pub mod threads;
 pub mod tolerance;
 
@@ -30,6 +31,7 @@ pub use feature::{FeatureType, GeometricFeature};
 pub use plan::{
     InspectionPlan, LengthUnit, MultiSetupPlan, SensorType, StockAllowanceMode, WorkpieceMaterial,
 };
+pub use review::{Approval, ApprovedItem, ApprovedPlan, ReviewError, UnreviewedItem};
 pub use threads::{
     classify_thread_from_bore, classify_thread_from_callout, ManualGaugeItem, SetupSheetGaugeReport,
     ThreadBypassStrategy, ThreadDiameterKind, ThreadSpecification, ThreadStandard,
@@ -385,6 +387,42 @@ mod tests {
 
         assert_eq!(multi_setup.setup_instructions.len(), 3);
         assert!(multi_setup.setup_instructions[1].contains("180° ters çevirin"));
+    }
+
+    #[test]
+    fn test_typestate_review_approval_chain() {
+        let unreviewed = UnreviewedItem {
+            id: 1,
+            feature_name: "CYLINDER_BORE_20".to_string(),
+            nominal: Some(20.0),
+            tolerance: Some(0.021),
+            is_mismatch: false,
+            is_ambiguous: false,
+            is_rejected: false,
+        };
+
+        let approved = unreviewed
+            .approve("OP_TECH_42", "2026-10-04T12:00:00Z", "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0")
+            .expect("Valid unreviewed item should approve");
+
+        assert_eq!(approved.nominal(), 20.0);
+        assert_eq!(approved.tolerance(), 0.021);
+        assert_eq!(approved.approval().operator_id, "OP_TECH_42");
+
+        let approved_plan = ApprovedPlan::new("VALVE_OP10", vec![approved], "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0");
+        assert_eq!(approved_plan.items.len(), 1);
+        assert!(!approved_plan.audit_hash.is_empty());
+
+        let invalid = UnreviewedItem {
+            id: 2,
+            feature_name: "BAD_BORE".to_string(),
+            nominal: Some(15.0),
+            tolerance: None,
+            is_mismatch: true,
+            is_ambiguous: false,
+            is_rejected: false,
+        };
+        assert_eq!(invalid.approve("OP_1", "now", "hash"), Err(ReviewError::CadMismatch));
     }
 }
 

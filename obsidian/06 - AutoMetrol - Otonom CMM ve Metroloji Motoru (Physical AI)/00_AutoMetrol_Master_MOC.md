@@ -1,4 +1,4 @@
-# 🌐 AutoMetrol: Otonom CMM ve Metroloji Motoru (Master MOC)
+﻿# 🌐 AutoMetrol: Otonom CMM ve Metroloji Motoru (Master MOC)
 
 > **"Tasarım dosyasını (STEP) ve teknik resmi alıp; prob kafası kinematiğini, temas noktalarını ve çarpışmasız hareket yollarını hesaplayarak doğrudan tezgaha yüklenebilir DMIS/PC-DMIS teftiş kodu basan yerel masaüstü yazılımı."**
 > 
@@ -48,6 +48,7 @@ Aşağıdaki belgeler, AutoMetrol'ün kavramsal mimarisinden matematiksel çekir
 | [[01_Problem_Tanimi_ve_Pazar_Dinamikleri\|01. Problem Tanımı ve Pazar Dinamikleri]] | CAM-CMM Uçurumu ve Pazar Boşluğu | 2-8 saatten 30 saniyeye, $2K-$6K kaza maliyeti, Hexagon/Zeiss kısıtları, Node-locked lisanslama. |
 | [[02_Geometri_Motoru_ve_BRep_Ayristirma\|02. Geometri Motoru ve B-Rep Ayrıştırma]] | STEP AP214/AP242 & OpenCASCADE | TopoDS_Shape hiyerarşisi, analitik yüzey tipleri, normal vektörler, cidar kalınlığı analizi, Rust FFI. |
 | [[03_2D_PDF_GDT_ve_Datum_Esleme_Motoru\|03. 2D PDF GD&T ve Datum Eşleme]] | Semantik Katman ve 3-2-1 Hizalama | Yerel Vision OCR (GGUF), Feature Control Frame, çap/sayı eşleştirme, ISO 10360 & ASME Y14.5 örnekleme. |
+| [[03_1_Teknik_Resim_Metin_GDT_Cikarim_Stratejileri_ve_Hibrit_Mimari\|03.1. Metin & GD&T Çıkarım Stratejileri]] | Hibrit Mimari & OCR Seçenekleri | PyMuPDF, Surya OCR, PaddleOCR, eDOCr analizi, VRAM/doğruluk matrisi, deterministik fallback mimarisi. |
 | [[04_Prob_Kinematigi_ve_Aci_Optimizasyonu\|04. Prob Kinematiği ve Açı Optimizasyonu]] | PH10 & MH20i Kafa Hesaplamaları | 720 diskret açı projeksiyonu, k-means manuel kafa kümeleme, kalibre edilmiş açı önceliği, dönüş hacmi. |
 | [[05_Carpisma_Onleme_Emniyet_Zarfi_ve_Yol_Planlama\|05. Çarpışma Önleme ve Emniyet Zarfı]] | Güvenli Rota & Şaft Çarpışma Koruması | +50mm Clearance Box, pabuç/fikstür Keep-Out alanları, prob şaftı & modül kaçıklığı, çapak marj ofseti. |
 | [[06_Metroloji_Matematigi_Fitting_ve_Standartlar\|06. Metroloji Matematiği ve Standartlar]] | Fitting Algoritmaları & Prob Fiziği | Gauss vs Chebyshev (H7 delik), dokunmatik vs analog tarama, prob esnemesi (pre-travel), PTB/NIST akreditasyonu. |

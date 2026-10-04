@@ -58,7 +58,29 @@ impl DmisEmitter {
         self
     }
 
-    /// PC-DMIS uyumlu daire / delik ölçüm bloğu (FEAT/CIRCLE, MEAS/CIRCLE, HIT/BASIC..., ENDMES)
+    pub fn emit_pcdmis_from_approved_plan(
+        &self,
+        approved_plan: &ortho_ast::ApprovedPlan,
+    ) -> Result<String, EmitterError> {
+        let mut dmis = String::new();
+        writeln!(
+            dmis,
+            "$$\n$$ PROGRAM: {}\n$$ AS9100-AUDIT-HASH: {}\n$$",
+            approved_plan.plan_name, approved_plan.audit_hash
+        )?;
+        for item in &approved_plan.items {
+            writeln!(
+                dmis,
+                "$$ FEATURE: {} | NOMINAL: {:.3} | TOL: {:.3} | OPERATOR: {}",
+                item.feature_name(),
+                item.nominal(),
+                item.tolerance(),
+                item.approval().operator_id
+            )?;
+        }
+        Ok(dmis)
+    }
+
     pub fn emit_circle_block(
         &self,
         feature_name: &str,

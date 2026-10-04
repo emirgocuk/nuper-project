@@ -46,13 +46,11 @@ pub enum SheetType {
 /// Teknik resim başlık bloğu (Title Block) bilgileri
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TitleBlock {
-    pub part_name: String,
-    pub drawing_number: String,
-    pub revision: String,
-    pub material: String,
-    /// Genel tolerans standardı (Örn: "ISO 2768-mK")
-    pub general_tolerance: String,
-    /// Birincil datum etiketleri (Örn: ["A", "B", "C"])
+    pub part_name: Option<String>,
+    pub drawing_number: Option<String>,
+    pub revision: Option<String>,
+    pub material: Option<String>,
+    pub general_tolerance: Option<String>,
     pub primary_datums: Vec<String>,
 }
 
@@ -255,47 +253,53 @@ impl DrawingSheet {
         Self::new_overview(sheet_number, width_mm, height_mm)
     }
 
-    /// Sayfa metninden başlık bloğu (Title Block) bilgilerini ayıklar
     pub fn extract_title_block(&mut self, text: &str) {
         let upper = text.to_uppercase();
-        let mut part_name = "PART_1".to_string();
-        let mut drawing_number = "DWG_001".to_string();
-        let mut revision = "REV_A".to_string();
-        let mut material = "ALUMINUM_6061_T6".to_string();
-        let mut general_tolerance = "ISO 2768-mK".to_string();
-        let primary_datums = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+        let mut part_name = None;
+        let mut drawing_number = None;
+        let mut revision = None;
+        let mut material = None;
+        let mut general_tolerance = None;
+        let primary_datums = Vec::new();
 
         for line in upper.lines() {
             let trimmed = line.trim();
             if trimmed.contains("PART NO") || trimmed.contains("PARÇA NO") || trimmed.contains("DWG NO") {
                 if let Some(idx) = trimmed.find(':') {
-                    drawing_number = trimmed[idx + 1..].trim().to_string();
+                    drawing_number = Some(trimmed[idx + 1..].trim().to_string());
                 }
             } else if trimmed.contains("PART NAME") || trimmed.contains("PARÇA ADI") {
                 if let Some(idx) = trimmed.find(':') {
-                    part_name = trimmed[idx + 1..].trim().to_string();
+                    part_name = Some(trimmed[idx + 1..].trim().to_string());
                 }
             } else if trimmed.contains("REV") {
                 if let Some(idx) = trimmed.find(':') {
-                    revision = trimmed[idx + 1..].trim().to_string();
+                    revision = Some(trimmed[idx + 1..].trim().to_string());
                 }
             } else if trimmed.contains("MATERIAL") || trimmed.contains("MALZEME") {
                 if let Some(idx) = trimmed.find(':') {
-                    material = trimmed[idx + 1..].trim().to_string();
+                    material = Some(trimmed[idx + 1..].trim().to_string());
                 }
             } else if trimmed.contains("ISO 2768") || trimmed.contains("TOLERANCE") {
-                general_tolerance = trimmed.to_string();
+                general_tolerance = Some(trimmed.to_string());
             }
         }
 
-        self.title_block = Some(TitleBlock {
-            part_name,
-            drawing_number,
-            revision,
-            material,
-            general_tolerance,
-            primary_datums,
-        });
+        if part_name.is_some()
+            || drawing_number.is_some()
+            || revision.is_some()
+            || material.is_some()
+            || general_tolerance.is_some()
+        {
+            self.title_block = Some(TitleBlock {
+                part_name,
+                drawing_number,
+                revision,
+                material,
+                general_tolerance,
+                primary_datums,
+            });
+        }
     }
 }
 

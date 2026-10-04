@@ -55,6 +55,7 @@ Create additional files/folders within memory-bank/ when they help organize:
 - API documentation
 - Testing strategies
 - Deployment procedures
+- `architectureBlueprint.md`: Ürünün iç yapısı, veri hattı, değişmez yasalar (Y1-Y9), tip sistemi, modül sınırları ve uygulama yol haritası (F0-F8).
 - `developmentInfrastructureRules.md`: Geliştirme altyapısı kurulum planı, darboğaz önleme kuralları, modüler UI mimarisi, IPC şema sözleşmeleri ve test standartları.
 
 

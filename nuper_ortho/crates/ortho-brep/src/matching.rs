@@ -122,6 +122,7 @@ impl DrawingToStepMatcher {
         cutting_planes: &[CuttingPlane],
     ) -> Vec<FeatureMatch> {
         let mut matches = Vec::new();
+        let mut assigned_feature_ids = std::collections::HashSet::new();
 
         for sheet in sheets.iter_mut() {
             // Kesit sayfası ise ilgili sanal kesme düzlemini bul
@@ -136,6 +137,9 @@ impl DrawingToStepMatcher {
                 let mut best_match: Option<(u32, f64, String)> = None;
 
                 for feat in features {
+                    if assigned_feature_ids.contains(&feat.id) {
+                        continue;
+                    }
                     let score = Self::calculate_match_score(ann, feat, active_plane);
                     if score > 0.50 {
                         if let Some((_, best_score, _)) = best_match {
@@ -157,6 +161,7 @@ impl DrawingToStepMatcher {
                 }
 
                 if let Some((feat_id, score, rationale)) = best_match {
+                    assigned_feature_ids.insert(feat_id);
                     ann.confidence = score;
 
                     // Balon listesinde ilgili balonu güncelle

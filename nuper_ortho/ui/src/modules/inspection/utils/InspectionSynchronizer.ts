@@ -20,6 +20,10 @@ export interface InspectionDimension {
   feature_key?: string;
   gdt?: string;
   datum_reference?: string;
+  bbox?: [number, number, number, number];
+  operation?: 'OP10' | 'OP20';
+  cad_feature_id?: string;
+  match_confidence?: 'EXACT' | 'ENVELOPE' | 'RADIUS_HALF' | 'UNMATCHED';
 }
 
 export interface FeatureCoordinates {

@@ -82,8 +82,13 @@ Başlangıç ve bitiş hareketlerinde çapraz iniş kazalarını önlemek için:
 2. İkinci hareket: Parça merkezine yatay ($X/Y$) güvenli intikal.
 3. Üçüncü hareket: Parçanın $+50\text{ mm}$ Clearance Box kutusuna dikey ($Z$) iniş.
 
-### G. Dişli Delik Koruması ve Kurulum Föyü Entegrasyonu
-Vida dişli deliklere ($\text{M-Thread}$) yakut bilye daldırılmaz; kaza riski elenir ve Setup Sheet üzerine otomatik geçer/geçmez tampon diş mastarı talimatı basılır.
+### H. Evidence-First Drawing Ingestion ve Sıfır Sentetik Veri Değişmezi (No-Fabrication Invariant)
+Teknik resim ve PDF okuma hattında kaynağı/evidence'ı olmayan hiçbir nominal, tolerans, datum veya GD&T üretilemez:
+1. **Çıkarım Ölçüm Değildir:** PDF parser katmanı `measured`, `deviation` ve `status: PASS` üretemez. Henüz CMM tarafından fiziksel temasla ölçülmemiş tüm karakteristikler `status: UNMEASURED`, `measured: ""` ve `deviation: ""` olarak işaretlenir.
+2. **Uydurma Değer Yasağı:** Çizimde bulunmayan datumlar için `["A", "B", "C"]` veya varsayılan pürüzlülük / tolerans uydurulamaz; bulunamayan veri boş (`[]` veya `""`) kalır.
+3. **Dosya Adı İzolasyonu:** Dosya adındaki kelimelere (örn. "gobek", "3051") göre sabit metrik setleri veya yapay dallanmalar yapılamaz (Y4).
+4. **Doğrulama Yaşam Döngüsü (Verification Lifecycle):** Karakteristikler `RAW` $\to$ `PARSED` $\to$ `DUAL_VERIFIED` $\to$ `CAD_VERIFIED` $\to$ `HUMAN_VERIFIED` açık durum makinesiyle izlenir; şüpheli durumlar `NEEDS_REVIEW` ve `CONFLICT` olarak işaretlenir.
+5. **Menşe İzlenebilirliği (Provenance):** Her çıkarılan öğe sayfa numarası, sınırlayıcı kutu (`bbox`), çıkarma yöntemi (`PDF_VECTOR`, `OCR`) ve ayrıştırıcı sürüm bilgisini taşır.
 
 ---
 
@@ -98,4 +103,5 @@ Detaylar için bakınız: [developmentInfrastructureRules.md](file:///d:/Project
 5. **Headless Görsel Regresyon:** 2D Balonlama ve 3D kamera projeksiyonu Playwright canvas snapshot testleri ile korunur.
 6. **Pre-Commit / Pre-Push Kalkanı:** Husky git hook'ları ile `ui/index.html`'e satır ekleme ve `scratch/*` commit'leri otomatik engellenir.
 7. **AI Ajan Koruma Protokolü:** Tek prompt'ta maksimum 3 modül değişikliği limiti; yeni fonksiyonların `utils/` altında saf (pure) ve birim testli yazılması; ölü kodun yoruma alınmadan doğrudan silinmesi.
+
 

@@ -41,17 +41,17 @@ describe('Referans Numune Entegrasyon Duman Testi (Smoke Test)', () => {
 
     expect(result.success).toBe(true);
     expect(result.filename).toBe('drawing.pdf');
-    expect(result.datums).toEqual(['A', 'B', 'C']);
+    expect(result.datums).toEqual([]);
     expect(result.title_block.hardness).toBe('38-44 HRC');
-    expect(result.title_block.general_tolerance).toBe('ISO 2768-mK');
     expect(result.dimensions.length).toBe(13);
 
-    const radiusCallout = result.dimensions.find((d) => d.id === 1);
-    expect(radiusCallout?.nominal_str).toBe('2x R2.5');
-    expect(radiusCallout?.status).toBe('PASS');
+    const radiusCallout = result.dimensions.find((d) => d.type === 'RADIUS');
+    expect(radiusCallout).toBeDefined();
+    expect(radiusCallout?.nominal_str).toContain('R');
+    expect(radiusCallout?.status).toBe('UNMEASURED');
 
-    const linearCallout = result.dimensions.find((d) => d.id === 10);
-    expect(linearCallout?.nominal_str).toBe('191.0 ±14');
+    const linearCallout = result.dimensions.find((d) => d.nominal_str.includes('191.0'));
+    expect(linearCallout).toBeDefined();
     expect(linearCallout?.nominal).toBe(191.0);
   });
 
@@ -120,15 +120,17 @@ describe('Referans Numune Entegrasyon Duman Testi (Smoke Test)', () => {
     const rows = table.getRows();
 
     expect(rows.length).toBe(13);
-    expect(table.getDatums()).toEqual(['A', 'B', 'C']);
+    expect(table.getDatums()).toEqual([]);
     expect(table.getTitleBlock().hardness).toBe('38-44 HRC');
 
     const summary = table.getSummary();
     expect(summary.total).toBe(13);
-    expect(summary.pass).toBe(13);
+    expect(summary.pass).toBe(0);
+    expect(summary.unmeasured).toBe(13);
     expect(summary.fail).toBe(0);
 
-    table.selectRow(10);
-    expect(table.getSelectedRow()?.nominal_str).toBe('191.0 ±14');
+    const firstItem = result.dimensions[0];
+    table.selectRow(firstItem.id);
+    expect(table.getSelectedRow()?.nominal_str).toBe(firstItem.nominal_str);
   });
 });

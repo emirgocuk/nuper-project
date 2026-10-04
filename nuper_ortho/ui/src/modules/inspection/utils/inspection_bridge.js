@@ -148,11 +148,6 @@
       }
     }
 
-    // 6. Eğer Çift Kanvas Açık Değilse Aç (2D ve 3D Birlikte Görünsün)
-    if (typeof window.isDualCanvas !== 'undefined' && !window.isDualCanvas && typeof window.toggleDualCanvas === 'function') {
-      window.toggleDualCanvas();
-    }
-
     if (!skipCamera && typeof window.showToast === 'function') {
       window.showToast(`🎯 Balon ${d.balloon}: ${d.nominal_str} (Ölçülen: ${d.measured}) ✓`);
     }

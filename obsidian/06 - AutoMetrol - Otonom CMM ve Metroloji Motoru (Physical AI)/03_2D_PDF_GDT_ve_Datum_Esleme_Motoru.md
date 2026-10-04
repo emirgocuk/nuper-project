@@ -1,10 +1,18 @@
-# 📐 03. 2D PDF GD&T ve Datum Eşleme Motoru (Semantik Katman)
+﻿# 📐 03. 2D PDF GD&T ve Datum Eşleme Motoru (Semantik Katman)
 
 > **"Tasarım ofisinden gelen 2D PDF teknik resimdeki tolerans kutularını (Feature Control Frame) yerel Vision-AI ile okuyup; STEP dosyasındaki 3D geometrik unsurlarla eşleştiren ve 3-2-1 hizalama sırasını deterministik olarak kuran semantik motor."**
 
 ---
 
 ## 📌 1. Semantik Darboğaz ve Hibrit Çıkarım Hattı
+
+> 🔗 *Ayrıntılı Proje ve Algoritma Analizi İçin Bakınız:* [[03_1_Teknik_Resim_Metin_GDT_Cikarim_Stratejileri_ve_Hibrit_Mimari|03.1. Teknik Resim Metin, GD&T Çıkarım Stratejileri ve Hibrit Mimari]]
+
+3D CAD modellerinin %90'ında gömülü tolerans (PMI/MBD) bulunmaz. Ölçüm kriterleri, çizim üzerindeki semboller, oklar ve tolerans tablolarıyla 2D PDF dosyasında verilir.
+
+AutoMetrol, gizlilik ve savunma regülasyonları gereği internete bağlanmadan (**air-gapped**), yerel donanımda çalışan **Hibrit (Vektör Kümeleme + Hafif Yerel OCR)** hattı kullanır:
+- **Vektörel PDF'ler (Siemens NX, CATIA):** 0 MB VRAM, <10 ms süre, PyMuPDF / pdfjs 2D uzamsal token kümeleme ile %99.9 deterministik çıkarım.
+- **Taranmış / Raster PDF'ler (Görüntü):** 300 DPI sayfa render'ı üzerinden yerel OCR (Surya OCR / RapidOCR PP-OCRv4) ile koordinatlı metin çıkarımı.
 
 3D CAD modellerinin %90'ında gömülü tolerans (PMI/MBD) bulunmaz. Ölçüm kriterleri, çizim üzerindeki semboller, oklar ve tolerans tablolarıyla 2D PDF dosyasında verilir.
 

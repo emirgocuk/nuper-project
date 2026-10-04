@@ -22,4 +22,6 @@ Tüm AI ajanları (Antigravity, Cursor, Claude, Copilot vb.) bu depoda kod yazar
 - UI tarafında `Error Boundary` kullanılmalı, kullanıcıya şık hata bildirimi gösterilmeli ve WebGL bağlamı `SceneCleaner` ile serbest bırakılmalıdır.
 
 ---
-Detaylı kurallar ve mimari standartlar için: [memory-bank/developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md)
+Detaylı mimari plan, değişmez yasalar ve standartlar için:
+- Mimari Plan ve Değişmez Yasalar (Zorunlu): [memory-bank/architectureBlueprint.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/architectureBlueprint.md)
+- Geliştirme Altyapı Kuralları: [memory-bank/developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md)

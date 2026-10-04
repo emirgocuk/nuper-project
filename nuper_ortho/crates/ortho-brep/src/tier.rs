@@ -78,24 +78,31 @@ impl HardwareProfile {
 pub struct Tier1RuleBasedParser;
 
 impl Tier1RuleBasedParser {
-    /// Standart bir çap ve tolerans metnini ayrıştırır (Örn: "4x Ø20 H7", "Ø15 +0.021/0", "Ø10")
     pub fn parse_diameter_callout(text: &str) -> Option<(usize, f64, f64)> {
         let clean = text.trim();
-        // Basit miktar ayrıştırma (Örn: "4x" veya "4X")
+        if clean.starts_with('M') || clean.starts_with('m') || clean.starts_with('G') || clean.contains("UNF") || clean.contains("UNC") {
+            return None;
+        }
+
         let (qty, rest) = if let Some(idx) = clean.find(['x', 'X']) {
             let qty_str = clean[..idx].trim();
-            let q = qty_str.parse::<usize>().unwrap_or(1);
-            (q, clean[idx + 1..].trim())
+            if !qty_str.is_empty() && qty_str.chars().all(|c| c.is_ascii_digit()) {
+                if let Ok(q) = qty_str.parse::<usize>() {
+                    (q, clean[idx + 1..].trim())
+                } else {
+                    (1, clean)
+                }
+            } else {
+                (1, clean)
+            }
         } else {
             (1, clean)
         };
 
-        // Çap sembolü "Ø" veya "DIA" veya "O"
         let dia_str = rest
             .trim_start_matches(|c| c == 'Ø' || c == 'O' || c == 'o')
             .trim();
 
-        // Sayısal çapı çıkar
         let mut num_str = String::new();
         let mut chars = dia_str.chars().peekable();
         while let Some(&c) = chars.peek() {
@@ -109,21 +116,37 @@ impl Tier1RuleBasedParser {
 
         let dia = num_str.parse::<f64>().ok()?;
 
-        // ISO H7 vb. fit kontrolü
         let remaining: String = chars.collect();
         let tol_band = if remaining.contains("H7") || remaining.contains("h7") {
-            // Nominal çapa göre H7 bandı (basitleştirilmiş standart aralık)
-            if dia <= 18.0 {
+            if dia <= 3.0 {
+                0.010
+            } else if dia <= 6.0 {
+                0.012
+            } else if dia <= 10.0 {
+                0.015
+            } else if dia <= 18.0 {
                 0.018
             } else if dia <= 30.0 {
                 0.021
             } else if dia <= 50.0 {
                 0.025
-            } else {
+            } else if dia <= 80.0 {
                 0.030
+            } else if dia <= 120.0 {
+                0.035
+            } else if dia <= 180.0 {
+                0.040
+            } else if dia <= 250.0 {
+                0.046
+            } else if dia <= 315.0 {
+                0.052
+            } else if dia <= 400.0 {
+                0.057
+            } else {
+                0.063
             }
         } else {
-            0.050 // Varsayılan genel tolerans
+            0.0
         };
 
         Some((qty, dia, tol_band))

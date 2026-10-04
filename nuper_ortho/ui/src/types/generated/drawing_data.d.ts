@@ -35,6 +35,27 @@ export interface DrawingExtractionResult {
     measured: string;
     deviation: string;
     status: "PASS" | "WARN" | "FAIL" | "UNMEASURED";
+    verification?:
+      | "RAW"
+      | "PARSED"
+      | "DUAL_VERIFIED"
+      | "CAD_VERIFIED"
+      | "HUMAN_VERIFIED"
+      | "NEEDS_REVIEW"
+      | "CONFLICT"
+      | "UNVERIFIED";
+    provenance?: {
+      source_sha256?: string;
+      page?: number;
+      /**
+       * @minItems 4
+       * @maxItems 4
+       */
+      bbox?: [number, number, number, number];
+      method?: string;
+      extractor_version?: string;
+      [k: string]: unknown;
+    };
     feature_key?: string;
     gdt?: string;
     /**

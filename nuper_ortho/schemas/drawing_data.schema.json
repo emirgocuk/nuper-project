@@ -44,7 +44,31 @@
           "lower_tol": { "type": "string" },
           "measured": { "type": "string" },
           "deviation": { "type": "string" },
-          "status": { "type": "string", "enum": ["PASS", "WARN", "FAIL", "UNMEASURED"] },
+          "status": {
+            "type": "string",
+            "enum": ["PASS", "WARN", "FAIL", "UNMEASURED"],
+            "default": "UNMEASURED"
+          },
+          "verification": {
+            "type": "string",
+            "enum": ["RAW", "PARSED", "DUAL_VERIFIED", "CAD_VERIFIED", "HUMAN_VERIFIED", "NEEDS_REVIEW", "CONFLICT", "UNVERIFIED"],
+            "default": "PARSED"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "source_sha256": { "type": "string" },
+              "page": { "type": "integer" },
+              "bbox": {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "method": { "type": "string" },
+              "extractor_version": { "type": "string" }
+            }
+          },
           "feature_key": { "type": "string" },
           "gdt": { "type": "string" },
           "bbox": {
@@ -58,3 +82,4 @@
     }
   }
 }
+

@@ -671,6 +671,21 @@
 | | **5.2 SQLite Golden Benchmark** | 12 numune ve standartların SQLite üzerinden regresyon testi | `test_golden_benchmarks.py`, `benchmarks.db` | Pytest (4 test PASS) | ✅ **Tamamlandı** |
 | | **5.3 scratch/ Tasfiyesi & Büyük Kanıt**| `scratch/` arşivlenmesi/temizliği ve tam pipeline mühürlenmesi | `.gitignore`, `package.json` | `npm run check:all` tam yeşil logu | ✅ **Tamamlandı** |
 
+---
+
+### 🔬 Trusted Drawing Ingestion / PDF Metrology Compiler Yol Haritası
+
+| Ara Faz No | Kapsam | İlgili Dosyalar (Maks 3) | Davranış Değişikliği / Güvenlik Kanıtı | Durum |
+|---|---|---|---|:---:|
+| **ARA FAZ 1** | **Şema & Sentetik Veri Temizliği** | `schemas/drawing_data.schema.json`, `tools/drawing_extractor.py`, `tools/tests/test_drawing_extractor.py` | `is_gobek` hardcoding, `len(dims)==0` dummy dimension, sentetik `measured: +0.004` ve `status: PASS` kaldırıldı; boş girdi için sıfır uydurma veri garanti edildi. `status: UNMEASURED` ve `verification` eklendi. Pytest 18/18 PASS, codegen senkron. | ✅ **Tamamlandı** |
+| **ARA FAZ 2** | **Eski Testlerin Tasfiyesi & Kanıta Dayalı UI Testleri** | `InspectionSmoke.test.ts`, `DrawingCanvas.test.ts`, `InspectionTable.test.ts` | Eski sahte verilere (`status: PASS`, `datums: ['A','B','C']`, `gobek 12 dims`) bağımlı kalan 3 UI testinin yeni unmeasured sözleşmesine adapte edilmesi; Vitest 75/75 PASS. | ✅ **Tamamlandı** |
+| **ARA FAZ 3 & 4** | **Modüler Pure Metrology Parsers & ISO 286 Tablosu** | `tools/extractor/parse/dimension.py`, `tools/extractor/parse/tolerance.py`, `tools/extractor/parse/thread.py` | ISO 286-1 IT7/IT8 tablosu, simetrik/iki taraflı tolerans, çap/yarıçap/doğrusal boyut ayrıştırıcıları, `title_block.py`, `spatial.py` uzamsal bbox eşleme, 6 yeni birim test (Pytest 24/24 PASS). | ✅ **Tamamlandı** |
+| **ARA FAZ 5** | **Deterministik Bire-Bir CAD/Çizim Eşleme** | `CadDrawingMatcher.ts`, `ortho-brep/matching.rs` | CAD feature ID takibi ve `assigned_feature_ids` hash seti ile her geometrik unsura yalnızca bir kez eşleme; mükerrer eşleme önlendi. | ✅ **Tamamlandı** |
+| **ARA FAZ 6** | **Tip Seviyesinde Onay Güvenlik Zinciri (Typestate Review)** | `ortho-ast/review.rs`, `ortho-ast/lib.rs`, `ortho-emitter/lib.rs` | `UnreviewedItem` $\to$ `approve` $\to$ `ApprovedItem` $\to$ `ApprovedPlan` (AS9100 denetim hash'i ile zincirleme); `DmisEmitter::emit_pcdmis_from_approved_plan` onaylanmamış planı derleme anında reddeder. | ✅ **Tamamlandı** |
+| **ARA FAZ 7** | **Rust Çekirdek Güvenlik İyileştirmeleri (P0/P1)** | `ortho-brep/pmi.rs`, `ortho-brep/drawing.rs`, `ortho-brep/tier.rs` | `StepPmiReader` uydurma tolerans üretmek yerine `PmiError::Unsupported` döner; `TitleBlock` alanları `Option<String>` olup uydurma string doldurmaz; `Tier1RuleBasedParser` ISO 286-1 IT7 tablosuna bağlandı. | ✅ **Tamamlandı** |
+| **ARA FAZ 8** | **Uçtan Uca Bütünsel Doğrulama (Green Pipeline)** | `npm run check:all` | TypeScript 0 hata, 16 UI test dosyası 75 test PASS, 24 Pytest PASS, Rust workspace derleme PASS. | ✅ **Mühürlendi** |
+
+
 
 
 

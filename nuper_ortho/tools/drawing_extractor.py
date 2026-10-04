@@ -1,10 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Nuper Ortho — Endüstriyel Teknik Resim Okuma ve Ölçü/Tolerans Çıkarım Motoru
-Çoklu sayfa desteği (Multi-Page), vektörel çizim ayrıştırma, katı metrik ve FCF filtresi (Hallucination Guard).
-"""
-
+import hashlib
 import json
 import os
 import re
@@ -12,6 +6,15 @@ import sys
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
+
+tools_dir = os.path.dirname(os.path.abspath(__file__))
+if tools_dir not in sys.path:
+    sys.path.insert(0, tools_dir)
+
+from extractor.title_block import extract_title_block_fields, extract_datum_labels
+from extractor.parse.dimension import parse_diameter_callouts, parse_radius_callouts, parse_linear_callouts
+from extractor.parse.thread import parse_thread_callout
+from extractor.spatial import match_spatial_bbox
 
 
 def resolve_pdf_path(path_str: str) -> str:
@@ -41,40 +44,120 @@ def extract_from_pdf(pdf_path: str):
     if not os.path.exists(resolved):
         return {
             "success": False,
-            "error": f"Dosya bulunamadı: {pdf_path} (çözümlenen: {resolved})",
+            "error": f"Dosya bulunamadi: {pdf_path} (cozumlenen: {resolved})",
             "filename": os.path.basename(pdf_path),
             "title_block": {},
             "datums": [],
             "dimensions": [],
         }
 
+    cache_dir = os.path.join(os.path.dirname(__file__), ".ocr_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    with open(resolved, "rb") as f:
+        file_hash = hashlib.md5(f.read()).hexdigest()
+    cache_file = os.path.join(cache_dir, f"{file_hash}.json")
+
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                cached_data = json.load(f)
+                return parse_text_to_metrology(
+                    cached_data["text_content"],
+                    cached_data["page_count"],
+                    os.path.basename(resolved),
+                    resolved,
+                    cached_data.get("pages_data", []),
+                )
+        except Exception:
+            pass
+
+    pages_data = []
     text_content = ""
     page_count = 0
 
     try:
         import pymupdf
-
         doc = pymupdf.open(resolved)
         page_count = len(doc)
+        total_vector_text = 0
+
         for i, page in enumerate(doc):
             txt = page.get_text() or ""
-            text_content += f"\n--- SAYFA {i+1} ---\n" + txt
+            total_vector_text += len(txt.strip())
+
+        use_ocr = (total_vector_text < 50)
+        ocr_engine = None
+        if use_ocr:
+            try:
+                from rapidocr_onnxruntime import RapidOCR
+                ocr_engine = RapidOCR()
+            except Exception:
+                ocr_engine = None
+
+        for i, page in enumerate(doc):
+            txt = page.get_text() or ""
+            page_num = i + 1
+            items = []
+
+            if not use_ocr:
+                words = page.get_text("words")
+                for w in words:
+                    items.append({
+                        "text": w[4],
+                        "bbox": [round(w[0], 1), round(w[1], 1), round(w[2], 1), round(w[3], 1)],
+                        "confidence": 1.0,
+                    })
+                pages_data.append({"page": page_num, "text": txt, "items": items, "method": "vector"})
+                text_content += f"\n--- SAYFA {page_num} ---\n" + txt
+            else:
+                ocr_items = []
+                ocr_lines = []
+                if ocr_engine is not None:
+                    pix = page.get_pixmap(dpi=150)
+                    img_bytes = pix.tobytes("png")
+                    res, _ = ocr_engine(img_bytes)
+                    if res:
+                        for box, text_val, score in res:
+                            x0 = min(pt[0] for pt in box)
+                            y0 = min(pt[1] for pt in box)
+                            x1 = max(pt[0] for pt in box)
+                            y1 = max(pt[1] for pt in box)
+                            clean_t = text_val.replace("\ufffd", "±").replace("@", "Ø")
+                            score_val = float(score) if isinstance(score, (int, float)) else 0.85
+                            ocr_items.append({
+                                "text": clean_t,
+                                "bbox": [round(x0, 1), round(y0, 1), round(x1, 1), round(y1, 1)],
+                                "confidence": score_val,
+                            })
+                            ocr_lines.append(clean_t)
+
+                page_txt = "\n".join(ocr_lines) if ocr_lines else txt
+                pages_data.append({"page": page_num, "text": page_txt, "items": ocr_items, "method": "ocr"})
+                text_content += f"\n--- SAYFA {page_num} ---\n" + page_txt
+
+        with open(cache_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "text_content": text_content,
+                "page_count": page_count,
+                "pages_data": pages_data,
+            }, f, ensure_ascii=False)
+
     except Exception:
         try:
             import pypdf
-
             reader = pypdf.PdfReader(resolved)
             page_count = len(reader.pages)
             for i, page in enumerate(reader.pages):
                 txt = page.extract_text() or ""
+                pages_data.append({"page": i + 1, "text": txt, "items": [], "method": "vector"})
                 text_content += f"\n--- SAYFA {i+1} ---\n" + txt
         except Exception:
             pass
 
-    return parse_text_to_metrology(text_content, page_count, os.path.basename(resolved), resolved)
+    return parse_text_to_metrology(text_content, page_count, os.path.basename(resolved), resolved, pages_data)
 
 
-def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path: str = ""):
+def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path: str = "", pages_data=None):
     result = {
         "success": True,
         "filename": filename,
@@ -85,534 +168,160 @@ def parse_text_to_metrology(text: str, page_count: int, filename: str, full_path
             "material": "",
             "hardness": "",
             "roughness": "",
-            "general_tolerance": "ISO 2768-mK",
+            "general_tolerance": "",
             "drawing_number": "",
         },
-        "datums": ["A", "B", "C"],
+        "datums": [],
         "dimensions": [],
     }
 
-    is_gobek_olugu = "gobek" in filename.lower() or "3051" in filename.lower() or "gobek" in full_path.lower()
-
-    if is_gobek_olugu or (len(text.strip()) < 50 and "gobek" in filename.lower()):
-        result["page_count"] = 3
-        result["title_block"] = {
-            "part_number": "KPT - 3051 GOBEK BAGI OLUGU",
-            "drawing_number": "GOBEK BAGI OLUGU_TR_AB",
-            "material": "Alüminyum 7075-T6",
-            "hardness": "150 HB (T6)",
-            "roughness": "Ra 1.6 µm",
-            "general_tolerance": "ISO 2768-m (ASME B1.13M METRIC SCREWS)",
-        }
-        result["datums"] = ["A", "B", "C"]
-
-        dims = [
-            {
-                "id": 1,
-                "balloon": "#1",
-                "page": 2,
-                "type": "LINEAR",
-                "type_label": "Tam Boy (Overall Length)",
-                "icon": "📏",
-                "nominal": 395.5,
-                "nominal_str": "395.5",
-                "upper_tol": "+0.800",
-                "lower_tol": "-0.800",
-                "measured": "395.504 mm",
-                "deviation": "+0.004 mm",
-                "status": "PASS",
-                "feature_key": "overall_length_395_5",
-                "gdt": "| A",
-                "bbox": [409.0, 748.4, 464.3, 776.8],
-            },
-            {
-                "id": 2,
-                "balloon": "#2",
-                "page": 2,
-                "type": "LINEAR",
-                "type_label": "Doğrusal Eksen Mesafesi",
-                "icon": "📏",
-                "nominal": 305.2,
-                "nominal_str": "305.2",
-                "upper_tol": "+0.500",
-                "lower_tol": "-0.500",
-                "measured": "305.204 mm",
-                "deviation": "+0.004 mm",
-                "status": "PASS",
-                "feature_key": "dist_305_2",
-                "gdt": "| A",
-                "bbox": [408.1, 262.9, 464.6, 291.5],
-            },
-            {
-                "id": 3,
-                "balloon": "#3",
-                "page": 2,
-                "type": "LINEAR",
-                "type_label": "Gövde Genişliği (Asimetrik Tolerans)",
-                "icon": "📏",
-                "nominal": 35.0,
-                "nominal_str": "35 (-0.2 / 0)",
-                "upper_tol": "0.000",
-                "lower_tol": "-0.200",
-                "measured": "34.985 mm",
-                "deviation": "-0.015 mm",
-                "status": "PASS",
-                "feature_key": "width_35",
-                "gdt": "| A | B",
-                "bbox": [407.7, 472.1, 464.5, 523.6],
-            },
-            {
-                "id": 4,
-                "balloon": "#4",
-                "page": 2,
-                "type": "DIAMETER",
-                "type_label": "Montaj Delik Grubu (4x)",
-                "icon": "⭕",
-                "nominal": 2.5,
-                "nominal_str": "4x Ø2.5",
-                "upper_tol": "+0.100",
-                "lower_tol": "0.000",
-                "measured": "2.505 mm",
-                "deviation": "+0.005 mm",
-                "status": "PASS",
-                "feature_key": "hole_4x_dia_2_5",
-                "gdt": "⌖ Ø 0.100 | A | B",
-                "bbox": [637.2, 562.7, 654.8, 569.9],
-            },
-            {
-                "id": 5,
-                "balloon": "#5",
-                "page": 2,
-                "type": "DIAMETER",
-                "type_label": "Bağlantı Pimi Yuvası (2x)",
-                "icon": "⭕",
-                "nominal": 6.0,
-                "nominal_str": "2x Ø6 (+0.5 / 0)",
-                "upper_tol": "+0.500",
-                "lower_tol": "0.000",
-                "measured": "6.025 mm",
-                "deviation": "+0.025 mm",
-                "status": "PASS",
-                "feature_key": "pin_2x_dia_6",
-                "gdt": "⌖ Ø 0.150 | A | B",
-                "bbox": [605.2, 244.3, 619.4, 251.6],
-            },
-            {
-                "id": 6,
-                "balloon": "#6",
-                "page": 2,
-                "type": "PROFILE",
-                "type_label": "Yüzey Profili Geometrik Toleransı",
-                "icon": "⌒",
-                "nominal": 0.0,
-                "nominal_str": "Profil 0.5 | A",
-                "upper_tol": "+0.500",
-                "lower_tol": "0.000",
-                "measured": "0.025 mm",
-                "deviation": "+0.025 mm",
-                "status": "PASS",
-                "feature_key": "profile_surf_0_5",
-                "gdt": "⌒ 0.500 | A",
-                "bbox": [222.1, 293.2, 277.3, 301.7],
-            },
-            {
-                "id": 7,
-                "balloon": "#7",
-                "page": 3,
-                "type": "LINEAR",
-                "type_label": "Kare Montaj Eksen Aralığı (DETAY M)",
-                "icon": "📏",
-                "nominal": 36.5,
-                "nominal_str": "36.5 ±0.1",
-                "upper_tol": "+0.100",
-                "lower_tol": "-0.100",
-                "measured": "36.505 mm",
-                "deviation": "+0.005 mm",
-                "status": "PASS",
-                "feature_key": "detay_m_spacing_36_5",
-                "gdt": "| A | B",
-                "bbox": [901.6, 309.6, 960.3, 324.2],
-            },
-            {
-                "id": 8,
-                "balloon": "#8",
-                "page": 3,
-                "type": "DIAMETER",
-                "type_label": "Kare Flanş Bağlantı Delikleri (DETAY M)",
-                "icon": "⭕",
-                "nominal": 3.5,
-                "nominal_str": "4x Ø3.5 (+0.2 / 0)",
-                "upper_tol": "+0.200",
-                "lower_tol": "0.000",
-                "measured": "3.512 mm",
-                "deviation": "+0.012 mm",
-                "status": "PASS",
-                "feature_key": "detay_m_holes_4x_dia_3_5",
-                "gdt": "⌖ Ø 0.100 | A | B | C",
-                "bbox": [1019.2, 247.0, 1067.6, 294.1],
-            },
-            {
-                "id": 9,
-                "balloon": "#9",
-                "page": 3,
-                "type": "DIAMETER",
-                "type_label": "Dış Çap (KESIT G-G)",
-                "icon": "⭕",
-                "nominal": 43.0,
-                "nominal_str": "Ø43 (+0.5 / 0)",
-                "upper_tol": "+0.500",
-                "lower_tol": "0.000",
-                "measured": "43.018 mm",
-                "deviation": "+0.018 mm",
-                "status": "PASS",
-                "feature_key": "kesit_gg_outer_dia_43",
-                "gdt": "◎ 0.050 | A",
-                "bbox": [798.6, 264.3, 820.2, 311.7],
-            },
-            {
-                "id": 10,
-                "balloon": "#10",
-                "page": 3,
-                "type": "DIAMETER",
-                "type_label": "İç Kılavuz Çapı (KESIT G-G)",
-                "icon": "⭕",
-                "nominal": 21.0,
-                "nominal_str": "Ø21 (+0.25 / 0)",
-                "upper_tol": "+0.250",
-                "lower_tol": "0.000",
-                "measured": "21.010 mm",
-                "deviation": "+0.010 mm",
-                "status": "PASS",
-                "feature_key": "kesit_gg_inner_dia_21",
-                "gdt": "◎ 0.030 | A",
-                "bbox": [798.9, 545.4, 806.2, 587.2],
-            },
-            {
-                "id": 11,
-                "balloon": "#11",
-                "page": 3,
-                "type": "LINEAR",
-                "type_label": "Kanal Derinliği / Kademe (KESIT G-G)",
-                "icon": "📏",
-                "nominal": 12.0,
-                "nominal_str": "12 ±0.5",
-                "upper_tol": "+0.500",
-                "lower_tol": "-0.500",
-                "measured": "12.008 mm",
-                "deviation": "+0.008 mm",
-                "status": "PASS",
-                "feature_key": "kesit_gg_step_12",
-                "gdt": "| A",
-                "bbox": [909.4, 444.0, 951.2, 451.3],
-            },
-            {
-                "id": 12,
-                "balloon": "#12",
-                "page": 3,
-                "type": "LINEAR",
-                "type_label": "Hassas Dayama Payı (KESIT G-G)",
-                "icon": "📏",
-                "nominal": 9.11,
-                "nominal_str": "9.11 (+0 / -0.25)",
-                "upper_tol": "0.000",
-                "lower_tol": "-0.250",
-                "measured": "9.095 mm",
-                "deviation": "-0.015 mm",
-                "status": "PASS",
-                "feature_key": "kesit_gg_recess_9_11",
-                "gdt": "| A | B",
-                "bbox": [1043.8, 572.4, 1086.9, 594.1],
-            },
-        ]
-        result["dimensions"] = dims
-        return result
-
-    # Genel Metin Tabanlı Çıkarım (Askı Kancası vb.)
-    clean_name = re.sub(r"[\.\-\s]+pdf$", "", filename, flags=re.I)
-    result["title_block"]["drawing_number"] = clean_name
-    result["title_block"]["part_number"] = clean_name
-
-    doc_match = re.search(r"(?:DOKUMAN|DRAWING|RES[Iİ]M)\s*NO[^\w]*([A-Z0-9\-_/]{4,35})", text, re.IGNORECASE)
-    if doc_match:
-        result["title_block"]["drawing_number"] = doc_match.group(1).strip()
-        result["title_block"]["part_number"] = doc_match.group(1).strip()
-
-    mat_match = re.search(r"MALZEME[^\w]*([^\n\r]+)", text, re.IGNORECASE)
-    if mat_match:
-        result["title_block"]["material"] = mat_match.group(1).strip()[:100]
-    else:
-        for m in ["SAE 4340", "34CrNiMo6", "7075-T6", "6082-T6", "AISI 316", "Ti-6Al-4V", "17-4PH"]:
-            if m.lower() in text.lower():
-                result["title_block"]["material"] = m
-                break
-
-    hard_match = re.search(r"(\d+[-–]\d+\s*HRC|\d+\s*HRC|\d+\s*HB)", text, re.IGNORECASE)
-    if hard_match:
-        result["title_block"]["hardness"] = hard_match.group(1).strip()
-
-    datum_matches = re.findall(r"DATUM\s*([A-Z])|\[([A-Z])\]", text)
-    found_datums = set()
-    for d in datum_matches:
-        v = d[0] or d[1]
-        if v:
-            found_datums.add(v)
-    result["datums"] = sorted(list(found_datums)) if found_datums else ["A", "B", "C"]
+    result["title_block"] = extract_title_block_fields(text, filename)
+    result["datums"] = extract_datum_labels(text)
 
     dims = []
     balloon_idx = 1
     seen_nominals = set()
 
-    # (A) Çap ve Delik Ölçüleri (Ø)
-    dia_matches = re.finditer(
-        r"(?:(\d+)\s*x\s*)?(?:[Ø\u00d8]|DIA|CAP)\s*([0-9]+(?:\.[0-9]+)?)\s*(?:(H[678]|g6|f7|js7)|(MIN|MAKS|MAX)|(?:\(\s*([+-]?[0-9\.]+)\s*(?:/|\s+)\s*([+-]?[0-9\.]+)\s*\))|(?:[±\+]\s*([0-9\.]+)))?",
-        text,
-        re.IGNORECASE,
-    )
+    page_entries = pages_data if pages_data and len(pages_data) > 0 else [{"page": 1, "text": text, "items": [], "method": "vector"}]
 
-    for m in dia_matches:
-        count = m.group(1) or ""
-        nom = float(m.group(2))
-        fit = m.group(3) or ""
-        limit = m.group(4) or ""
-        upper_raw = m.group(5) or ""
-        lower_raw = m.group(6) or ""
-        sym_tol = m.group(7) or ""
+    for p_info in page_entries:
+        p_num = p_info.get("page", 1)
+        p_text = p_info.get("text", "")
+        p_items = p_info.get("items", [])
 
-        key = f"DIA_{count}_{nom}_{fit}_{limit}_{upper_raw}_{lower_raw}"
-        if key in seen_nominals:
-            continue
-        seen_nominals.add(key)
+        # (A) Çap ve Delik Ölçüleri (Ø)
+        for parsed_dia in parse_diameter_callouts(p_text):
+            nom = parsed_dia["nominal"]
+            qty = parsed_dia["quantity"]
+            fit = parsed_dia["fit"] or ""
+            limit = parsed_dia["limit"] or ""
+            key = f"DIA_{p_num}_{qty}_{nom}_{fit}_{limit}_{parsed_dia['upper_tol']}_{parsed_dia['lower_tol']}"
+            if key in seen_nominals:
+                continue
+            seen_nominals.add(key)
 
-        nom_str = f"{count}x Ø{nom}" if count else f"Ø{nom}"
-        if fit:
-            nom_str += f" {fit.upper()}"
-        if limit:
-            nom_str += f" {limit.upper()}"
+            label = f"Montaj Delik Grubu ({qty}x)" if qty > 1 else "Silindirik Cap / Delik"
+            box = match_spatial_bbox(str(nom), p_items, [200.0, 200.0, 250.0, 220.0])
 
-        upper = "+0.021"
-        lower = "0.000"
-        if fit.upper() == "H7":
-            upper = "+0.021" if nom <= 30 else "+0.025"
-            lower = "0.000"
-        elif fit.upper() == "H8":
-            upper = "+0.033"
-            lower = "0.000"
-        elif limit.upper() == "MIN":
-            upper = "+0.050"
-            lower = "0.000"
-        elif limit.upper() in ["MAKS", "MAX"]:
-            upper = "0.000"
-            lower = "-0.050"
-        elif upper_raw and lower_raw:
-            upper = upper_raw if upper_raw.startswith(("+", "-")) else f"+{upper_raw}"
-            lower = lower_raw if lower_raw.startswith(("+", "-")) else f"+{lower_raw}"
-        elif sym_tol:
-            upper = f"+{sym_tol}"
-            lower = f"-{sym_tol}"
-
-        dims.append(
-            {
+            dims.append({
                 "id": balloon_idx,
                 "balloon": f"#{balloon_idx}",
+                "page": p_num,
                 "type": "DIAMETER",
-                "type_label": "Silindirik Çap / Delik",
+                "type_label": label,
                 "icon": "⭕",
                 "nominal": nom,
-                "nominal_str": nom_str,
-                "upper_tol": upper,
-                "lower_tol": lower,
-                "measured": f"{(nom + 0.004):.3f} mm",
-                "deviation": "+0.004 mm",
-                "status": "PASS",
-                "feature_key": f"dia_{nom}".replace(".", "_"),
-                "gdt": f"⌖ Ø 0.020 | {result['datums'][0]} | {result['datums'][1] if len(result['datums']) > 1 else 'B'}",
-            }
-        )
-        balloon_idx += 1
+                "nominal_str": parsed_dia["nominal_str"],
+                "upper_tol": parsed_dia["upper_tol"],
+                "lower_tol": parsed_dia["lower_tol"],
+                "measured": "",
+                "deviation": "",
+                "status": "UNMEASURED",
+                "verification": "PARSED",
+                "feature_key": f"dia_{nom}_{balloon_idx}".replace(".", "_"),
+                "gdt": "",
+                "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
+                "bbox": box,
+            })
+            balloon_idx += 1
 
-    # (B) Yarıçap Ölçüleri (R)
-    rad_matches = re.finditer(r"(?:(\d+)\s*x\s*)?R\s*([0-9]+(?:\.[0-9]+)?)", text, re.IGNORECASE)
-    for m in rad_matches:
-        count = m.group(1) or ""
-        r_val = float(m.group(2))
-        key = f"RAD_{count}_{r_val}"
-        if key in seen_nominals:
-            continue
-        seen_nominals.add(key)
+        # (B) Yarıçap Ölçüleri (R)
+        for parsed_rad in parse_radius_callouts(p_text):
+            r_val = parsed_rad["nominal"]
+            qty = parsed_rad["quantity"]
+            key = f"RAD_{p_num}_{qty}_{r_val}"
+            if key in seen_nominals:
+                continue
+            seen_nominals.add(key)
 
-        nom_str = f"{count}x R{r_val}" if count else f"R{r_val}"
-        dims.append(
-            {
+            box = match_spatial_bbox(str(r_val), p_items, [500.0, 500.0, 550.0, 520.0])
+            dims.append({
                 "id": balloon_idx,
                 "balloon": f"#{balloon_idx}",
+                "page": p_num,
                 "type": "RADIUS",
-                "type_label": "Kavis / Yarıçap (Fillet/Round)",
+                "type_label": "Kavis / Yaricap (Fillet/Round)",
                 "icon": "📐",
                 "nominal": r_val,
-                "nominal_str": nom_str,
-                "upper_tol": "+0.100",
-                "lower_tol": "-0.100",
-                "measured": f"{(r_val + 0.015):.3f} mm",
-                "deviation": "+0.015 mm",
-                "status": "PASS",
-                "feature_key": f"radius_{r_val}".replace(".", "_"),
-                "gdt": f"⌒ 0.050 | {result['datums'][0]}",
-            }
-        )
-        balloon_idx += 1
+                "nominal_str": parsed_rad["nominal_str"],
+                "upper_tol": "",
+                "lower_tol": "",
+                "measured": "",
+                "deviation": "",
+                "status": "UNMEASURED",
+                "verification": "PARSED",
+                "feature_key": f"radius_{r_val}_{balloon_idx}".replace(".", "_"),
+                "gdt": "",
+                "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
+                "bbox": box,
+            })
+            balloon_idx += 1
 
-    # (C) Katı Metrik Filtresi (Hallucination Guard: UNF/UNC yasak, sadece M metrik dişler)
-    thread_matches = re.finditer(r"\b(M\d+(?:\s*x\s*[\d\.]+)?(?:\s*-\s*[0-9A-Za-z]+)?)\b", text)
-    for m in thread_matches:
-        th = m.group(1).strip()
-        key = f"TH_{th}"
-        if key in seen_nominals:
-            continue
-        seen_nominals.add(key)
-
-        dims.append(
-            {
+        # (C) Metrik / UNC / UNF Vida Dişleri
+        thread_matches = re.finditer(r"\b((?:M\d+(?:\s*x\s*[\d\.]+)?(?:\s*-\s*[0-9A-Za-z]+)?)|(?:\d+/\d+-\d+\s*(?:UNF|UNC|UN)))\b", p_text, re.IGNORECASE)
+        for m in thread_matches:
+            th = m.group(1).strip()
+            key = f"TH_{p_num}_{th}"
+            if key in seen_nominals:
+                continue
+            seen_nominals.add(key)
+            box = match_spatial_bbox(th, p_items, [350.0, 200.0, 400.0, 220.0])
+            dims.append({
                 "id": balloon_idx,
                 "balloon": f"#{balloon_idx}",
+                "page": p_num,
                 "type": "THREAD",
-                "type_label": "Metrik Vida / Diş (ASME B1.13M)",
+                "type_label": "Vida / Dis (Thread Callout)",
                 "icon": "🧵",
                 "nominal": 0.0,
                 "nominal_str": th,
-                "upper_tol": "6H",
-                "lower_tol": "Standart",
-                "measured": "GEÇER (GO/NO-GO)",
-                "deviation": "0.000",
-                "status": "PASS",
+                "upper_tol": "",
+                "lower_tol": "",
+                "measured": "",
+                "deviation": "",
+                "status": "UNMEASURED",
+                "verification": "PARSED",
                 "feature_key": f"thread_{balloon_idx}",
-                "gdt": "Diş Emniyet Protokolü Baypas ✓",
-            }
-        )
-        balloon_idx += 1
+                "gdt": "",
+                "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
+                "bbox": box,
+            })
+            balloon_idx += 1
 
-    # (D) Açık Toleranslı Doğrusal Boyutlar (±, +, -)
-    lin_matches = re.finditer(
-        r"([0-9]{1,4}(?:\.[0-9]+)?)\s*(?:([±\+]\s*[0-9]+(?:\.[0-9]+)?(?:\s*[\/\-]\s*[-+]?[0-9]+(?:\.[0-9]+)?)?))",
-        text,
-    )
-    for m in lin_matches:
-        val = float(m.group(1))
-        tol_str = m.group(2) or ""
-        if val < 2.0 or val > 2500.0:
-            continue
-        key = f"LIN_{val}"
-        if key in seen_nominals:
-            continue
-        seen_nominals.add(key)
+        # (D) Açık Toleranslı Doğrusal Boyutlar (±, +, -)
+        for parsed_lin in parse_linear_callouts(p_text):
+            val = parsed_lin["nominal"]
+            key = f"LIN_{p_num}_{val}_{parsed_lin['nominal_str']}"
+            if key in seen_nominals:
+                continue
+            seen_nominals.add(key)
 
-        upper = "+0.100"
-        lower = "-0.100"
-        if "±" in tol_str:
-            num = re.search(r"[0-9\.]+", tol_str)
-            if num:
-                upper = f"+{num.group(0)}"
-                lower = f"-{num.group(0)}"
-        elif "+" in tol_str:
-            parts = re.findall(r"([+-]?[0-9\.]+)", tol_str)
-            if len(parts) >= 2:
-                upper = parts[0] if parts[0].startswith(("+", "-")) else f"+{parts[0]}"
-                lower = parts[1] if parts[1].startswith(("+", "-")) else f"+{parts[1]}"
-            elif len(parts) == 1:
-                upper = f"+{parts[0]}"
-                lower = "0.000"
-
-        dims.append(
-            {
+            box = match_spatial_bbox(str(val), p_items, [400.0, 500.0, 450.0, 520.0])
+            dims.append({
                 "id": balloon_idx,
                 "balloon": f"#{balloon_idx}",
+                "page": p_num,
                 "type": "LINEAR",
-                "type_label": "Doğrusal Boyut (Linear Distance)",
+                "type_label": "Dogrusal Boyut (Linear Distance)",
                 "icon": "📏",
                 "nominal": val,
-                "nominal_str": f"{val} {tol_str}".strip(),
-                "upper_tol": upper,
-                "lower_tol": lower,
-                "measured": f"{(val + 0.004):.3f} mm",
-                "deviation": "+0.004 mm",
-                "status": "PASS",
-                "feature_key": f"lin_{val}".replace(".", "_"),
-                "gdt": f"| {result['datums'][0]} | {result['datums'][1] if len(result['datums']) > 1 else 'B'}",
-            }
-        )
-        balloon_idx += 1
-        if len(dims) >= 20:
-            break
-
-    if len(dims) == 0:
-        dims = [
-            {
-                "id": 1,
-                "balloon": "#1",
-                "type": "DATUM",
-                "type_label": "Primer Datum Düzlemi (Datum A)",
-                "icon": "🔲",
-                "nominal": 0.0,
-                "nominal_str": "DATUM [A] TABAN DÜZLEMİ",
-                "upper_tol": "+0.010",
-                "lower_tol": "-0.000",
-                "measured": "0.003 mm",
-                "deviation": "+0.003 mm",
-                "status": "PASS",
-                "feature_key": "step_solid_body",
-                "gdt": "⏥ 0.010 | A",
-            },
-            {
-                "id": 2,
-                "balloon": "#2",
-                "type": "DIAMETER",
-                "type_label": "Ana Montaj / Rulman Yuvası",
-                "icon": "⭕",
-                "nominal": 20.0,
-                "nominal_str": "Ø20.000 H7 (+0.021/0)",
-                "upper_tol": "+0.021",
-                "lower_tol": "0.000",
-                "measured": "20.004 mm",
-                "deviation": "+0.004 mm",
-                "status": "PASS",
-                "feature_key": "step_cyl_1",
-                "gdt": "⌖ Ø 0.020 Ⓜ | A | B | C",
-            },
-            {
-                "id": 3,
-                "balloon": "#3",
-                "type": "LINEAR",
-                "type_label": "Toplam Yükseklik",
-                "icon": "📏",
-                "nominal": 50.0,
-                "nominal_str": "50.00 ±0.05 mm",
-                "upper_tol": "+0.050",
-                "lower_tol": "-0.050",
-                "measured": "50.012 mm",
-                "deviation": "+0.012 mm",
-                "status": "PASS",
-                "feature_key": "dim_height",
-                "gdt": "∥ 0.015 | A",
-            },
-            {
-                "id": 4,
-                "balloon": "#4",
-                "type": "THREAD",
-                "type_label": "Metrik Bağlantı Dişi (ASME B1.13M)",
-                "icon": "🧵",
-                "nominal": 0.0,
-                "nominal_str": "M8x1.25 - 6H",
-                "upper_tol": "6H",
-                "lower_tol": "Standart",
-                "measured": "GEÇER (PASS)",
-                "deviation": "0.000",
-                "status": "PASS",
-                "feature_key": "step_thread_1",
-                "gdt": "Diş Emniyet Protokolü Baypas ✓",
-            },
-        ]
+                "nominal_str": parsed_lin["nominal_str"],
+                "upper_tol": parsed_lin["upper_tol"],
+                "lower_tol": parsed_lin["lower_tol"],
+                "measured": "",
+                "deviation": "",
+                "status": "UNMEASURED",
+                "verification": "PARSED",
+                "feature_key": f"lin_{val}_{balloon_idx}".replace(".", "_"),
+                "gdt": "",
+                "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
+                "bbox": box,
+            })
+            balloon_idx += 1
 
     result["dimensions"] = dims
     return result
+
 
 
 if __name__ == "__main__":
