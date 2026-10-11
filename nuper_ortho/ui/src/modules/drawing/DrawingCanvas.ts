@@ -1,6 +1,31 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { FeatureDefinitionModal, type DefinedFeatureData } from '../inspection/utils/FeatureDefinitionModal';
+import {
+  allocateBalloonId,
+  buildLightTableCommands,
+  canvasToClient,
+  canvasToPage,
+  clampZoom,
+  clientToCanvas,
+  computeFitZoom,
+  formatZoom,
+  hitTestBalloons,
+  isUsableRegion,
+  LIGHT_TABLE_HIT_RADIUS,
+  LIGHT_TABLE_REGION_HINT,
+  normalizeRegion,
+  resolveLightTableShortcut,
+  stepPage,
+  visibleBalloons,
+  zoomBy,
+  type BBox,
+  type LightTableCommand,
+  type LightTableCommandId,
+  type LightTableTool,
+  type LightTableViewFilter,
+  type Point,
+} from './utils/LightTableControls';
 
 export interface BalloonItem {
   id: string | number;
@@ -151,11 +176,23 @@ export class DrawingCanvas {
   private pdfDoc: PDFDocumentProxy | null = null;
   private balloonCreatedListeners: Array<(b: BalloonItem) => void> = [];
   private balloonUpdatedListeners: Array<(b: BalloonItem) => void> = [];
+  private containerEl: HTMLElement | null = null;
+  private statusReadoutEl: HTMLElement | null = null;
+  private tool: LightTableTool = 'select';
+  private viewFilter: LightTableViewFilter = 'all';
+  private pageWidth = 0;
+  private pageHeight = 0;
+  private regionOverlayEl: HTMLElement | null = null;
+  private regionStart: Point | null = null;
+  private pointerToolsAttached = false;
+  private keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
   public initialize(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.attachCanvasContextMenu();
+    this.attachPointerTools();
+    this.attachKeyboardShortcuts();
     this.disableMockSvg();
   }
 
@@ -183,10 +220,179 @@ export class DrawingCanvas {
         existingItem: hitBalloon
           ? { id: Number(hitBalloon.id), balloon: `#${hitBalloon.id}`, nominal_str: hitBalloon.feature_label || `${hitBalloon.nominal}` }
           : null,
-        onAdd: (coords) => this.promptAddFeature(coords.x, coords.y, coords.page),
+        onAdd: () => this.promptAddFeature(),
         onEdit: (id) => this.promptEditFeature(id),
         onDelete: (id) => this.removeBalloon(id),
       });
+    });
+  }
+
+  private attachPointerTools(): void {
+    if (!this.canvas || this.pointerToolsAttached) return;
+    this.pointerToolsAttached = true;
+
+    this.canvas.addEventListener('click', (e: MouseEvent) => {
+      if (this.tool !== 'select') return;
+      const canvasPoint = this.canvasPointFromEvent(e);
+      if (!canvasPoint) return;
+      const candidates = this.getBalloonsForActivePage()
+        .filter((balloon) => !!balloon.bbox)
+        .map((balloon) => {
+          const position = this.getBalloonPosition(balloon);
+          return { id: String(balloon.id), x: position.x + this.panX, y: position.y + this.panY };
+        });
+      const hit = hitTestBalloons(candidates, canvasPoint, LIGHT_TABLE_HIT_RADIUS * this.zoom);
+      this.selectBalloon(hit);
+    });
+
+    this.canvas.addEventListener('mousedown', (e: MouseEvent) => this.beginRegionDrag(e));
+    this.canvas.addEventListener('mousemove', (e: MouseEvent) => this.updateRegionDrag(e));
+    this.canvas.addEventListener('mouseup', (e: MouseEvent) => this.endRegionDrag(e));
+  }
+
+  private canvasPointFromEvent(e: MouseEvent): Point | null {
+    if (!this.canvas) return null;
+    const rect = this.canvas.getBoundingClientRect?.();
+    const content = { width: this.canvas.width, height: this.canvas.height };
+    if (!rect || content.width <= 0 || content.height <= 0) return null;
+    return clientToCanvas(
+      { x: e.clientX, y: e.clientY },
+      { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      content
+    );
+  }
+
+  private beginRegionDrag(e: MouseEvent): void {
+    if (this.tool !== 'region' || e.button !== 0) return;
+    const start = this.canvasPointFromEvent(e);
+    if (!start) return;
+    e.preventDefault();
+    this.regionStart = start;
+    const overlay = this.ensureRegionOverlay();
+    if (overlay) {
+      this.updateRegionOverlay(start, start);
+    }
+  }
+
+  private updateRegionDrag(e: MouseEvent): void {
+    if (this.tool !== 'region' || !this.regionStart || !this.regionOverlayEl) return;
+    const current = this.canvasPointFromEvent(e);
+    if (!current) return;
+    this.updateRegionOverlay(this.regionStart, current);
+  }
+
+  private endRegionDrag(e: MouseEvent): void {
+    if (this.tool !== 'region' || !this.regionStart) return;
+    const start = this.regionStart;
+    const end = this.canvasPointFromEvent(e) ?? start;
+    this.regionStart = null;
+    this.removeRegionOverlay();
+    const region = normalizeRegion(
+      canvasToPage(start, { x: this.panX, y: this.panY }, this.zoom),
+      canvasToPage(end, { x: this.panX, y: this.panY }, this.zoom)
+    );
+    if (!isUsableRegion(region)) return;
+    this.openFeatureForRegion(region);
+  }
+
+  private ensureRegionOverlay(): HTMLElement | null {
+    if (this.regionOverlayEl) return this.regionOverlayEl;
+    if (!this.containerEl || typeof document === 'undefined') return null;
+    const overlay = document.createElement('div');
+    overlay.className = 'lt-region-overlay';
+    overlay.style.position = 'absolute';
+    overlay.style.border = '1.5px dashed #0284C7';
+    overlay.style.background = 'rgba(2, 132, 199, 0.12)';
+    overlay.style.pointerEvents = 'none';
+    overlay.style.zIndex = '30';
+    this.containerEl.appendChild(overlay);
+    this.regionOverlayEl = overlay;
+    return overlay;
+  }
+
+  private removeRegionOverlay(): void {
+    if (this.regionOverlayEl && this.regionOverlayEl.parentNode) {
+      this.regionOverlayEl.parentNode.removeChild(this.regionOverlayEl);
+    }
+    this.regionOverlayEl = null;
+  }
+
+  private updateRegionOverlay(a: Point, b: Point): void {
+    if (!this.regionOverlayEl || !this.canvas || !this.containerEl) return;
+    const rect = this.canvas.getBoundingClientRect?.();
+    if (!rect) return;
+    const content = { width: this.canvas.width, height: this.canvas.height };
+    const baseRect = this.containerEl.getBoundingClientRect?.();
+    const baseLeft = baseRect ? baseRect.left : 0;
+    const baseTop = baseRect ? baseRect.top : 0;
+    const from = canvasToClient(a, { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, content);
+    const to = canvasToClient(b, { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, content);
+    this.regionOverlayEl.style.left = `${Math.min(from.x, to.x) - baseLeft}px`;
+    this.regionOverlayEl.style.top = `${Math.min(from.y, to.y) - baseTop}px`;
+    this.regionOverlayEl.style.width = `${Math.abs(to.x - from.x)}px`;
+    this.regionOverlayEl.style.height = `${Math.abs(to.y - from.y)}px`;
+  }
+
+  private attachKeyboardShortcuts(): void {
+    if (typeof window === 'undefined' || this.keyHandler) return;
+    this.keyHandler = (e: KeyboardEvent) => this.handleShortcut(e);
+    window.addEventListener('keydown', this.keyHandler);
+  }
+
+  private handleShortcut(e: KeyboardEvent): void {
+    const target = e.target as HTMLElement | null;
+    if (target) {
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
+    }
+    const action = resolveLightTableShortcut(e.key, {
+      ctrlKey: e.ctrlKey,
+      metaKey: e.metaKey,
+      altKey: e.altKey,
+    });
+    if (!action) return;
+
+    if (action === 'zoom-in') this.setZoom(zoomBy(this.zoom, 1));
+    else if (action === 'zoom-out') this.setZoom(zoomBy(this.zoom, -1));
+    else if (action === 'zoom-reset') this.setZoom(1);
+    else if (action === 'page-prev') this.setActivePage(stepPage(this.activePage, this.totalPages, -1));
+    else if (action === 'page-next') this.setActivePage(stepPage(this.activePage, this.totalPages, 1));
+    else if (action === 'cancel') {
+      this.setTool('select');
+      this.selectBalloon(null);
+    } else return;
+
+    e.preventDefault();
+  }
+
+  private openFeatureForRegion(region: BBox): void {
+    const nextId = allocateBalloonId(this.balloons);
+    const centerX = (region.x0 + region.x1) / 2;
+    const centerY = (region.y0 + region.y1) / 2;
+
+    FeatureDefinitionModal.getInstance().openModal({
+      canvasX: centerX,
+      canvasY: centerY,
+      page: this.activePage,
+      nextId,
+      onSave: (data: DefinedFeatureData) => {
+        const newBalloon: BalloonItem = {
+          id: data.id || nextId,
+          page: data.page || this.activePage,
+          nominal: data.nominal,
+          tolerance: `${data.lower_tol}/${data.upper_tol}`,
+          bbox: [region.x0, region.y0, region.x1, region.y1],
+          pageHeight: this.pageHeight > 0 ? this.pageHeight : undefined,
+          confirmed: false,
+          feature_label: data.nominal_str,
+        };
+        this.balloons.push(newBalloon);
+        this.setTool('select');
+        this.selectBalloon(String(newBalloon.id));
+        for (const cb of this.balloonCreatedListeners) {
+          cb(newBalloon);
+        }
+      },
     });
   }
 
@@ -204,36 +410,8 @@ export class DrawingCanvas {
     };
   }
 
-  public promptAddFeature(canvasX: number, canvasY: number, page: number = this.activePage): void {
-    const existingIds = this.balloons.map((b) => Number(b.id)).filter((id) => !isNaN(id));
-    const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
-
-    FeatureDefinitionModal.getInstance().openModal({
-      canvasX,
-      canvasY,
-      page,
-      nextId,
-      onSave: (data: DefinedFeatureData) => {
-        const newBalloon: BalloonItem = {
-          id: data.id || nextId,
-          page: data.page || page,
-          nominal: data.nominal,
-          tolerance: `${data.lower_tol}/${data.upper_tol}`,
-          bbox: [canvasX, canvasY, canvasX + 40, canvasY + 20],
-          pageHeight: 595.28,
-          confirmed: true,
-          feature_label: data.nominal_str,
-        };
-
-        this.balloons.push(newBalloon);
-        this.selectBalloon(String(newBalloon.id));
-        void this.render();
-
-        for (const cb of this.balloonCreatedListeners) {
-          cb(newBalloon);
-        }
-      },
-    });
+  public promptAddFeature(): void {
+    this.setTool('region');
   }
 
   public promptEditFeature(id: number | string): void {
@@ -424,6 +602,7 @@ export class DrawingCanvas {
     } else {
       this.selectedBalloonId = null;
     }
+    this.updatePageControls();
     void this.render();
   }
 
@@ -432,7 +611,7 @@ export class DrawingCanvas {
   }
 
   public setZoom(zoom: number): void {
-    this.zoom = Math.max(0.2, Math.min(zoom, 5.0));
+    this.zoom = clampZoom(zoom);
     void this.render();
   }
 
@@ -440,6 +619,58 @@ export class DrawingCanvas {
     this.panX = x;
     this.panY = y;
     void this.render();
+  }
+
+  public getZoom(): number {
+    return this.zoom;
+  }
+
+  public getTool(): LightTableTool {
+    return this.tool;
+  }
+
+  public setTool(tool: LightTableTool): void {
+    if (this.tool === tool) return;
+    this.tool = tool;
+    if (tool !== 'region') {
+      this.regionStart = null;
+      this.removeRegionOverlay();
+    }
+    if (this.canvas) {
+      this.canvas.style.cursor = tool === 'region' ? 'crosshair' : tool === 'pan' ? 'grab' : 'default';
+    }
+    this.updatePageControls();
+  }
+
+  public getViewFilter(): LightTableViewFilter {
+    return this.viewFilter;
+  }
+
+  public setViewFilter(filter: LightTableViewFilter): void {
+    if (this.viewFilter === filter) return;
+    this.viewFilter = filter;
+    this.updatePageControls();
+    void this.render();
+  }
+
+  public getVisibleBalloons(): BalloonItem[] {
+    return visibleBalloons(this.getBalloonsForActivePage(), this.viewFilter, this.selectedBalloonId);
+  }
+
+  public fitToView(): void {
+    if (!this.canvas) return;
+    const viewport = {
+      width: this.containerEl?.clientWidth || this.canvas.width,
+      height: this.containerEl?.clientHeight || this.canvas.height,
+    };
+    const page = { width: this.pageWidth, height: this.pageHeight };
+    if (page.width <= 0 || page.height <= 0) {
+      this.setZoom(1);
+      return;
+    }
+    this.panX = 0;
+    this.panY = 0;
+    this.setZoom(computeFitZoom(viewport, page));
   }
 
   public mount(containerOrSelector: HTMLElement | string = '#drawing-viewport-canvas'): void {
@@ -468,6 +699,7 @@ export class DrawingCanvas {
     }
 
     if (container) {
+      this.containerEl = container;
       container.style.position = 'relative';
       container.style.display = 'block';
       const pane2d = document.getElementById('dual-canvas-2d');
@@ -482,7 +714,13 @@ export class DrawingCanvas {
         toolbar.style.position = 'absolute';
         toolbar.style.top = '8px';
         toolbar.style.left = '12px';
+        toolbar.style.right = '12px';
         toolbar.style.zIndex = '20';
+        toolbar.style.background = 'rgba(255, 255, 255, 0.96)';
+        toolbar.style.border = '1px solid #E2E8F0';
+        toolbar.style.borderRadius = '6px';
+        toolbar.style.padding = '6px 8px';
+        toolbar.style.boxShadow = '0 4px 14px rgba(15, 23, 42, 0.08)';
         container.insertBefore(toolbar, container.firstChild);
       }
       this.mountPageControls(toolbar);
@@ -519,24 +757,23 @@ export class DrawingCanvas {
     const group = document.createElement('div');
     group.className = 'canvas-page-selector';
     group.style.display = 'flex';
+    group.style.flexWrap = 'wrap';
     group.style.gap = '6px';
     group.style.alignItems = 'center';
 
-    const addBtn = document.createElement('button');
-    addBtn.className = 'btn-add-feature';
-    addBtn.style.padding = '5px 10px';
-    addBtn.style.background = '#0284c7';
-    addBtn.style.color = '#ffffff';
-    addBtn.style.border = 'none';
-    addBtn.style.borderRadius = '4px';
-    addBtn.style.fontSize = '11px';
-    addBtn.style.fontWeight = '600';
-    addBtn.style.cursor = 'pointer';
-    addBtn.innerText = '➕ Unsur Ekle';
-    addBtn.addEventListener('click', () => {
-      this.promptAddFeature(400, 250, this.activePage);
+    const commands = buildLightTableCommands({
+      tool: this.tool,
+      filter: this.viewFilter,
+      zoom: this.zoom,
+      activePage: this.activePage,
+      totalPages: this.totalPages,
+      hasSelection: this.selectedBalloonId !== null,
+      hasDocument: this.pdfDoc !== null || this.balloons.length > 0,
     });
-    group.appendChild(addBtn);
+
+    for (const command of commands) {
+      group.appendChild(this.createCommandButton(command));
+    }
 
     const pageCount = Math.max(3, this.totalPages);
     for (let p = 1; p <= pageCount; p++) {
@@ -550,7 +787,84 @@ export class DrawingCanvas {
       group.appendChild(btn);
     }
 
+    const status = document.createElement('span');
+    status.className = 'lt-status';
+    status.style.fontSize = '10.5px';
+    status.style.fontWeight = '600';
+    status.style.color = '#475569';
+    status.style.marginLeft = '4px';
+    this.statusReadoutEl = status;
+    group.appendChild(status);
+
     this.pageControlsContainer.appendChild(group);
+    this.updateStatusReadout();
+  }
+
+  private createCommandButton(command: LightTableCommand): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = command.active ? 'lt-tool-btn active' : 'lt-tool-btn';
+    btn.setAttribute('data-command', command.id);
+    btn.setAttribute('title', command.reason ? `${command.label} — ${command.reason}` : command.label);
+    btn.innerText = command.label;
+    btn.style.padding = '4px 8px';
+    btn.style.borderRadius = '4px';
+    btn.style.border = '1px solid #CBD5E1';
+    btn.style.background = command.active ? '#0284C7' : '#FFFFFF';
+    btn.style.color = command.active ? '#FFFFFF' : command.enabled ? '#0F172A' : '#94A3B8';
+    btn.style.fontSize = '11px';
+    btn.style.fontWeight = '600';
+    btn.style.cursor = command.enabled ? 'pointer' : 'not-allowed';
+    btn.disabled = !command.enabled;
+    if (command.enabled) {
+      btn.addEventListener('click', () => this.runCommand(command.id));
+    }
+    return btn;
+  }
+
+  private runCommand(id: LightTableCommandId): void {
+    switch (id) {
+      case 'tool-pan':
+        this.setTool('pan');
+        break;
+      case 'tool-select':
+        this.setTool('select');
+        break;
+      case 'tool-region':
+        this.setTool('region');
+        break;
+      case 'add':
+        this.promptAddFeature();
+        break;
+      case 'zoom-out':
+        this.setZoom(zoomBy(this.zoom, -1));
+        break;
+      case 'zoom-in':
+        this.setZoom(zoomBy(this.zoom, 1));
+        break;
+      case 'zoom-reset':
+        this.setZoom(1);
+        break;
+      case 'fit':
+        this.fitToView();
+        break;
+      case 'view-all':
+        this.setViewFilter('all');
+        break;
+      case 'view-selected':
+        this.setViewFilter('selected');
+        break;
+      case 'auto-extract':
+        break;
+    }
+  }
+
+  private updateStatusReadout(): void {
+    if (!this.statusReadoutEl) return;
+    const toolLabel = this.tool === 'pan' ? 'El' : this.tool === 'region' ? 'Bölge Seç' : 'Seç';
+    const filterLabel = this.viewFilter === 'selected' ? 'Yalnız Seçili' : 'Tüm Balonlar';
+    const selected = this.selectedBalloonId ? ` • Balon #${this.selectedBalloonId}` : '';
+    const regionHint = this.tool === 'region' ? ` • ${LIGHT_TABLE_REGION_HINT}` : '';
+    this.statusReadoutEl.innerText = `Sayfa ${this.activePage}/${Math.max(1, this.totalPages)} • ${formatZoom(this.zoom)} • ${this.getBalloonsForActivePage().length} balon • Araç: ${toolLabel} • ${filterLabel}${selected}${regionHint}`;
   }
 
   public async render(): Promise<void> {
@@ -562,6 +876,8 @@ export class DrawingCanvas {
       try {
         const page = await this.pdfDoc.getPage(this.activePage);
         const viewport = page.getViewport({ scale: this.zoom });
+        this.pageWidth = this.zoom > 0 ? viewport.width / this.zoom : viewport.width;
+        this.pageHeight = this.zoom > 0 ? viewport.height / this.zoom : viewport.height;
         this.canvas.width = Math.round(viewport.width);
         this.canvas.height = Math.round(viewport.height);
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -580,9 +896,9 @@ export class DrawingCanvas {
     ctx.save();
     ctx.translate(this.panX, this.panY);
 
-    const visibleBalloons = this.getBalloonsForActivePage();
+    const pageBalloons = this.getVisibleBalloons();
 
-    for (const b of visibleBalloons) {
+    for (const b of pageBalloons) {
       if (!b.bbox) continue;
       const balloonPt = this.getBalloonPosition(b);
 
@@ -645,12 +961,21 @@ export class DrawingCanvas {
     }
 
     ctx.restore();
+    this.updateStatusReadout();
   }
 
   public destroy(): void {
+    if (this.keyHandler && typeof window !== 'undefined') {
+      window.removeEventListener('keydown', this.keyHandler);
+    }
+    this.keyHandler = null;
+    this.removeRegionOverlay();
+    this.pointerToolsAttached = false;
     this.balloons = [];
     this.pageChangeListeners = [];
     this.pageControlsContainer = null;
+    this.containerEl = null;
+    this.statusReadoutEl = null;
     this.canvas = null;
     this.ctx = null;
     this.pdfDoc = null;
