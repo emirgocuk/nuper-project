@@ -59,6 +59,8 @@ Rust testleri, fiziksel CMM ve üretici yazılımında çıktı kabulü bu incel
 
 ## 6. Şimdiki odak
 
+11 Ekim 2026 planlama eki: [Işık masası detay planı](lightTableCapabilityPlan.md) §12–14, kalıcı arayüz düzenini ve otomatik çıkarımdan bağımsız manuel çalışma yolunu tanımlar. Sonraki arayüz odağı kaynak bölgesi → manuel karakteristik kartı → taslak → inceleme akışıdır; R0/R1 önkoşulları ve progress.md iş sırası geçerlidir. Bu ek yalnız tasarımdır; UI veya sözleşme uygulanmadı, uygulama testi çalıştırılmadı.
+
 Ürün akışı kullanıcının CMM programlama sırasına göre tanımlandı: çizim/genel notlar → gerçek datumlar veya açık operatör referansları → bağlama/erişim → düzlem/daire/kenar/kurgu çizgisiyle hizalama → tam karakteristik ve düzenlenebilir balon kontrolü → ölçüm stratejisi/onay → program. X yönü için uygun kenar veya operatörün seçtiği iki daire merkezinden çizgi desteklenecek; belirli geometriye zorlanmayacak. Bu davranışlar henüz uygulamada yoktur.
 
 İlk kabul adayı KPT-3150 Kör Tapa'nın iki sayfalı PDF'i ve yerel STEP dosyasıdır. PDF'in metin katmanından içerik çıkarılamadı; OCR gerekir. Görsel incelemede açık A/B/C datum etiketi saptanmadı; pafta harfleri/not numaraları datum sayılmayacak. Antet/genel not, diş tablosu ve kaplama sonrası ölçüm şartı plan kapsamındadır. Tek bağlama sonucu prob/fikstür/erişim doğrulaması olmadan verilmeyecek. Kaynak hash'leri ve gözlem sınırları progress.md §7'de bulunur.

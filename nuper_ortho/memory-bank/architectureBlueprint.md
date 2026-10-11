@@ -9,9 +9,10 @@
 ## 0. Ajan İçin Okuma Sırası
 
 1. `AGENTS.md`
-2. Bu belge: önce §1 (Değişmez Yasalar), sonra görevin ilgili bölümü
-3. `developmentInfrastructureRules.md` (yalnızca altyapı görevi ise)
-4. İlgili `schemas/*.schema.json`
+2. `gdtStandardsAndDrawingRules.md` (Teknik resim kuralları, ASME Y14.5, antet hiyerarşisi, MBD)
+3. Bu belge: önce §1 (Değişmez Yasalar), sonra görevin ilgili bölümü
+4. `developmentInfrastructureRules.md` (yalnızca altyapı görevi ise)
+5. İlgili `schemas/*.schema.json`
 
 Görev bu belgedeki bir yasayla çelişiyorsa **kod yazma**, çelişkiyi raporla.
 

@@ -252,6 +252,25 @@ Bu örnek için henüz onaylı datum, fikstür, tek bağlama kararı, tam karakt
 
 ## 9. İş kapatma kaydı
 
+### 11 Ekim 2026 — Işık masası detay planı
+
+- Arayüz ve manuel çalışma genişletmesi: detay planına §12–14 eklendi. Kalıcı panel düzeni, kaynak kırpımlı özellik kartı, OCR olmadan giriş, manuel GD&T/datum/tablo/not/CAD bağlantısı, taslak/onay ayrımı ve otomatik adaylarla birleşme davranışı tanımlandı. UI-M01–UI-M14 gerçek kullanıcı kabul senaryolarıdır; henüz uygulanmış veya çalıştırılmış değildir.
+
+- Kullanıcı isteğiyle [Işık Masası Yetkinlik ve Kabul Planı](lightTableCapabilityPlan.md) oluşturuldu; GD&T belgesinden bağlantı eklendi.
+- Kapsam: IM-01–IM-09 yetkinlikleri, beş destek seviyesi, ekran/operatör akışı, şemalaştırılacak veri kavramları, standart doğrulama kapısı, değişiklik etkileri, LT-01–LT-16 kabul senaryoları ve yeterlilik ölçütleri.
+- Bu belge R0–R8 sırasını değiştirmez; yeni uygulama veya kabul başarısı kaydetmez. Sonraki ışık masası odağı, mevcut R0/R1 önkoşullarıyla kaynaklı karakteristik kartını hazırlamak ve belirsiz standart kurallarını alan doğrulamasına almaktır.
+- Teslim yalnız dokümantasyondur; uygulama testleri çalıştırılmadı. Bağlantı ve diff kontrolü doküman tesliminin doğrulamasıdır.
+
+### 11 Ekim 2026 — Işık masası araç şeridi ve manuel kaynak-bölgesi ekleme (kod dilimi 1–2)
+
+- İş kimliği: plan §12.1/§12.3/§13.1 UI katmanının ilk iki atomik kod dilimi; R0–R8 kapı sırasını değiştirmez.
+- Değişen dosyalar: `ui/src/modules/drawing/utils/LightTableControls.ts` (yeni), `ui/src/modules/drawing/utils/LightTableControls.test.ts` (yeni), `ui/src/modules/drawing/DrawingCanvas.ts` (entegrasyon). `ui/index.html` değişmedi; SetupWizard büyütülmedi.
+- Önceki davranış: manuel ekleme uydurma `bbox [x, y, x+40, y+20]` ve sahte `confirmed: true` üretiyordu; araç şeridi/zoom/sayfa/status desteği yoktu.
+- Yeni davranış: kalıcı araç şeridi (Seç/El/Bölge Seç, ＋Unsur Ekle, zoom −/%/＋/Sığdır, sayfa sekmeleri, Tüm Balonlar/Yalnız Seçili görünüm filtresi, Otomatik Çıkar gerekçeyle kapalı), durum şeridi, klavye kısayolları (+/−/0/PageUp/PageDown/Esc), tıkla-seçim; manuel karakteristik artık yalnız operatörün çizdiği gerçek kaynak bölgesinden doğar ve taslak olarak (`confirmed: false`) kaydedilir; `allocateBalloonId` ile çakışmasız kalıcı kimlik. Mantık saf fonksiyonlarla `utils/LightTableControls.ts` içinde, 16 birim testi ile.
+- Testler: `npx tsc --noEmit` temiz; `npx vitest run ui/src/modules/drawing` 22/22 geçti (D: çalışma ağacında); tam UI paketi 106 geçti — kalan 2 hata önceden var olan InspectionSmoke Python çıkarım sayısı uyumsuzluğu (48↔13), bu dilimden bağımsız (stash ile doğrulandı).
+- Şema/çıktı envanteri: değişmedi; mevcut BalloonItem sözleşmesi kullanıldı, schema-first gerekmedi.
+- Kalan sınırlamalar: §12.1 tam çalışma masası (sol envanter paneli + sağ özellik kartı + inceleme kuyruğu), undo/redo (Ctrl+Z/Y), FeatureDefinitionModal'daki uydurma varsayılan alan değerleri (`50.0`, `'Ø50 ±0.1'`, `±0.100`), manuel GD&T/datum/tablo/not/CAD akışları henüz uygulanmadı; R0/R1 önkoşulları açık.
+
 Her alt iş şu bilgilerle kapanır: iş kimliği; değişen dosyalar; başlangıç hatası; yeni davranış; girdi/hash ve şema sürümü; test komutları/çıkış kodları; gerçek akış kanıtı; kalan sınırlamalar. Commit varsa kimliği, yoksa çalışma ağacı bilgisi yazılır.
 
 Gerçekleşmemiş işler yeşile çevrilmez. Yeni bulgu kabulü geçersiz kılıyorsa ilgili iş yeniden açılır. Şu anda ilk uygulanacak görev R0.1'dir.
