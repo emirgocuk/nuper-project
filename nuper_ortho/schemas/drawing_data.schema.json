@@ -25,6 +25,19 @@
       "type": "array",
       "items": { "type": "string" }
     },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page", "image_data"],
+        "properties": {
+          "page": { "type": "integer" },
+          "width": { "type": "number" },
+          "height": { "type": "number" },
+          "image_data": { "type": "string" }
+        }
+      }
+    },
     "dimensions": {
       "type": "array",
       "items": {

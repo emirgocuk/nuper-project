@@ -2071,89 +2071,14 @@ FEATURES:
     <aside class="sidebar-left">
       <div class="panel-header" style="padding: 0; background: #F8FAFC;">
         <div class="sidebar-tab-bar" style="width: 100%;">
-          <button class="sidebar-tab-btn active" id="tab-btn-tree" onclick="switchSidebarTab('tree')">🌲 3D Unsur Ağacı (<span id="tree-feat-count">7</span>)</button>
+          <button class="sidebar-tab-btn active" id="tab-btn-tree" onclick="switchSidebarTab('tree')">🌲 3D Unsur Ağacı (<span id="tree-feat-count">0</span>)</button>
           <button class="sidebar-tab-btn" id="tab-btn-drawing" onclick="switchSidebarTab('drawing')">📄 Teknik Resim (<span id="drawing-dim-count">0</span>)</button>
         </div>
       </div>
 
       <div class="tree-scroll" id="sidebar-tree-scroll">
-        <!-- 3-2-1 Datum Çerçevesi -->
-        <div class="tree-group">
-          <div class="tree-group-title">
-            <span>3-2-1 Datum Çerçevesi (PCS_AUTO_321)</span>
-            <span style="font-size: 10px; color: var(--color-datum);">6 DoF Kilitli</span>
-          </div>
-          <div class="tree-node active" id="node-datum_a" onclick="selectFeature('datum_a')">
-            <div class="node-label">
-              <span class="node-icon-badge badge-datum">📐</span>
-              <span>DATUM_A_TOP</span>
-            </div>
-            <span class="node-status">Düzlem (Z=50)</span>
-          </div>
-          <div class="tree-node" id="node-datum_b" onclick="selectFeature('datum_b')">
-            <div class="node-label">
-              <span class="node-icon-badge badge-datum">📐</span>
-              <span>DATUM_B_FRONT</span>
-            </div>
-            <span class="node-status">Düzlem (Y=0)</span>
-          </div>
-          <div class="tree-node" id="node-datum_c" onclick="selectFeature('datum_c')">
-            <div class="node-label">
-              <span class="node-icon-badge badge-datum">📐</span>
-              <span>DATUM_C_LEFT</span>
-            </div>
-            <span class="node-status">Düzlem (X=0)</span>
-          </div>
-        </div>
-
-        <!-- Ölçüm Unsurları & GD&T -->
-        <div class="tree-group">
-          <div class="tree-group-title">
-            <span>Ölçüm Unsurları & Toleranslar</span>
-          </div>
-          <div class="tree-node" id="node-bore_h7" onclick="selectFeature('bore_h7')">
-            <div class="node-label">
-              <span class="node-icon-badge badge-cyl">🥫</span>
-              <span>BORE_20_H7</span>
-            </div>
-            <span class="node-status">Ø20 H7 (Chebyshev)</span>
-          </div>
-          <div class="tree-node" id="node-thread_m8" onclick="selectFeature('thread_m8')">
-            <div class="node-label">
-              <span class="node-icon-badge badge-thread">🧵</span>
-              <span>THREAD_M8_BOLT</span>
-            </div>
-            <span class="node-status">M8 Mastar Baypas</span>
-          </div>
-          <div class="tree-node" id="node-airfoil" onclick="selectFeature('airfoil')">
-            <div class="node-label">
-              <span class="node-icon-badge badge-surf">〰️</span>
-              <span>SURF_AIRFOIL_PROFILE</span>
-            </div>
-            <span class="node-status">0.80 Ⓤ 0.20 mm</span>
-          </div>
-          <div class="tree-node" id="node-unresolved_slot" onclick="selectFeature('unresolved_slot')">
-            <div class="node-label">
-              <span class="node-icon-badge badge-hole">⭕</span>
-              <span>UNRESOLVED_SLOT_01</span>
-            </div>
-            <span class="node-status" style="color: #B45309; background: #FEF3C7;">Onay Bekliyor</span>
-          </div>
-        </div>
-
-        <!-- Emniyet & Fikstür Pabuçları -->
-        <div class="tree-group">
-          <div class="tree-group-title">
-            <span>Emniyet & Yasaklı Alanlar (Keep-Out)</span>
-            <button onclick="toggleClampPlacement()" style="font-size: 10px; padding: 2px 6px; cursor: pointer; border: 1px solid var(--border-color); background: #fff; border-radius: 4px;">+ Pabuç Ekle</button>
-          </div>
-          <div class="tree-node" id="node-clamp" onclick="selectFeature('clamp')">
-            <div class="node-label">
-              <span class="node-icon-badge badge-clamp">🗜️</span>
-              <span>FIXTURE_CLAMP_OP10</span>
-            </div>
-            <span class="node-status">+40mm Lift-Hop</span>
-          </div>
+        <div style="padding: 24px 16px; text-align: center; color: #64748B; font-size: 11px;">
+          Model veya teknik resim yüklendiğinde unsurlar burada listelenecektir.
         </div>
       </div>
 
@@ -2189,13 +2114,13 @@ FEATURES:
                 <!-- Birleşik Metroloji & CAD Telemetri Paneli (Unified Zero-Blur HUD) -->
         <div class="canvas-overlay-hud" id="unified-metro-hud" style="top: 12px; left: 12px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 4px 14px rgba(0,0,0,0.08); min-width: 280px;">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px;">
-            <span style="font-weight: 800; color: #0284C7; font-size: 11px; font-family: var(--font-mono);" id="model-badge-name">VALVE_BODY_OP10.step</span>
-            <span style="font-size: 9px; font-weight: 700; background: #E0F2FE; color: #0369A1; padding: 1px 6px; border-radius: 3px;" id="hud-status-pill">6 DoF KİLİTLİ</span>
+            <span style="font-weight: 800; color: #0284C7; font-size: 11px; font-family: var(--font-mono);" id="model-badge-name">Model: Yüklenmedi</span>
+            <span style="font-size: 9px; font-weight: 700; background: #E0F2FE; color: #0369A1; padding: 1px 6px; border-radius: 3px;" id="hud-status-pill">BEKLEMEDE</span>
           </div>
-          <div class="hud-title" id="hud-feature-name" style="font-size: 12px; color: #0F172A; font-weight: 700;">DATUM_A_BASE (Z=0)</div>
-          <div class="hud-meta" id="model-badge-size" style="font-family: var(--font-mono); font-size: 10px; color: #475569;">Boyut: 100.0 x 50.0 x 100.0 mm</div>
-          <div class="hud-meta" id="hud-feature-coords" style="font-family: var(--font-mono); font-size: 10px; color: #64748B;">Orijin (PCS): X: 0.000 | Y: 0.000 | Z: 0.000 mm</div>
-          <div class="hud-meta" id="hud-feature-details" style="font-size: 10px; color: #059669; font-weight: 600;">✓ Emniyet Zarfı: GJK Temiz | Z_Clearance: +25.0 mm</div>
+          <div class="hud-title" id="hud-feature-name" style="font-size: 12px; color: #0F172A; font-weight: 700;">CAD / STEP Modeli Bekleniyor</div>
+          <div class="hud-meta" id="model-badge-size" style="font-family: var(--font-mono); font-size: 10px; color: #475569;">Boyut: -- x -- x -- mm</div>
+          <div class="hud-meta" id="hud-feature-coords" style="font-family: var(--font-mono); font-size: 10px; color: #64748B;">Orijin (PCS): --</div>
+          <div class="hud-meta" id="hud-feature-details" style="font-size: 10px; color: #059669; font-weight: 600;">Lütfen STEP veya CAD dosyası seçin.</div>
         </div>
 
         <!-- Hızlı Kamera Butonları -->
@@ -2722,7 +2647,7 @@ FEATURES:
         <div id="step-dropzone" style="border: 2px dashed #0284C7; border-radius: 8px; padding: 22px; text-align: center; background: #F0F9FF; cursor: pointer; transition: all 0.2s ease;"
              onclick="triggerCadImport()"
              ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDropStep(event)">
-          <input type="file" id="step-file-input" accept=".step,.stp,.stl,.obj" style="display: none;" onchange="handleStepFileInput(event)">
+          <input type="file" id="step-file-input" accept=".step,.stp,.stl,.obj" style="display: none;" onclick="event.stopPropagation();" onchange="handleStepFileInput(event)">
           <div style="font-size: 32px; margin-bottom: 6px;">📥</div>
           <div style="font-weight: 700; font-size: 13px; color: #0369A1;">STEP / STL / OBJ Dosyanızı Buraya Sürükleyin veya Tıklayın</div>
           <div style="font-size: 11px; color: #64748B; margin-top: 3px;">Desteklenen: STEP AP203/AP214/AP242 | STL (Binary/ASCII) | OBJ (Wavefront)</div>
@@ -2736,12 +2661,9 @@ FEATURES:
         <!-- Hızlı Hazır CAD Modelleri Seçici -->
         <div style="margin-top: 14px; background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px;">
           <div style="font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 8px;">
-            ⚡ Hazır Metroloji Test Modellerini Tek Tıkla Yükleyin:
+            ⚡ Savunma ve Havacılık Modelleri:
           </div>
           <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-            <button class="btn-header" onclick="loadSampleCad('valve')" style="font-size: 11px; padding: 5px 11px; font-weight: 600;">Valf Bloğu (OP10)</button>
-            <button class="btn-header" onclick="loadSampleCad('impeller')" style="font-size: 11px; padding: 5px 11px; font-weight: 600;">Kanatlı Çark (5 Eksen Impeller)</button>
-            <button class="btn-header" onclick="loadSampleCad('manifold')" style="font-size: 11px; padding: 5px 11px; font-weight: 600;">Kademeli Manifold Bloğu</button>
             <button class="btn-header primary" onclick="loadCitadelCad('Anten Kapak TM.stp')" style="font-size: 11px; padding: 5px 11px; font-weight: 600;">📡 Anten Kapak TM (Siemens NX STEP)</button>
             <button class="btn-header primary" onclick="loadCitadelCad('601855 BATARYA TUTUCU.stp')" style="font-size: 11px; padding: 5px 11px; font-weight: 600;">🔋 Batarya Tutucu (AP214 STEP)</button>
             <button class="btn-header" onclick="loadCitadelCad('KANAT BURCU SAG M12_01.stp')" style="font-size: 11px; padding: 5px 11px; font-weight: 600;">✈️ Kanat Burcu M12 (STEP)</button>
@@ -2756,7 +2678,7 @@ FEATURES:
           <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 11px;">
             <div style="background: #F8FAFC; padding: 8px; border-radius: 4px; border: 1px solid #E2E8F0;">
               <b style="color: #64748B;">Model Adı:</b>
-              <div id="cad-stat-name" style="font-weight: 700; color: #0F172A; margin-top: 2px;">VALVE_BODY_OP10.step</div>
+              <div id="cad-stat-name" style="font-weight: 700; color: #0F172A; margin-top: 2px;">--</div>
             </div>
             <div style="background: #F8FAFC; padding: 8px; border-radius: 4px; border: 1px solid #E2E8F0;">
               <b style="color: #64748B;">Standart & Protokol:</b>
@@ -4023,42 +3945,17 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
       else alert("🤖 AI ile Teknik Resimden Ölçü Çıkarma: Resimdeki ölçüleri tespit edip CAD yüzeyleriyle eşleştirir.");
     }
 
-    // Başlangıçta Otomatik Model Yükleme ve Konfigürasyon
     window.addEventListener('load', () => {
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {}
       sessionStorage.setItem('probe_configured', 'true');
-
-      if (typeof generateDynamicProbeTrajectory === 'function') {
-        generateDynamicProbeTrajectory();
+      if (window.nuperApp) {
+        const sim = window.nuperApp.getCADViewer().getSimulationController();
+        sim.pause();
       }
-      if (typeof syncSimControllerWaypoints === 'function') {
-        syncSimControllerWaypoints();
-      }
-
-      setTimeout(async () => {
-        try {
-          const lastFile = localStorage.getItem('last_cad_filename') || "ROLE BAGLANTI PARCA_AA (1).stp";
-          if (typeof loadCitadelCad === 'function') {
-            await loadCitadelCad(lastFile);
-          }
-        } catch (e) {
-          // Sessiz geçiş
-        }
-      }, 100);
-
-      setTimeout(() => {
-        if (typeof generateDynamicProbeTrajectory === 'function') {
-          generateDynamicProbeTrajectory();
-        }
-        if (typeof syncSimControllerWaypoints === 'function') {
-          syncSimControllerWaypoints();
-        }
-        if (window.nuperApp) {
-          const sim = window.nuperApp.getCADViewer().getSimulationController();
-          sim.setSpeedMultiplier(5.0);
-          sim.play();
-          window.isSimulating = true;
-        }
-      }, 250);
+      window.isSimulating = false;
     });
 
     // ==========================================================================
@@ -4196,105 +4093,9 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
     // ==========================================================================
     const selectableMeshes = [];
     const blockGroup = new THREE.Group();
-
-    // Ana Valf Bloğu (100 x 50 x 100 mm)
-    const blockGeo = new THREE.BoxGeometry(100, 50, 100);
-    const blockMat = new THREE.MeshLambertMaterial({
-      color: 0x94A3B8,
-      transparent: true,
-      opacity: 0.88,
-    });
-    const blockMesh = new THREE.Mesh(blockGeo, blockMat);
-    blockMesh.position.set(50, 25, 50);
-    blockMesh.userData = { featureKey: 'datum_a' };
-    blockGroup.add(blockMesh);
-    selectableMeshes.push(blockMesh);
-
-    // CAD Kenar Çizgileri (LineSegments)
-    const edges = new THREE.EdgesGeometry(blockGeo);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x475569, linewidth: 1 });
-    const wireframe = new THREE.LineSegments(edges, lineMat);
-    wireframe.position.copy(blockMesh.position);
-    blockGroup.add(wireframe);
-
-    // Datum A Yüzeyi Vurgu Plakası (+Z Düzlemi, Yeşil #059669)
-    const datumAPlaneGeo = new THREE.PlaneGeometry(100, 100);
-    const datumAPlaneMat = new THREE.MeshBasicMaterial({
-      color: 0x059669,
-      transparent: true,
-      opacity: 0.25,
-      side: THREE.DoubleSide
-    });
-    const datumAPlane = new THREE.Mesh(datumAPlaneGeo, datumAPlaneMat);
-    datumAPlane.position.set(50, 50.2, 50);
-    datumAPlane.rotation.x = -Math.PI / 2;
-    datumAPlane.userData = { featureKey: 'datum_a' };
-    blockGroup.add(datumAPlane);
-    selectableMeshes.push(datumAPlane);
-
-    // BORE_20_H7 İç Silindirik Delik (Ø20 x 30 mm derinlik, Mavi #0284C7)
-    const holeGeo = new THREE.CylinderGeometry(10, 10, 30, 32, 1, true);
-    const holeMat = new THREE.MeshLambertMaterial({ color: 0x0284C7, side: THREE.DoubleSide });
-    const holeMesh = new THREE.Mesh(holeGeo, holeMat);
-    holeMesh.position.set(50, 35, 50);
-    holeMesh.userData = { featureKey: 'bore_h7' };
-    blockGroup.add(holeMesh);
-    selectableMeshes.push(holeMesh);
-
-    // THREAD_M8_BOLT Vida Dişli Delik (Mor #8B5CF6)
-    const threadGeo = new THREE.CylinderGeometry(4, 4, 16, 24, 1, true);
-    const threadMat = new THREE.MeshLambertMaterial({ color: 0x8B5CF6, side: THREE.DoubleSide });
-    const threadMesh = new THREE.Mesh(threadGeo, threadMat);
-    threadMesh.position.set(80, 42, 20);
-    threadMesh.userData = { featureKey: 'thread_m8' };
-    blockGroup.add(threadMesh);
-    selectableMeshes.push(threadMesh);
-
-    // SURF_AIRFOIL_PROFILE Serbest Yüzey Eğrisi (Pembe #EC4899)
-    const curvePoints = [];
-    for (let t = 0; t <= 1.0; t += 0.05) {
-      const x = 30 + t * 40;
-      const z = 75 + Math.sin(t * Math.PI) * 12;
-      curvePoints.push(new THREE.Vector3(x, 50.5, z));
-    }
-    const curveGeo = new THREE.BufferGeometry().setFromPoints(curvePoints);
-    const curveLineMat = new THREE.LineBasicMaterial({ color: 0xEC4899, linewidth: 3 });
-    const curveLine = new THREE.Line(curveGeo, curveLineMat);
-    curveLine.userData = { featureKey: 'airfoil' };
-    blockGroup.add(curveLine);
-
-    // UNRESOLVED_SLOT Bekleyen Kanal (Sarı #EAB308)
-    const slotGeo = new THREE.BoxGeometry(18, 10, 40);
-    const slotMat = new THREE.MeshLambertMaterial({ color: 0xEAB308, transparent: true, opacity: 0.7 });
-    const slotMesh = new THREE.Mesh(slotGeo, slotMat);
-    slotMesh.position.set(20, 45, 50);
-    slotMesh.userData = { featureKey: 'unresolved_slot' };
-    blockGroup.add(slotMesh);
-    selectableMeshes.push(slotMesh);
-
-    // FİKSTÜR PABUCU (AABB KEEP-OUT ZONE - Turuncu #F97316)
-    let clampVisible = true;
-    const clampGroup = new THREE.Group();
-    const clampGeo = new THREE.BoxGeometry(20, 35, 30);
-    const clampMat = new THREE.MeshLambertMaterial({
-      color: 0xF97316,
-      transparent: true,
-      opacity: 0.70,
-    });
-    const clampMesh = new THREE.Mesh(clampGeo, clampMat);
-    clampMesh.position.set(-5, 17.5, 25);
-    clampMesh.userData = { featureKey: 'clamp' };
-    clampGroup.add(clampMesh);
-    selectableMeshes.push(clampMesh);
-
-    const clampEdges = new THREE.EdgesGeometry(clampGeo);
-    const clampLineMat = new THREE.LineBasicMaterial({ color: 0xC2410C, linewidth: 2 });
-    const clampWire = new THREE.LineSegments(clampEdges, clampLineMat);
-    clampWire.position.copy(clampMesh.position);
-    clampGroup.add(clampWire);
-
-    blockGroup.add(clampGroup);
-    scene.add(blockGroup);
+    blockGroup.visible = false;
+    window.blockGroup = blockGroup;
+    window.scene = scene;
 
     // ==========================================================================
     // 3. RENISHAW PH10M + TP20 + STYLUS DİJİTAL İKİZİ (5-EKSEN KİNEMATİK RİG)
@@ -4362,7 +4163,10 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
     const trajMat = new THREE.LineBasicMaterial({ color: 0x0284C7, linewidth: 1.5, transparent: true, opacity: 0.75 });
     let trajGeo = new THREE.BufferGeometry();
     const trajLine = new THREE.Line(trajGeo, trajMat);
+    trajLine.visible = false;
     scene.add(trajLine);
+    window.trajLine = trajLine;
+    window.probeGroup = probeGroup;
 
     // Metroloji Sınıfı Kesin Sıkı Sınır Kutusu (Tight Oriented AABB - Vertex Transform)
     function computeTightBounds(object) {
@@ -4565,7 +4369,7 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
       syncSimControllerWaypoints();
     }
 
-    window.isSimulating = true;
+    window.isSimulating = false;
     function syncSimControllerWaypoints() {
       if (window.nuperApp && trajectoryPoints && trajectoryPoints.length > 0) {
         const simCtrl = window.nuperApp.getCADViewer().getSimulationController();
@@ -4598,8 +4402,8 @@ $$ DURUM: 6 DoF TAM KILITLI (RANK 6/6) | DET(J) = 1.000000 | PCS AKTIF`;
             });
           }
         });
-        window.isSimulating = true;
-        simCtrl.play();
+        window.isSimulating = false;
+        simCtrl.pause();
       }
     }
     window.syncSimControllerWaypoints = syncSimControllerWaypoints;
@@ -5681,32 +5485,33 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
     }
 
     // Native Windows Gezgini ile CAD Seçimi (Electron) veya Web Input
+    let isCadImporting = false;
     async function triggerCadImport() {
-      if (electronIpc) {
-        try {
-          const res = await electronIpc.invoke('select-cad-file');
-          if (res) {
-            handleCadData(res);
+      if (isCadImporting) return;
+      isCadImporting = true;
+      try {
+        if (electronIpc) {
+          try {
+            const res = await electronIpc.invoke('select-cad-file');
+            if (res) {
+              handleCadData(res);
+            }
             return;
+          } catch (err) {
+            console.warn('Native dialog error, web input fallback:', err);
           }
-        } catch (err) {
-          console.warn('Native dialog error, web input fallback:', err);
         }
+        const fileInput = document.getElementById('step-file-input') || document.getElementById('real-3d-file-input');
+        if (fileInput) fileInput.click();
+      } finally {
+        setTimeout(() => {
+          isCadImporting = false;
+        }, 300);
       }
-      // Web fallback
-      const fileInput = document.getElementById('step-file-input') || document.getElementById('real-3d-file-input');
-      if (fileInput) fileInput.click();
     }
 
     // Citadel Klasöründen Hazır Savunma/Havacılık Modeli Yükleme
     async function loadCitadelCad(filename) {
-      if (filename === 'VALVE_BODY_OP10.step') {
-        loadSampleCad('valve');
-        localStorage.setItem('last_cad_filename', filename);
-        const sel = document.getElementById('quick-model-select');
-        if (sel) sel.value = filename;
-        return;
-      }
       if (electronIpc) {
         try {
           showToast(`⏳ Model diskten yükleniyor: ${filename}...`);
@@ -5716,27 +5521,19 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
           }
           if (res) {
             handleCadData(res);
-            localStorage.setItem('last_cad_filename', filename);
-            const sel = document.getElementById('quick-model-select');
-            if (sel) sel.value = filename;
             return;
           }
         } catch (err) {
           console.error('Citadel read error:', err);
         }
       }
-      // Fallback
-      if (filename.includes('Anten')) loadSampleCad('impeller');
-      else loadSampleCad('manifold');
+      showToast(`⚠️ CAD modeli diskten yüklenemedi: ${filename}`);
     }
 
     // Ortak CAD Veri Yönlendirici (Hem IPC hem FileReader sonuçları buraya gelir)
     function handleCadData(cadData) {
       if (!cadData) return;
       const { name, ext, dataText, dataBase64 } = cadData;
-      localStorage.setItem('last_cad_filename', name);
-      const sel = document.getElementById('quick-model-select');
-      if (sel) sel.value = name;
       const lowerExt = (ext || name.split('.').pop()).toLowerCase();
 
       if (lowerExt === 'step' || lowerExt === 'stp') {
@@ -6879,59 +6676,9 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
       selectFeature('step_datum_a');
     }
 
-    function loadSampleCad(type) {
-      if (type === 'valve') {
-        currentUploadedCad = {
-          name: "VALVE_BODY_OP10.step",
-          protocol: "ISO 10303-21 (AP214)",
-          bbox: "100.0 x 50.0 x 100.0 mm",
-          faces: 14,
-          cylinders: 4,
-          wallThickness: "min 4.2 mm (Güvenli >2.5)",
-          datumSuggestion: "Primer: Taban Düzlemi (Z=0) | İkincil: Ön Yüz (Y=0) | Üçüncül: Sol Yüz (X=0)"
-        };
-      } else if (type === 'impeller') {
-        currentUploadedCad = {
-          name: "IMPELLER_TI6AL4V_5AXIS.step",
-          protocol: "ISO 10303-21 (AP242 MBD)",
-          bbox: "140.0 x 140.0 x 65.0 mm",
-          faces: 28,
-          cylinders: 2,
-          wallThickness: "min 2.8 mm (Aerodinamik Kanat)",
-          datumSuggestion: "Primer: Merkez Delik (Z-Axis) | İkincil: Alt Alın Düzlemi (Z=0) | Üçüncül: Kanat Referansı"
-        };
-      } else if (type === 'manifold') {
-        currentUploadedCad = {
-          name: "HYDRAULIC_MANIFOLD_OP10.step",
-          protocol: "ISO 10303-21 (AP214)",
-          bbox: "160.0 x 110.0 x 80.0 mm",
-          faces: 36,
-          cylinders: 12,
-          wallThickness: "min 5.5 mm (Yüksek Basınç)",
-          datumSuggestion: "Primer: Bağlama Tabanı (Z=0) | İkincil: Referans Yan Kenar | Üçüncül: Pim Deliği"
-        };
-      }
-      updateCadModalTelemetry();
-      applyUploadedCadToScene();
-    }
-
-    function updateCadModalTelemetry() {
-      const n = document.getElementById('cad-stat-name');
-      const p = document.getElementById('cad-stat-protocol');
-      const b = document.getElementById('cad-stat-bbox');
-      const f = document.getElementById('cad-stat-faces');
-      const c = document.getElementById('cad-stat-cylinders');
-      const w = document.getElementById('cad-stat-walls');
-      if (n) n.innerText = currentUploadedCad.name;
-      if (p) p.innerText = currentUploadedCad.protocol;
-      if (b) b.innerText = currentUploadedCad.bbox;
-      if (f) f.innerText = `${currentUploadedCad.faces} ADVANCED_FACE`;
-      if (c) c.innerText = `${currentUploadedCad.cylinders} Delik / Silindir`;
-      if (w) w.innerText = currentUploadedCad.wallThickness;
-    }
-
     function applyUploadedCadToScene() {
       const cad = currentUploadedCad;
+      if (!cad) return;
       closeCadIngestionModal();
 
       const badge = document.getElementById('part-name-badge');
@@ -6942,102 +6689,6 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
       if (uploadedMeshGroup) {
         scene.remove(uploadedMeshGroup);
         uploadedMeshGroup = null;
-      }
-
-      if (cad.name.includes("IMPELLER") || cad.name.toLowerCase().includes("impeller")) {
-        // --- 3D IMPELLER MODEL ---
-        blockGroup.visible = false;
-        uploadedMeshGroup = new THREE.Group();
-
-        const hubGeo = new THREE.CylinderGeometry(28, 48, 30, 36);
-        const hubMat = new THREE.MeshStandardMaterial({ color: 0x38BDF8, metalness: 0.6, roughness: 0.3 });
-        const hubMesh = new THREE.Mesh(hubGeo, hubMat);
-        hubMesh.position.y = 15;
-        uploadedMeshGroup.add(hubMesh);
-
-        const boreGeo = new THREE.CylinderGeometry(12.5, 12.5, 34, 32, 1, true);
-        const boreMat = new THREE.MeshLambertMaterial({ color: 0x0284C7, side: THREE.DoubleSide });
-        const boreMesh = new THREE.Mesh(boreGeo, boreMat);
-        boreMesh.position.y = 15;
-        boreMesh.userData = { featureKey: 'impeller_hub' };
-        uploadedMeshGroup.add(boreMesh);
-        selectableMeshes.push(boreMesh);
-
-        const bladeMat = new THREE.MeshStandardMaterial({ color: 0x94A3B8, metalness: 0.5, roughness: 0.4 });
-        for (let i = 0; i < 8; i++) {
-          const angle = (i / 8) * Math.PI * 2;
-          const bladeGeo = new THREE.BoxGeometry(4, 24, 36);
-          const bladeMesh = new THREE.Mesh(bladeGeo, bladeMat);
-          bladeMesh.position.set(Math.cos(angle) * 34, 16, Math.sin(angle) * 34);
-          bladeMesh.rotation.y = angle + 0.45;
-          bladeMesh.rotation.z = 0.22;
-          bladeMesh.userData = { featureKey: 'impeller_blade' };
-          uploadedMeshGroup.add(bladeMesh);
-          selectableMeshes.push(bladeMesh);
-        }
-
-        const ringGeo = new THREE.RingGeometry(46, 50, 36);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0x059669, side: THREE.DoubleSide });
-        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-        ringMesh.position.y = 0.1;
-        ringMesh.rotation.x = -Math.PI / 2;
-        ringMesh.userData = { featureKey: 'impeller_datum' };
-        uploadedMeshGroup.add(ringMesh);
-        selectableMeshes.push(ringMesh);
-
-        scene.add(uploadedMeshGroup);
-        updateInspectionTreeForImpeller();
-        camera.position.set(130, 140, 160);
-        controls.target.set(0, 15, 0);
-
-      } else if (cad.name.includes("MANIFOLD") || cad.name.toLowerCase().includes("manifold")) {
-        // --- 3D HYDRAULIC MANIFOLD MODEL ---
-        blockGroup.visible = false;
-        uploadedMeshGroup = new THREE.Group();
-
-        const manGeo = new THREE.BoxGeometry(140, 70, 90);
-        const manMat = new THREE.MeshStandardMaterial({ color: 0x64748B, metalness: 0.4, roughness: 0.5, transparent: true, opacity: 0.9 });
-        const manMesh = new THREE.Mesh(manGeo, manMat);
-        manMesh.position.set(0, 35, 0);
-        manMesh.userData = { featureKey: 'man_datum_a' };
-        uploadedMeshGroup.add(manMesh);
-        selectableMeshes.push(manMesh);
-
-        const edges = new THREE.EdgesGeometry(manGeo);
-        const lineMat = new THREE.LineBasicMaterial({ color: 0x1E293B });
-        uploadedMeshGroup.add(new THREE.LineSegments(edges, lineMat));
-
-        const portMat = new THREE.MeshLambertMaterial({ color: 0x0284C7, side: THREE.DoubleSide });
-        const portPositions = [[-40, 0], [0, 0], [40, 0], [-20, 25]];
-        portPositions.forEach((pos, idx) => {
-          const portGeo = new THREE.CylinderGeometry(8, 8, 25, 24, 1, true);
-          const portMesh = new THREE.Mesh(portGeo, portMat);
-          portMesh.position.set(pos[0], 60, pos[1]);
-          portMesh.userData = { featureKey: `man_port_${idx+1}` };
-          uploadedMeshGroup.add(portMesh);
-          selectableMeshes.push(portMesh);
-        });
-
-        const galGeo = new THREE.CylinderGeometry(10, 10, 142, 24, 1, true);
-        const galMat = new THREE.MeshLambertMaterial({ color: 0x8B5CF6, side: THREE.DoubleSide });
-        const galMesh = new THREE.Mesh(galGeo, galMat);
-        galMesh.position.set(0, 35, 0);
-        galMesh.rotation.z = Math.PI / 2;
-        galMesh.userData = { featureKey: 'man_gallery' };
-        uploadedMeshGroup.add(galMesh);
-        selectableMeshes.push(galMesh);
-
-        scene.add(uploadedMeshGroup);
-        updateInspectionTreeForManifold();
-        camera.position.set(160, 160, 170);
-        controls.target.set(0, 35, 0);
-
-      } else {
-        // --- 3D VALVE BLOCK (DEFAULT) ---
-        blockGroup.visible = true;
-        updateInspectionTreeForValve();
-        camera.position.set(160, 180, 200);
-        controls.target.set(50, 25, 50);
       }
 
       if (typeof generateDynamicProbeTrajectory === 'function') {
@@ -8507,30 +8158,39 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
     }
 
     // trigger2dUpload fonksiyonunu akıllı hale getir
+    let isDrawingUploading = false;
     trigger2dUpload = async function() {
-      document.querySelectorAll('.app-menubar .menu-item').forEach(m => m.classList.remove('open'));
-      if (electronIpc) {
-        try {
-          const res = await electronIpc.invoke('select-drawing-file');
-          if (res) {
-            showToast(`⏳ ${res.name} teknik resmi okunuyor...`);
-            let extracted = await electronIpc.invoke('extract-drawing-data', res.filePath);
-            if (!extracted) {
-              extracted = {
-                title_block: { drawing_number: res.name },
-                datums: ['A', 'B', 'C'],
-                dimensions: []
-              };
+      if (isDrawingUploading) return;
+      isDrawingUploading = true;
+      try {
+        document.querySelectorAll('.app-menubar .menu-item').forEach(m => m.classList.remove('open'));
+        if (electronIpc) {
+          try {
+            const res = await electronIpc.invoke('select-drawing-file');
+            if (res) {
+              showToast(`⏳ ${res.name} teknik resmi okunuyor...`);
+              let extracted = await electronIpc.invoke('extract-drawing-data', res.filePath);
+              if (!extracted) {
+                extracted = {
+                  title_block: { drawing_number: res.name },
+                  datums: ['A', 'B', 'C'],
+                  dimensions: []
+                };
+              }
+              loadDrawingData(extracted, res.filePath, res.name);
             }
-            loadDrawingData(extracted, res.filePath, res.name);
             return;
+          } catch (e) {
+            console.warn('Native drawing select error, fallback to web:', e);
           }
-        } catch (e) {
-          console.warn('Native drawing select error, fallback to web:', e);
         }
+        const fileInput = document.getElementById('drawing-file-input');
+        if (fileInput) fileInput.click();
+      } finally {
+        setTimeout(() => {
+          isDrawingUploading = false;
+        }, 300);
       }
-      const fileInput = document.getElementById('drawing-file-input');
-      if (fileInput) fileInput.click();
     };
 
     // Web File Input işleyicisini zenginleştir
@@ -8646,12 +8306,6 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
 
 
 
-
-    // trigger2dUpload fonksiyonunu güncelle
-    trigger2dUpload = function() {
-      document.querySelectorAll('.app-menubar .menu-item').forEach(m => m.classList.remove('open'));
-      document.getElementById('drawing-file-input').click();
-    };
 
     // Ribbon STEP Yükle butonunu da gerçek dosya yüklemeye yönlendir
     const origStepClick = document.getElementById('step-file-input');

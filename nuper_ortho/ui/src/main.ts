@@ -127,6 +127,23 @@ export class NuperApp {
     if (!drawingFile) {
       return null;
     }
+
+    if (drawingFile.dataBase64) {
+      try {
+        const binaryString = atob(drawingFile.dataBase64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        await this.drawingCanvas.loadPdf(bytes);
+        await this.setupWizard.loadPdfData(bytes, drawingFile.name);
+      } catch {}
+    } else if (drawingFile.filePath) {
+      try {
+        await this.drawingCanvas.loadPdf(drawingFile.filePath);
+      } catch {}
+    }
+
     const result = await this.ipcClient.extractDrawingData(drawingFile.filePath);
     if (result) {
       this.loadDrawingData(result);
@@ -200,6 +217,11 @@ if (typeof window !== 'undefined') {
 
   const initApp = () => {
     app.mountDrawingCanvas('#drawing-viewport-canvas');
+    app.getDrawingCanvas().setBalloons([]);
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch {}
     const simCtrl = app.getCADViewer().getSimulationController();
     simCtrl.setSpeedMultiplier(5.0);
     SimulationController.wireSpeedButtons('.speed-controls', simCtrl);

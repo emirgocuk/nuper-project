@@ -96,18 +96,16 @@ function setupPdfWorker(): void {
     const path = getNodePath();
     if (fs && path) {
       try {
-        const localWorker = path.resolve('node_modules/pdfjs-dist/build/pdf.worker.js');
+        const localWorker = path.resolve('node_modules/pdfjs-dist/build/pdf.worker.min.js');
         if (fs.existsSync(localWorker)) {
-          if (typeof window !== 'undefined' && typeof (window as unknown as { require?: unknown }).require !== 'function') {
-            pdf.GlobalWorkerOptions.workerSrc = 'file:///' + localWorker.replace(/\\/g, '/');
-          } else {
-            pdf.GlobalWorkerOptions.workerSrc = localWorker;
-          }
+          const buf = fs.readFileSync(localWorker);
+          const blob = new Blob([buf as unknown as BlobPart], { type: 'application/javascript' });
+          pdf.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
           return;
         }
       } catch {}
     }
-    pdf.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdf.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
   }
 }
 

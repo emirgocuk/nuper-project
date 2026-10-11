@@ -477,4 +477,17 @@ describe('SetupWizard — Sıfır Durum ve Beyaz Temalı Işık Masası Modalı'
     wizard.removeFeature(nextId);
     expect(wizard.getDimensions().some((d) => d.id === nextId)).toBe(false);
   });
+
+  it('Kullanıcı dosya seçimini iptal ettiğinde sihirbaz modalı açmaz ve temiz şekilde sonlanır', async () => {
+    const mockApp = {
+      openAndLoadDrawingFile: vi.fn().mockResolvedValue(null),
+    };
+    wizard = new SetupWizard(mockApp);
+    const openModalSpy = vi.spyOn(wizard, 'openDrawingAuditModal');
+
+    await wizard.handleTeknikResimClick();
+
+    expect(mockApp.openAndLoadDrawingFile).toHaveBeenCalledTimes(1);
+    expect(openModalSpy).not.toHaveBeenCalled();
+  });
 });

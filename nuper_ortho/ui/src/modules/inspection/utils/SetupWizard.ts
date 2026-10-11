@@ -12,7 +12,14 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { matchCadWithDrawing, type CadDrawingMatchResult } from './CadDrawingMatcher';
 import type { CadMetadata } from '../../../types/generated/cad_metadata';
 import type { DrawingExtractionResult } from '../../../types/generated/drawing_data';
-import { FeatureDefinitionModal, type DefinedFeatureData } from './FeatureDefinitionModal';
+import { FeatureDefinitionModal } from './FeatureDefinitionModal';
+import {
+  exceedsDragThreshold,
+  screenDeltaToStage,
+  applyLabelOffset,
+  escapeHtmlText,
+  type LabelOffset,
+} from './BalloonEditing';
 
 export interface SetupWizardOptions {
   onConfirm?: (dimensions: InspectionDimension[]) => void;
@@ -30,6 +37,7 @@ export class SetupWizard {
   private loadedFileName: string = '';
   private pdfDoc: PDFDocumentProxy | null = null;
   private loadedImageUrl: string | null = null;
+  private pageImages: Map<number, { width: number; height: number; image_data: string }> = new Map();
   private confirmCallback?: (dimensions: InspectionDimension[]) => void;
   private appInstance: unknown = null;
   private currentCadMetadata: CadMetadata | null = null;
@@ -41,6 +49,24 @@ export class SetupWizard {
   private isDragging: boolean = false;
   private dragStartX: number = 0;
   private dragStartY: number = 0;
+
+  private editingId: number | null = null;
+  private isAddingInline: boolean = false;
+  private pendingAddX: number = 0;
+  private pendingAddY: number = 0;
+  private pendingAddPage: number = 1;
+  private balloonLabelOffsets: Map<number, LabelOffset> = new Map();
+
+  private rightDragCandidateId: number | null = null;
+  private rightDragStartX: number = 0;
+  private rightDragStartY: number = 0;
+  private rightDragMoved: boolean = false;
+  private dragPreviewNode: SVGGElement | null = null;
+  private dragPreviewDx: number = 0;
+  private dragPreviewDy: number = 0;
+  private activeMoveHandler: ((e: MouseEvent) => void) | null = null;
+  private activeUpHandler: ((e: MouseEvent) => void) | null = null;
+  private activeKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
   constructor(app?: unknown, options?: SetupWizardOptions) {
     this.appInstance = app || null;
@@ -235,9 +261,33 @@ export class SetupWizard {
       `;
     }
 
+    const modelBadge = document.getElementById('model-badge-name');
+    if (modelBadge) modelBadge.textContent = 'Model: Yüklenmedi';
+
+    const hudStatus = document.getElementById('hud-status-pill');
+    if (hudStatus) hudStatus.textContent = 'BEKLEMEDE';
+
+    const hudFeature = document.getElementById('hud-feature-name');
+    if (hudFeature) hudFeature.textContent = 'CAD / STEP Modeli Bekleniyor';
+
+    const modelSize = document.getElementById('model-badge-size');
+    if (modelSize) modelSize.textContent = 'Boyut: -- x -- x -- mm';
+
+    const hudCoords = document.getElementById('hud-feature-coords');
+    if (hudCoords) hudCoords.textContent = 'Orijin (PCS): --';
+
+    const hudDetails = document.getElementById('hud-feature-details');
+    if (hudDetails) hudDetails.textContent = 'Lütfen STEP veya CAD dosyası seçin.';
+
+    const app = this.appInstance as { getDrawingCanvas?: () => { setBalloons: (b: unknown[]) => void } } | null;
+    if (app && typeof app.getDrawingCanvas === 'function') {
+      app.getDrawingCanvas()?.setBalloons([]);
+    }
+
     if (typeof window !== 'undefined') {
       const win = window as unknown as {
         isDualCanvas?: boolean;
+        isSimulating?: boolean;
         blockGroup?: { visible: boolean };
         trajLine?: { visible: boolean };
         probeGroup?: { position: { set: (x: number, y: number, z: number) => void } };
@@ -245,6 +295,7 @@ export class SetupWizard {
       };
 
       win.isDualCanvas = false;
+      win.isSimulating = false;
       if (win.blockGroup) win.blockGroup.visible = false;
       if (win.trajLine) win.trajLine.visible = false;
       if (win.probeGroup) win.probeGroup.position.set(0, 100, 0);
@@ -303,8 +354,8 @@ export class SetupWizard {
         const res = await app.openAndLoadDrawingFile();
         if (res) {
           this.openDrawingAuditModal();
-          return;
         }
+        return;
       } catch {}
     }
     this.openDrawingAuditModal();
@@ -333,7 +384,26 @@ export class SetupWizard {
     this.selectedId = this.dimensions.length > 0 ? this.dimensions[0].id : null;
     this.hasLoadedDrawing = true;
 
-    if (typeof fetch === 'function') {
+    const win = (typeof window !== 'undefined' ? window : {}) as unknown as {
+      electronIpc?: { invoke: (channel: string, ...args: unknown[]) => Promise<unknown> };
+    };
+
+    if (win.electronIpc) {
+      try {
+        const fileRes = (await win.electronIpc.invoke('read-local-cad', 'GOBEK BAGI OLUGU_TR_AB.pdf')) as { dataBase64?: string } | null;
+        if (fileRes && fileRes.dataBase64) {
+          const binaryString = atob(fileRes.dataBase64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const doc = await parsePdfDrawing(bytes, 'GOBEK_BAGI_OLUGU_TR_AB.pdf');
+          this.pdfDoc = doc.pdfDoc;
+        }
+      } catch {}
+    }
+
+    if (!this.pdfDoc && typeof fetch === 'function') {
       try {
         const res = await fetch('test_assets/KPT - 3051 Gobek Bagı Olugu/GOBEK BAGI OLUGU_TR_AB.pdf');
         if (res.ok) {
@@ -347,6 +417,21 @@ export class SetupWizard {
     this.renderDrawingAuditModal();
   }
 
+  public async loadPdfData(data: Uint8Array | ArrayBuffer, fileName: string): Promise<void> {
+    this.loadedFileName = fileName;
+    this.hasLoadedDrawing = true;
+    try {
+      const extracted = await parsePdfDrawing(data, fileName);
+      this.pdfDoc = extracted.pdfDoc;
+      this.loadedImageUrl = null;
+      this.totalPages = Math.max(1, extracted.pdfDoc?.numPages || extracted.result.page_count || 1);
+      this.activePage = 1;
+      this.renderDrawingAuditModal();
+    } catch {
+      this.pdfDoc = null;
+    }
+  }
+
   public async loadDrawingFile(file: File): Promise<void> {
     this.loadedFileName = file.name;
     this.hasLoadedDrawing = true;
@@ -356,38 +441,40 @@ export class SetupWizard {
       nuperApp?: { loadDrawingData: (data: unknown) => void };
     };
 
-    if (win.electronIpc && (file as unknown as { path?: string }).path) {
-      try {
-        const filePath = (file as unknown as { path: string }).path;
-        const extracted = (await win.electronIpc.invoke('extract-drawing-data', filePath)) as {
-          dimensions?: InspectionDimension[];
-          page_count?: number;
-          filename?: string;
-        } | null;
-        if (extracted && extracted.dimensions && extracted.dimensions.length > 0) {
-          this.setExtractedData(extracted, file.name);
-          if (win.nuperApp) {
-            win.nuperApp.loadDrawingData(extracted);
-          }
-          return;
-        }
-      } catch {}
-    }
-
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     if (isPdf) {
       try {
         const buf = await file.arrayBuffer();
-        const extracted = await parsePdfDrawing(buf, file.name);
-        this.pdfDoc = extracted.pdfDoc;
+        const extractedLocal = await parsePdfDrawing(buf, file.name);
+        this.pdfDoc = extractedLocal.pdfDoc;
         this.loadedImageUrl = null;
-        this.totalPages = Math.max(1, extracted.result.page_count || 1);
+        this.totalPages = Math.max(1, extractedLocal.pdfDoc?.numPages || extractedLocal.result.page_count || 1);
         this.activePage = 1;
-        this.setExtractedData(extracted.result, file.name);
 
-        if (win.nuperApp) {
-          win.nuperApp.loadDrawingData(extracted.result);
+        if (win.electronIpc && (file as unknown as { path?: string }).path) {
+          try {
+            const filePath = (file as unknown as { path: string }).path;
+            const aiExtracted = (await win.electronIpc.invoke('extract-drawing-data', filePath)) as {
+              dimensions?: InspectionDimension[];
+              page_count?: number;
+              filename?: string;
+            } | null;
+            if (aiExtracted && aiExtracted.dimensions && aiExtracted.dimensions.length > 0) {
+              this.setExtractedData(aiExtracted, file.name);
+              if (win.nuperApp) {
+                win.nuperApp.loadDrawingData(aiExtracted);
+              }
+              this.renderDrawingAuditModal();
+              return;
+            }
+          } catch {}
         }
+
+        this.setExtractedData(extractedLocal.result, file.name);
+        if (win.nuperApp) {
+          win.nuperApp.loadDrawingData(extractedLocal.result);
+        }
+        this.renderDrawingAuditModal();
         return;
       } catch {}
     }
@@ -399,19 +486,38 @@ export class SetupWizard {
       }
       this.totalPages = 1;
       this.activePage = 1;
-      this.dimensions = [];
-      this.balloons = [];
+      if (win.electronIpc && (file as unknown as { path?: string }).path) {
+        try {
+          const filePath = (file as unknown as { path: string }).path;
+          const aiExtracted = (await win.electronIpc.invoke('extract-drawing-data', filePath)) as {
+            dimensions?: InspectionDimension[];
+            page_count?: number;
+            filename?: string;
+          } | null;
+          if (aiExtracted && aiExtracted.dimensions && aiExtracted.dimensions.length > 0) {
+            this.setExtractedData(aiExtracted, file.name);
+            if (win.nuperApp) {
+              win.nuperApp.loadDrawingData(aiExtracted);
+            }
+          }
+        } catch {}
+      }
       this.renderDrawingAuditModal();
       return;
     }
-
-    void this.loadDrawingSample();
   }
 
   public setExtractedData(
     data: {
       page_count?: number;
       filename?: string;
+      pages?: Array<{
+        page?: number;
+        width?: number;
+        height?: number;
+        image_data?: string;
+        [k: string]: unknown;
+      }>;
       dimensions?: Array<{
         id: number;
         balloon: string;
@@ -439,6 +545,22 @@ export class SetupWizard {
     else if (data.filename) this.loadedFileName = data.filename;
     this.hasLoadedDrawing = true;
     if (data.page_count) this.totalPages = Math.max(1, data.page_count);
+
+    if (data.pages && Array.isArray(data.pages)) {
+      this.pageImages.clear();
+      for (const p of data.pages) {
+        if (p.page && p.image_data) {
+          this.pageImages.set(p.page, {
+            width: p.width || 1200,
+            height: p.height || 840,
+            image_data: p.image_data,
+          });
+        }
+      }
+      if (data.pages.length > 0) {
+        this.totalPages = Math.max(this.totalPages, data.pages.length);
+      }
+    }
 
     if (data.dimensions && data.dimensions.length > 0) {
       this.dimensions = data.dimensions.map((d) => ({
@@ -599,11 +721,6 @@ export class SetupWizard {
             <span class="audit-file-name-badge ${this.hasLoadedDrawing ? 'loaded' : 'empty'}" id="audit-file-badge">
               ${this.hasLoadedDrawing ? '📄 ' + (this.loadedFileName || 'Teknik_Resim.pdf') : 'Henüz Dosya Yüklenmedi'}
             </span>
-            ${
-              !this.hasLoadedDrawing
-                ? `<button class="audit-demo-btn" id="btn-audit-load-sample" title="Referans Numune PDF'ini Yükle">⚡ Numune Çizimi Yükle (Demo)</button>`
-                : ''
-            }
           </div>
 
           <div class="nuper-audit-zoom-controls">
@@ -614,19 +731,13 @@ export class SetupWizard {
           </div>
 
           <div class="nuper-audit-tip">
-            <span>🖱️ Mouse tekerleği: <b>Zoom (0.5x − 3.0x)</b> | Sürükle: <b>Pan</b></span>
+            <span>🖱️ Tekerlek: <b>Zoom</b> | Sol tık sürükle: <b>Pan</b> | Sağ tık sürükle: <b>Balonu Taşı</b> | Çift tık: <b>Unsuru Düzenle</b> | Seç + <b>Del</b>: Sil</span>
           </div>
         </div>
 
         <div class="nuper-audit-body-container">
           <div class="nuper-audit-pages-sidebar">
-            <div class="audit-pages-sidebar-header">
-              <span class="sidebar-header-title">SAYFALAR</span>
-              <span class="sidebar-header-badge">${this.totalPages} Sayfa</span>
-            </div>
-            <div class="audit-pages-sidebar-list">
-              ${this.renderPageThumbnails()}
-            </div>
+            ${this.renderAuditSidebar()}
           </div>
 
           <div class="nuper-audit-viewport" id="audit-viewport-area">
@@ -725,6 +836,18 @@ export class SetupWizard {
       })
       .join('');
 
+    const pageImg = this.pageImages.get(page);
+    if (pageImg) {
+      return `
+        <div class="audit-img-render-wrap" style="position: relative; display: inline-block;">
+          <img src="${pageImg.image_data}" style="display: block; width: ${pageImg.width}px; max-width: 100%; height: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.12); border-radius: 4px; background: #FFFFFF;" />
+          <svg id="audit-balloon-overlay" viewBox="0 0 ${pageImg.width} ${pageImg.height}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: auto;">
+            ${balloonNodes}
+          </svg>
+        </div>
+      `;
+    }
+
     if (this.pdfDoc) {
       return `
         <div class="audit-pdf-render-wrap" style="position: relative; display: inline-block;">
@@ -774,6 +897,130 @@ export class SetupWizard {
     return items.join('');
   }
 
+  private renderAuditSidebar(): string {
+    if (this.isAddingInline) {
+      return this.renderInlineEditor(null);
+    }
+    if (this.editingId !== null) {
+      const dim = this.dimensions.find((d) => d.id === this.editingId);
+      if (dim) {
+        return this.renderInlineEditor(dim);
+      }
+      this.editingId = null;
+    }
+    return `
+      <div class="audit-pages-sidebar-header">
+        <span class="sidebar-header-title">SAYFALAR</span>
+        <span class="sidebar-header-badge">${this.totalPages} Sayfa</span>
+      </div>
+      <div class="audit-pages-sidebar-list">
+        ${this.renderPageThumbnails()}
+      </div>
+    `;
+  }
+
+  private resolveFeatureMeta(type: string): { label: string; icon: string } {
+    const map: Record<string, { label: string; icon: string }> = {
+      DIAMETER: { label: 'Silindirik Çap / Delik', icon: '⭕' },
+      LINEAR: { label: 'Doğrusal Ölçü', icon: '📏' },
+      RADIUS: { label: 'Kavis / Yarıçap (Fillet)', icon: '📐' },
+      ANGLE: { label: 'Açı / Koniklik', icon: '📐' },
+      CHAMFER: { label: 'Pah Kırma', icon: '✂️' },
+      THREAD: { label: 'Vida / Diş', icon: '🔩' },
+      POSITION: { label: 'Konum / GD&T', icon: '🎯' },
+    };
+    return map[type] || map.LINEAR;
+  }
+
+  private nextFeatureId(): number {
+    const ids = this.dimensions.map((d) => d.id);
+    return ids.length > 0 ? Math.max(...ids) + 1 : 1;
+  }
+
+  private renderInlineEditor(dim: InspectionDimension | null): string {
+    const isEdit = !!dim;
+    const id = dim ? dim.id : this.nextFeatureId();
+    const balloon = dim ? dim.balloon : `#${id}`;
+    const type = dim?.type || 'DIAMETER';
+    const callout = dim?.nominal_str || '';
+    const nominal = dim?.nominal ?? 0;
+    const upper = dim?.upper_tol || '';
+    const lower = dim?.lower_tol || '';
+    const datum = dim?.datum_reference || '[A]';
+    const desc = dim?.type_label || '';
+    const page = dim?.page || this.pendingAddPage;
+
+    const typeOptions: Array<{ value: string; label: string }> = [
+      { value: 'DIAMETER', label: '⭕ Çap (DIAMETER)' },
+      { value: 'LINEAR', label: '📏 Doğrusal Boyut (LINEAR)' },
+      { value: 'RADIUS', label: '📐 Radyus / Kavis (RADIUS)' },
+      { value: 'ANGLE', label: '📐 Açı / Koniklik (ANGLE)' },
+      { value: 'CHAMFER', label: '✂️ Pah (CHAMFER)' },
+      { value: 'THREAD', label: '🔩 Vida / Diş (THREAD)' },
+      { value: 'POSITION', label: '🎯 Konum / GD&T (POSITION)' },
+    ];
+
+    return `
+      <div class="audit-pages-sidebar-header audit-inline-header">
+        <button type="button" class="audit-inline-back" id="btn-inline-back" title="Sayfalar listesine dön">← Sayfalar</button>
+        <span class="sidebar-header-badge">${escapeHtmlText(balloon)}</span>
+      </div>
+      <form class="audit-inline-editor" id="audit-inline-form" data-mode="${isEdit ? 'edit' : 'add'}" data-feature-id="${id}" data-page="${page}">
+        <div class="audit-inline-editor-title">
+          ${isEdit ? 'UNSUR DÜZENLE' : 'YENİ UNSUR'}
+          <span class="audit-inline-editor-sub">Sayfa ${page} • Işık masası üzerinde canlı düzenleme</span>
+        </div>
+
+        <label class="audit-inline-label">Unsur Tipi</label>
+        <select id="audit-inline-type" class="audit-inline-field">
+          ${typeOptions
+            .map((opt) => `<option value="${opt.value}" ${opt.value === type ? 'selected' : ''}>${opt.label}</option>`)
+            .join('')}
+        </select>
+
+        <label class="audit-inline-label">Teknik Resim İfadesi (Callout)</label>
+        <input type="text" id="audit-inline-callout" class="audit-inline-field" value="${escapeHtmlText(callout)}" placeholder="örn: Ø86 ±0.5, 3 x45°, R3" />
+        <div class="audit-inline-symbols">
+          ${['Ø', '±', '°', 'R', 'x45°']
+            .map((sym) => `<button type="button" class="audit-inline-symbol" data-symbol="${sym}">${sym}</button>`)
+            .join('')}
+        </div>
+
+        <div class="audit-inline-grid3">
+          <div>
+            <label class="audit-inline-label">Nominal</label>
+            <input type="number" step="any" id="audit-inline-nominal" class="audit-inline-field" value="${nominal}" />
+          </div>
+          <div>
+            <label class="audit-inline-label">Üst Tol</label>
+            <input type="text" id="audit-inline-upper" class="audit-inline-field" value="${escapeHtmlText(upper)}" placeholder="+0.100" />
+          </div>
+          <div>
+            <label class="audit-inline-label">Alt Tol</label>
+            <input type="text" id="audit-inline-lower" class="audit-inline-field" value="${escapeHtmlText(lower)}" placeholder="-0.100" />
+          </div>
+        </div>
+
+        <div class="audit-inline-grid2">
+          <div>
+            <label class="audit-inline-label">Datum Ref</label>
+            <input type="text" id="audit-inline-datum" class="audit-inline-field" value="${escapeHtmlText(datum)}" placeholder="[A]" />
+          </div>
+          <div>
+            <label class="audit-inline-label">Açıklama</label>
+            <input type="text" id="audit-inline-desc" class="audit-inline-field" value="${escapeHtmlText(desc)}" placeholder="örn: Ana Çap" />
+          </div>
+        </div>
+
+        <div class="audit-inline-actions">
+          <button type="submit" class="audit-inline-save" id="btn-inline-save">✓ Kaydet</button>
+          <button type="button" class="audit-inline-cancel" id="btn-inline-cancel">Vazgeç</button>
+          ${isEdit ? '<button type="button" class="audit-inline-delete" id="btn-inline-delete">🗑️ Sil</button>' : ''}
+        </div>
+      </form>
+    `;
+  }
+
   private renderEmptyDropzone(): string {
     return `
       <div class="audit-empty-dropzone" id="audit-dropzone-click">
@@ -787,9 +1034,6 @@ export class SetupWizard {
             <button class="dropzone-btn primary" id="btn-dropzone-select">
               📁 PDF Dosyası Seç
             </button>
-            <button class="dropzone-btn secondary" id="btn-dropzone-sample">
-              ⚡ Numune Teknik Resim Yükle
-            </button>
           </div>
           <div class="dropzone-features">
             <span>✓ Çok Sayfalı Belge Gezgini</span>
@@ -802,8 +1046,6 @@ export class SetupWizard {
   }
 
   private renderDrawingSheetSvg(page: number): string {
-    const isP1 = page === 1;
-    const isP2 = page === 2;
     const pageDims = this.dimensions.filter((d) => (d.page || 1) === page);
 
     const balloonNodes = pageDims
@@ -847,70 +1089,50 @@ export class SetupWizard {
       .join('');
 
     let sheetContent = '';
-    if (isP1) {
+    if (page === 1) {
       sheetContent = `
         <g stroke="#CBD5E1" stroke-width="1.5">
-          <rect x="180" y="110" width="840" height="400" rx="4" fill="#FFFFFF"/>
+          <rect x="40" y="30" width="1120" height="580" fill="#FFFFFF" rx="4"/>
         </g>
-        <line x1="200" y1="310" x2="1000" y2="310" stroke="#0284C7" stroke-width="1" stroke-dasharray="10 5 2 5"/>
-        <line x1="600" y1="120" x2="600" y2="490" stroke="#0284C7" stroke-width="1" stroke-dasharray="10 5 2 5"/>
-        <rect x="260" y="180" width="680" height="260" rx="6" fill="#F8FAFC" stroke="#0F172A" stroke-width="2"/>
-        
-        <g transform="translate(260, 440)">
-          <path d="M0,0 L-14,24 L14,24 Z" fill="#059669"/>
-          <rect x="-18" y="24" width="36" height="24" fill="#059669" rx="2"/>
-          <text x="0" y="41" text-anchor="middle" fill="#FFFFFF" font-size="13" font-weight="900" font-family="'JetBrains Mono', monospace">A</text>
-          <text x="25" y="38" fill="#059669" font-size="11" font-weight="700">DATUM [A] TABAN TEMAS DÜZLEMİ</text>
-        </g>
-
-        <g transform="translate(940, 310)">
-          <path d="M0,0 L24,-14 L24,14 Z" fill="#0284C7"/>
-          <rect x="24" y="-12" width="36" height="24" fill="#0284C7" rx="2"/>
-          <text x="42" y="5" text-anchor="middle" fill="#FFFFFF" font-size="13" font-weight="900" font-family="'JetBrains Mono', monospace">B</text>
-          <text x="68" y="4" fill="#0284C7" font-size="11" font-weight="700">DATUM [B] ALIN</text>
-        </g>
-
-        <g transform="translate(600, 180)">
-          <path d="M0,0 L-14,-24 L14,-24 Z" fill="#0284C7"/>
-          <rect x="-18" y="-48" width="36" height="24" fill="#0284C7" rx="2"/>
-          <text x="0" y="-32" text-anchor="middle" fill="#FFFFFF" font-size="13" font-weight="900" font-family="'JetBrains Mono', monospace">C</text>
-          <text x="25" y="-32" fill="#0284C7" font-size="11" font-weight="700">DATUM [C] YAN DÜZLEM</text>
-        </g>
+        <line x1="60" y1="320" x2="1140" y2="320" stroke="#0284C7" stroke-width="0.8" stroke-dasharray="10 5 2 5" opacity="0.3"/>
+        <line x1="600" y1="40" x2="600" y2="600" stroke="#0284C7" stroke-width="0.8" stroke-dasharray="10 5 2 5" opacity="0.3"/>
+        <text x="600" y="300" text-anchor="middle" fill="#64748B" font-size="16" font-weight="700" font-family="'JetBrains Mono', monospace">
+          📄 ${this.loadedFileName || 'TEKNİK RESİM PAFTASI'} — PAFTA 1 / ${this.totalPages}
+        </text>
+        <text x="600" y="335" text-anchor="middle" fill="#059669" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace">
+          DATUM [A] TABAN TEMAS DÜZLEMİ
+        </text>
       `;
-    } else if (isP2) {
+    } else if (page === 2) {
       sheetContent = `
-        <rect x="140" y="80" width="920" height="460" rx="4" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
-        <rect x="180" y="170" width="840" height="230" rx="4" fill="#F8FAFC" stroke="#0F172A" stroke-width="2"/>
-        <line x1="180" y1="170" x2="1020" y2="170" stroke="#0284C7" stroke-width="1.5" stroke-dasharray="8 4"/>
-        <line x1="180" y1="400" x2="1020" y2="400" stroke="#059669" stroke-width="3"/>
-        <text x="200" y="426" fill="#059669" font-size="12" font-weight="700">DATUM [A] TABAN TEMAS DÜZLEMİ (Z=0.000 mm)</text>
-
-        <circle cx="300" cy="285" r="18" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
-        <circle cx="460" cy="285" r="18" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
-        <circle cx="740" cy="285" r="18" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
-        <circle cx="900" cy="285" r="18" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
-
-        <line x1="180" y1="130" x2="1020" y2="130" stroke="#64748B" stroke-width="1.5"/>
-        <text x="600" y="122" text-anchor="middle" fill="#0F172A" font-size="13" font-family="'JetBrains Mono', monospace" font-weight="700">395.5 ±0.800 mm [Tam Boy]</text>
-
-        <line x1="300" y1="460" x2="900" y2="460" stroke="#64748B" stroke-width="1.5"/>
-        <text x="600" y="478" text-anchor="middle" fill="#0F172A" font-size="13" font-family="'JetBrains Mono', monospace" font-weight="700">305.2 ±0.500 mm [Eksenler Arası]</text>
+        <g stroke="#CBD5E1" stroke-width="1.5">
+          <rect x="40" y="30" width="1120" height="580" fill="#FFFFFF" rx="4"/>
+        </g>
+        <line x1="60" y1="320" x2="1140" y2="320" stroke="#0284C7" stroke-width="0.8" stroke-dasharray="10 5 2 5" opacity="0.3"/>
+        <line x1="600" y1="40" x2="600" y2="600" stroke="#0284C7" stroke-width="0.8" stroke-dasharray="10 5 2 5" opacity="0.3"/>
+        <text x="600" y="300" text-anchor="middle" fill="#64748B" font-size="16" font-weight="700" font-family="'JetBrains Mono', monospace">
+          📄 ${this.loadedFileName || 'TEKNİK RESİM PAFTASI'} — PAFTA 2 / ${this.totalPages}
+        </text>
+        <text x="600" y="335" text-anchor="middle" fill="#0F172A" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace">
+          395.5 ±0.800 mm
+        </text>
       `;
     } else {
       sheetContent = `
-        <rect x="140" y="80" width="920" height="460" rx="4" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
-        <rect x="220" y="140" width="300" height="300" rx="4" fill="#F8FAFC" stroke="#0F172A" stroke-width="2"/>
-        <circle cx="370" cy="290" r="70" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
-        <circle cx="280" cy="200" r="12" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.5"/>
-        <circle cx="460" cy="200" r="12" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.5"/>
-        <circle cx="280" cy="380" r="12" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.5"/>
-        <circle cx="460" cy="380" r="12" fill="#FFFFFF" stroke="#0F172A" stroke-width="1.5"/>
-        <text x="370" y="465" text-anchor="middle" fill="#0F172A" font-size="12.5" font-weight="700">DETAY M (Kare Flanş Grubu 36.5 ±0.1)</text>
-
-        <rect x="680" y="150" width="380" height="280" rx="4" fill="#F8FAFC" stroke="#0F172A" stroke-width="2"/>
-        <path d="M680 220 H1060 V360 H680 Z" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
-        <line x1="680" y1="150" x2="1060" y2="150" stroke="#059669" stroke-width="2" stroke-dasharray="6 3"/>
-        <text x="870" y="460" text-anchor="middle" fill="#0F172A" font-size="12.5" font-weight="700">KESIT G-G (Ø43 Dış Çap / Ø21 İç Çap)</text>
+        <g stroke="#CBD5E1" stroke-width="1.5">
+          <rect x="40" y="30" width="1120" height="580" fill="#FFFFFF" rx="4"/>
+        </g>
+        <line x1="60" y1="320" x2="1140" y2="320" stroke="#0284C7" stroke-width="0.8" stroke-dasharray="10 5 2 5" opacity="0.3"/>
+        <line x1="600" y1="40" x2="600" y2="600" stroke="#0284C7" stroke-width="0.8" stroke-dasharray="10 5 2 5" opacity="0.3"/>
+        <text x="600" y="290" text-anchor="middle" fill="#64748B" font-size="16" font-weight="700" font-family="'JetBrains Mono', monospace">
+          📄 ${this.loadedFileName || 'TEKNİK RESİM PAFTASI'} — PAFTA ${page} / ${this.totalPages}
+        </text>
+        <text x="600" y="325" text-anchor="middle" fill="#0F172A" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace">
+          DETAY M
+        </text>
+        <text x="600" y="350" text-anchor="middle" fill="#0F172A" font-size="12" font-weight="700" font-family="'JetBrains Mono', monospace">
+          KESIT G-G
+        </text>
       `;
     }
 
@@ -952,16 +1174,14 @@ export class SetupWizard {
     confirmBtn?.addEventListener('click', () => this.confirmAndTransferPlan());
 
     const uploadBtn = modalEl.querySelector('#btn-audit-upload-file');
-    uploadBtn?.addEventListener('click', () => this.triggerFilePicker());
-
-    const sampleBtn = modalEl.querySelector('#btn-audit-load-sample');
-    sampleBtn?.addEventListener('click', () => this.loadDrawingSample());
+    uploadBtn?.addEventListener('click', () => {
+      void this.handleTeknikResimClick();
+    });
 
     const dropzoneSelectBtn = modalEl.querySelector('#btn-dropzone-select');
-    dropzoneSelectBtn?.addEventListener('click', () => this.triggerFilePicker());
-
-    const dropzoneSampleBtn = modalEl.querySelector('#btn-dropzone-sample');
-    dropzoneSampleBtn?.addEventListener('click', () => this.loadDrawingSample());
+    dropzoneSelectBtn?.addEventListener('click', () => {
+      void this.handleTeknikResimClick();
+    });
 
     const internalFileInput = modalEl.querySelector<HTMLInputElement>('#audit-drawing-input-internal');
     internalFileInput?.addEventListener('change', (e) => {
@@ -1026,50 +1246,90 @@ export class SetupWizard {
       });
 
       viewport.addEventListener('mousedown', (e: MouseEvent) => {
-        if (e.button !== 0) return;
-        this.isDragging = true;
-        this.dragStartX = e.clientX - this.panX;
-        this.dragStartY = e.clientY - this.panY;
-        viewport.style.cursor = 'grabbing';
+        if (e.button === 0) {
+          this.isDragging = true;
+          this.dragStartX = e.clientX - this.panX;
+          this.dragStartY = e.clientY - this.panY;
+          viewport.style.cursor = 'grabbing';
+          return;
+        }
+        if (e.button === 2) {
+          const hit = this.pickBalloonAt(e.clientX, e.clientY, viewport);
+          this.rightDragCandidateId = hit ? hit.id : null;
+          this.rightDragStartX = e.clientX;
+          this.rightDragStartY = e.clientY;
+          this.rightDragMoved = false;
+          this.dragPreviewDx = 0;
+          this.dragPreviewDy = 0;
+          this.dragPreviewNode = hit ? this.findBalloonNode(modalEl, hit.id) : null;
+          if (hit) this.selectedId = hit.id;
+        }
       });
 
       const onMouseMove = (e: MouseEvent) => {
-        if (!this.isDragging) return;
-        this.setPan(e.clientX - this.dragStartX, e.clientY - this.dragStartY);
-      };
-
-      const onMouseUp = () => {
         if (this.isDragging) {
-          this.isDragging = false;
-          if (viewport) viewport.style.cursor = 'grab';
+          this.setPan(e.clientX - this.dragStartX, e.clientY - this.dragStartY);
+          return;
+        }
+        if (this.rightDragCandidateId === null) return;
+
+        if (
+          !this.rightDragMoved &&
+          exceedsDragThreshold(this.rightDragStartX, this.rightDragStartY, e.clientX, e.clientY)
+        ) {
+          this.rightDragMoved = true;
+          if (this.dragPreviewNode) {
+            this.dragPreviewNode.style.transition = 'none';
+            viewport.style.cursor = 'grabbing';
+          }
+        }
+
+        if (this.rightDragMoved) {
+          this.dragPreviewDx = e.clientX - this.rightDragStartX;
+          this.dragPreviewDy = e.clientY - this.rightDragStartY;
+          if (this.dragPreviewNode) {
+            const stageX = this.dragPreviewDx / this.zoom;
+            const stageY = this.dragPreviewDy / this.zoom;
+            this.dragPreviewNode.style.transform = `translate(${stageX}px, ${stageY}px)`;
+          }
         }
       };
 
+      const onMouseUp = (e: MouseEvent) => {
+        if (this.isDragging && e.button === 0) {
+          this.isDragging = false;
+          viewport.style.cursor = 'grab';
+        }
+        if (e.button === 2) {
+          this.finishBalloonPointer(e.clientX, e.clientY, viewport);
+        }
+      };
+
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key !== 'Delete') return;
+        if (!this.isAuditOpen || this.selectedId === null) return;
+        const target = e.target as HTMLElement | null;
+        if (target && typeof target.closest === 'function' && target.closest('input, textarea, select, [contenteditable="true"]')) {
+          return;
+        }
+        e.preventDefault();
+        this.removeFeature(this.selectedId);
+      };
+
       if (typeof window !== 'undefined') {
+        if (this.activeMoveHandler) window.removeEventListener('mousemove', this.activeMoveHandler);
+        if (this.activeUpHandler) window.removeEventListener('mouseup', this.activeUpHandler);
+        if (this.activeKeyHandler) window.removeEventListener('keydown', this.activeKeyHandler);
+        this.activeMoveHandler = onMouseMove;
+        this.activeUpHandler = onMouseUp;
+        this.activeKeyHandler = onKeyDown;
         window.addEventListener('mousemove', onMouseMove);
         window.addEventListener('mouseup', onMouseUp);
+        window.addEventListener('keydown', onKeyDown);
       }
 
       viewport.addEventListener('contextmenu', (e: MouseEvent) => {
         e.preventDefault();
-        const stage = document.getElementById('audit-canvas-stage');
-        const rect = (stage || viewport).getBoundingClientRect?.() || { left: 0, top: 0 };
-        const canvasX = Math.round((e.clientX - rect.left) / this.zoom);
-        const canvasY = Math.round((e.clientY - rect.top) / this.zoom);
-
-        const hitDim = this.findBalloonNear(canvasX, canvasY, this.activePage, 35);
-
-        FeatureDefinitionModal.getInstance().showContextMenu({
-          clientX: e.clientX,
-          clientY: e.clientY,
-          canvasX,
-          canvasY,
-          page: this.activePage,
-          existingItem: hitDim ? { id: hitDim.id, balloon: hitDim.balloon, nominal_str: hitDim.nominal_str } : null,
-          onAdd: (coords) => this.promptAddFeature(coords.x, coords.y, coords.page),
-          onEdit: (id) => this.promptEditFeature(id),
-          onDelete: (id) => this.removeFeature(id),
-        });
       });
 
       const addFeatureBtn = modalEl.querySelector('#btn-audit-add-feature');
@@ -1077,6 +1337,8 @@ export class SetupWizard {
         this.promptAddFeature(500, 350, this.activePage);
       });
     }
+
+    this.attachInlineEditorEvents(modalEl);
 
     modalEl.querySelectorAll<HTMLElement>('.audit-balloon-node').forEach((node) => {
       node.addEventListener('click', (e) => {
@@ -1090,18 +1352,280 @@ export class SetupWizard {
         e.stopPropagation();
         const idAttr = node.getAttribute('data-balloon-id');
         if (idAttr) {
-          this.promptEditFeature(parseInt(idAttr, 10));
+          this.startInlineEdit(parseInt(idAttr, 10));
         }
       });
     });
   }
 
-  public getBalloonStageCoords(d: InspectionDimension): { cx: number; cy: number } {
-    if (d.bbox && d.bbox.length >= 2) {
-      if (this.pdfDoc) {
-        return { cx: Math.round(d.bbox[0] * 1.25), cy: Math.round(d.bbox[1] * 1.25) };
+  private findBalloonNode(modalEl: HTMLElement, id: number): SVGGElement | null {
+    const nodes = modalEl.querySelectorAll<SVGGElement>('.audit-balloon-node');
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].getAttribute('data-balloon-id') === String(id)) {
+        return nodes[i];
       }
-      return { cx: Math.round(d.bbox[0]), cy: Math.round(d.bbox[1]) };
+    }
+    return null;
+  }
+
+  private pickBalloonAt(clientX: number, clientY: number, viewport: HTMLElement): InspectionDimension | null {
+    const stage = (typeof document !== 'undefined' ? document.getElementById('audit-canvas-stage') : null) as HTMLElement | null;
+    const rect = (stage || viewport).getBoundingClientRect?.() || { left: 0, top: 0 };
+    const canvasX = (clientX - rect.left) / this.zoom;
+    const canvasY = (clientY - rect.top) / this.zoom;
+    return this.findBalloonNear(canvasX, canvasY, this.activePage, 35);
+  }
+
+  private finishBalloonPointer(clientX: number, clientY: number, viewport: HTMLElement): void {
+    const candidateId = this.rightDragCandidateId;
+    const moved = this.rightDragMoved;
+    const dx = this.dragPreviewDx;
+    const dy = this.dragPreviewDy;
+    const preview = this.dragPreviewNode;
+
+    this.rightDragCandidateId = null;
+    this.rightDragMoved = false;
+    this.dragPreviewDx = 0;
+    this.dragPreviewDy = 0;
+    this.dragPreviewNode = null;
+
+    if (preview) {
+      preview.style.transform = '';
+      preview.style.transition = '';
+    }
+    viewport.style.cursor = 'grab';
+
+    if (candidateId !== null && moved) {
+      const stageDelta = screenDeltaToStage(dx, dy, this.zoom);
+      const current = this.balloonLabelOffsets.get(candidateId);
+      this.balloonLabelOffsets.set(candidateId, applyLabelOffset(current, stageDelta));
+      this.selectedId = candidateId;
+      this.renderDrawingAuditModal();
+      this.syncBalloonsToCanvas();
+      return;
+    }
+
+    this.showBalloonContextMenu(clientX, clientY, viewport, candidateId);
+  }
+
+  private showBalloonContextMenu(clientX: number, clientY: number, viewport: HTMLElement, candidateId: number | null): void {
+    const stage = (typeof document !== 'undefined' ? document.getElementById('audit-canvas-stage') : null) as HTMLElement | null;
+    const rect = (stage || viewport).getBoundingClientRect?.() || { left: 0, top: 0 };
+    const canvasX = Math.round((clientX - rect.left) / this.zoom);
+    const canvasY = Math.round((clientY - rect.top) / this.zoom);
+    const hitDim = candidateId !== null
+      ? this.dimensions.find((d) => d.id === candidateId) || null
+      : this.findBalloonNear(canvasX, canvasY, this.activePage, 35);
+
+    FeatureDefinitionModal.getInstance().showContextMenu({
+      clientX,
+      clientY,
+      canvasX,
+      canvasY,
+      page: this.activePage,
+      existingItem: hitDim ? { id: hitDim.id, balloon: hitDim.balloon, nominal_str: hitDim.nominal_str } : null,
+      onAdd: (coords) => this.promptAddFeature(coords.x, coords.y, coords.page),
+      onEdit: (id) => this.promptEditFeature(id),
+      onDelete: (id) => this.removeFeature(id),
+    });
+  }
+
+  private attachInlineEditorEvents(modalEl: HTMLElement): void {
+    const form = modalEl.querySelector<HTMLFormElement>('#audit-inline-form');
+    if (!form) return;
+
+    const backBtn = modalEl.querySelector('#btn-inline-back');
+    backBtn?.addEventListener('click', () => this.closeInlineEditor());
+
+    const cancelBtn = modalEl.querySelector('#btn-inline-cancel');
+    cancelBtn?.addEventListener('click', () => this.closeInlineEditor());
+
+    const deleteBtn = modalEl.querySelector('#btn-inline-delete');
+    deleteBtn?.addEventListener('click', () => {
+      const idAttr = form.getAttribute('data-feature-id');
+      if (idAttr) {
+        this.removeFeature(parseInt(idAttr, 10));
+      }
+      this.closeInlineEditor();
+    });
+
+    const calloutInput = modalEl.querySelector<HTMLInputElement>('#audit-inline-callout');
+    const typeSelect = modalEl.querySelector<HTMLSelectElement>('#audit-inline-type');
+    const nominalInput = modalEl.querySelector<HTMLInputElement>('#audit-inline-nominal');
+    const upperInput = modalEl.querySelector<HTMLInputElement>('#audit-inline-upper');
+    const lowerInput = modalEl.querySelector<HTMLInputElement>('#audit-inline-lower');
+
+    modalEl.querySelectorAll<HTMLButtonElement>('.audit-inline-symbol').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (!calloutInput) return;
+        const sym = btn.getAttribute('data-symbol') || '';
+        const start = calloutInput.selectionStart ?? calloutInput.value.length;
+        const end = calloutInput.selectionEnd ?? start;
+        calloutInput.value = calloutInput.value.slice(0, start) + sym + calloutInput.value.slice(end);
+        this.syncInlineCallout(calloutInput, typeSelect, nominalInput, upperInput, lowerInput);
+      });
+    });
+
+    calloutInput?.addEventListener('input', () => {
+      this.syncInlineCallout(calloutInput, typeSelect, nominalInput, upperInput, lowerInput);
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.saveInlineEditor(form, calloutInput, typeSelect, nominalInput, upperInput, lowerInput, modalEl);
+    });
+  }
+
+  private syncInlineCallout(
+    calloutInput: HTMLInputElement,
+    typeSelect: HTMLSelectElement | null,
+    nominalInput: HTMLInputElement | null,
+    upperInput: HTMLInputElement | null,
+    lowerInput: HTMLInputElement | null
+  ): void {
+    const parsed = FeatureDefinitionModal.getInstance().parseCallout(calloutInput.value);
+    if (typeSelect && parsed.type) typeSelect.value = parsed.type;
+    if (nominalInput && parsed.nominal !== undefined && !isNaN(parsed.nominal)) {
+      nominalInput.value = String(parsed.nominal);
+    }
+    if (upperInput && parsed.upper_tol !== undefined) upperInput.value = parsed.upper_tol;
+    if (lowerInput && parsed.lower_tol !== undefined) lowerInput.value = parsed.lower_tol;
+  }
+
+  private saveInlineEditor(
+    form: HTMLFormElement,
+    calloutInput: HTMLInputElement | null,
+    typeSelect: HTMLSelectElement | null,
+    nominalInput: HTMLInputElement | null,
+    upperInput: HTMLInputElement | null,
+    lowerInput: HTMLInputElement | null,
+    modalEl: HTMLElement
+  ): void {
+    const mode = form.getAttribute('data-mode');
+    const idAttr = form.getAttribute('data-feature-id');
+    const id = idAttr ? parseInt(idAttr, 10) : this.nextFeatureId();
+    const callout = calloutInput?.value.trim() || '';
+    const inferred = FeatureDefinitionModal.getInstance().parseCallout(callout);
+    let type = typeSelect?.value || inferred.type || 'LINEAR';
+    if ((!typeSelect || typeSelect.value === 'LINEAR') && inferred.type) {
+      type = inferred.type;
+    }
+    const meta = this.resolveFeatureMeta(type);
+    const parsedNominal = parseFloat(nominalInput?.value || '0');
+    const nominal = isNaN(parsedNominal) ? 0 : parsedNominal;
+    const upper = upperInput?.value.trim() || inferred.upper_tol || '';
+    const lower = lowerInput?.value.trim() || inferred.lower_tol || '';
+    const datum = (modalEl.querySelector<HTMLInputElement>('#audit-inline-datum')?.value || '').trim();
+    const desc = (modalEl.querySelector<HTMLInputElement>('#audit-inline-desc')?.value || '').trim();
+    const typeLabel = desc || meta.label;
+
+    if (mode === 'edit') {
+      const dim = this.dimensions.find((d) => d.id === id);
+      if (dim) {
+        dim.type = type;
+        dim.type_label = typeLabel;
+        dim.icon = meta.icon;
+        dim.nominal = nominal;
+        dim.nominal_str = callout;
+        dim.upper_tol = upper;
+        dim.lower_tol = lower;
+        dim.datum_reference = datum;
+        this.updateBalloonMeta(dim);
+      }
+    } else {
+      const page = parseInt(form.getAttribute('data-page') || String(this.pendingAddPage), 10);
+      const storedBbox: [number, number, number, number] = this.pdfDoc
+        ? [
+            Math.round(this.pendingAddX / 1.25),
+            Math.round(this.pendingAddY / 1.25),
+            Math.round(this.pendingAddX / 1.25) + 40,
+            Math.round(this.pendingAddY / 1.25) + 20,
+          ]
+        : [this.pendingAddX, this.pendingAddY, this.pendingAddX + 40, this.pendingAddY + 20];
+
+      const newDim: InspectionDimension = {
+        id,
+        balloon: `#${id}`,
+        page,
+        type,
+        type_label: typeLabel,
+        icon: meta.icon,
+        nominal,
+        nominal_str: callout,
+        upper_tol: upper,
+        lower_tol: lower,
+        measured: '',
+        deviation: '',
+        status: 'UNMEASURED',
+        feature_key: `feat_${id}_${nominal}`.replace(/[^a-zA-Z0-9_]/g, '_'),
+        datum_reference: datum,
+        bbox: storedBbox,
+      };
+
+      this.dimensions.push(newDim);
+      this.balloons.push({
+        id: newDim.id,
+        page: newDim.page,
+        nominal: newDim.nominal,
+        tolerance: `${newDim.lower_tol}/${newDim.upper_tol}`,
+        bbox: storedBbox,
+        pageHeight: 595.28,
+        confirmed: true,
+        feature_label: newDim.nominal_str,
+      });
+      this.selectedId = id;
+      this.activePage = page;
+    }
+
+    this.editingId = null;
+    this.isAddingInline = false;
+    this.renderDrawingAuditModal();
+    this.syncBalloonsToCanvas();
+  }
+
+  private updateBalloonMeta(dim: InspectionDimension): void {
+    const balloon = this.balloons.find((b) => b.id === dim.id);
+    if (!balloon) return;
+    balloon.nominal = dim.nominal;
+    balloon.tolerance = `${dim.lower_tol}/${dim.upper_tol}`;
+    balloon.feature_label = dim.nominal_str;
+  }
+
+  private syncBalloonsToCanvas(): void {
+    const win = (typeof window !== 'undefined' ? window : {}) as unknown as {
+      nuperApp?: { getDrawingCanvas: () => { setBalloons: (b: unknown[]) => void } };
+    };
+    if (win.nuperApp) {
+      win.nuperApp.getDrawingCanvas().setBalloons(this.balloons);
+    }
+  }
+
+  public getBalloonStageCoords(d: InspectionDimension): { cx: number; cy: number } {
+    const base = this.getBalloonBaseCoords(d);
+    const offset = this.balloonLabelOffsets.get(d.id);
+    if (!offset) return base;
+    return { cx: Math.round(base.cx + offset.dx), cy: Math.round(base.cy + offset.dy) };
+  }
+
+  private getBalloonBaseCoords(d: InspectionDimension): { cx: number; cy: number } {
+    const page = d.page || 1;
+    const pageImg = this.pageImages.get(page);
+
+    if (d.bbox && d.bbox.length >= 2) {
+      const x = d.bbox[0];
+      const y = d.bbox[1];
+      if (pageImg) {
+        if (x <= 1200 && pageImg.width > 1200) {
+          const scaleX = pageImg.width / 1190.55;
+          const scaleY = pageImg.height / 841.89;
+          return { cx: Math.round(x * scaleX), cy: Math.round(y * scaleY) };
+        }
+        return { cx: Math.round(x), cy: Math.round(y) };
+      }
+      if (this.pdfDoc) {
+        return { cx: Math.round(x * 1.25), cy: Math.round(y * 1.25) };
+      }
+      return { cx: Math.round(x), cy: Math.round(y) };
     }
     const coordsMapP2: Record<number, { cx: number; cy: number }> = {
       1: { cx: 620, cy: 110 },
@@ -1120,7 +1644,13 @@ export class SetupWizard {
       12: { cx: 1010, cy: 260 },
     };
     const coordsMap = (d.page || 1) === 2 ? coordsMapP2 : coordsMapP3;
-    return coordsMap[d.id] || { cx: 400, cy: 250 };
+    const pt = coordsMap[d.id] || { cx: 400, cy: 250 };
+    if (pageImg && pageImg.width > 1200) {
+      const scaleX = pageImg.width / 1200;
+      const scaleY = pageImg.height / 640;
+      return { cx: Math.round(pt.cx * scaleX), cy: Math.round(pt.cy * scaleY) };
+    }
+    return pt;
   }
 
   public findBalloonNear(x: number, y: number, page: number, maxDist: number = 35): InspectionDimension | null {
@@ -1136,128 +1666,50 @@ export class SetupWizard {
   }
 
   public promptAddFeature(canvasX: number, canvasY: number, page: number = this.activePage): void {
-    const existingIds = this.dimensions.map((d) => d.id);
-    const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
-
-    FeatureDefinitionModal.getInstance().openModal({
-      canvasX,
-      canvasY,
-      page,
-      nextId,
-      onSave: (data: DefinedFeatureData) => {
-        const storedBbox: [number, number, number, number] = this.pdfDoc
-          ? [Math.round(canvasX / 1.25), Math.round(canvasY / 1.25), Math.round(canvasX / 1.25) + 40, Math.round(canvasY / 1.25) + 20]
-          : [canvasX, canvasY, canvasX + 40, canvasY + 20];
-
-        const newDim: InspectionDimension = {
-          id: data.id || nextId,
-          balloon: data.balloon || `#${data.id || nextId}`,
-          page: data.page || page,
-          type: data.type,
-          type_label: data.type_label,
-          icon: data.icon,
-          nominal: data.nominal,
-          nominal_str: data.nominal_str,
-          upper_tol: data.upper_tol,
-          lower_tol: data.lower_tol,
-          measured: '',
-          deviation: '',
-          status: 'UNMEASURED',
-          feature_key: `feat_${data.id || nextId}_${data.nominal}`.replace(/[^a-zA-Z0-9_]/g, '_'),
-          datum_reference: data.datum_reference,
-          bbox: storedBbox,
-        };
-
-        this.dimensions.push(newDim);
-        this.balloons.push({
-          id: newDim.id,
-          page: newDim.page,
-          nominal: newDim.nominal,
-          tolerance: `${newDim.lower_tol}/${newDim.upper_tol}`,
-          bbox: storedBbox,
-          pageHeight: 595.28,
-          confirmed: true,
-          feature_label: newDim.nominal_str,
-        });
-
-        this.selectedId = newDim.id;
-        this.renderDrawingAuditModal();
-
-        const win = (typeof window !== 'undefined' ? window : {}) as unknown as {
-          nuperApp?: { getDrawingCanvas: () => { setBalloons: (b: unknown[]) => void } };
-        };
-        if (win.nuperApp) {
-          win.nuperApp.getDrawingCanvas().setBalloons(this.balloons);
-        }
-      },
-    });
+    this.startInlineAdd(canvasX, canvasY, page);
   }
 
   public promptEditFeature(id: number): void {
+    this.startInlineEdit(id);
+  }
+
+  public startInlineEdit(id: number): void {
     const dim = this.dimensions.find((d) => d.id === id);
     if (!dim) return;
-    const pt = this.getBalloonStageCoords(dim);
+    this.selectedId = id;
+    if (dim.page && dim.page !== this.activePage) {
+      this.activePage = dim.page;
+    }
+    this.isAddingInline = false;
+    this.editingId = id;
+    this.renderDrawingAuditModal();
+  }
 
-    FeatureDefinitionModal.getInstance().openModal({
-      canvasX: pt.cx,
-      canvasY: pt.cy,
-      page: dim.page || this.activePage,
-      nextId: dim.id,
-      existingData: {
-        id: dim.id,
-        balloon: dim.balloon,
-        type: dim.type,
-        type_label: dim.type_label,
-        nominal: dim.nominal,
-        nominal_str: dim.nominal_str,
-        upper_tol: dim.upper_tol,
-        lower_tol: dim.lower_tol,
-        datum_reference: dim.datum_reference,
-        description: dim.type_label,
-      },
-      onSave: (data: DefinedFeatureData) => {
-        dim.type = data.type;
-        dim.type_label = data.type_label;
-        dim.icon = data.icon;
-        dim.nominal = data.nominal;
-        dim.nominal_str = data.nominal_str;
-        dim.upper_tol = data.upper_tol;
-        dim.lower_tol = data.lower_tol;
-        dim.datum_reference = data.datum_reference;
+  private startInlineAdd(canvasX: number, canvasY: number, page: number): void {
+    this.pendingAddX = canvasX;
+    this.pendingAddY = canvasY;
+    this.pendingAddPage = page;
+    this.editingId = null;
+    this.isAddingInline = true;
+    this.renderDrawingAuditModal();
+  }
 
-        const balloon = this.balloons.find((b) => b.id === id);
-        if (balloon) {
-          balloon.nominal = data.nominal;
-          balloon.tolerance = `${data.lower_tol}/${data.upper_tol}`;
-          balloon.feature_label = data.nominal_str;
-        }
-
-        this.renderDrawingAuditModal();
-
-        const win = (typeof window !== 'undefined' ? window : {}) as unknown as {
-          nuperApp?: { getDrawingCanvas: () => { setBalloons: (b: unknown[]) => void } };
-        };
-        if (win.nuperApp) {
-          win.nuperApp.getDrawingCanvas().setBalloons(this.balloons);
-        }
-      },
-    });
+  public closeInlineEditor(): void {
+    this.editingId = null;
+    this.isAddingInline = false;
+    this.renderDrawingAuditModal();
   }
 
   public removeFeature(id: number): void {
     this.dimensions = this.dimensions.filter((d) => d.id !== id);
     this.balloons = this.balloons.filter((b) => b.id !== id);
+    this.balloonLabelOffsets.delete(id);
+    if (this.editingId === id) this.editingId = null;
     if (this.selectedId === id) {
       this.selectedId = this.dimensions.length > 0 ? this.dimensions[0].id : null;
     }
     this.renderDrawingAuditModal();
-
-    const win = (typeof window !== 'undefined' ? window : {}) as unknown as {
-      nuperApp?: { getDrawingCanvas: () => { setBalloons: (b: unknown[]) => void } };
-    };
-    if (win.nuperApp) {
-      win.nuperApp.getDrawingCanvas().setBalloons(this.balloons);
-    }
+    this.syncBalloonsToCanvas();
   }
 
   private applyStageTransform(): void {
@@ -1334,7 +1786,6 @@ export class SetupWizard {
       };
 
       win.isDualCanvas = false;
-      if (win.blockGroup) win.blockGroup.visible = true;
       if (win.trajLine) win.trajLine.visible = true;
 
       window.dispatchEvent(new Event('resize'));
@@ -2024,11 +2475,160 @@ export class SetupWizard {
         color: #64748B;
         font-family: 'JetBrains Mono', monospace;
       }
+      .audit-inline-header {
+        gap: 8px;
+      }
+      .audit-inline-back {
+        padding: 4px 8px;
+        background: #FFFFFF;
+        color: #0284C7;
+        border: 1px solid #BAE6FD;
+        border-radius: 4px;
+        font-size: 10.5px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .audit-inline-back:hover {
+        background: #F0F9FF;
+        border-color: #0284C7;
+      }
+      .audit-inline-editor {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        margin: 0;
+        padding: 12px 12px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        background: #FFFFFF;
+      }
+      .audit-inline-editor-title {
+        font-size: 11px;
+        font-weight: 800;
+        color: #0F172A;
+        letter-spacing: 0.5px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #E2E8F0;
+      }
+      .audit-inline-editor-sub {
+        display: block;
+        margin-top: 2px;
+        font-size: 9.5px;
+        font-weight: 500;
+        color: #64748B;
+        letter-spacing: 0;
+      }
+      .audit-inline-label {
+        font-size: 9.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #64748B;
+        letter-spacing: 0.3px;
+      }
+      .audit-inline-field {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px 8px;
+        background: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        border-radius: 4px;
+        color: #0F172A;
+        font-size: 12px;
+      }
+      .audit-inline-field:focus {
+        outline: none;
+        border-color: #0284C7;
+        box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.12);
+      }
+      .audit-inline-symbols {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .audit-inline-symbol {
+        padding: 2px 7px;
+        font-size: 10px;
+        font-weight: 700;
+        background: #F1F5F9;
+        border: 1px solid #CBD5E1;
+        border-radius: 3px;
+        color: #0284C7;
+        cursor: pointer;
+      }
+      .audit-inline-symbol:hover {
+        background: #E0F2FE;
+        border-color: #0284C7;
+      }
+      .audit-inline-grid3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 6px;
+      }
+      .audit-inline-grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+      .audit-inline-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .audit-inline-save {
+        flex: 1;
+        padding: 7px 10px;
+        background: #0284C7;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .audit-inline-save:hover {
+        background: #0369A1;
+      }
+      .audit-inline-cancel {
+        padding: 7px 10px;
+        background: #F1F5F9;
+        color: #334155;
+        border: 1px solid #CBD5E1;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .audit-inline-cancel:hover {
+        background: #E2E8F0;
+      }
+      .audit-inline-delete {
+        padding: 7px 10px;
+        background: #FEF2F2;
+        color: #DC2626;
+        border: 1px solid #FCA5A5;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .audit-inline-delete:hover {
+        background: #FEE2E2;
+      }
     `;
     document.head.appendChild(style);
   }
 
   public destroy(): void {
+    if (typeof window !== 'undefined') {
+      if (this.activeMoveHandler) window.removeEventListener('mousemove', this.activeMoveHandler);
+      if (this.activeUpHandler) window.removeEventListener('mouseup', this.activeUpHandler);
+      if (this.activeKeyHandler) window.removeEventListener('keydown', this.activeKeyHandler);
+    }
+    this.activeMoveHandler = null;
+    this.activeUpHandler = null;
+    this.activeKeyHandler = null;
     if (typeof document !== 'undefined') {
       const modal = document.getElementById('modal-drawing-audit');
       if (modal) modal.remove();

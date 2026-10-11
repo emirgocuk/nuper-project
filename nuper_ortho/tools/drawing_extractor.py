@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import os
@@ -19,6 +20,7 @@ from extractor.spatial import match_spatial_bbox
 from extractor.vector_extractor import extract_vector_dimensions_from_page
 from extractor.semantic_grammar import normalize_engineering_callout, build_321_alignment, classify_operation_setup
 from extractor.brep_verifier import parse_step_file, verify_dimensions_against_step
+from extractor.vision_ai_extractor import run_local_or_hybrid_ai_extraction
 
 
 def resolve_pdf_path(path_str: str) -> str:
@@ -44,9 +46,6 @@ def resolve_pdf_path(path_str: str) -> str:
 
 
 def find_matching_step_file(pdf_path: str) -> Optional[str]:
-    """
-    Teknik resim PDF'ine ait 3D STEP dosyasını otomatik keşfeder.
-    """
     pdf_dir = os.path.dirname(os.path.abspath(pdf_path))
     pdf_stem = os.path.splitext(os.path.basename(pdf_path))[0].lower()
     norm_stem = re.sub(r"[\s_\-]+", "", pdf_stem)
@@ -83,9 +82,25 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
             },
             "datums": [],
             "dimensions": [],
+            "pages": [],
         }
 
-
+    rendered_pages: List[Dict[str, Any]] = []
+    try:
+        import pymupdf
+        doc_render = pymupdf.open(resolved)
+        for i, page in enumerate(doc_render):
+            pix = page.get_pixmap(dpi=72)
+            b64 = "data:image/jpeg;base64," + base64.b64encode(pix.tobytes("jpeg", 80)).decode("ascii")
+            rendered_pages.append({
+                "page": i + 1,
+                "width": pix.width,
+                "height": pix.height,
+                "image_data": b64,
+            })
+        doc_render.close()
+    except Exception:
+        pass
 
     cache_dir = os.path.join(os.path.dirname(__file__), ".ocr_cache")
     os.makedirs(cache_dir, exist_ok=True)
@@ -104,13 +119,14 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
                     resolved,
                     cached_data.get("pages_data", []),
                     step_path=step_path,
+                    rendered_pages=rendered_pages,
                 )
         except Exception:
             pass
 
     pages_data = []
     text_content = ""
-    page_count = 0
+    page_count = len(rendered_pages) if rendered_pages else 1
     vector_dims_all = []
 
     try:
@@ -121,7 +137,6 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
         use_ocr = (total_vector_text < 50)
 
         if not use_ocr:
-            # KATMAN 1: Deterministik Vektör & Bölge Ayrıştırma (Sıfır VRAM, Saf CPU)
             for i, page in enumerate(doc):
                 p_num = i + 1
                 v_res = extract_vector_dimensions_from_page(page, p_num)
@@ -144,43 +159,84 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
                     "method": "vector",
                 })
                 vector_dims_all.extend(v_res.get("dimensions", []))
+            doc.close()
+
+            if len(vector_dims_all) > 0:
+                return parse_text_to_metrology(
+                    text_content,
+                    page_count,
+                    os.path.basename(resolved),
+                    resolved,
+                    pages_data,
+                    step_path=step_path,
+                    rendered_pages=rendered_pages,
+                )
         else:
-            # Taranmış veya raster resimli paftalar için OCR yedekleme
-            ocr_engine = None
-            try:
-                from rapidocr_onnxruntime import RapidOCR
-                ocr_engine = RapidOCR()
-            except Exception:
-                pass
+            doc.close()
+    except Exception:
+        pass
 
-            for i, page in enumerate(doc):
-                p_num = i + 1
-                txt = page.get_text() or ""
-                ocr_items = []
-                ocr_lines = []
+    ai_result = run_local_or_hybrid_ai_extraction(resolved, max_duration_seconds=4.2)
+    if ai_result and ai_result.get("dimensions"):
+        dims = ai_result["dimensions"]
+        if step_path and os.path.exists(step_path):
+            step_data = parse_step_file(step_path)
+            if step_data.get("success"):
+                verified, _ = verify_dimensions_against_step(dims, step_data)
+                dims = verified
+        for idx, d in enumerate(dims, 1):
+            d["id"] = idx
+            d["balloon"] = f"#{idx}"
+        return {
+            "success": True,
+            "filename": os.path.basename(resolved),
+            "page_count": len(rendered_pages) if rendered_pages else 1,
+            "pages": rendered_pages,
+            "raw_text_length": 0,
+            "title_block": ai_result.get("title_block", {}),
+            "datums": ai_result.get("datums", []),
+            "dimensions": dims,
+        }
 
-                if ocr_engine is not None:
-                    pix = page.get_pixmap(dpi=150)
-                    img_bytes = pix.tobytes("png")
-                    res, _ = ocr_engine(img_bytes)
-                    if res:
-                        for box, text_val, score in res:
-                            x0 = min(pt[0] for pt in box)
-                            y0 = min(pt[1] for pt in box)
-                            x1 = max(pt[0] for pt in box)
-                            y1 = max(pt[1] for pt in box)
-                            clean_t = text_val.replace("\ufffd", "±").replace("@", "Ø")
-                            score_val = float(score) if isinstance(score, (int, float)) else 0.85
-                            ocr_items.append({
-                                "text": clean_t,
-                                "bbox": [round(x0, 1), round(y0, 1), round(x1, 1), round(y1, 1)],
-                                "confidence": score_val,
-                            })
-                            ocr_lines.append(clean_t)
+    ocr_engine = None
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+        ocr_engine = RapidOCR()
+    except Exception:
+        pass
 
-                page_txt = "\n".join(ocr_lines) if ocr_lines else txt
-                pages_data.append({"page": p_num, "text": page_txt, "items": ocr_items, "method": "ocr"})
-                text_content += f"\n--- SAYFA {p_num} ---\n" + page_txt
+    try:
+        import pymupdf
+        doc = pymupdf.open(resolved)
+        for i, page in enumerate(doc):
+            p_num = i + 1
+            txt = page.get_text() or ""
+            ocr_items = []
+            ocr_lines = []
+
+            if ocr_engine is not None:
+                pix = page.get_pixmap(dpi=150)
+                img_bytes = pix.tobytes("png")
+                res, _ = ocr_engine(img_bytes)
+                if res:
+                    for box, text_val, score in res:
+                        x0 = min(pt[0] for pt in box)
+                        y0 = min(pt[1] for pt in box)
+                        x1 = max(pt[0] for pt in box)
+                        y1 = max(pt[1] for pt in box)
+                        clean_t = text_val.replace("\ufffd", "±").replace("@", "Ø")
+                        score_val = float(score) if isinstance(score, (int, float)) else 0.85
+                        ocr_items.append({
+                            "text": clean_t,
+                            "bbox": [round(x0, 1), round(y0, 1), round(x1, 1), round(y1, 1)],
+                            "confidence": score_val,
+                        })
+                        ocr_lines.append(clean_t)
+
+            page_txt = "\n".join(ocr_lines) if ocr_lines else txt
+            pages_data.append({"page": p_num, "text": page_txt, "items": ocr_items, "method": "ocr"})
+            text_content += f"\n--- SAYFA {p_num} ---\n" + page_txt
+        doc.close()
 
         with open(cache_file, "w", encoding="utf-8") as f:
             json.dump({
@@ -188,12 +244,8 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
                 "page_count": page_count,
                 "pages_data": pages_data,
             }, f, ensure_ascii=False)
-
     except Exception:
-        if cached_data:
-            text_content = cached_data.get("text_content", "")
-            page_count = cached_data.get("page_count", 1)
-            pages_data = cached_data.get("pages_data", [])
+        pass
 
     return parse_text_to_metrology(
         text_content,
@@ -202,6 +254,7 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
         resolved,
         pages_data,
         step_path=step_path,
+        rendered_pages=rendered_pages,
     )
 
 
@@ -212,6 +265,7 @@ def parse_text_to_metrology(
     full_path: str = "",
     pages_data=None,
     step_path: Optional[str] = None,
+    rendered_pages: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     result = {
         "success": True,
@@ -228,6 +282,7 @@ def parse_text_to_metrology(
         },
         "datums": [],
         "dimensions": [],
+        "pages": rendered_pages if rendered_pages is not None else [],
     }
 
     result["title_block"] = extract_title_block_fields(text, filename)

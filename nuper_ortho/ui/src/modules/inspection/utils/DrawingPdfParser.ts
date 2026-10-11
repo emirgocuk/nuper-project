@@ -29,8 +29,21 @@ function ensurePdfWorker(): void {
   if (!pdf || !pdf.GlobalWorkerOptions) return;
   if (!pdf.GlobalWorkerOptions.workerSrc) {
     if (typeof window !== 'undefined') {
-      pdf.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const win = window as unknown as { require?: (mod: string) => unknown };
+      if (typeof win.require === 'function') {
+        try {
+          const fs = win.require('fs') as { existsSync: (p: string) => boolean; readFileSync: (p: string) => Uint8Array };
+          const path = win.require('path') as { resolve: (...p: string[]) => string };
+          const localWorker = path.resolve('node_modules/pdfjs-dist/build/pdf.worker.min.js');
+          if (fs.existsSync(localWorker)) {
+            const buf = fs.readFileSync(localWorker);
+            const blob = new Blob([buf as unknown as BlobPart], { type: 'application/javascript' });
+            pdf.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+            return;
+          }
+        } catch {}
+      }
+      pdf.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
     } else {
       pdf.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/build/pdf.worker.js';
     }

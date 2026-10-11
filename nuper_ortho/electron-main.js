@@ -22,7 +22,22 @@ function createWindow() {
   });
 
   const distIndexPath = path.join(__dirname, 'ui', 'dist', 'index.html');
-  mainWindow.loadFile(distIndexPath);
+  mainWindow.webContents.session.clearStorageData();
+
+  const devServerUrl = process.env.NUPER_DEV_SERVER_URL || '';
+  if (process.argv.includes('--dev') || devServerUrl) {
+    const targetUrl = devServerUrl || 'http://localhost:5173';
+    const loadDevServer = () => {
+      if (!mainWindow) return;
+      mainWindow.loadURL(targetUrl).catch(() => {});
+    };
+    mainWindow.webContents.on('did-fail-load', () => {
+      setTimeout(loadDevServer, 500);
+    });
+    loadDevServer();
+  } else {
+    mainWindow.loadFile(distIndexPath);
+  }
 
   // Shortcuts: F5 / Ctrl+R to reload, F12 to toggle DevTools
   mainWindow.webContents.on('before-input-event', (event, input) => {

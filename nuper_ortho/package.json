@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "app": "electron .",
-    "dev": "concurrently -k \"vite\" \"electron .\"",
+    "dev": "concurrently -k \"vite\" \"electron . --dev\"",
     "dev:mock": "vite --mode mock",
     "build": "vite build",
     "codegen": "node scripts/codegen.mjs",

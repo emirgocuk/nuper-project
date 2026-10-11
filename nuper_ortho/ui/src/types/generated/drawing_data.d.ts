@@ -20,6 +20,13 @@ export interface DrawingExtractionResult {
     [k: string]: unknown;
   };
   datums: string[];
+  pages?: {
+    page: number;
+    width?: number;
+    height?: number;
+    image_data: string;
+    [k: string]: unknown;
+  }[];
   dimensions: {
     id: number;
     balloon: string;
