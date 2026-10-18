@@ -575,9 +575,9 @@ export class SetupWizard {
         nominal_str: d.nominal_str || String(d.nominal ?? 0),
         upper_tol: d.upper_tol || '+0.100',
         lower_tol: d.lower_tol || '-0.100',
-        measured: d.measured || String(d.nominal ?? 0),
-        deviation: d.deviation || '0.000',
-        status: (d.status as 'PASS' | 'WARN' | 'FAIL' | 'UNMEASURED') || 'PASS',
+        measured: d.measured || '',
+        deviation: d.deviation || '',
+        status: (d.status as 'PASS' | 'WARN' | 'FAIL' | 'UNMEASURED') || 'UNMEASURED',
         gdt: d.gdt || 'ASME Y14.5',
         op: d.op || 'OP10',
         op_reason: d.op_reason || 'Standart üst bağlama (Z- probu).',
@@ -634,7 +634,7 @@ export class SetupWizard {
   }
 
   public confirmAndTransferPlan(): void {
-    if (!this.hasLoadedDrawing) {
+    if (!this.hasLoadedDrawing && this.dimensions.length === 0) {
       this.loadDrawingSample();
     }
     this.isConfirmed = true;

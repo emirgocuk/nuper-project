@@ -115,3 +115,23 @@ Operatör akışı için aşağıdaki ek kurallar uygulanır; iş sırası ve ka
 | Sınırlar | Desteklenmeyen durum, kalan hata ve bağımlılık |
 
 Bir görev bütün fazın tamamlanması değildir. Sonuç [progress.md](progress.md) içine kanıt kapsamıyla, sonraki odak [activeContext.md](activeContext.md) içine kısa yazılır. Kanıtsız sertifikasyon, sıfır çarpışma, sıfır sızıntı veya yüzde yüz tamamlanma kullanılmaz.
+
+## 11. Ajan Felsefesi, İletişim ve Token Disiplini
+
+[AGENTS.md](../AGENTS.md) ve [.agents/rules/agent-behavior.md](../.agents/rules/agent-behavior.md) ile zorunlu kılınan çalışma standartları şunlardır:
+
+1. **Minimalist Mühendislik & YAGNI (Ponytail Standardı):**
+   - En iyi kod, hiç yazılmamış koddur. Yalnızca istenen problemi çözen en kısa ve en doğrudan kod yazılır.
+   - İleride gerekeceği varsayılan kurgusal soyutlamalar, kullanılmayan generic/adapter yapıları ve gereksiz bağımlılıklar eklenemez.
+   - Harici paket yerine dilin standart kütüphanesi ve mevcut araçlar kullanılır.
+   - Her görevin sonunda atlanan kısımlar veya bilinen sınırlar dürüstçe tek satırda listelenir (Accountability).
+
+2. **Düşük Bilişsel Yük ve Direkt İletişim (ADHD-Friendly Standardı):**
+   - Cevaplar doğrudan birincil sonuç ve sıradaki somut eylem ile başlar.
+   - Giriş-çıkış nezaket cümleleri ve lüzumsuz açıklamalar elenir; yüksek sinyal-gürültü oranı korunur.
+   - Çok adımlı işler net numaralandırılmış listelerle yürütülür.
+
+3. **Bağlam ve Token Koruma (Context-Mode Standardı):**
+   - CMM çıktıları (`output_pcdmis.dmi`, `output_calypso.txt`), devasa test raporları veya yüzlerce satırlık ham loglar doğrudan bağlama dökülemez.
+   - Ajanlar hedefli araçlarla (`grep_search`, `view_file` dilimleme) yalnızca ilgili kısımları inceleyerek bağlam kirliliğini ve token israfını önler.
+

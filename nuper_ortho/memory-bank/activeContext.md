@@ -81,4 +81,5 @@ Sonraki sıra: R1 sözleşmeler → R2 başlatma/IPC → R3 CAD/PDF akışı →
 - Yeni IPC alanı için önce şema ve codegen işi tamamlanır; tüketiciler geçmeden yeni sözleşme etkinleştirilmez.
 - Modül testleri, gerçek Electron akışı ve saha kabulü ayrı kanıt seviyeleridir.
 - İleri AI, yeni sağlayıcılar, Tauri geçişi, lisans/dongle ve CNC kapalı döngüsü ilk çalışan dikey dilimin önüne alınmaz.
+- Ajan davranışında Ponytail (minimalizm, YAGNI, standart kütüphane), ADHD-friendly (direkt iletişim, sıradaki eylem odaklılık) ve Context-Mode (token/log sandboxing) ilkeleri uygulanır.
 - Sonraki çalışma iş kimliğini, değişen dosyaları, test girdilerini, komut sonuçlarını ve kalan engelleri kaydeder. Kanıtsız yüzde veya mühür ifadesi kullanılmaz.

@@ -26,6 +26,9 @@ describe('DrawingPdfParser — Deterministik 2D Vektör ve Uzamsal Metin Ayrış
 
     const firstDim = doc.result.dimensions[0];
     expect(firstDim).toBeDefined();
+    expect(firstDim.status).toBe('UNMEASURED');
+    expect(firstDim.measured).toBe('');
+    expect(firstDim.deviation).toBe('');
     expect(firstDim.bbox).toBeDefined();
     if (firstDim.bbox) {
       expect(firstDim.bbox.length).toBe(4);
@@ -78,7 +81,7 @@ describe('DrawingPdfParser — Deterministik 2D Vektör ve Uzamsal Metin Ayrış
     expect(m3OrM4.length).toBeGreaterThan(0);
   });
 
-  it('Referans Göbek Bağı Oluğu yüklendiğinde 3 sayfa ve plan unsurlarını eksiksiz sağlar', async () => {
+  it('Taranmış ve sıfır gömülü metinli PDF yüklendiğinde sahte mock veri üretmez, 0 ölçü döner', async () => {
     const testPdfPath = path.resolve(
       'test_assets',
       'KPT - 3051 Gobek Bagı Olugu',
@@ -92,10 +95,6 @@ describe('DrawingPdfParser — Deterministik 2D Vektör ve Uzamsal Metin Ayrış
     const doc = await parsePdfDrawing(buf, 'GOBEK_BAGI_OLUGU_TR_AB.pdf');
 
     expect(doc.result.page_count).toBe(3);
-    expect(doc.result.dimensions.length).toBe(12);
-
-    const page2Dims = doc.result.dimensions.filter((d) => d.page === 2);
-    expect(page2Dims.length).toBe(6);
-    expect(page2Dims.map((d) => d.nominal)).toContain(395.5);
+    expect(doc.result.dimensions.length).toBe(0);
   });
 });
