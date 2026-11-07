@@ -13,6 +13,7 @@ import { matchCadWithDrawing, type CadDrawingMatchResult } from './CadDrawingMat
 import type { CadMetadata } from '../../../types/generated/cad_metadata';
 import type { DrawingExtractionResult } from '../../../types/generated/drawing_data';
 import { FeatureDefinitionModal } from './FeatureDefinitionModal';
+import { resolveGeneralTolerance, GENERAL_TOLERANCE_PRESETS } from './GeneralTolerance';
 import {
   exceedsDragThreshold,
   screenDeltaToStage,
@@ -45,6 +46,8 @@ export interface SetupWizardOptions {
 
 export class SetupWizard {
   private knownDatums: string[] = ['A', 'B', 'C'];
+  private generalToleranceSpec: string = '';
+  private generalTolDimIds: Set<number> = new Set();
   private dimensions: InspectionDimension[] = [];
   private balloons: BalloonItem[] = [];
   private selectedId: number | null = null;
@@ -229,7 +232,7 @@ export class SetupWizard {
         material: '',
         hardness: '',
         roughness: '',
-        general_tolerance: 'ISO 2768-m',
+        general_tolerance: this.generalToleranceSpec,
         drawing_number: this.loadedFileName || '',
       },
       datums: ['A', 'B', 'C'],
@@ -678,10 +681,50 @@ export class SetupWizard {
     }
   }
 
+  private resolveDimTolerance(d: {
+    id: number;
+    nominal?: number;
+    type?: string;
+    upper_tol?: string;
+    lower_tol?: string;
+  }): { upper_tol: string; lower_tol: string } {
+    if (d.upper_tol && d.lower_tol) {
+      this.generalTolDimIds.delete(d.id);
+      return { upper_tol: d.upper_tol, lower_tol: d.lower_tol };
+    }
+    const isAngular = /ang|açı/i.test(d.type || '');
+    const tol = isAngular ? null : resolveGeneralTolerance(this.generalToleranceSpec, d.nominal ?? Number.NaN);
+    if (!tol) {
+      this.generalTolDimIds.delete(d.id);
+      return { upper_tol: '', lower_tol: '' };
+    }
+    this.generalTolDimIds.add(d.id);
+    return { upper_tol: tol.upper, lower_tol: tol.lower };
+  }
+
+  public getGeneralTolerance(): string {
+    return this.generalToleranceSpec;
+  }
+
+  public setGeneralTolerance(spec: string): void {
+    this.generalToleranceSpec = spec.trim();
+    for (const dim of this.dimensions) {
+      const carriesGeneral = this.generalTolDimIds.has(dim.id) || (!dim.upper_tol && !dim.lower_tol);
+      if (!carriesGeneral) continue;
+      const resolved = this.resolveDimTolerance({ ...dim, upper_tol: '', lower_tol: '' });
+      dim.upper_tol = resolved.upper_tol;
+      dim.lower_tol = resolved.lower_tol;
+      this.updateBalloonMeta(dim);
+    }
+    this.renderDrawingAuditModal();
+    this.syncBalloonsToCanvas();
+  }
+
   public setExtractedData(
     data: {
       page_count?: number;
       filename?: string;
+      title_block?: { general_tolerance?: string; [k: string]: unknown };
       pages?: Array<{
         page?: number;
         width?: number;
@@ -743,33 +786,40 @@ export class SetupWizard {
       }
     }
 
-    if (data.dimensions && data.dimensions.length > 0) {
-      this.dimensions = data.dimensions.map((d) => ({
-        id: d.id,
-        balloon: d.balloon,
-        page: d.page || 1,
-        datum_reference: d.datum_reference,
-        type: d.type || 'linear',
-        type_label: d.type_label || d.nominal_str || 'Ölçü',
-        icon: d.icon || '📏',
-        nominal: d.nominal ?? 0,
-        nominal_str: d.nominal_str || String(d.nominal ?? 0),
-        upper_tol: d.upper_tol || '+0.100',
-        lower_tol: d.lower_tol || '-0.100',
-        measured: d.measured || '',
-        deviation: d.deviation || '',
-        status: (d.status as 'PASS' | 'WARN' | 'FAIL' | 'UNMEASURED') || 'UNMEASURED',
-        gdt: d.gdt || 'ASME Y14.5',
-        op: d.op || 'OP10',
-        op_reason: d.op_reason || 'Standart üst bağlama (Z- probu).',
-        bbox: d.bbox,
-      }));
+    if (data.title_block?.general_tolerance) {
+      this.generalToleranceSpec = data.title_block.general_tolerance;
+    }
 
-      this.balloons = data.dimensions.map((d) => ({
+    if (data.dimensions && data.dimensions.length > 0) {
+      this.dimensions = data.dimensions.map((d) => {
+        const tol = this.resolveDimTolerance(d);
+        return {
+          id: d.id,
+          balloon: d.balloon,
+          page: d.page || 1,
+          datum_reference: d.datum_reference,
+          type: d.type || 'linear',
+          type_label: d.type_label || d.nominal_str || 'Ölçü',
+          icon: d.icon || '📏',
+          nominal: d.nominal ?? 0,
+          nominal_str: d.nominal_str || String(d.nominal ?? 0),
+          upper_tol: tol.upper_tol,
+          lower_tol: tol.lower_tol,
+          measured: d.measured || '',
+          deviation: d.deviation || '',
+          status: (d.status as 'PASS' | 'WARN' | 'FAIL' | 'UNMEASURED') || 'UNMEASURED',
+          gdt: d.gdt || 'ASME Y14.5',
+          op: d.op || 'OP10',
+          op_reason: d.op_reason || 'Standart üst bağlama (Z- probu).',
+          bbox: d.bbox,
+        };
+      });
+
+      this.balloons = this.dimensions.map((d) => ({
         id: d.id,
         page: d.page || 1,
         nominal: d.nominal,
-        tolerance: `${d.lower_tol || '-0.100'}/${d.upper_tol || '+0.100'}`,
+        tolerance: `${d.lower_tol}/${d.upper_tol}`,
         bbox: d.bbox,
         pageHeight: 595.28,
         confirmed: d.status === 'PASS',
@@ -918,6 +968,13 @@ export class SetupWizard {
               ➕ Unsur Ekle
             </button>
             <input type="file" id="audit-drawing-input-internal" accept=".pdf,.png,.jpg,.jpeg,.svg" style="display: none;" />
+            <label class="audit-general-tol" title="Antette yazan genel tolerans. Toleransı verilmemiş ölçülere ve deliklerin konumuna bu sınıf uygulanır.">
+              Genel Tolerans
+              <input type="text" id="audit-general-tol" list="audit-general-tol-list" value="${escapeHtmlText(this.generalToleranceSpec)}" placeholder="ISO 2768-m veya ±0.2" />
+              <datalist id="audit-general-tol-list">
+                ${GENERAL_TOLERANCE_PRESETS.map((p) => `<option value="${p}"></option>`).join('')}
+              </datalist>
+            </label>
             <span class="audit-file-name-badge ${this.hasLoadedDrawing ? 'loaded' : 'empty'}" id="audit-file-badge">
               ${this.hasLoadedDrawing ? '📄 ' + (this.loadedFileName || 'Teknik_Resim.pdf') : 'Henüz Dosya Yüklenmedi'}
             </span>
@@ -1428,6 +1485,9 @@ export class SetupWizard {
 
     const zoomInBtn = modalEl.querySelector('#btn-audit-zoom-in');
     zoomInBtn?.addEventListener('click', () => this.setZoom(this.zoom + 0.2));
+
+    const generalTolInput = modalEl.querySelector<HTMLInputElement>('#audit-general-tol');
+    generalTolInput?.addEventListener('change', () => this.setGeneralTolerance(generalTolInput.value));
 
     const zoomOutBtn = modalEl.querySelector('#btn-audit-zoom-out');
     zoomOutBtn?.addEventListener('click', () => this.setZoom(this.zoom - 0.2));
