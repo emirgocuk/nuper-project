@@ -76,6 +76,59 @@
           "maxItems": 9
         }
       }
+    },
+    "pmi": {
+      "type": "object",
+      "description": "STEP AP242 Ürün ve İmalat Bilgisi (PMI/MBD).",
+      "properties": {
+        "datums": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label"],
+            "properties": {
+              "label": { "type": "string" },
+              "target_type": { "type": "string" }
+            }
+          }
+        },
+        "tolerances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tolerance_type", "magnitude"],
+            "properties": {
+              "tolerance_type": { "type": "string" },
+              "magnitude": { "type": "number" },
+              "zone_unit": { "type": "string" },
+              "datums": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["nominal_value"],
+            "properties": {
+              "nominal_value": { "type": "number" },
+              "dimension_type": { "type": "string" },
+              "upper_tolerance": { "type": "number" },
+              "lower_tolerance": { "type": "number" }
+            }
+          }
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" }
+            }
+          }
+        }
+      }
     }
   }
 }

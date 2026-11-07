@@ -114,5 +114,34 @@ export interface CadMetadata {
     orientation_matrix?: [number, number, number, number, number, number, number, number, number];
     [k: string]: unknown;
   };
+  /**
+   * STEP AP242 Ürün ve İmalat Bilgisi (PMI/MBD).
+   */
+  pmi?: {
+    datums?: {
+      label: string;
+      target_type?: string;
+      [k: string]: unknown;
+    }[];
+    tolerances?: {
+      tolerance_type: string;
+      magnitude: number;
+      zone_unit?: string;
+      datums?: string[];
+      [k: string]: unknown;
+    }[];
+    dimensions?: {
+      nominal_value: number;
+      dimension_type?: string;
+      upper_tolerance?: number;
+      lower_tolerance?: number;
+      [k: string]: unknown;
+    }[];
+    views?: {
+      name: string;
+      [k: string]: unknown;
+    }[];
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }

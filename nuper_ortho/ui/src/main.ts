@@ -29,11 +29,29 @@ export class NuperApp {
 
     this.inspectionTable.onSelectionChange((row) => {
       if (row) {
-        this.drawingCanvas.selectBalloon(String(row.id));
+        this.drawingCanvas.selectBalloon(String(row.id), false);
         this.cadViewer.highlightFeature(row.feature_key);
       } else {
-        this.drawingCanvas.selectBalloon(null);
+        this.drawingCanvas.selectBalloon(null, false);
         this.cadViewer.highlightFeature(undefined);
+      }
+    });
+
+    this.drawingCanvas.onBalloonSelected((balloonId) => {
+      if (balloonId !== null) {
+        const row = this.inspectionTable.getRows().find((r) => String(r.id) === balloonId || r.balloon.replace('#', '') === balloonId);
+        if (row) {
+          this.inspectionTable.selectRow(row.id);
+          this.cadViewer.highlightFeature(row.feature_key);
+        }
+      }
+    });
+
+    this.cadViewer.onFeatureSelected((featureId) => {
+      const row = this.inspectionTable.getRows().find((r) => r.feature_key === featureId || r.feature_key?.replace(/^CAD_/, '') === featureId.replace(/^CAD_/, ''));
+      if (row) {
+        this.inspectionTable.selectRow(row.id);
+        this.drawingCanvas.selectBalloon(String(row.id), false);
       }
     });
 
@@ -122,7 +140,7 @@ export class NuperApp {
       this.cadViewer.setModelGeometry(geometry);
 
       const ext = (cadFile.name.split('.').pop()?.toLowerCase() || 'stp') as 'step' | 'stp' | 'stl' | 'obj';
-      this.setupWizard.setCadMetadata(cadFile.metadata || {
+      const cadMeta: CadMetadata = cadFile.metadata || {
         model_name: cadFile.name,
         file_format: (['step', 'stp', 'stl', 'obj'].includes(ext) ? ext : 'stp') as 'step' | 'stp' | 'stl' | 'obj',
         vertex_count: tess.geometry ? tess.geometry.attributes.position.count : 0,
@@ -133,7 +151,9 @@ export class NuperApp {
           size: tess.bbox.size,
         },
         features: (tess.cadFeatures as unknown as NonNullable<CadMetadata['features']>) || [],
-      });
+      };
+      this.cadViewer.setCadMetadata(cadMeta);
+      this.setupWizard.setCadMetadata(cadMeta);
     } else {
       const fileInput = document.getElementById('step-file-input') || document.getElementById('real-3d-file-input');
       if (fileInput) {
@@ -185,6 +205,7 @@ export class NuperApp {
         this.lastCadFilePath = suite.cad.filePath;
       }
       if (suite.cad.metadata) {
+        this.cadViewer.setCadMetadata(suite.cad.metadata);
         this.setupWizard.setCadMetadata(suite.cad.metadata);
       }
       const tess = applyStepModelToScene(suite.cad.name, suite.cad.dataText || '', suite.cad.metadata);

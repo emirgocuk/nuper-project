@@ -176,6 +176,7 @@ export class DrawingCanvas {
   private pdfDoc: PDFDocumentProxy | null = null;
   private balloonCreatedListeners: Array<(b: BalloonItem) => void> = [];
   private balloonUpdatedListeners: Array<(b: BalloonItem) => void> = [];
+  private balloonSelectedListeners: Array<(id: string | null) => void> = [];
   private containerEl: HTMLElement | null = null;
   private statusReadoutEl: HTMLElement | null = null;
   private tool: LightTableTool = 'select';
@@ -410,6 +411,13 @@ export class DrawingCanvas {
     };
   }
 
+  public onBalloonSelected(cb: (id: string | null) => void): () => void {
+    this.balloonSelectedListeners.push(cb);
+    return () => {
+      this.balloonSelectedListeners = this.balloonSelectedListeners.filter((listener) => listener !== cb);
+    };
+  }
+
   public promptAddFeature(): void {
     this.setTool('region');
   }
@@ -588,7 +596,7 @@ export class DrawingCanvas {
     };
   }
 
-  public selectBalloon(id: string | null): void {
+  public selectBalloon(id: string | null, emit = true): void {
     if (id !== null) {
       const match = this.balloons.find((b) => String(b.id) === String(id));
       if (match && match.page && match.page !== this.activePage) {
@@ -604,6 +612,11 @@ export class DrawingCanvas {
     }
     this.updatePageControls();
     void this.render();
+    if (emit) {
+      for (const listener of this.balloonSelectedListeners) {
+        listener(this.selectedBalloonId);
+      }
+    }
   }
 
   public getSelectedBalloonId(): string | null {

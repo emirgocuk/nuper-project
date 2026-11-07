@@ -3,6 +3,7 @@ import { SceneCleaner } from './utils/SceneCleaner';
 import { SimulationController } from './SimulationController';
 import { SetupPrep, type BoundingBoxEnvelope, type SetupPrepOptions } from './utils/SetupPrep';
 import { type GeneratedMeasurementPlan } from './utils/MeasurementPathGenerator';
+import type { CadMetadata } from '../../types/generated/cad_metadata';
 
 export interface CADViewerOptions {
   antialias?: boolean;
@@ -17,12 +18,17 @@ export class CADViewer {
   private renderer: THREE.WebGLRenderer | null = null;
   private modelGroup: THREE.Group;
   private currentGeometry: THREE.BufferGeometry | null = null;
+  private cadMetadata: CadMetadata | null = null;
   private simulationController: SimulationController;
   private animationFrameId: number | null = null;
   private isDestroyed = false;
   private highlightedFeatureKey: string | null = null;
   private highlightGroup: THREE.Group;
   private trajectoryGroup: THREE.Group;
+  private raycaster: THREE.Raycaster = new THREE.Raycaster();
+  private pointer: THREE.Vector2 = new THREE.Vector2();
+  private featureSelectedListeners: Array<(featureId: string, feature: NonNullable<CadMetadata['features']>[0]) => void> = [];
+  private canvasClickHandler: ((e: MouseEvent) => void) | null = null;
 
   constructor(options: CADViewerOptions = {}) {
     this.scene = new THREE.Scene();
@@ -85,7 +91,61 @@ export class CADViewer {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     this.container.appendChild(this.renderer.domElement);
+    this.canvasClickHandler = (e: MouseEvent) => this.handleCanvasClick(e);
+    this.renderer.domElement.addEventListener('click', this.canvasClickHandler);
     this.render();
+  }
+
+  public setCadMetadata(metadata: CadMetadata): void {
+    this.cadMetadata = metadata;
+  }
+
+  public getCadMetadata(): CadMetadata | null {
+    return this.cadMetadata;
+  }
+
+  public onFeatureSelected(cb: (featureId: string, feature: NonNullable<CadMetadata['features']>[0]) => void): () => void {
+    this.featureSelectedListeners.push(cb);
+    return () => {
+      this.featureSelectedListeners = this.featureSelectedListeners.filter((listener) => listener !== cb);
+    };
+  }
+
+  private handleCanvasClick(e: MouseEvent): void {
+    if (!this.renderer) return;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.modelGroup.children, true);
+    if (intersects.length > 0) {
+      const hit = intersects[0];
+      const hitPoint = hit.point;
+      const features = this.cadMetadata?.features || [];
+      if (features.length > 0) {
+        let closestFeat: NonNullable<CadMetadata['features']>[0] | null = null;
+        let minDistance = Infinity;
+
+        for (const feat of features) {
+          if (feat.center) {
+            const featCenter = new THREE.Vector3(feat.center[0], feat.center[1], feat.center[2]);
+            const dist = hitPoint.distanceTo(featCenter);
+            if (dist < minDistance) {
+              minDistance = dist;
+              closestFeat = feat;
+            }
+          }
+        }
+
+        if (closestFeat) {
+          this.highlightFeature(closestFeat.id);
+          for (const cb of this.featureSelectedListeners) {
+            cb(closestFeat.id, closestFeat);
+          }
+        }
+      }
+    }
   }
 
   public setModelGeometry(geometry: THREE.BufferGeometry): void {
@@ -235,7 +295,76 @@ export class CADViewer {
     this.highlightedFeatureKey = featureKey || null;
     SceneCleaner.disposeNode(this.highlightGroup);
 
-    if (featureKey && this.currentGeometry) {
+    if (!featureKey) {
+      this.render();
+      return;
+    }
+
+    const features = this.cadMetadata?.features || [];
+    const targetFeature = features.find((f) => f.id === featureKey || f.id.replace(/^CAD_/, '') === featureKey.replace(/^CAD_/, ''));
+
+    if (targetFeature && targetFeature.center) {
+      const center = new THREE.Vector3(targetFeature.center[0], targetFeature.center[1], targetFeature.center[2]);
+      const normal = targetFeature.normal
+        ? new THREE.Vector3(targetFeature.normal[0], targetFeature.normal[1], targetFeature.normal[2]).normalize()
+        : new THREE.Vector3(0, 0, 1);
+
+      const nominalDim = targetFeature.nominal_dimension || 8;
+      const radius = Math.max(1.5, nominalDim / 2);
+
+      if (targetFeature.feature_type === 'INTERNAL_CYLINDER' || targetFeature.feature_type === 'EXTERNAL_CYLINDER') {
+        const ringGeo = new THREE.TorusGeometry(radius, 0.4, 16, 32);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.copy(center);
+        ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+        this.highlightGroup.add(ring);
+
+        const arrow = new THREE.ArrowHelper(normal, center, radius * 2.5, 0x0ea5e9, radius * 0.8, radius * 0.4);
+        this.highlightGroup.add(arrow);
+
+        const sphereGeo = new THREE.SphereGeometry(radius * 0.35, 12, 12);
+        const sphereMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+        const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+        sphere.position.copy(center);
+        this.highlightGroup.add(sphere);
+      } else if (targetFeature.feature_type === 'PLANE') {
+        const planeSize = Math.max(8, Math.min(60, Math.sqrt(targetFeature.area_or_length || 100)));
+        const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
+        const planeMat = new THREE.MeshBasicMaterial({
+          color: 0x0284c7,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.35,
+          depthWrite: false,
+        });
+        const planeMesh = new THREE.Mesh(planeGeo, planeMat);
+        planeMesh.position.copy(center);
+        planeMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+        this.highlightGroup.add(planeMesh);
+
+        const planeEdges = new THREE.EdgesGeometry(planeGeo);
+        const planeLineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
+        const planeWire = new THREE.LineSegments(planeEdges, planeLineMat);
+        planeWire.position.copy(center);
+        planeWire.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+        this.highlightGroup.add(planeWire);
+
+        const arrow = new THREE.ArrowHelper(normal, center, planeSize * 0.6, 0x0ea5e9, planeSize * 0.2, planeSize * 0.1);
+        this.highlightGroup.add(arrow);
+      } else {
+        const markerGeo = new THREE.SphereGeometry(radius, 16, 16);
+        const markerMat = new THREE.MeshBasicMaterial({
+          color: 0x38bdf8,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.8,
+        });
+        const marker = new THREE.Mesh(markerGeo, markerMat);
+        marker.position.copy(center);
+        this.highlightGroup.add(marker);
+      }
+    } else if (this.currentGeometry) {
       const box = new THREE.Box3().setFromBufferAttribute(
         this.currentGeometry.attributes.position as THREE.BufferAttribute
       );
@@ -271,7 +400,12 @@ export class CADViewer {
       this.animationFrameId = null;
     }
 
-    // Sahnedeki tüm modelleri ve vurguları temizle
+    if (this.renderer && this.canvasClickHandler) {
+      this.renderer.domElement.removeEventListener('click', this.canvasClickHandler);
+      this.canvasClickHandler = null;
+    }
+    this.featureSelectedListeners = [];
+
     SceneCleaner.disposeNode(this.trajectoryGroup);
     SceneCleaner.disposeNode(this.highlightGroup);
     SceneCleaner.disposeNode(this.modelGroup);

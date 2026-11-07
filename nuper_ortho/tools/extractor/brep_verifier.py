@@ -8,6 +8,14 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
+    from tools.extractor.pmi_extractor import extract_pmi_schema_payload
+except ImportError:
+    try:
+        from pmi_extractor import extract_pmi_schema_payload
+    except ImportError:
+        extract_pmi_schema_payload = None
+
+try:
     from OCP.STEPControl import STEPControl_Reader
     from OCP.IFSelect import IFSelect_ReturnStatus
     from OCP.BRepMesh import BRepMesh_IncrementalMesh
@@ -318,7 +326,7 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
 
     stat = os.stat(step_path)
 
-    return {
+    res_dict = {
         "success": True,
         "kernel": "OpenCASCADE 8.0 (OCP)",
         "model_name": os.path.basename(step_path),
@@ -342,6 +350,11 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
             "faces": mesh_faces,
         },
     }
+    if extract_pmi_schema_payload:
+        pmi_data = extract_pmi_schema_payload(step_path)
+        if pmi_data:
+            res_dict["pmi"] = pmi_data
+    return res_dict
 
 
 def parse_step_file(step_path: str) -> Dict[str, Any]:
@@ -770,7 +783,7 @@ def extract_cad_metadata(step_path: str) -> Dict[str, Any]:
     file_size = stat.st_size
     filename = os.path.basename(step_path)
 
-    return {
+    fallback_dict = {
         "success": True,
         "kernel": "Regex / Parser Fallback",
         "model_name": filename,
@@ -782,6 +795,11 @@ def extract_cad_metadata(step_path: str) -> Dict[str, Any]:
         "bbox": step_data.get("bbox", {"min": [0.0, 0.0, 0.0], "max": [0.0, 0.0, 0.0], "size": [0.0, 0.0, 0.0]}),
         "features": features,
     }
+    if extract_pmi_schema_payload:
+        pmi_data = extract_pmi_schema_payload(step_path)
+        if pmi_data:
+            fallback_dict["pmi"] = pmi_data
+    return fallback_dict
 
 
 if __name__ == "__main__":
