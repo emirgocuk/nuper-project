@@ -23,6 +23,7 @@ try:
     from OCP.TopAbs import TopAbs_FACE, TopAbs_EDGE, TopAbs_REVERSED
     from OCP.TopoDS import TopoDS
     from OCP.BRep import BRep_Tool
+    from OCP.BRepTools import BRepTools
     from OCP.TopLoc import TopLoc_Location
     from OCP.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
     from OCP.GeomAbs import (
@@ -46,6 +47,10 @@ try:
     OCP_AVAILABLE = True
 except ImportError:
     OCP_AVAILABLE = False
+
+
+HOLE_MIN_SPAN_RAD = math.radians(330.0)
+BOSS_MIN_SPAN_RAD = math.radians(180.0)
 
 
 def _canon_vec(v: Tuple[float, float, float]) -> Tuple[float, float, float]:
@@ -160,7 +165,7 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
     face_idx = 0
     current_vert_offset = 0
 
-    cylinder_groups: Dict[Tuple[float, Tuple[float, float, float], float, str], Dict[str, Any]] = {}
+    cylinder_groups: Dict[Tuple[float, Tuple[float, float, float], Tuple[float, float, float], str], Dict[str, Any]] = {}
 
     while face_exp.More():
         face_idx += 1
@@ -248,26 +253,32 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
 
             ftype = "INTERNAL_CYLINDER" if is_rev else "EXTERNAL_CYLINDER"
             loc_pnt = cyl.Location()
-            proj_dist = round(loc_pnt.X() * canon_axis[0] + loc_pnt.Y() * canon_axis[1] + loc_pnt.Z() * canon_axis[2], 1)
-            ortho_x = loc_pnt.X() - proj_dist * canon_axis[0]
-            ortho_y = loc_pnt.Y() - proj_dist * canon_axis[1]
-            ortho_z = loc_pnt.Z() - proj_dist * canon_axis[2]
-            ortho_hash = round(math.sqrt(ortho_x*ortho_x + ortho_y*ortho_y + ortho_z*ortho_z), 2)
+            proj_dist = loc_pnt.X() * canon_axis[0] + loc_pnt.Y() * canon_axis[1] + loc_pnt.Z() * canon_axis[2]
+            ortho_vec = (
+                round(loc_pnt.X() - proj_dist * canon_axis[0], 2),
+                round(loc_pnt.Y() - proj_dist * canon_axis[1], 2),
+                round(loc_pnt.Z() - proj_dist * canon_axis[2], 2),
+            )
+            u_min, u_max, _v_min, _v_max = BRepTools.UVBounds_s(face)
+            face_span = u_max - u_min
 
-            grp_key = (round(diameter, 3), canon_axis_r, ortho_hash, ftype)
+            grp_key = (round(diameter, 3), canon_axis_r, ortho_vec, ftype)
             if grp_key not in cylinder_groups:
                 cylinder_groups[grp_key] = {
                     "diameter": diameter,
                     "radius": radius,
                     "feature_type": ftype,
                     "axis": [round(canon_axis[0], 4), round(canon_axis[1], 4), round(canon_axis[2], 4)],
+                    "axis_origin": (loc_pnt.X(), loc_pnt.Y(), loc_pnt.Z()),
                     "centers": [center_vec],
                     "total_area": area,
+                    "total_span": face_span,
                     "face_ids": [face_id],
                 }
             else:
                 cylinder_groups[grp_key]["centers"].append(center_vec)
                 cylinder_groups[grp_key]["total_area"] += area
+                cylinder_groups[grp_key]["total_span"] += face_span
                 cylinder_groups[grp_key]["face_ids"].append(face_id)
 
         elif stype_enum == GeomAbs_Cone:
@@ -372,11 +383,20 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
 
     cyl_idx = 1
     for grp in cylinder_groups.values():
-        c_list = grp["centers"]
-        avg_x = sum(c[0] for c in c_list) / len(c_list)
-        avg_y = sum(c[1] for c in c_list) / len(c_list)
-        avg_z = sum(c[2] for c in c_list) / len(c_list)
         is_int = grp["feature_type"] == "INTERNAL_CYLINDER"
+        min_span = HOLE_MIN_SPAN_RAD if is_int else BOSS_MIN_SPAN_RAD
+        if grp["total_span"] < min_span:
+            continue
+        c_list = grp["centers"]
+        mean_x = sum(c[0] for c in c_list) / len(c_list)
+        mean_y = sum(c[1] for c in c_list) / len(c_list)
+        mean_z = sum(c[2] for c in c_list) / len(c_list)
+        o = grp["axis_origin"]
+        a = grp["axis"]
+        t = (mean_x - o[0]) * a[0] + (mean_y - o[1]) * a[1] + (mean_z - o[2]) * a[2]
+        avg_x = o[0] + t * a[0]
+        avg_y = o[1] + t * a[1]
+        avg_z = o[2] + t * a[2]
         label = "Delik" if is_int else "Mil / Silindir"
         feat_id = f"CAD_{'HOLE' if is_int else 'CYL'}_Ø{grp['diameter']:.2f}_{cyl_idx}"
         extracted_features.append({
