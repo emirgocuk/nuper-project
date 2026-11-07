@@ -222,6 +222,18 @@ export class SetupWizard {
 
   private lastGeneratedPlan: GeneratedMeasurementPlan | null = null;
 
+  private announceStylusRecommendations(plan: GeneratedMeasurementPlan): void {
+    if (typeof document === 'undefined' || plan.stylusRecommendations.length === 0) return;
+    const hudDetails = document.getElementById('hud-feature-details');
+    if (!hudDetails) return;
+    const notes = plan.stylusRecommendations.map((r) =>
+      r.feasible
+        ? `${r.balloon} Ø${r.holeDiameterMm}: Ø${r.ballDiameterMm} stylus gerekli`
+        : `${r.balloon} Ø${r.holeDiameterMm}: Ø${r.ballDiameterMm} stylus bile sığmıyor`
+    );
+    hudDetails.textContent = `${hudDetails.textContent ?? ''} Stylus uyarısı: ${notes.join('; ')}.`;
+  }
+
   private recomputeCadMatch(): void {
     if (!this.currentCadMetadata || this.dimensions.length === 0) return;
     const drawingPayload: DrawingExtractionResult = {
@@ -2179,6 +2191,7 @@ export class SetupWizard {
         balloon: d.balloon,
         type: d.type,
         type_label: d.type_label,
+        gdt: d.gdt,
         nominal: typeof d.nominal === 'number' ? d.nominal : parseFloat(String(d.nominal)) || 10,
         cad_center: [coords.x, coords.y, coords.z],
         cad_normal: d.cad_normal || [0, 1, 0],
@@ -2195,6 +2208,7 @@ export class SetupWizard {
       clearanceZMarginMm: 15.0,
     });
     this.lastGeneratedPlan = plan;
+    this.announceStylusRecommendations(plan);
 
     const app = this.appInstance as { getCADViewer?: () => CADViewer } | null;
     if (app && typeof app.getCADViewer === 'function') {
@@ -2431,6 +2445,7 @@ export class SetupWizard {
         balloon: d.balloon,
         type: d.type,
         type_label: d.type_label,
+        gdt: d.gdt,
         nominal: typeof d.nominal === 'number' ? d.nominal : parseFloat(String(d.nominal)) || 10,
         cad_center: [coords.x, coords.y, coords.z],
         cad_normal: d.cad_normal || [0, 1, 0],
@@ -2446,6 +2461,7 @@ export class SetupWizard {
       clearanceZMarginMm: 15.0,
     });
     this.lastGeneratedPlan = plan;
+    this.announceStylusRecommendations(plan);
 
     if (app && typeof app.getCADViewer === 'function') {
       const cadViewer = app.getCADViewer();
