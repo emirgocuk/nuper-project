@@ -331,6 +331,75 @@ export class StepModelTessellator {
       Math.abs(sizeX - sizeZ) <= Math.max(sizeX, sizeZ) * 0.12 &&
       sizeY > Math.max(sizeX, sizeZ) * 0.65;
 
+    const resolveCollisionFreeSurfaceApproach = (
+      cx: number,
+      cy: number,
+      cz: number,
+      norm: [number, number, number]
+    ): { cy: number; norm: [number, number, number] } => {
+      const lenH = Math.hypot(norm[0], norm[2]);
+      if (lenH <= 0.25) {
+        return { cy, norm };
+      }
+      const hx = norm[0] / lenH;
+      const hz = norm[2] / lenH;
+      const halfX = sizeX / 2;
+      const halfZ = sizeZ / 2;
+
+      const posOut = Math.abs(cx + hx * 8.0) > halfX + 0.5 || Math.abs(cz + hz * 8.0) > halfZ + 0.5;
+      const negOut = Math.abs(cx - hx * 8.0) > halfX + 0.5 || Math.abs(cz - hz * 8.0) > halfZ + 0.5;
+
+      let cntPos = 0;
+      let cntNeg = 0;
+      let maxYPos = -Infinity;
+      let maxYNeg = -Infinity;
+
+      if (posAttr && posAttr.count > 0) {
+        for (let i = 0; i < posAttr.count; i++) {
+          const vx = posAttr.getX(i) - cx;
+          const vz = posAttr.getZ(i) - cz;
+          const perp = Math.abs(-vx * hz + vz * hx);
+          if (perp > 4.0) continue;
+          const proj = vx * hx + vz * hz;
+          const py = posAttr.getY(i);
+          if (proj >= 1.2 && proj <= 12.0) {
+            if (py > maxYPos) maxYPos = py;
+            if (py >= cy - 0.8) cntPos++;
+          } else if (proj <= -1.2 && proj >= -12.0) {
+            if (py > maxYNeg) maxYNeg = py;
+            if (py >= cy - 0.8) cntNeg++;
+          }
+        }
+      }
+
+      const outwardDot = cx * hx + cz * hz;
+      let flip = false;
+      if (negOut && !posOut) {
+        flip = true;
+      } else if (!posOut && !negOut) {
+        if (cntNeg < cntPos) {
+          flip = true;
+        } else if (cntNeg === cntPos && maxYNeg < maxYPos - 0.3) {
+          flip = true;
+        } else if (cntNeg === cntPos && Math.abs(maxYNeg - maxYPos) <= 0.3 && outwardDot < -1.0) {
+          flip = true;
+        }
+      } else if (posOut && negOut && outwardDot < -1.0) {
+        flip = true;
+      }
+
+      const finalNorm: [number, number, number] = flip
+        ? [parseFloat((-norm[0]).toFixed(4)), norm[1], parseFloat((-norm[2]).toFixed(4))]
+        : norm;
+      const chosenMaxY = flip ? maxYNeg : maxYPos;
+      const chosenOut = flip ? negOut : posOut;
+      let safeCy = cy;
+      if (!chosenOut && isFinite(chosenMaxY) && chosenMaxY >= cy - 1.0 && chosenMaxY < standoffHeight + sizeY - 0.2) {
+        safeCy = parseFloat(Math.min(standoffHeight + sizeY - 0.3, Math.max(cy, chosenMaxY + 1.1)).toFixed(3));
+      }
+      return { cy: safeCy, norm: finalNorm };
+    };
+
     const detectedHoles: DetectedHoleItem[] = [];
     const cadFeatures: CadFeatureItem[] = [];
 
@@ -389,6 +458,10 @@ export class StepModelTessellator {
         cx = parseFloat(rCross.toFixed(3));
         cz = 0;
         norm = [1, 0, 0];
+      } else if (feat.feature_type === 'PLANE' || feat.feature_type === 'CONE') {
+        const resolved = resolveCollisionFreeSurfaceApproach(cx, cy, cz, norm);
+        cy = resolved.cy;
+        norm = resolved.norm;
       }
 
       const shiftedCenter: [number, number, number] = [cx, cy, cz];

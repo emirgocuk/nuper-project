@@ -19,6 +19,8 @@ export class NuperApp {
   private ipcClient: IpcClient;
   private setupWizard: SetupWizard;
   private lastCadFilePath: string | null = null;
+  private isSelectingCad = false;
+  private isSelectingDrawing = false;
 
   constructor() {
     this.cadViewer = new CADViewer();
@@ -130,68 +132,84 @@ export class NuperApp {
   }
 
   public async openAndLoadCadFile(): Promise<SelectedCadFile | null> {
-    const cadFile = await this.ipcClient.selectCadFile();
-    if (cadFile) {
-      if (cadFile.filePath) {
-        this.lastCadFilePath = cadFile.filePath;
-      }
-      const tess = applyStepModelToScene(cadFile.name, cadFile.dataText || '', cadFile.metadata);
-      const geometry = tess.geometry || new THREE.BoxGeometry(tess.bbox.size[0], tess.bbox.size[1], tess.bbox.size[2]);
-      this.cadViewer.setModelGeometry(geometry);
-
-      const ext = (cadFile.name.split('.').pop()?.toLowerCase() || 'stp') as 'step' | 'stp' | 'stl' | 'obj';
-      const cadMeta: CadMetadata = cadFile.metadata || {
-        model_name: cadFile.name,
-        file_format: (['step', 'stp', 'stl', 'obj'].includes(ext) ? ext : 'stp') as 'step' | 'stp' | 'stl' | 'obj',
-        vertex_count: tess.geometry ? tess.geometry.attributes.position.count : 0,
-        triangle_count: tess.geometry && tess.geometry.index ? tess.geometry.index.count / 3 : 0,
-        bbox: {
-          min: tess.bbox.min,
-          max: tess.bbox.max,
-          size: tess.bbox.size,
-        },
-        features: (tess.cadFeatures as unknown as NonNullable<CadMetadata['features']>) || [],
-      };
-      this.cadViewer.setCadMetadata(cadMeta);
-      this.setupWizard.setCadMetadata(cadMeta);
-    } else {
-      const fileInput = document.getElementById('step-file-input') || document.getElementById('real-3d-file-input');
-      if (fileInput) {
-        fileInput.click();
-      }
+    if (this.isSelectingCad) {
+      return null;
     }
-    return cadFile;
+    this.isSelectingCad = true;
+    try {
+      const cadFile = await this.ipcClient.selectCadFile();
+      if (cadFile) {
+        if (cadFile.filePath) {
+          this.lastCadFilePath = cadFile.filePath;
+        }
+        const tess = applyStepModelToScene(cadFile.name, cadFile.dataText || '', cadFile.metadata);
+        const geometry = tess.geometry || new THREE.BoxGeometry(tess.bbox.size[0], tess.bbox.size[1], tess.bbox.size[2]);
+        this.cadViewer.setModelGeometry(geometry);
+
+        const ext = (cadFile.name.split('.').pop()?.toLowerCase() || 'stp') as 'step' | 'stp' | 'stl' | 'obj';
+        const cadMeta: CadMetadata = cadFile.metadata || {
+          model_name: cadFile.name,
+          file_format: (['step', 'stp', 'stl', 'obj'].includes(ext) ? ext : 'stp') as 'step' | 'stp' | 'stl' | 'obj',
+          vertex_count: tess.geometry ? tess.geometry.attributes.position.count : 0,
+          triangle_count: tess.geometry && tess.geometry.index ? tess.geometry.index.count / 3 : 0,
+          bbox: {
+            min: tess.bbox.min,
+            max: tess.bbox.max,
+            size: tess.bbox.size,
+          },
+          features: (tess.cadFeatures as unknown as NonNullable<CadMetadata['features']>) || [],
+        };
+        this.cadViewer.setCadMetadata(cadMeta);
+        this.setupWizard.setCadMetadata(cadMeta);
+      } else {
+        const fileInput = document.getElementById('step-file-input') || document.getElementById('real-3d-file-input');
+        if (fileInput) {
+          fileInput.click();
+        }
+      }
+      return cadFile;
+    } finally {
+      this.isSelectingCad = false;
+    }
   }
 
   public async openAndLoadDrawingFile(): Promise<DrawingExtractionResult | null> {
-    const drawingFile: SelectedDrawingFile | null = await this.ipcClient.selectDrawingFile();
-    if (!drawingFile) {
+    if (this.isSelectingDrawing) {
       return null;
     }
+    this.isSelectingDrawing = true;
+    try {
+      const drawingFile: SelectedDrawingFile | null = await this.ipcClient.selectDrawingFile();
+      if (!drawingFile) {
+        return null;
+      }
 
-    if (drawingFile.dataBase64) {
-      try {
-        const binaryString = atob(drawingFile.dataBase64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        await this.drawingCanvas.loadPdf(bytes);
-        await this.setupWizard.loadPdfData(bytes, drawingFile.name);
-      } catch {}
-    } else if (drawingFile.filePath) {
-      try {
-        await this.drawingCanvas.loadPdf(drawingFile.filePath);
-      } catch {}
-    }
+      if (drawingFile.dataBase64) {
+        try {
+          const binaryString = atob(drawingFile.dataBase64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          await this.drawingCanvas.loadPdf(bytes);
+          await this.setupWizard.loadPdfData(bytes, drawingFile.name);
+        } catch {}
+      } else if (drawingFile.filePath) {
+        try {
+          await this.drawingCanvas.loadPdf(drawingFile.filePath);
+        } catch {}
+      }
 
-    const result = await this.ipcClient.extractDrawingData(drawingFile.filePath, this.lastCadFilePath || undefined);
-    if (result) {
-      this.loadDrawingData(result);
-      this.setupWizard.setExtractedData(result, drawingFile.name);
-      this.setupWizard.openDrawingAuditModal();
+      const result = await this.ipcClient.extractDrawingData(drawingFile.filePath, this.lastCadFilePath || undefined);
+      if (result) {
+        this.loadDrawingData(result);
+        this.setupWizard.setExtractedData(result, drawingFile.name);
+        this.setupWizard.openDrawingAuditModal();
+      }
+      return result;
+    } finally {
+      this.isSelectingDrawing = false;
     }
-    return result;
   }
 
   public async loadBenchmark(specimenIndex: number | string): Promise<BenchmarkSpecimenSuite | null> {
@@ -304,9 +322,11 @@ if (typeof window !== 'undefined') {
       'button[onclick*="trigger2dUpload"], .dropdown-row[onclick*="trigger2dUpload"], button[title*="2D PDF"]'
     );
     drawingBtns.forEach((btn) => {
+      btn.removeAttribute('onclick');
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
         wizard.handleTeknikResimClick();
       });
     });
@@ -325,93 +345,6 @@ if (typeof window !== 'undefined') {
     workflowRibbon.mount('.app-ribbon');
     (win as unknown as { workflowRibbon?: WorkflowRibbon }).workflowRibbon = workflowRibbon;
 
-    const bindWorkflowEvents = () => {
-      const stepCadBtn = document.querySelector('[data-workflow-id="step_cad"]');
-      if (stepCadBtn) {
-        stepCadBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          app.openAndLoadCadFile().then((res) => {
-            if (res) {
-              const shortName = res.name.length > 20 ? res.name.substring(0, 18) + '...' : res.name;
-              workflowRibbon.setStepLabel('step_cad', `Katı Model: ${shortName}`);
-              workflowRibbon.advanceToStep(2);
-              workflowRibbon.mount('.app-ribbon');
-              bindWorkflowEvents();
-            }
-          });
-        });
-      }
-
-      const stepFixtureBtn = document.querySelector('[data-workflow-id="step_fixture"]');
-      if (stepFixtureBtn) {
-        stepFixtureBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          if (typeof win.openClampingModal === 'function') {
-            win.openClampingModal();
-          }
-          workflowRibbon.advanceToStep(3);
-          workflowRibbon.mount('.app-ribbon');
-          bindWorkflowEvents();
-        });
-      }
-
-      const stepDrawingBtn = document.querySelector('[data-workflow-id="step_drawing"]');
-      if (stepDrawingBtn) {
-        stepDrawingBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          wizard.handleTeknikResimClick();
-          workflowRibbon.advanceToStep(4);
-          workflowRibbon.mount('.app-ribbon');
-          bindWorkflowEvents();
-        });
-      }
-
-      const stepAlignBtn = document.querySelector('[data-workflow-id="step_align"]');
-      if (stepAlignBtn) {
-        stepAlignBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          if (typeof win.apply321Alignment === 'function') {
-            win.apply321Alignment();
-          } else if (typeof win.open321Modal === 'function') {
-            win.open321Modal();
-          }
-        });
-      }
-
-      const stepSimBtn = document.querySelector('[data-workflow-id="step_simulation"]');
-      if (stepSimBtn) {
-        stepSimBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          workflowRibbon.advanceToStep(5);
-          workflowRibbon.mount('.app-ribbon');
-          bindWorkflowEvents();
-          simCtrl.togglePlay();
-        });
-      }
-
-      const benchBtn = document.getElementById('wf-btn-bench');
-      if (benchBtn) {
-        benchBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          if (typeof win.openBenchmarkLabModal === 'function') {
-            win.openBenchmarkLabModal();
-          }
-        });
-      }
-
-      const diagBtn = document.getElementById('wf-btn-diag');
-      if (diagBtn) {
-        diagBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          if (typeof win.toggleDiagnosticsDrawer === 'function') {
-            win.toggleDiagnosticsDrawer();
-          }
-        });
-      }
-    };
-
-    bindWorkflowEvents();
-
     const origApply321 = win.apply321Alignment;
     win.apply321Alignment = () => {
       const wAny = win as unknown as { optimizePartOrientation?: () => void };
@@ -428,7 +361,6 @@ if (typeof window !== 'undefined') {
       }
       workflowRibbon.advanceToStep(5);
       workflowRibbon.mount('.app-ribbon');
-      bindWorkflowEvents();
     };
 
     win.open321Modal = () => {

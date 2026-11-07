@@ -110,11 +110,15 @@ export class MeasurementPathGenerator {
     let currentAngleLabel: string | null = null;
     let headRotations = 0;
 
+    const partCx = (bbox.min[0] + bbox.max[0]) / 2;
+    const partCz = (bbox.min[2] + bbox.max[2]) / 2;
+
     for (const feat of opFeatures) {
       const center = feat.cad_center ?? (isYAxis
-        ? [(bbox.min[0] + bbox.max[0]) / 2, Math.max(0, bbox.max[1]), (bbox.min[2] + bbox.max[2]) / 2]
-        : [(bbox.min[0] + bbox.max[0]) / 2, (bbox.min[1] + bbox.max[1]) / 2, bbox.max[2]]);
-      const normal = feat.cad_normal ?? (isYAxis ? [0, 1, 0] : [0, 0, 1]);
+        ? [partCx, Math.max(0, bbox.max[1]), partCz]
+        : [partCx, (bbox.min[1] + bbox.max[1]) / 2, bbox.max[2]]);
+      const rawNormal = feat.cad_normal ?? (isYAxis ? [0, 1, 0] : [0, 0, 1]);
+      const normal: [number, number, number] = [rawNormal[0], rawNormal[1], rawNormal[2]];
 
       const featWaypoints: ExtendedWaypoint[] = [];
       const touchRecords: TouchPointRecord[] = [];
@@ -122,6 +126,16 @@ export class MeasurementPathGenerator {
       const isDiameter = feat.type === 'DIAMETER' || /dia|çap|delik/i.test(feat.type_label ?? '');
       const nom = feat.nominal;
       const cadId = feat.cad_feature_id ?? '';
+
+      if (isYAxis && !isDiameter && Math.hypot(normal[0], normal[2]) > 0.25) {
+        const relX = center[0] - partCx;
+        const relZ = center[2] - partCz;
+        const dotOut = relX * normal[0] + relZ * normal[2];
+        if (dotOut < -1.0) {
+          normal[0] = -normal[0];
+          normal[2] = -normal[2];
+        }
+      }
       const isExtCyl =
         feat.feature_type === 'EXTERNAL_CYLINDER' ||
         cadId.startsWith('CAD_CYL_') ||
@@ -407,19 +421,29 @@ export class MeasurementPathGenerator {
 
         featWaypoints.push(makeWp(outOverhead.clone(), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°'));
       } else {
-        const touchPos = new THREE.Vector3(
-          center[0],
-          isYAxis ? Math.max(0, center[1]) : center[1],
-          center[2]
-        );
+        const isHorizWall = isYAxis && Math.hypot(normal[0], normal[2]) > 0.25;
+        let safeTouchY = isYAxis ? Math.max(0, center[1]) : center[1];
+        if (isHorizWall) {
+          const sx = center[0] + normal[0] * approachDist;
+          const sz = center[2] + normal[2] * approachDist;
+          const insideFootprint =
+            sx > bbox.min[0] + 1.0 &&
+            sx < bbox.max[0] - 1.0 &&
+            sz > bbox.min[2] + 1.0 &&
+            sz < bbox.max[2] - 1.0;
+          if (insideFootprint) {
+            safeTouchY = Math.max(safeTouchY, Math.min(yMaxPart - 0.3, Math.max(center[1], yMaxPart - 1.2)));
+          }
+        }
+        const touchPos = new THREE.Vector3(center[0], safeTouchY, center[2]);
         const standoffPos = new THREE.Vector3(
           center[0] + normal[0] * approachDist,
-          isYAxis ? Math.max(0.5, center[1] + normal[1] * approachDist) : center[1] + normal[1] * approachDist,
+          isYAxis ? Math.max(0.5, safeTouchY + normal[1] * approachDist) : safeTouchY + normal[1] * approachDist,
           center[2] + normal[2] * approachDist
         );
         const retractPos = new THREE.Vector3(
           center[0] + normal[0] * retractDist,
-          isYAxis ? Math.max(0.5, center[1] + normal[1] * retractDist) : center[1] + normal[1] * retractDist,
+          isYAxis ? Math.max(0.5, safeTouchY + normal[1] * retractDist) : safeTouchY + normal[1] * retractDist,
           center[2] + normal[2] * retractDist
         );
 
