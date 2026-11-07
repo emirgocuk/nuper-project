@@ -31,6 +31,13 @@ export interface StandoffSupportItem {
   height: number;
 }
 
+export interface DatumSurfacePointItem {
+  balloon: 'DATUM_A' | 'DATUM_B' | 'DATUM_C';
+  position: [number, number, number];
+  normal: [number, number, number];
+  label: string;
+}
+
 export interface TessellatedModelResult {
   group: THREE.Group;
   geometry?: THREE.BufferGeometry;
@@ -43,6 +50,7 @@ export interface TessellatedModelResult {
   primaryDatumNormal: [number, number, number];
   cadFeatures?: CadFeatureItem[];
   standoffSupports?: StandoffSupportItem[];
+  datumSurfacePoints?: DatumSurfacePointItem[];
 }
 
 function getThree(): typeof THREE {
@@ -394,13 +402,78 @@ export class StepModelTessellator {
       const finalNorm: [number, number, number] = flip
         ? [parseFloat((-norm[0]).toFixed(4)), norm[1], parseFloat((-norm[2]).toFixed(4))]
         : norm;
-      const chosenMaxY = flip ? maxYNeg : maxYPos;
-      const chosenOut = flip ? negOut : posOut;
-      let safeCy = cy;
-      if (!chosenOut && isFinite(chosenMaxY) && chosenMaxY >= cy - 1.0 && chosenMaxY < standoffHeight + sizeY - 0.2) {
-        safeCy = parseFloat(Math.min(standoffHeight + sizeY - 0.3, Math.max(cy, chosenMaxY + 1.1)).toFixed(3));
+      return { cy, norm: finalNorm };
+    };
+
+    const snapPointToMeshSurface = (
+      cx: number,
+      cy: number,
+      cz: number,
+      norm: [number, number, number]
+    ): [number, number, number] => {
+      if (!posAttr || posAttr.count === 0) {
+        return [cx, cy, cz];
       }
-      return { cy: safeCy, norm: finalNorm };
+      const isHorizontalPlane = Math.abs(norm[1]) >= 0.7;
+      if (isHorizontalPlane) {
+        let localMaxY = -Infinity;
+        let closestSurfY = Infinity;
+        let minDy = Infinity;
+        for (let i = 0; i < posAttr.count; i++) {
+          const dx = posAttr.getX(i) - cx;
+          const dz = posAttr.getZ(i) - cz;
+          if (dx * dx + dz * dz <= 6.25) {
+            const py = posAttr.getY(i);
+            if (py > localMaxY) localMaxY = py;
+            const dy = Math.abs(py - cy);
+            if (dy < minDy) {
+              minDy = dy;
+              closestSurfY = py;
+            }
+          }
+        }
+        if (isFinite(localMaxY)) {
+          const snappedY = minDy <= 0.8 ? closestSurfY : Math.min(cy, localMaxY);
+          return [cx, parseFloat(Math.min(snappedY, localMaxY).toFixed(3)), cz];
+        }
+        let bestDistSq = Infinity;
+        let bestX = cx;
+        let bestY = cy;
+        let bestZ = cz;
+        for (let i = 0; i < posAttr.count; i++) {
+          const py = posAttr.getY(i);
+          if (Math.abs(py - cy) <= 1.2) {
+            const px = posAttr.getX(i);
+            const pz = posAttr.getZ(i);
+            const dSq = (px - cx) * (px - cx) + (pz - cz) * (pz - cz);
+            if (dSq < bestDistSq) {
+              bestDistSq = dSq;
+              bestX = px;
+              bestY = py;
+              bestZ = pz;
+            }
+          }
+        }
+        return [parseFloat(bestX.toFixed(3)), parseFloat(bestY.toFixed(3)), parseFloat(bestZ.toFixed(3))];
+      }
+
+      let wallMinY = Infinity;
+      let wallMaxY = -Infinity;
+      for (let i = 0; i < posAttr.count; i++) {
+        const dx = posAttr.getX(i) - cx;
+        const dz = posAttr.getZ(i) - cz;
+        if (dx * dx + dz * dz <= 9.0) {
+          const py = posAttr.getY(i);
+          if (py < wallMinY) wallMinY = py;
+          if (py > wallMaxY) wallMaxY = py;
+        }
+      }
+      if (isFinite(wallMinY) && isFinite(wallMaxY) && wallMaxY >= wallMinY) {
+        const margin = Math.min(0.35, (wallMaxY - wallMinY) * 0.25);
+        const clampedY = Math.max(wallMinY + margin, Math.min(wallMaxY - margin, cy));
+        return [cx, parseFloat(clampedY.toFixed(3)), cz];
+      }
+      return [cx, cy, cz];
     };
 
     const analyzeVerticalCylinderCorridor = (
@@ -508,6 +581,10 @@ export class StepModelTessellator {
         const resolved = resolveCollisionFreeSurfaceApproach(cx, cy, cz, norm);
         cy = resolved.cy;
         norm = resolved.norm;
+        const snapped = snapPointToMeshSurface(cx, cy, cz, norm);
+        cx = snapped[0];
+        cy = snapped[1];
+        cz = snapped[2];
       }
 
       let axialMin: number | undefined;
@@ -564,10 +641,73 @@ export class StepModelTessellator {
     );
     group.add(this.createStandoffRiserGroup(standoffSupports));
 
+    const minXScene = parseFloat((-sizeX / 2).toFixed(3));
+    const maxXScene = parseFloat((sizeX / 2).toFixed(3));
+    const minZScene = parseFloat((-sizeZ / 2).toFixed(3));
+    const maxZScene = parseFloat((sizeZ / 2).toFixed(3));
+
+    const nudgeFromDetectedHoles = (px: number, pz: number): [number, number] => {
+      let x = px;
+      let z = pz;
+      for (const h of detectedHoles) {
+        const minR = Math.max(2.0, h.radius + 2.5);
+        const d = Math.hypot(x - h.center[0], z - h.center[2]);
+        if (d < minR) {
+          const dx = d > 0.1 ? (x - h.center[0]) / d : 1.0;
+          const dz = d > 0.1 ? (z - h.center[2]) / d : 0.0;
+          x = h.center[0] + dx * (minR + 1.2);
+          z = h.center[2] + dz * (minR + 1.2);
+        }
+      }
+      return [
+        parseFloat(Math.max(minXScene + 2.5, Math.min(maxXScene - 2.5, x)).toFixed(3)),
+        parseFloat(Math.max(minZScene + 2.5, Math.min(maxZScene - 2.5, z)).toFixed(3)),
+      ];
+    };
+
+    const candA: Array<[number, number]> = [
+      nudgeFromDetectedHoles(minXScene + sizeX * 0.22, minZScene + sizeZ * 0.24),
+      nudgeFromDetectedHoles(maxXScene - sizeX * 0.22, minZScene + sizeZ * 0.24),
+      nudgeFromDetectedHoles(0, maxZScene - sizeZ * 0.24),
+    ];
+
+    const datumSurfacePoints: DatumSurfacePointItem[] = [];
+    for (let i = 0; i < candA.length; i++) {
+      const [ax, az] = candA[i];
+      const snappedA = snapPointToMeshSurface(ax, standoffHeight + sizeY, az, [0, 1, 0]);
+      datumSurfacePoints.push({
+        balloon: 'DATUM_A',
+        position: snappedA,
+        normal: [0, 1, 0],
+        label: `DATUM_A #${i + 1}`,
+      });
+    }
+
+    const insetZ = Math.max(3.5, sizeZ * 0.24);
+    const bZs = [minZScene + insetZ, maxZScene - insetZ];
+    for (let i = 0; i < bZs.length; i++) {
+      const snappedB = snapPointToMeshSurface(minXScene, standoffHeight + 0.9, bZs[i], [-1, 0, 0]);
+      datumSurfacePoints.push({
+        balloon: 'DATUM_B',
+        position: [minXScene, snappedB[1], parseFloat(bZs[i].toFixed(3))],
+        normal: [-1, 0, 0],
+        label: `DATUM_B #${i + 1}`,
+      });
+    }
+
+    const snappedC = snapPointToMeshSurface(0, standoffHeight + 0.9, minZScene, [0, 0, -1]);
+    datumSurfacePoints.push({
+      balloon: 'DATUM_C',
+      position: [0, snappedC[1], minZScene],
+      normal: [0, 0, -1],
+      label: 'DATUM_C #1',
+    });
+
     group.userData.detectedHoles = detectedHoles;
     group.userData.datumANormal = new T.Vector3(0, -1, 0);
     group.userData.standoffHeight = standoffHeight;
     group.userData.standoffSupports = standoffSupports;
+    group.userData.datumSurfacePoints = datumSurfacePoints;
 
     return {
       group,
@@ -581,6 +721,7 @@ export class StepModelTessellator {
       primaryDatumNormal: [0, -1, 0],
       cadFeatures,
       standoffSupports,
+      datumSurfacePoints,
     };
   }
 

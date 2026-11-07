@@ -221,6 +221,12 @@ export class SetupWizard {
   }
 
   private lastGeneratedPlan: GeneratedMeasurementPlan | null = null;
+  private currentDatumSurfacePoints: Array<{
+    balloon: 'DATUM_A' | 'DATUM_B' | 'DATUM_C';
+    position: [number, number, number];
+    normal: [number, number, number];
+    label: string;
+  }> = [];
 
   private announceStylusRecommendations(plan: GeneratedMeasurementPlan): void {
     if (typeof document === 'undefined' || plan.stylusRecommendations.length === 0) return;
@@ -276,11 +282,21 @@ export class SetupWizard {
     for (const matchedDim of this.matchResult.dimensions) {
       const target = this.dimensions.find((d) => d.id === matchedDim.id);
       if (target) {
+        const targetExt = target as InspectionDimension & {
+          axial_min?: number;
+          axial_max?: number;
+          stem_blocked?: boolean;
+          cad_instances?: unknown;
+        };
         target.cad_feature_id = matchedDim.cad_feature_id;
         target.cad_center = matchedDim.cad_center;
         target.cad_normal = matchedDim.cad_normal;
         target.operation = matchedDim.operation;
         target.match_confidence = matchedDim.match_confidence;
+        targetExt.axial_min = matchedDim.axial_min;
+        targetExt.axial_max = matchedDim.axial_max;
+        targetExt.stem_blocked = matchedDim.stem_blocked;
+        targetExt.cad_instances = matchedDim.cad_instances;
 
         const labelText = `${target.type || ''} ${target.type_label || ''} ${target.nominal_str || ''}`.toLowerCase();
         const isAngle = target.type === 'ANGLE' || /açı|konik|°/i.test(labelText);
@@ -322,23 +338,18 @@ export class SetupWizard {
         }
 
         if (!target.cad_center) {
-          const stepH = Math.min(sizeY - 2.0, Math.max(2.0, target.nominal <= sizeY ? target.nominal : (target.id * 17) % sizeY));
-          const safeY = parseFloat((yMin + stepH).toFixed(2));
-          let rAtHeight = maxR * 0.82;
-          for (const f of cadFeats) {
-            if (f.center && Math.abs(f.center[1] - safeY) < 25.0) {
-              const rf = Math.hypot(f.center[0], f.center[2]);
-              if (rf > 4.0) {
-                rAtHeight = rf;
-                break;
-              } else if (f.nominal_dimension && f.nominal_dimension > 8.0 && f.nominal_dimension <= maxR * 2.1) {
-                rAtHeight = f.nominal_dimension / 2.0;
-                break;
-              }
-            }
+          const validFeats = cadFeats.filter((f) => f.center && f.normal);
+          if (validFeats.length > 0) {
+            const fallbackFeat = validFeats[Math.abs(target.id) % validFeats.length];
+            target.cad_feature_id = fallbackFeat.id;
+            target.cad_center = [fallbackFeat.center![0], fallbackFeat.center![1], fallbackFeat.center![2]];
+            target.cad_normal = [fallbackFeat.normal![0], fallbackFeat.normal![1], fallbackFeat.normal![2]];
+          } else {
+            const stepH = Math.min(sizeY - 0.5, Math.max(0.5, sizeY * 0.25));
+            const safeY = parseFloat((yMin + stepH).toFixed(2));
+            target.cad_center = [parseFloat((maxR * 0.82).toFixed(2)), safeY, 0];
+            target.cad_normal = [1, 0, 0];
           }
-          target.cad_center = [parseFloat(rAtHeight.toFixed(2)), safeY, 0];
-          target.cad_normal = [1, 0, 0];
         }
 
         const nomVal = typeof target.nominal === 'number' && !isNaN(target.nominal) ? target.nominal : parseFloat(String(target.nominal)) || 0;
@@ -2148,6 +2159,9 @@ export class SetupWizard {
         (this.loadedFileName ? this.loadedFileName : 'active_part.stp');
 
       const tess = applyStepModelToScene(cadName, '', this.currentCadMetadata || undefined);
+      if (tess?.datumSurfacePoints?.length) {
+        this.currentDatumSurfacePoints = tess.datumSurfacePoints;
+      }
       if (tess?.bbox?.min && tess?.bbox?.max) {
         tessBbox = { min: tess.bbox.min, max: tess.bbox.max };
         if (this.currentCadMetadata) {
@@ -2222,6 +2236,7 @@ export class SetupWizard {
       verticalAxis: 'Y',
       clearanceZMarginMm: 15.0,
       includeDatumSetup: true,
+      datumSurfacePoints: this.currentDatumSurfacePoints,
     });
     this.lastGeneratedPlan = plan;
     this.announceStylusRecommendations(plan);
@@ -2262,7 +2277,7 @@ export class SetupWizard {
             allTouches.push({ position: tp.position, label: `${fp.balloon} Temas Noktası`, isDatum: false });
           }
         }
-        this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], allTouches, 0.34);
+        this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], allTouches, 0.075);
 
         if (win.probeGroup && plan.allWaypoints.length > 0) {
           const firstWp = plan.allWaypoints[0] as ExtendedWaypoint;
@@ -2341,7 +2356,7 @@ export class SetupWizard {
   private renderSceneTrajectoryAndTouches(
     waypoints: ExtendedWaypoint[],
     touches: Array<{ position: [number, number, number]; label?: string; isDatum?: boolean }>,
-    tubeRadius = 0.35
+    tubeRadius = 0.075
   ): void {
     if (typeof window === 'undefined') return;
     const win = window as unknown as {
@@ -2368,8 +2383,8 @@ export class SetupWizard {
         win.trajLine.material.color.setHex(0x10b981);
       }
       if (win.trajLine.material) {
-        win.trajLine.material.opacity = 0.98;
-        win.trajLine.material.linewidth = 2.5;
+        win.trajLine.material.opacity = 0.75;
+        win.trajLine.material.linewidth = 1.2;
       }
       if (tPoints.length > 0) {
         (win.trajLine as unknown as { geometry: unknown }).geometry = new T.BufferGeometry().setFromPoints(tPoints);
@@ -2397,12 +2412,12 @@ export class SetupWizard {
 
       if (tPoints.length >= 2) {
         const lineGeo = new T.BufferGeometry().setFromPoints(tPoints);
-        const lineMat = new T.LineBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.98 });
+        const lineMat = new T.LineBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.75 });
         pathGroup.add(new T.Line(lineGeo, lineMat));
 
         const upAxis = new T.Vector3(0, 1, 0);
-        const matMeas = new T.MeshBasicMaterial({ color: 0x10b981 });
-        const matDatum = new T.MeshBasicMaterial({ color: 0xf59e0b });
+        const matMeas = new T.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.82 });
+        const matDatum = new T.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.85 });
 
         for (let i = 0; i < tPoints.length - 1; i++) {
           const pA = tPoints[i];
@@ -2412,7 +2427,7 @@ export class SetupWizard {
           if (segLen < 0.05) continue;
 
           const isDatumSeg = Boolean(waypoints[i + 1]?.balloon?.startsWith('DATUM_'));
-          const cylGeo = new T.CylinderGeometry(tubeRadius, tubeRadius, segLen, 8);
+          const cylGeo = new T.CylinderGeometry(tubeRadius, tubeRadius, segLen, 6);
           const cylMesh = new T.Mesh(cylGeo, isDatumSeg ? matDatum : matMeas);
           const mid = new T.Vector3().addVectors(pA, pB).multiplyScalar(0.5);
           cylMesh.position.copy(mid);
@@ -2421,7 +2436,7 @@ export class SetupWizard {
         }
       }
 
-      const dotGeo = new T.SphereGeometry(Math.max(1.2, tubeRadius * 3.6), 14, 14);
+      const dotGeo = new T.SphereGeometry(Math.max(0.28, tubeRadius * 3.4), 12, 12);
       const dotMatMeas = new T.MeshBasicMaterial({ color: 0x10b981 });
       const dotMatDatum = new T.MeshBasicMaterial({ color: 0xf59e0b });
       for (const tp of touches) {
@@ -2550,6 +2565,7 @@ export class SetupWizard {
       verticalAxis: 'Y',
       clearanceZMarginMm: 15.0,
       includeDatumSetup: true,
+      datumSurfacePoints: this.currentDatumSurfacePoints,
     });
     this.lastGeneratedPlan = plan;
     this.announceStylusRecommendations(plan);
@@ -2581,7 +2597,7 @@ export class SetupWizard {
         opTouches.push({ position: tp.position, label: `${fp.balloon} Temas Noktası`, isDatum: false });
       }
     }
-    this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], opTouches, 0.34);
+    this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], opTouches, 0.075);
 
     if (typeof document !== 'undefined') {
       const sidebarLeft = document.querySelector('.sidebar-left') as HTMLElement | null;
@@ -2732,7 +2748,7 @@ export class SetupWizard {
           label: `${fp.balloon} Temas Noktası`,
           isDatum: false,
         }));
-        this.renderSceneTrajectoryAndTouches(fp.waypoints as ExtendedWaypoint[], singleTouches, 0.45);
+        this.renderSceneTrajectoryAndTouches(fp.waypoints as ExtendedWaypoint[], singleTouches, 0.11);
 
         const touchWp = (fp.waypoints.find((w) => w.phase === 'TOUCH') || fp.waypoints[0]) as ExtendedWaypoint;
         this.orientProbeHead(win.probeGroup, touchWp.position, touchWp.stylusDir || [0, -1, 0], touchWp.ph10Label || headAngleStr);
