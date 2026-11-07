@@ -311,9 +311,11 @@ export class StepModelTessellator {
           ];
           const dx = vStart[0] - vEnd[0], dy = vStart[1] - vEnd[1], dz = vStart[2] - vEnd[2];
           const dist = Math.hypot(dx, dy, dz);
+          const ccw = oe.sense === e.sameSense;
           if (dist < 0.001) {
-            for (let k = 0; k < 24; k++) {
-              const theta = (2 * Math.PI * k) / 24;
+            const segs = 32;
+            for (let k = 0; k < segs; k++) {
+              const theta = (ccw ? 1 : -1) * ((2 * Math.PI * k) / segs);
               const cosT = Math.cos(theta), sinT = Math.sin(theta);
               loopPts.push([
                 center[0] + r * (cosT * u[0] + sinT * v[0]),
@@ -324,16 +326,25 @@ export class StepModelTessellator {
           } else {
             const pA = oe.sense ? vStart : vEnd;
             const pB = oe.sense ? vEnd : vStart;
-            loopPts.push(pA);
-            const vA = [pA[0] - center[0], pA[1] - center[1], pA[2] - center[2]];
-            const vB = [pB[0] - center[0], pB[1] - center[1], pB[2] - center[2]];
-            for (let step = 1; step <= 4; step++) {
-              const t = step / 5.0;
-              const ix = (1 - t) * vA[0] + t * vB[0];
-              const iy = (1 - t) * vA[1] + t * vB[1];
-              const iz = (1 - t) * vA[2] + t * vB[2];
-              const len = Math.hypot(ix, iy, iz) || 1;
-              loopPts.push([center[0] + (ix / len) * r, center[1] + (iy / len) * r, center[2] + (iz / len) * r]);
+            const vAx = pA[0] - center[0], vAy = pA[1] - center[1], vAz = pA[2] - center[2];
+            const vBx = pB[0] - center[0], vBy = pB[1] - center[1], vBz = pB[2] - center[2];
+            const thetaA = Math.atan2(vAx * v[0] + vAy * v[1] + vAz * v[2], vAx * u[0] + vAy * u[1] + vAz * u[2]);
+            const thetaB = Math.atan2(vBx * v[0] + vBy * v[1] + vBz * v[2], vBx * u[0] + vBy * u[1] + vBz * u[2]);
+            let dTheta = thetaB - thetaA;
+            if (ccw) {
+              while (dTheta <= 1e-5) dTheta += 2 * Math.PI;
+            } else {
+              while (dTheta >= -1e-5) dTheta -= 2 * Math.PI;
+            }
+            const steps = Math.max(6, Math.ceil((Math.abs(dTheta) / (2 * Math.PI)) * 32));
+            for (let step = 0; step < steps; step++) {
+              const theta = thetaA + (step / steps) * dTheta;
+              const cosT = Math.cos(theta), sinT = Math.sin(theta);
+              loopPts.push([
+                center[0] + r * (cosT * u[0] + sinT * v[0]),
+                center[1] + r * (cosT * u[1] + sinT * v[1]),
+                center[2] + r * (cosT * u[2] + sinT * v[2]),
+              ]);
             }
           }
         } else {
@@ -418,10 +429,41 @@ export class StepModelTessellator {
     const triNormals: number[] = [];
     const loopInfos: Array<{ normal: [number, number, number]; area: number; center: [number, number, number] }> = [];
 
-    for (const loopId of loopMap.keys()) {
-      const loopPts = sampleLoop(loopId);
-      if (loopPts.length < 3) continue;
+    const planeSurfRegex = /#([0-9]+)\s*=\s*PLANE\s*\(\s*(?:'[^']*'|\$)\s*,\s*#([0-9]+)\s*\)/g;
+    const planeSurfs = new Map<string, string>();
+    while ((m = planeSurfRegex.exec(stepText)) !== null) {
+      planeSurfs.set(m[1], m[2]);
+    }
 
+    const revSurfRegex = /#([0-9]+)\s*=\s*(CYLINDRICAL_SURFACE|CONICAL_SURFACE|TOROIDAL_SURFACE)\s*\(\s*(?:'[^']*'|\$)\s*,\s*#([0-9]+)\s*,\s*([-\d.eE+]+)(?:\s*,\s*([-\d.eE+]+))?\s*\)/g;
+    const revSurfs = new Map<string, { type: string; placementId: string; r1: number; r2: number }>();
+    while ((m = revSurfRegex.exec(stepText)) !== null) {
+      revSurfs.set(m[1], {
+        type: m[2],
+        placementId: m[3],
+        r1: parseFloat(m[4]),
+        r2: m[5] ? parseFloat(m[5]) : 0,
+      });
+    }
+
+    const fbRegex = /#([0-9]+)\s*=\s*FACE_(?:OUTER_)?BOUND\s*\(\s*(?:'[^']*'|\$)\s*,\s*#([0-9]+)\s*,\s*\.(T|F)\.\s*\)/g;
+    const faceBounds = new Map<string, { loopId: string; sense: boolean }>();
+    while ((m = fbRegex.exec(stepText)) !== null) {
+      faceBounds.set(m[1], { loopId: m[2], sense: m[3] === 'T' });
+    }
+
+    const afRegex = /#([0-9]+)\s*=\s*ADVANCED_FACE\s*\(\s*(?:'[^']*'|\$)\s*,\s*\(([^)]+)\)\s*,\s*#([0-9]+)\s*,\s*\.(T|F)\.\s*\)/g;
+    const advancedFaces: Array<{ id: string; boundIds: string[]; surfId: string; sameSense: boolean }> = [];
+    while ((m = afRegex.exec(stepText)) !== null) {
+      advancedFaces.push({
+        id: m[1],
+        boundIds: m[2].split(',').map((s) => s.trim().replace('#', '')),
+        surfId: m[3],
+        sameSense: m[4] === 'T',
+      });
+    }
+
+    const computeLoopProps = (loopPts: [number, number, number][]) => {
       let nx = 0, ny = 0, nz = 0;
       let cx = 0, cy = 0, cz = 0;
       for (let i = 0; i < loopPts.length; i++) {
@@ -432,14 +474,21 @@ export class StepModelTessellator {
         cx += c[0]; cy += c[1]; cz += c[2];
       }
       const lenN = Math.hypot(nx, ny, nz);
-      if (lenN < 1e-6) continue;
-      nx /= lenN; ny /= lenN; nz /= lenN;
-      loopInfos.push({
-        normal: [nx, ny, nz],
+      if (lenN < 1e-6) return null;
+      return {
+        normal: [nx / lenN, ny / lenN, nz / lenN] as [number, number, number],
         area: lenN * 0.5,
-        center: [cx / loopPts.length, cy / loopPts.length, cz / loopPts.length],
-      });
+        center: [cx / loopPts.length, cy / loopPts.length, cz / loopPts.length] as [number, number, number],
+      };
+    };
 
+    const emitPlanarLoopGroup = (
+      outerPts: [number, number, number][],
+      holeLoops: [number, number, number][][],
+      nx: number,
+      ny: number,
+      nz: number
+    ) => {
       let ux = 0, uy = 1, uz = 0;
       if (Math.abs(ny) > 0.9) { ux = 1; uy = 0; uz = 0; }
       let tx = ny * uz - nz * uy;
@@ -451,20 +500,215 @@ export class StepModelTessellator {
       const vy = nz * tx - nx * tz;
       const vz = nx * ty - ny * tx;
 
-      const pts2D: [number, number][] = loopPts.map((p) => [
-        (p[0] - loopPts[0][0]) * tx + (p[1] - loopPts[0][1]) * ty + (p[2] - loopPts[0][2]) * tz,
-        (p[0] - loopPts[0][0]) * vx + (p[1] - loopPts[0][1]) * vy + (p[2] - loopPts[0][2]) * vz,
-      ]);
+      const project2D = (pts: [number, number, number][]): [number, number][] =>
+        pts.map((p) => [
+          (p[0] - outerPts[0][0]) * tx + (p[1] - outerPts[0][1]) * ty + (p[2] - outerPts[0][2]) * tz,
+          (p[0] - outerPts[0][0]) * vx + (p[1] - outerPts[0][1]) * vy + (p[2] - outerPts[0][2]) * vz,
+        ]);
 
+      if (holeLoops.length > 0 && typeof T.ShapeUtils?.triangulateShape === 'function') {
+        const contour2D = project2D(outerPts).map((p) => new T.Vector2(p[0], p[1]));
+        const holes2D = holeLoops.map((hl) => project2D(hl).map((p) => new T.Vector2(p[0], p[1])));
+        const allPts3D: [number, number, number][] = [...outerPts];
+        for (const hl of holeLoops) {
+          allPts3D.push(...hl);
+        }
+        const faces = T.ShapeUtils.triangulateShape(contour2D, holes2D);
+        for (const f of faces) {
+          const pA = allPts3D[f[0]], pB = allPts3D[f[1]], pC = allPts3D[f[2]];
+          if (!pA || !pB || !pC) continue;
+          triPositions.push(pA[0], pA[1], pA[2], pB[0], pB[1], pB[2], pC[0], pC[1], pC[2]);
+          triNormals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
+        }
+        return;
+      }
+
+      const pts2D = project2D(outerPts);
       const tris = earClip2D(pts2D);
       for (let k = 0; k < tris.length; k += 3) {
-        const pA = loopPts[tris[k]], pB = loopPts[tris[k + 1]], pC = loopPts[tris[k + 2]];
-        triPositions.push(pA[0], pA[1], pA[2]);
-        triPositions.push(pB[0], pB[1], pB[2]);
-        triPositions.push(pC[0], pC[1], pC[2]);
-        triNormals.push(nx, ny, nz);
-        triNormals.push(nx, ny, nz);
-        triNormals.push(nx, ny, nz);
+        const pA = outerPts[tris[k]], pB = outerPts[tris[k + 1]], pC = outerPts[tris[k + 2]];
+        triPositions.push(pA[0], pA[1], pA[2], pB[0], pB[1], pB[2], pC[0], pC[1], pC[2]);
+        triNormals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
+      }
+    };
+
+    if (advancedFaces.length > 0) {
+      for (const af of advancedFaces) {
+        const sampledLoops: Array<{ pts: [number, number, number][]; area: number; normal: [number, number, number]; center: [number, number, number] }> = [];
+        for (const bId of af.boundIds) {
+          const fb = faceBounds.get(bId);
+          if (!fb) continue;
+          const pts = sampleLoop(fb.loopId);
+          if (pts.length < 3) continue;
+          const props = computeLoopProps(pts);
+          if (props) {
+            sampledLoops.push({ pts, area: props.area, normal: props.normal, center: props.center });
+          } else {
+            sampledLoops.push({ pts, area: 0, normal: [0, 1, 0], center: pts[0] });
+          }
+        }
+        if (sampledLoops.length === 0) continue;
+
+        const revSurf = revSurfs.get(af.surfId);
+        if (revSurf) {
+          const pl = placements.get(revSurf.placementId);
+          if (pl?.origin && pl?.axis) {
+            const origin = pl.origin;
+            const lenA = Math.hypot(...pl.axis) || 1;
+            const axis: [number, number, number] = [pl.axis[0] / lenA, pl.axis[1] / lenA, pl.axis[2] / lenA];
+            let ref = pl.ref;
+            if (!ref) ref = Math.abs(axis[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1];
+            const dot = ref[0] * axis[0] + ref[1] * axis[1] + ref[2] * axis[2];
+            let u: [number, number, number] = [ref[0] - dot * axis[0], ref[1] - dot * axis[1], ref[2] - dot * axis[2]];
+            const lenU = Math.hypot(...u) || 1;
+            u = [u[0] / lenU, u[1] / lenU, u[2] / lenU];
+            const v: [number, number, number] = [
+              axis[1] * u[2] - axis[2] * u[1],
+              axis[2] * u[0] - axis[0] * u[2],
+              axis[0] * u[1] - axis[1] * u[0],
+            ];
+
+            const allPts = sampledLoops.flatMap((l) => l.pts);
+            let hMin = Infinity, hMax = -Infinity;
+            const hVals: number[] = [];
+            const rVals: number[] = [];
+            const thetas: number[] = [];
+
+            for (const p of allPts) {
+              const dx = p[0] - origin[0], dy = p[1] - origin[1], dz = p[2] - origin[2];
+              const h = dx * axis[0] + dy * axis[1] + dz * axis[2];
+              const ru = dx * u[0] + dy * u[1] + dz * u[2];
+              const rv = dx * v[0] + dy * v[1] + dz * v[2];
+              const r = Math.hypot(ru, rv);
+              if (h < hMin) hMin = h;
+              if (h > hMax) hMax = h;
+              hVals.push(h);
+              rVals.push(r);
+              if (r > 1e-3) {
+                thetas.push(Math.atan2(rv, ru));
+              }
+            }
+
+            if (hMax - hMin > 1e-4) {
+              let rAtMin = revSurf.r1;
+              let rAtMax = revSurf.r1;
+              if (revSurf.type !== 'CYLINDRICAL_SURFACE') {
+                const band = Math.max(1e-3, (hMax - hMin) * 0.15);
+                let sumMin = 0, cntMin = 0, sumMax = 0, cntMax = 0;
+                for (let idx = 0; idx < hVals.length; idx++) {
+                  if (hVals[idx] <= hMin + band) { sumMin += rVals[idx]; cntMin++; }
+                  if (hVals[idx] >= hMax - band) { sumMax += rVals[idx]; cntMax++; }
+                }
+                if (cntMin > 0) rAtMin = sumMin / cntMin;
+                if (cntMax > 0) rAtMax = sumMax / cntMax;
+              }
+
+              let thetaStart = 0;
+              let dThetaSpan = 2 * Math.PI;
+              if (thetas.length >= 3) {
+                thetas.sort((a, b) => a - b);
+                let maxGap = 0;
+                let gapIdx = -1;
+                for (let idx = 0; idx < thetas.length - 1; idx++) {
+                  const gap = thetas[idx + 1] - thetas[idx];
+                  if (gap > maxGap) { maxGap = gap; gapIdx = idx; }
+                }
+                const wrapGap = thetas[0] + 2 * Math.PI - thetas[thetas.length - 1];
+                if (wrapGap > maxGap) {
+                  maxGap = wrapGap;
+                  gapIdx = thetas.length - 1;
+                }
+                if (maxGap > 0.45) {
+                  thetaStart = thetas[(gapIdx + 1) % thetas.length];
+                  dThetaSpan = Math.max(0.1, 2 * Math.PI - maxGap);
+                }
+              }
+
+              const nSegs = Math.max(12, Math.ceil((dThetaSpan / (2 * Math.PI)) * 36));
+              const signNorm = af.sameSense ? 1 : -1;
+              for (let k = 0; k < nSegs; k++) {
+                const t0 = thetaStart + (k / nSegs) * dThetaSpan;
+                const t1 = thetaStart + ((k + 1) / nSegs) * dThetaSpan;
+                const c0 = Math.cos(t0), s0 = Math.sin(t0);
+                const c1 = Math.cos(t1), s1 = Math.sin(t1);
+
+                const rad0: [number, number, number] = [c0 * u[0] + s0 * v[0], c0 * u[1] + s0 * v[1], c0 * u[2] + s0 * v[2]];
+                const rad1: [number, number, number] = [c1 * u[0] + s1 * v[0], c1 * u[1] + s1 * v[1], c1 * u[2] + s1 * v[2]];
+
+                const p00: [number, number, number] = [
+                  origin[0] + hMin * axis[0] + rAtMin * rad0[0],
+                  origin[1] + hMin * axis[1] + rAtMin * rad0[1],
+                  origin[2] + hMin * axis[2] + rAtMin * rad0[2],
+                ];
+                const p10: [number, number, number] = [
+                  origin[0] + hMin * axis[0] + rAtMin * rad1[0],
+                  origin[1] + hMin * axis[1] + rAtMin * rad1[1],
+                  origin[2] + hMin * axis[2] + rAtMin * rad1[2],
+                ];
+                const p11: [number, number, number] = [
+                  origin[0] + hMax * axis[0] + rAtMax * rad1[0],
+                  origin[1] + hMax * axis[1] + rAtMax * rad1[1],
+                  origin[2] + hMax * axis[2] + rAtMax * rad1[2],
+                ];
+                const p01: [number, number, number] = [
+                  origin[0] + hMax * axis[0] + rAtMax * rad0[0],
+                  origin[1] + hMax * axis[1] + rAtMax * rad0[1],
+                  origin[2] + hMax * axis[2] + rAtMax * rad0[2],
+                ];
+
+                const n0: [number, number, number] = [rad0[0] * signNorm, rad0[1] * signNorm, rad0[2] * signNorm];
+                const n1: [number, number, number] = [rad1[0] * signNorm, rad1[1] * signNorm, rad1[2] * signNorm];
+
+                triPositions.push(p00[0], p00[1], p00[2], p10[0], p10[1], p10[2], p11[0], p11[1], p11[2]);
+                triNormals.push(n0[0], n0[1], n0[2], n1[0], n1[1], n1[2], n1[0], n1[1], n1[2]);
+
+                triPositions.push(p00[0], p00[1], p00[2], p11[0], p11[1], p11[2], p01[0], p01[1], p01[2]);
+                triNormals.push(n0[0], n0[1], n0[2], n1[0], n1[1], n1[2], n0[0], n0[1], n0[2]);
+              }
+              continue;
+            }
+          }
+        }
+
+        sampledLoops.sort((a, b) => b.area - a.area);
+        const outer = sampledLoops[0];
+        if (outer.area < 1e-6) continue;
+
+        let nx = outer.normal[0], ny = outer.normal[1], nz = outer.normal[2];
+        const plSurfId = planeSurfs.get(af.surfId);
+        if (plSurfId) {
+          const pl = placements.get(plSurfId);
+          if (pl?.axis) {
+            const lenA = Math.hypot(...pl.axis) || 1;
+            const sign = af.sameSense ? 1 : -1;
+            nx = (pl.axis[0] / lenA) * sign;
+            ny = (pl.axis[1] / lenA) * sign;
+            nz = (pl.axis[2] / lenA) * sign;
+          }
+          const netArea = Math.max(0.1, outer.area - sampledLoops.slice(1).reduce((s, l) => s + l.area, 0));
+          loopInfos.push({
+            normal: [nx, ny, nz],
+            area: netArea,
+            center: outer.center,
+          });
+        }
+
+        emitPlanarLoopGroup(
+          outer.pts,
+          sampledLoops.slice(1).map((l) => l.pts),
+          nx,
+          ny,
+          nz
+        );
+      }
+    } else {
+      for (const loopId of loopMap.keys()) {
+        const loopPts = sampleLoop(loopId);
+        if (loopPts.length < 3) continue;
+        const props = computeLoopProps(loopPts);
+        if (!props) continue;
+        loopInfos.push(props);
+        emitPlanarLoopGroup(loopPts, [], props.normal[0], props.normal[1], props.normal[2]);
       }
     }
 
@@ -495,6 +739,28 @@ export class StepModelTessellator {
       partCx /= vCount; partCy /= vCount; partCz /= vCount;
       const dotCentroid = (partCx - c0[0]) * n0[0] + (partCy - c0[1]) * n0[1] + (partCz - c0[2]) * n0[2];
       ey = dotCentroid < -1e-4 ? [-n0[0], -n0[1], -n0[2]] : [n0[0], n0[1], n0[2]];
+
+      let minYTest = Infinity, maxYTest = -Infinity;
+      for (let i = 0; i < triPositions.length; i += 3) {
+        const py = triPositions[i] * ey[0] + triPositions[i + 1] * ey[1] + triPositions[i + 2] * ey[2];
+        if (py < minYTest) minYTest = py;
+        if (py > maxYTest) maxYTest = py;
+      }
+      const spanYTest = maxYTest - minYTest;
+      if (spanYTest > 1e-3) {
+        let areaNearMin = 0, areaNearMax = 0;
+        for (const li of loopInfos) {
+          const dAlign = Math.abs(li.normal[0] * ey[0] + li.normal[1] * ey[1] + li.normal[2] * ey[2]);
+          if (dAlign > 0.95) {
+            const cyProj = li.center[0] * ey[0] + li.center[1] * ey[1] + li.center[2] * ey[2];
+            if (cyProj - minYTest <= spanYTest * 0.15) areaNearMin += li.area;
+            if (maxYTest - cyProj <= spanYTest * 0.15) areaNearMax += li.area;
+          }
+        }
+        if (areaNearMax > areaNearMin + 1.0) {
+          ey = [-ey[0], -ey[1], -ey[2]];
+        }
+      }
 
       const secGroups = new Map<string, { vec: [number, number, number]; area: number }>();
       for (let i = 1; i < loopInfos.length; i++) {

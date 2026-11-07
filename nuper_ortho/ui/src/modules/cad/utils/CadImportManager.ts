@@ -23,11 +23,13 @@ export interface SelectedCadFileResult {
 }
 
 let isCadImporting = false;
+let cachedCadFilename = '';
 let cachedCadStepText = '';
 let cachedCadMetadata: CadMetadata | undefined = undefined;
 
 export function resetCadImportLock(): void {
   isCadImporting = false;
+  cachedCadFilename = '';
   cachedCadStepText = '';
   cachedCadMetadata = undefined;
 }
@@ -181,11 +183,28 @@ export function generateSafeProbeTrajectory(tess: TessellatedModelResult): THREE
 export function applyStepModelToScene(filename: string, stepText = '', metadata?: CadMetadata): TessellatedModelResult {
   if (stepText) {
     cachedCadStepText = stepText;
-  } else if (cachedCadStepText) {
+  } else if (cachedCadStepText && (!cachedCadFilename || cachedCadFilename === filename)) {
     stepText = cachedCadStepText;
   }
-  if (metadata) {
+  if (metadata?.mesh?.positions_b64) {
     cachedCadMetadata = metadata;
+    cachedCadFilename = filename;
+  } else if (metadata && cachedCadMetadata?.mesh?.positions_b64 && (!cachedCadFilename || cachedCadFilename === filename)) {
+    metadata = {
+      ...cachedCadMetadata,
+      ...metadata,
+      mesh: cachedCadMetadata.mesh,
+      alignment: metadata.alignment || cachedCadMetadata.alignment,
+      pmi: metadata.pmi || cachedCadMetadata.pmi,
+      features:
+        cachedCadMetadata.features && cachedCadMetadata.features.length > (metadata.features?.length || 0)
+          ? cachedCadMetadata.features
+          : metadata.features || cachedCadMetadata.features,
+    };
+    cachedCadMetadata = metadata;
+  } else if (metadata) {
+    cachedCadMetadata = metadata;
+    cachedCadFilename = filename;
   } else if (cachedCadMetadata) {
     metadata = cachedCadMetadata;
   }
@@ -303,6 +322,7 @@ export function applyStepModelToScene(filename: string, stepText = '', metadata?
     wWizard.setupWizard.setCadMetadata({
       model_name: filename,
       protocol: metadata?.kernel || 'ISO 10303-21',
+      kernel: metadata?.kernel,
       bbox: {
         min: tess.bbox.min,
         max: tess.bbox.max,
@@ -312,6 +332,11 @@ export function applyStepModelToScene(filename: string, stepText = '', metadata?
       faces_count: planeCount > 0 ? planeCount : (tess.cadFeatures?.length || 0),
       holes_count: tess.detectedHoles.length,
       wall_thickness_min: tess.bbox.size[1],
+      vertex_count: metadata?.vertex_count,
+      triangle_count: metadata?.triangle_count,
+      mesh: metadata?.mesh,
+      alignment: metadata?.alignment,
+      pmi: metadata?.pmi,
     });
   }
 
@@ -438,6 +463,10 @@ export async function safeTriggerCadImport(): Promise<void> {
           return;
         }
 
+        if (res.metadata) {
+          cachedCadMetadata = res.metadata;
+          cachedCadFilename = res.name;
+        }
         const tess = applyStepModelToScene(res.name, res.dataText || '', res.metadata);
 
         if (typeof win.handleCadData === 'function') {
@@ -448,12 +477,18 @@ export async function safeTriggerCadImport(): Promise<void> {
           win.setupWizard.setCadMetadata({
             model_name: res.name,
             format: res.ext.toUpperCase() as 'STEP' | 'STL' | 'OBJ',
+            kernel: res.metadata?.kernel,
             features: tess.cadFeatures || [],
             bbox: {
               min: tess.bbox.min,
               max: tess.bbox.max,
               size: tess.bbox.size,
             },
+            vertex_count: res.metadata?.vertex_count,
+            triangle_count: res.metadata?.triangle_count,
+            mesh: res.metadata?.mesh,
+            alignment: res.metadata?.alignment,
+            pmi: res.metadata?.pmi,
           });
         }
       } catch (ipcErr) {
@@ -508,7 +543,7 @@ export function installCadImportInterceptor(): void {
       setupWizard?: {
         isPlanConfirmed?: () => boolean;
         getDimensions?: () => unknown[];
-        applyActivePlanToWorkspace?: () => void;
+        applyActivePlanToWorkspace?: (dims?: unknown) => void;
       };
       trajLine?: { visible: boolean };
     };
@@ -518,7 +553,8 @@ export function installCadImportInterceptor(): void {
       wWiz.setupWizard.isPlanConfirmed() &&
       typeof wWiz.setupWizard.applyActivePlanToWorkspace === 'function'
     ) {
-      wWiz.setupWizard.applyActivePlanToWorkspace();
+      const dims = typeof wWiz.setupWizard.getDimensions === 'function' ? wWiz.setupWizard.getDimensions() : undefined;
+      wWiz.setupWizard.applyActivePlanToWorkspace(dims);
     } else if (wWiz.trajLine) {
       wWiz.trajLine.visible = false;
     }
@@ -534,7 +570,7 @@ export function installCadImportInterceptor(): void {
     blockGroup?: THREE.Group | null;
     setupWizard?: {
       getDimensions?: () => unknown[];
-      applyActivePlanToWorkspace?: () => void;
+      applyActivePlanToWorkspace?: (dims?: unknown) => void;
     };
   };
   const origApply321 = wAlign.apply321Alignment;
@@ -567,7 +603,7 @@ export function installCadImportInterceptor(): void {
       wAlign.setupWizard.getDimensions().length > 0 &&
       typeof wAlign.setupWizard.applyActivePlanToWorkspace === 'function'
     ) {
-      wAlign.setupWizard.applyActivePlanToWorkspace();
+      wAlign.setupWizard.applyActivePlanToWorkspace(wAlign.setupWizard.getDimensions());
     }
 
     if (win.workflowRibbon) {

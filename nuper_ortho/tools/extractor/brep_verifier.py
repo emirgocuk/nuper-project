@@ -93,8 +93,27 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
 
     reader = STEPControl_Reader()
     status = reader.ReadFile(step_path)
+    tmp_step_path: Optional[str] = None
     if status != IFSelect_ReturnStatus.IFSelect_RetDone:
-        return {"success": False, "error": f"STEP dosyası OpenCASCADE ile okunamadı: {step_path}"}
+        import shutil
+        import tempfile
+        try:
+            fd, tmp_step_path = tempfile.mkstemp(suffix=".stp", prefix="nuper_ocp_")
+            os.close(fd)
+            shutil.copyfile(step_path, tmp_step_path)
+            reader = STEPControl_Reader()
+            status = reader.ReadFile(tmp_step_path)
+        except Exception:
+            pass
+    try:
+        if status != IFSelect_ReturnStatus.IFSelect_RetDone:
+            return {"success": False, "error": f"STEP dosyası OpenCASCADE ile okunamadı: {step_path}"}
+    finally:
+        if tmp_step_path and os.path.exists(tmp_step_path):
+            try:
+                os.remove(tmp_step_path)
+            except Exception:
+                pass
 
     reader.TransferRoots()
     shape = reader.OneShape()
@@ -255,17 +274,65 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
             cone = adaptor.Cone()
             radius = cone.RefRadius()
             axis_dir = cone.Axis().Direction()
-            angle_deg = round(math.degrees(cone.SemiAngle()), 2)
+            ax_pnt = cone.Axis().Location()
+            angle_deg = round(math.degrees(abs(cone.SemiAngle())), 2)
+            comp_angle_deg = round(90.0 - angle_deg, 2)
+            max_cone_r = radius
+            h_min_c = float("inf")
+            h_max_c = float("-inf")
+            if tri is not None:
+                trsf_c = loc.Transformation()
+                for n_i in range(1, tri.NbNodes() + 1):
+                    pnt_c = tri.Node(n_i).Transformed(trsf_c)
+                    dx_c = pnt_c.X() - ax_pnt.X()
+                    dy_c = pnt_c.Y() - ax_pnt.Y()
+                    dz_c = pnt_c.Z() - ax_pnt.Z()
+                    h_c = dx_c * axis_dir.X() + dy_c * axis_dir.Y() + dz_c * axis_dir.Z()
+                    if h_c < h_min_c:
+                        h_min_c = h_c
+                    if h_c > h_max_c:
+                        h_max_c = h_c
+                    rx_c = dx_c - h_c * axis_dir.X()
+                    ry_c = dy_c - h_c * axis_dir.Y()
+                    rz_c = dz_c - h_c * axis_dir.Z()
+                    r_c = math.sqrt(rx_c * rx_c + ry_c * ry_c + rz_c * rz_c)
+                    if r_c > max_cone_r:
+                        max_cone_r = r_c
+            cone_dia = round(max_cone_r * 2.0, 4)
+            cone_span = round(max(0.0, h_max_c - h_min_c), 2) if h_max_c > h_min_c else 0.0
+            norm_c = [round(axis_dir.X(), 4), round(axis_dir.Y(), 4), round(axis_dir.Z(), 4)]
             extracted_features.append({
                 "id": f"CAD_CONE_{face_idx}",
                 "feature_type": "CONE",
-                "nominal_dimension": round(radius * 2.0, 4),
+                "nominal_dimension": cone_dia,
                 "center": center_vec,
-                "normal": [round(axis_dir.X(), 4), round(axis_dir.Y(), 4), round(axis_dir.Z(), 4)],
+                "normal": norm_c,
                 "area_or_length": angle_deg,
                 "face_ids": [face_id],
-                "description": f"Konik Yüzey (Yarım Açı: {angle_deg}°, Ø{radius*2:.2f})",
+                "description": f"Konik Yüzey (Açı: {angle_deg}° / {comp_angle_deg}°, Ø{cone_dia:.2f})",
             })
+            if comp_angle_deg > 0.5 and abs(comp_angle_deg - angle_deg) > 0.1:
+                extracted_features.append({
+                    "id": f"CAD_CONE_ANGLE_{face_idx}",
+                    "feature_type": "CONE",
+                    "nominal_dimension": comp_angle_deg,
+                    "center": center_vec,
+                    "normal": norm_c,
+                    "area_or_length": angle_deg,
+                    "face_ids": [face_id],
+                    "description": f"Konik Eğim Açısı ({comp_angle_deg}°)",
+                })
+            if abs(angle_deg - 45.0) <= 1.0 and cone_span >= 0.2:
+                extracted_features.append({
+                    "id": f"CAD_CHAMFER_{face_idx}",
+                    "feature_type": "CONE",
+                    "nominal_dimension": cone_span,
+                    "center": center_vec,
+                    "normal": norm_c,
+                    "area_or_length": 45.0,
+                    "face_ids": [face_id],
+                    "description": f"Pah Yüzeyi ({cone_span:.1f}x45°)",
+                })
         elif stype_enum == GeomAbs_Sphere:
             sphere = adaptor.Sphere()
             r = sphere.Radius()
@@ -369,6 +436,24 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
             ey = (-n0[0], -n0[1], -n0[2])
         else:
             ey = n0
+
+        ys_test = [all_positions[i] * ey[0] + all_positions[i + 1] * ey[1] + all_positions[i + 2] * ey[2] for i in range(0, len(all_positions), 3)]
+        min_y_test, max_y_test = min(ys_test), max(ys_test)
+        span_y_test = max_y_test - min_y_test
+        if span_y_test > 1e-3:
+            area_near_min = 0.0
+            area_near_max = 0.0
+            for pl_item in planes:
+                np_vec = _norm_vec((float(pl_item["normal"][0]), float(pl_item["normal"][1]), float(pl_item["normal"][2])))
+                if abs(_dot(np_vec, ey)) > 0.95:
+                    cp = pl_item.get("center", [cx_part, cy_part, cz_part])
+                    cy_proj = cp[0] * ey[0] + cp[1] * ey[1] + cp[2] * ey[2]
+                    if cy_proj - min_y_test <= span_y_test * 0.15:
+                        area_near_min += float(pl_item.get("area_or_length", 0.0))
+                    if max_y_test - cy_proj <= span_y_test * 0.15:
+                        area_near_max += float(pl_item.get("area_or_length", 0.0))
+            if area_near_max > area_near_min + 1.0:
+                ey = (-ey[0], -ey[1], -ey[2])
 
         sec_groups: Dict[Tuple[float, float, float], Dict[str, Any]] = {}
         for p_sec in planes[1:]:
@@ -502,10 +587,15 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
                 dist_idx += 1
 
     plane_features = [f for f in extracted_features if f.get("feature_type") == "PLANE" and f.get("normal") and f.get("center") and not f["id"].startswith("CAD_DIST_")]
+    virtual_extremes = [
+        {"center": [0.0, 0.0, 0.0], "normal": [0.0, -1.0, 0.0]},
+        {"center": [0.0, round(size_y, 4), 0.0], "normal": [0.0, 1.0, 0.0]},
+    ]
+    all_ref_planes = plane_features + virtual_extremes
     for i_p in range(len(plane_features)):
-        for j_p in range(i_p + 1, len(plane_features)):
+        for j_p in range(i_p + 1, len(all_ref_planes)):
             p1 = plane_features[i_p]
-            p2 = plane_features[j_p]
+            p2 = all_ref_planes[j_p]
             n1 = (float(p1["normal"][0]), float(p1["normal"][1]), float(p1["normal"][2]))
             n2 = (float(p2["normal"][0]), float(p2["normal"][1]), float(p2["normal"][2]))
             if abs(_dot(n1, n2)) > 0.98:
@@ -519,7 +609,7 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
                         "id": f"CAD_STEP_DIST_{d_perp:.2f}_{dist_idx}",
                         "feature_type": "PLANE",
                         "nominal_dimension": d_perp,
-                        "center": [round((c1[0] + c2[0]) / 2.0, 4), round((c1[1] + c2[1]) / 2.0, 4), round((c1[2] + c2[2]) / 2.0, 4)],
+                        "center": [round(float(c1[0]), 4), round(float(c1[1]), 4), round(float(c1[2]), 4)],
                         "normal": [round(abs(n1[0]), 4), round(abs(n1[1]), 4), round(abs(n1[2]), 4)],
                         "area_or_length": d_perp,
                         "description": f"Paralel Düzlemler Arası Mesafe ({d_perp:.2f} mm)",
@@ -1028,4 +1118,4 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         step_input = sys.argv[1]
         meta = extract_cad_metadata(step_input)
-        print(json.dumps(meta, ensure_ascii=False))
+        print(json.dumps(meta, ensure_ascii=True))
