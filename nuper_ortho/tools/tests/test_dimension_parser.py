@@ -11,6 +11,7 @@ from extractor.parse.tolerance import resolve_iso_fit, parse_symmetric_tolerance
 from extractor.parse.thread import parse_thread_callout
 from extractor.parse.dimension import parse_diameter_callouts, parse_radius_callouts, parse_linear_callouts
 from extractor.title_block import extract_title_block_fields, extract_datum_labels
+from extractor.spatial import find_spatial_tolerances_near
 
 
 def test_iso_fit_resolution():
@@ -81,6 +82,20 @@ def test_radius_and_linear_parsing():
     assert ocr_dias[0]["upper_tol"] == "+0.5"
     assert ocr_dias[1]["nominal"] == 117.5
 
+    fake_rad_sample = "SEKTOR 0.25 ve KORIDOR 0.5"
+    assert len(parse_radius_callouts(fake_rad_sample)) == 0
+
+
+def test_spatial_tolerances_association():
+    items = [
+        {"text": "Ø21", "bbox": [1015.0, 250.0, 1035.0, 265.0]},
+        {"text": "+0.25", "bbox": [1040.0, 245.0, 1065.0, 255.0]},
+        {"text": "0", "bbox": [1040.0, 256.0, 1055.0, 265.0]},
+    ]
+    u, l = find_spatial_tolerances_near([1015.0, 250.0, 1035.0, 265.0], items)
+    assert u == "+0.25"
+    assert l == "0"
+
 
 def test_thread_parsing():
     th1 = parse_thread_callout("M8x1.25 - 6H")
@@ -101,3 +116,26 @@ def test_title_block_and_datums():
 
     datums = extract_datum_labels(text)
     assert datums == ["A", "B", "C"]
+
+
+def test_page1_feature_discrimination():
+    from tools.drawing_extractor import is_feature_in_title_or_notes
+    from tools.extractor.vector_extractor import get_title_block_mask
+
+    page_w = 1190.55
+    page_h = 841.89
+    masks = get_title_block_mask(page_w, page_h)
+
+    # 1. Real drawing view feature on Page 1 (center of sheet, valid geometry)
+    view_box = [400.0, 300.0, 450.0, 320.0]
+    items = [{"text": "50.0 ±0.1", "bbox": [400.0, 300.0, 450.0, 320.0]}]
+    assert not is_feature_in_title_or_notes(view_box, items, masks, page_w, page_h)
+
+    # 2. Title block text (bottom right)
+    title_box = [800.0, 760.0, 850.0, 780.0]
+    assert is_feature_in_title_or_notes(title_box, items, masks, page_w, page_h)
+
+    # 3. Note bullet text
+    note_box = [150.0, 150.0, 180.0, 165.0]
+    note_items = [{"text": "BOYA NOTLARI: 1- MASKELENECEKTIR", "bbox": [150.0, 150.0, 350.0, 165.0]}]
+    assert is_feature_in_title_or_notes(note_box, note_items, masks, page_w, page_h)

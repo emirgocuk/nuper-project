@@ -10,8 +10,8 @@ describe('Simülasyon Oynatma Hızı Kontrolü (SimulationController)', () => {
     controller = new SimulationController();
   });
 
-  it('Varsayılan oynatma hızı 5.0x olarak başlar', () => {
-    expect(controller.getSpeedMultiplier()).toBe(5.0);
+  it('Varsayılan oynatma hızı 1.0x olarak başlar', () => {
+    expect(controller.getSpeedMultiplier()).toBe(1.0);
     expect(controller.getAvailableSpeeds()).toEqual(SUPPORTED_SPEEDS);
   });
 
@@ -108,11 +108,62 @@ describe('Simülasyon Oynatma Hızı Kontrolü (SimulationController)', () => {
 
   it('CADViewer ile SimulationController entegre çalışır', () => {
     const viewer = new CADViewer();
-    expect(viewer.getSpeedMultiplier()).toBe(5.0);
+    expect(viewer.getSpeedMultiplier()).toBe(1.0);
 
     viewer.setSpeedMultiplier(2.0);
     expect(viewer.getSpeedMultiplier()).toBe(2.0);
     expect(viewer.getSimulationController().getSpeedMultiplier()).toBe(2.0);
+
+    viewer.destroy();
+  });
+
+  it('CADViewer otomatik ölçüm yolunu (renderTrajectory) sahnede görselleştirir ve kontrolcüye bağlar', () => {
+    const viewer = new CADViewer();
+    const mockPlan = {
+      operation: 'OP10' as const,
+      zClearance: 85.0,
+      featurePaths: [
+        {
+          featureId: 1,
+          balloon: '#1',
+          ph10Angle: { aDeg: 0, bDeg: 0, direction: [0, 0, -1] as [number, number, number], label: 'A0° B0°' },
+          touchPoints: [{ position: [50, 50, 47] as [number, number, number], normal: [-1, 0, 0] as [number, number, number] }],
+          waypoints: [
+            { position: new THREE.Vector3(50, 50, 85), phase: 'TRAVERSE' as const },
+            { position: new THREE.Vector3(50, 50, 47), phase: 'TOUCH' as const },
+          ],
+        },
+      ],
+      allWaypoints: [
+        { position: new THREE.Vector3(0, 0, 85), phase: 'IDLE' as const },
+        { position: new THREE.Vector3(50, 50, 85), phase: 'TRAVERSE' as const },
+        { position: new THREE.Vector3(50, 50, 47), phase: 'TOUCH' as const },
+        { position: new THREE.Vector3(0, 0, 85), phase: 'COMPLETED' as const },
+      ],
+      totalDistanceMm: 120.0,
+      estimatedDurationSec: 5.2,
+      probeHeadRotations: 0,
+    };
+
+    viewer.renderTrajectory(mockPlan);
+
+    const trajGroup = viewer.getTrajectoryGroup();
+    expect(trajGroup.children.length).toBeGreaterThan(0);
+    expect(viewer.getSimulationController().getWaypoints().length).toBe(4);
+
+    viewer.destroy();
+  });
+
+  it('CADViewer OP10 ve OP20 kurulumlarına göre modeli 3D uzayda çevirir', () => {
+    const viewer = new CADViewer();
+    const boxGeo = new THREE.BoxGeometry(100, 100, 50);
+    viewer.setModelGeometry(boxGeo);
+
+    const envOp10 = viewer.applyOperationSetup('OP10');
+    expect(envOp10).toBeDefined();
+
+    const envOp20 = viewer.applyOperationSetup('OP20');
+    expect(envOp20).toBeDefined();
 
     viewer.destroy();
   });

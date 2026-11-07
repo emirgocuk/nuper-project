@@ -14,3 +14,4 @@ artifacts/
 tools/.ocr_cache/
 __pycache__/
 *.pyc
+test-results/

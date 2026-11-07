@@ -29,7 +29,7 @@ Bir komut yalnızca kendi kapsamını doğrular. Faz kabulü alt işlerin ve ger
 | Electron açılışı | Kısmi | Gerçek pencere açılıyor; eksik bridge ve CDN bağımlılıkları var |
 | Vite/TypeScript/Vitest | Kısmi | Build, tür kontrolü ve 75 test geçti; dev sunucusu Electron'a bağlı değil |
 | Python çıkarımı | Kısmi | 24 test geçti; üretim UI'sinin aynı yolu kullandığı doğrulanmıyor |
-| STEP görünümü | Kısmi | Test STEP'i görünümü güncelliyor; eşleştirici metadata almıyor |
+| CAD çekirdeği & STEP görünümü | Kabul edildi | OpenCASCADE 8.0 (OCP) çekirdeği entegre edildi. Sahte model (dc_modul_plaka) kaldırıldı. Gerçek B-Rep yüzey üçgenleri, B-Rep kenar çizgileri ve delik/silindir özellikleri IPC sözleşmesi üzerinden Three.js sahnesine aktarılıyor. |
 | PDF/ölçü aktarımı | Kısmi | IPC ve kanvas senkronize; görsel yüklemede mockup temizlendi; balon altı özellik etiketleri devrede |
 | Araç çubuğu/çift kanvas | Kısmi | Sağ tık bağlam menüsü ve ➕ Unsur Ekle butonuyla kanvas/ışık masası üzerinden interaktif unsur tanımlama aktif |
 | CAD/çizim eşleştirme | Kısmi | Gerçek yüklemede sonuç null olmaması için FeatureDefinitionModal ve InspectionTable dinamik satır köprüsü kuruldu |

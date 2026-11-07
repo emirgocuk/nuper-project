@@ -8,6 +8,7 @@
     "file_path": { "type": "string" },
     "file_format": { "type": "string", "enum": ["step", "stp", "stl", "obj"] },
     "file_size_bytes": { "type": "integer" },
+    "kernel": { "type": "string", "description": "Geometriyi okuyan B-Rep çekirdeği ve sürümü." },
     "vertex_count": { "type": "integer" },
     "triangle_count": { "type": "integer" },
     "bbox": {
@@ -26,11 +27,40 @@
         "required": ["id", "feature_type"],
         "properties": {
           "id": { "type": "string" },
-          "feature_type": { "type": "string", "enum": ["PLANE", "INTERNAL_CYLINDER", "EXTERNAL_CYLINDER", "CONE", "SPHERE", "FREEFORM"] },
-          "nominal_dimension": { "type": "number" },
+          "feature_type": { "type": "string", "enum": ["PLANE", "INTERNAL_CYLINDER", "EXTERNAL_CYLINDER", "CONE", "SPHERE", "TORUS", "FREEFORM"] },
+          "nominal_dimension": { "type": "number", "description": "Silindir/küre/koni: çap. Torus: 2 x küçük yarıçap." },
           "center": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
           "normal": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
-          "area_or_length": { "type": "number" }
+          "area_or_length": { "type": "number" },
+          "angular_span_deg": { "type": "number", "description": "Dönel yüzeyin toplam açısal kapsamı (360 = tam delik/mil)." },
+          "description": { "type": "string" },
+          "face_ids": { "type": "array", "items": { "type": "string" }, "description": "Unsuru oluşturan B-Rep yüzey kimlikleri (mesh.faces[].id)." }
+        }
+      }
+    },
+    "mesh": {
+      "type": "object",
+      "description": "B-Rep çekirdeğinin ürettiği yüzey bazlı üçgen ağı. Diziler little-endian base64.",
+      "required": ["positions_b64", "normals_b64", "indices_b64", "edges_b64", "linear_deflection", "faces"],
+      "properties": {
+        "positions_b64": { "type": "string", "description": "Float32 x,y,z." },
+        "normals_b64": { "type": "string", "description": "Float32 nx,ny,nz." },
+        "indices_b64": { "type": "string", "description": "Uint32 üçgen indeksleri." },
+        "edges_b64": { "type": "string", "description": "Float32 B-Rep kenar çizgi parçaları (x1,y1,z1,x2,y2,z2)." },
+        "linear_deflection": { "type": "number" },
+        "faces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "surface_type", "triangle_start", "triangle_count"],
+            "properties": {
+              "id": { "type": "string" },
+              "surface_type": { "type": "string", "enum": ["PLANE", "CYLINDER", "CONE", "SPHERE", "TORUS", "BSPLINE", "BEZIER", "REVOLUTION", "EXTRUSION", "OFFSET", "OTHER"] },
+              "triangle_start": { "type": "integer" },
+              "triangle_count": { "type": "integer" },
+              "area": { "type": "number" }
+            }
+          }
         }
       }
     },

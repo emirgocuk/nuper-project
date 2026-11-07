@@ -154,15 +154,7 @@ export class IpcClient {
     if (!ipc) {
       return null;
     }
-    let result = (await ipc.invoke('select-drawing-file')) as SelectedDrawingFile | null;
-    if (!result) {
-      result = {
-        filePath: '050-164849-000 - Kopya.pdf',
-        name: '050-164849-000 - Kopya.pdf',
-        ext: 'pdf',
-        size: 104230,
-      };
-    }
+    const result = (await ipc.invoke('select-drawing-file')) as SelectedDrawingFile | null;
     return result;
   }
 

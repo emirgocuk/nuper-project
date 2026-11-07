@@ -1,0 +1,65 @@
+import { describe, it, expect } from 'vitest';
+import { Ph10Kinematics } from './Ph10Kinematics';
+
+describe('Ph10Kinematics — Renishaw PH10 A/B Motorize Açı ve Yönelim Motoru', () => {
+  it('A=0, B=0 iken prob yönelim vektörü tam dikey aşağı (-Z) bakar', () => {
+    const dir = Ph10Kinematics.computeDirection(0, 0);
+    expect(dir[0]).toBeCloseTo(0, 4);
+    expect(dir[1]).toBeCloseTo(0, 4);
+    expect(dir[2]).toBeCloseTo(-1, 4);
+  });
+
+  it('A=90, B=0 iken prob ön yöne (-Y) bakar', () => {
+    const dir = Ph10Kinematics.computeDirection(90, 0);
+    expect(dir[0]).toBeCloseTo(0, 4);
+    expect(dir[1]).toBeCloseTo(-1, 4);
+    expect(dir[2]).toBeCloseTo(0, 4);
+  });
+
+  it('A=90, B=90 iken prob sağ yöne (+X) bakar', () => {
+    const dir = Ph10Kinematics.computeDirection(90, 90);
+    expect(dir[0]).toBeCloseTo(1, 4);
+    expect(dir[1]).toBeCloseTo(0, 4);
+    expect(dir[2]).toBeCloseTo(0, 4);
+  });
+
+  it('A=90, B=-90 iken prob sol yöne (-X) bakar', () => {
+    const dir = Ph10Kinematics.computeDirection(90, -90);
+    expect(dir[0]).toBeCloseTo(-1, 4);
+    expect(dir[1]).toBeCloseTo(0, 4);
+    expect(dir[2]).toBeCloseTo(0, 4);
+  });
+
+  it('720 diskret açılık LUT tablosu oluşturur ve önbelleğe alır', () => {
+    const lut = Ph10Kinematics.getLookUpTable();
+    expect(lut.length).toBe(16 * 48); // 16 A adımı (0..105° 7.5°'lik) * 48 B adımı
+    expect(lut[0].label).toBe('A0° B-180°');
+  });
+
+  it('Hedef yaklaşma vektörüne en yakın PH10 açısını sıfır sapmayla seçer', () => {
+    // Düşey aşağı delik yaklaşması [0, 0, -1] -> A0 B0
+    const resTop = Ph10Kinematics.findBestAngle([0, 0, -1]);
+    expect(resTop.angle.aDeg).toBe(0);
+    expect(resTop.angularErrorDeg).toBeCloseTo(0, 2);
+
+    // Yan yüzey yaklaşması [0, -1, 0] -> A90 B0
+    const resFront = Ph10Kinematics.findBestAngle([0, -1, 0]);
+    expect(resFront.angle.aDeg).toBe(90);
+    expect(resFront.angle.bDeg).toBe(0);
+    expect(resFront.angularErrorDeg).toBeCloseTo(0, 2);
+  });
+
+  it('Unsur kümesini kafa açısına göre gruplayarak kafa dönme sayısını optimize eder', () => {
+    const features = [
+      { id: 'hole1', approach: [0, 0, -1] as [number, number, number] },
+      { id: 'hole2', approach: [0, 0, -1] as [number, number, number] },
+      { id: 'side1', approach: [1, 0, 0] as [number, number, number] },
+    ];
+
+    const clusters = Ph10Kinematics.clusterFeaturesByAngle(features, (f) => f.approach);
+    expect(clusters.size).toBe(2);
+    expect(clusters.get('A0° B0°')?.items.length).toBe(2);
+    expect(clusters.get('A90° B90°')?.items.length).toBe(1);
+  });
+});
+

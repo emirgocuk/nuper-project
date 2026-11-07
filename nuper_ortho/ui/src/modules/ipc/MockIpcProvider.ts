@@ -72,9 +72,9 @@ export class MockIpcProvider {
             nominal_str: 'Ø20.000 H7 (+0.021/0)',
             upper_tol: '+0.021',
             lower_tol: '0.000',
-            measured: '20.004 mm',
-            deviation: '+0.004 mm',
-            status: 'PASS',
+            measured: '',
+            deviation: '',
+            status: 'UNMEASURED',
             feature_key: 'cyl_20',
             gdt: '⌖ Ø 0.020 Ⓜ | A | B | C',
             bbox: [120, 340, 220, 390]
@@ -89,9 +89,9 @@ export class MockIpcProvider {
             nominal_str: '51.60 ±0.20 mm',
             upper_tol: '+0.200',
             lower_tol: '-0.200',
-            measured: '51.615 mm',
-            deviation: '+0.015 mm',
-            status: 'PASS',
+            measured: '',
+            deviation: '',
+            status: 'UNMEASURED',
             feature_key: 'dim_51_6',
             gdt: '∥ 0.015 | A',
             bbox: [300, 200, 410, 250]
@@ -106,14 +106,22 @@ export class MockIpcProvider {
             nominal_str: 'R2.50 mm',
             upper_tol: '+0.100',
             lower_tol: '-0.100',
-            measured: '2.502 mm',
-            deviation: '+0.002 mm',
-            status: 'PASS',
+            measured: '',
+            deviation: '',
+            status: 'UNMEASURED',
             feature_key: 'rad_2_5',
             gdt: '⌒ 0.010',
             bbox: [420, 480, 480, 520]
           }
         ]
+      }),
+
+      'select-drawing-file': async () => ({
+        filePath: '050-164849-000 - Kopya.pdf',
+        name: '050-164849-000 - Kopya.pdf',
+        ext: 'pdf',
+        size: 104230,
+        dataBase64: ''
       }),
 
       'load-benchmark-specimen': async (): Promise<unknown> => ({

@@ -311,4 +311,34 @@ describe('FeatureDefinitionModal — İnteraktif Unsur Tanımlama ve Sağ Tık M
 
     expect(mockDoc.getElementById('modal-feature-definition')).toBeNull();
   });
+
+  it('Datum chipleri ve PC-DMIS SVG ikon önizlemesi modalda doğru oluşturulur', () => {
+    modalManager.openModal({
+      canvasX: 100,
+      canvasY: 100,
+      page: 2,
+      nextId: 6,
+      existingData: {
+        id: 6,
+        balloon: '#6',
+        type: 'LINEAR',
+        nominal: 291.9,
+        nominal_str: '(291.9)',
+        datum_reference: '[A]',
+      },
+      onSave: vi.fn(),
+    });
+
+    const modal = mockDoc.getElementById('modal-feature-definition');
+    expect(modal).not.toBeNull();
+    const typePreview = modal!.querySelector('#feat-type-icon-preview');
+    expect(typePreview).not.toBeNull();
+    const datumChips = modal!.querySelector('#feat-datum-chips');
+    expect(datumChips).not.toBeNull();
+    const datumInput = modal!.querySelector('#feat-datum');
+    expect(datumInput).not.toBeNull();
+    expect(modal?.innerHTML).toContain('id="feat-datum" value="[A]"');
+    expect(modal?.innerHTML).toContain('data-datum="A"');
+    expect(modal?.innerHTML).toContain('feat-type-icon-preview');
+  });
 });

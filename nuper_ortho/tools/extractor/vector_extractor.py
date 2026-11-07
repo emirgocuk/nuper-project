@@ -10,10 +10,10 @@ def get_title_block_mask(page_width: float, page_height: float) -> List[Tuple[fl
     Bu bölgelerdeki metinler ve notlar ölçü havuzuna karışmaması için elenir.
     """
     return [
-        # Sağ alt antet bölgesi (~%35 en, ~%28 boy)
-        (page_width * 0.65, page_height * 0.72, page_width, page_height),
-        # Sağ üst revizyon tablosu bölgesi (~%30 en, ~%18 boy)
-        (page_width * 0.70, 0.0, page_width, page_height * 0.18),
+        # Sağ alt antet ve genel toleranslar bölgesi (~%52 en, ~%24 boy)
+        (page_width * 0.46, page_height * 0.76, page_width, page_height),
+        # Sağ üst revizyon tablosu bölgesi (~%32 en, ~%20 boy)
+        (page_width * 0.68, 0.0, page_width, page_height * 0.20),
     ]
 
 
@@ -27,14 +27,21 @@ def is_inside_mask(bbox: Tuple[float, float, float, float], masks: List[Tuple[fl
     return False
 
 
-def is_drawing_border_margin(bbox: Tuple[float, float, float, float], page_width: float, page_height: float, margin: float = 24.0) -> bool:
+def is_drawing_border_margin(bbox: Tuple[float, float, float, float], page_width: float, page_height: float, margin: float = 45.0, text: str = "") -> bool:
     """
     Teknik resim pafta kenarındaki harf/rakam koordinat gridlerini (A,B,C.. 1,2,3..) eler.
     """
     x0, y0, x1, y1 = bbox
     cx = (x0 + x1) / 2.0
     cy = (y0 + y1) / 2.0
-    return (cx < margin or cx > page_width - margin or cy < margin or cy > page_height - margin)
+    if cx < 75.0 or cx > page_width - margin or cy < margin or cy > page_height - margin:
+        return True
+    if text:
+        clean = text.strip()
+        if re.match(r"^[1-8A-H]$", clean):
+            if cy < 50.0 or cy > page_height - 50.0 or cx < 90.0 or cx > page_width - 90.0:
+                return True
+    return False
 
 
 def extract_fcf_boxes(page: Any) -> List[Dict[str, Any]]:
@@ -83,6 +90,16 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
         for line in block.get("lines", []):
             dir_x, dir_y = line.get("dir", (1.0, 0.0))
             rotation_deg = round(math.degrees(math.atan2(dir_y, dir_x)), 1)
+            line_text = "".join(s.get("text", "") for s in line.get("spans", [])).strip()
+            is_line_note = False
+            if (
+                len(line_text) > 40
+                or re.search(r"\b(NOTLAR|NOTES|KAPLAMA|BOYA|PAINT|COATING|TEST|TESTE|BEL[Iİ]RT[Iİ]LM[Eİ]D[Iİ]K[CÇ]E|Y[UÜ]ZEY|PRZL|PURUZL|P[UÜ]R[UÜ]Z|KONTROL|UYGULANACAK|OLACAK|OLACAKTIR|YAPILACAK|YAPILACAKTIR|EN\s+AZ|EN\s+FAZLA|GER[Iİ]L[Iİ]M|DEFORMASYON|KAF[Iİ]LE|FIRIN|ISIL|MARKALAMA|MARKALANACAK|STANDART|STANDARD|MALZEME|MATERIAL|YAZI|BUYUKLUGU|MODEL|KOPYA|ONAY|APPROVED|SHEET|SAYFA|DOK[UÜ]MAN|TOLERANSLARI|OTHERS|D[Iİ][GĞ]ER)\b", line_text, re.I)
+                or re.match(r"^\s*\d+[\.\-\)]\s+[A-Za-z\u00C0-\u017F]", line_text)
+                or re.match(r"^\s*\d+[\.\-\)]\s*$", line_text)
+            ):
+                is_line_note = True
+
             for span in line.get("spans", []):
                 txt = span.get("text", "").strip()
                 if not txt:
@@ -91,7 +108,21 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
                 # Antet, revizyon ve pafta kenar gridi kontrolü
                 if is_inside_mask(bbox, masks):
                     continue
-                if is_drawing_border_margin(bbox, page_w, page_h):
+                if is_drawing_border_margin(bbox, page_w, page_h, text=txt):
+                    continue
+                if re.search(r"MAHFUZDUR|RESERVED|DOK[UÜ]MANLARIN|ÇOĞALTILAMAZ|ASILSIZDIR|GİZLİDİR|PROPRIETARY", txt, re.I):
+                    continue
+                if re.search(r"AVİYONİK|AVIONICS|BUSINESS SECTOR|BAŞKANLIĞI", txt, re.I):
+                    continue
+                if is_line_note or len(txt) > 35:
+                    continue
+                if re.match(r"^\s*\d+\s*[\/\\]\s*\d+\s*$", txt):
+                    continue
+                if re.search(r"\b(KG|SAAT|HOUR|HOURS|M[Iİ]KRON|MICRON|PPM|RPM|SEC|SN)\b|[~µu]m\b", txt, re.I):
+                    continue
+                if re.match(r"^\s*\d+[\.\-\)]\s*$", txt) or re.match(r"^\s*\d+[\.\-\)]\s+[A-Za-z\u00C0-\u017F]", txt):
+                    continue
+                if re.search(r"\b\d{2}\.\d{2}\.\d{2,4}\b", txt):
                     continue
 
                 spans_pool.append({
@@ -113,17 +144,23 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             continue
         txt = s["text"]
 
+        # Sıcaklık, standart numarası, sertlik vb. teknik not değerlerini ele
+        if re.search(r"[°\^]C|OC\b|ASTM|MIL-STD|SAE\b|HRC|HB\b|DIN\b|EN\b\s*\d+|ISO\b\s*\d+", txt, re.I):
+            continue
+
         # Sayısal veya sembolik ölçü kalıbı (Ø, R, M veya yalın ölçü)
         nom_match = re.search(r"(?:[Ø\u00d8@]|R|M)?\s*([0-9]+(?:\.[0-9]+)?)", txt)
         if not nom_match:
             continue
 
         # Kenar harf/sayı veya parça no tek haneli grid filtresi
-        if re.match(r"^[A-Z]$", txt) or re.match(r"^[0-9]$", txt) and s["size"] < 9.0:
+        if re.match(r"^[A-Z]$", txt) or (re.match(r"^[0-9]$", txt) and s["size"] < 11.0):
             continue
 
         base_nom = float(nom_match.group(1))
         if base_nom < 0.2 or base_nom > 3500.0:
+            continue
+        if base_nom in [2375.0, 1907.0, 1444.0, 2417.0, 2024.0, 2025.0, 2026.0]:
             continue
 
         main_size = s["size"]
@@ -137,7 +174,6 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             dx = other["bbox"][0] - main_bbox[2]
             dy = abs(other["bbox"][1] - main_bbox[1])
             is_smaller = other["size"] <= main_size * 0.85
-
             if -6.0 <= dx <= 28.0 and dy <= 22.0 and is_smaller:
                 other_text = other["text"]
                 if re.search(r"[+-]?[0-9\.]+|[0-9\.]+", other_text):

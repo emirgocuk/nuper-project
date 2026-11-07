@@ -98,16 +98,18 @@ impl DatumReferenceFrame {
 
         // 1. Birincil Datum Kontrolü
         let primary_f = find_feature(self.primary.feature_id)?;
-        if primary_f.feature_type != FeatureType::Plane {
-            return Err(AstError::IncompleteDatumFrame {
-                reason: format!(
-                    "Primer Datum (A) daima bir düzlem (Plane) olmalıdır; bulunan tip: {:?}",
-                    primary_f.feature_type
-                ),
-            });
-        }
-
-        let mut locked_dof = 3; // Düzlem ile Tz, Rx, Ry kilitlenir
+        let mut locked_dof = match primary_f.feature_type {
+            FeatureType::Plane => 3,
+            FeatureType::ExternalCylinder | FeatureType::InternalCylinder => 4,
+            _ => {
+                return Err(AstError::IncompleteDatumFrame {
+                    reason: format!(
+                        "Primer Datum (A) bir düzlem (Plane) veya silindir (Cylinder) olmalıdır; bulunan tip: {:?}",
+                        primary_f.feature_type
+                    ),
+                });
+            }
+        };
 
         // 2. İkincil Datum Kontrolü
         if let Some(sec) = &self.secondary {
@@ -118,7 +120,11 @@ impl DatumReferenceFrame {
                 });
             }
             let _sec_f = find_feature(sec.feature_id)?;
-            locked_dof += 2; // Çizgi veya eksen ile Ty, Rz kilitlenir
+            if locked_dof == 4 {
+                locked_dof += 1;
+            } else {
+                locked_dof += 2;
+            }
         }
 
         // 3. Üçüncül Datum Kontrolü

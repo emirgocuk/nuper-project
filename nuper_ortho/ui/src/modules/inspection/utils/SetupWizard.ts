@@ -20,12 +20,26 @@ import {
   escapeHtmlText,
   type LabelOffset,
 } from './BalloonEditing';
+import {
+  getFeatureTypeSvg,
+  getFeatureTypeOptions,
+  parseDatumReference,
+  formatDatumReference,
+} from './MetrologyIcons';
+import * as THREE from 'three';
+import { MeasurementPathGenerator, type PathFeatureInput } from '../../cad/utils/MeasurementPathGenerator';
+import { SetupPrep, type SetupRecommendation } from '../../cad/utils/SetupPrep';
+import { type CADViewer } from '../../cad/CADViewer';
+import { type SimulationState } from '../../cad/SimulationController';
+import { StepModelTessellator } from '../../cad/utils/StepModelTessellator';
+import { applyStepModelToScene } from '../../cad/utils/CadImportManager';
 
 export interface SetupWizardOptions {
   onConfirm?: (dimensions: InspectionDimension[]) => void;
 }
 
 export class SetupWizard {
+  private knownDatums: string[] = ['A', 'B', 'C'];
   private dimensions: InspectionDimension[] = [];
   private balloons: BalloonItem[] = [];
   private selectedId: number | null = null;
@@ -41,7 +55,11 @@ export class SetupWizard {
   private confirmCallback?: (dimensions: InspectionDimension[]) => void;
   private appInstance: unknown = null;
   private currentCadMetadata: CadMetadata | null = null;
+  private activeCadModelName: string | null = null;
   private matchResult: CadDrawingMatchResult | null = null;
+  private currentActiveOperation: 'OP10' | 'OP20' = 'OP10';
+  private simUnregister: (() => void) | null = null;
+  private lastActiveFeatureId: number | null = null;
 
   private zoom: number = 1.0;
   private panX: number = 0;
@@ -92,6 +110,18 @@ export class SetupWizard {
     return this.selectedId;
   }
 
+  public getKnownDatums(): string[] {
+    const set = new Set(this.knownDatums);
+    for (const d of this.dimensions) {
+      if (d.datum_reference) {
+        for (const dat of parseDatumReference(d.datum_reference)) {
+          set.add(dat);
+        }
+      }
+    }
+    return Array.from(set).sort();
+  }
+
   public getActivePage(): number {
     return this.activePage;
   }
@@ -120,15 +150,61 @@ export class SetupWizard {
     return this.isAuditOpen;
   }
 
+  private setupRecommendation: SetupRecommendation | null = null;
+
   public isPlanConfirmed(): boolean {
     return this.isConfirmed;
   }
 
+  public getSetupRecommendation(): SetupRecommendation | null {
+    return this.setupRecommendation;
+  }
+
   public setCadMetadata(cad: CadMetadata): void {
     this.currentCadMetadata = cad;
+    if (cad.model_name) {
+      this.activeCadModelName = cad.model_name;
+    }
+    if (cad.bbox) {
+      this.setupRecommendation = SetupPrep.recommendPartSetup(cad.bbox, cad.features);
+      this.updateSetupTelemetry();
+    }
+    if (typeof document !== 'undefined') {
+      const modelBadge = document.getElementById('model-badge-name');
+      if (modelBadge && cad.model_name) modelBadge.textContent = cad.model_name;
+
+      const modelSize = document.getElementById('model-badge-size');
+      if (modelSize && cad.bbox?.size) {
+        modelSize.textContent = `Boyut: ${cad.bbox.size[0].toFixed(1)} x ${cad.bbox.size[1].toFixed(1)} x ${cad.bbox.size[2].toFixed(1)} mm`;
+      }
+
+      const hudStatus = document.getElementById('hud-status-pill');
+      if (hudStatus) {
+        hudStatus.textContent = 'HAZIR / OP10';
+        hudStatus.style.setProperty('background', '#D1FAE5', 'important');
+        hudStatus.style.setProperty('color', '#065F46', 'important');
+      }
+
+      const hudFeature = document.getElementById('hud-feature-name');
+      if (hudFeature && cad.model_name) {
+        hudFeature.textContent = `${cad.model_name} (B-Rep Doğrulandı)`;
+      }
+    }
     if (this.dimensions.length > 0) {
       this.recomputeCadMatch();
       this.renderDrawingAuditModal();
+    }
+  }
+
+  private updateSetupTelemetry(): void {
+    if (typeof document === 'undefined' || !this.setupRecommendation) return;
+    const hudDetails = document.getElementById('hud-feature-details');
+    if (hudDetails) {
+      hudDetails.innerText = this.setupRecommendation.summaryMessage;
+    }
+    const win = window as unknown as { showToast?: (msg: string) => void };
+    if (typeof win.showToast === 'function') {
+      win.showToast(this.setupRecommendation.summaryMessage);
     }
   }
 
@@ -172,6 +248,8 @@ export class SetupWizard {
       const target = this.dimensions.find((d) => d.id === matchedDim.id);
       if (target) {
         target.cad_feature_id = matchedDim.cad_feature_id;
+        target.cad_center = matchedDim.cad_center;
+        target.cad_normal = matchedDim.cad_normal;
         target.operation = matchedDim.operation;
         target.match_confidence = matchedDim.match_confidence;
         if (matchedDim.match_confidence === 'UNMATCHED') {
@@ -262,22 +340,36 @@ export class SetupWizard {
     }
 
     const modelBadge = document.getElementById('model-badge-name');
-    if (modelBadge) modelBadge.textContent = 'Model: Yüklenmedi';
+    if (modelBadge) {
+      modelBadge.textContent = this.currentCadMetadata?.model_name || 'Model: Yüklenmedi';
+    }
 
     const hudStatus = document.getElementById('hud-status-pill');
-    if (hudStatus) hudStatus.textContent = 'BEKLEMEDE';
+    if (hudStatus) {
+      hudStatus.textContent = this.currentCadMetadata ? 'HAZIR / OP10' : 'BEKLEMEDE';
+    }
 
     const hudFeature = document.getElementById('hud-feature-name');
-    if (hudFeature) hudFeature.textContent = 'CAD / STEP Modeli Bekleniyor';
+    if (hudFeature) {
+      hudFeature.textContent = this.currentCadMetadata?.model_name
+        ? `${this.currentCadMetadata.model_name} (B-Rep Doğrulandı)`
+        : 'CAD / STEP Modeli Bekleniyor';
+    }
 
     const modelSize = document.getElementById('model-badge-size');
-    if (modelSize) modelSize.textContent = 'Boyut: -- x -- x -- mm';
+    if (modelSize) {
+      modelSize.textContent = this.currentCadMetadata?.bbox?.size
+        ? `Boyut: ${this.currentCadMetadata.bbox.size[0].toFixed(1)} x ${this.currentCadMetadata.bbox.size[1].toFixed(1)} x ${this.currentCadMetadata.bbox.size[2].toFixed(1)} mm`
+        : 'Boyut: -- x -- x -- mm';
+    }
 
     const hudCoords = document.getElementById('hud-feature-coords');
     if (hudCoords) hudCoords.textContent = 'Orijin (PCS): --';
 
     const hudDetails = document.getElementById('hud-feature-details');
-    if (hudDetails) hudDetails.textContent = 'Lütfen STEP veya CAD dosyası seçin.';
+    if (hudDetails) {
+      hudDetails.textContent = this.setupRecommendation?.summaryMessage || 'Lütfen STEP veya CAD dosyası seçin.';
+    }
 
     const app = this.appInstance as { getDrawingCanvas?: () => { setBalloons: (b: unknown[]) => void } } | null;
     if (app && typeof app.getDrawingCanvas === 'function') {
@@ -545,6 +637,16 @@ export class SetupWizard {
     else if (data.filename) this.loadedFileName = data.filename;
     this.hasLoadedDrawing = true;
     if (data.page_count) this.totalPages = Math.max(1, data.page_count);
+    if ((data as { datums?: string[] }).datums && Array.isArray((data as { datums?: string[] }).datums)) {
+      for (const d of (data as { datums?: string[] }).datums || []) {
+        if (d && typeof d === 'string') {
+          const letter = d.trim().toUpperCase();
+          if (/^[A-Z][0-9]?$/.test(letter) && !this.knownDatums.includes(letter)) {
+            this.knownDatums.push(letter);
+          }
+        }
+      }
+    }
 
     if (data.pages && Array.isArray(data.pages)) {
       this.pageImages.clear();
@@ -595,6 +697,9 @@ export class SetupWizard {
       }));
 
       this.selectedId = this.dimensions[0].id;
+      if (this.dimensions[0].page) {
+        this.activePage = this.dimensions[0].page;
+      }
       this.recomputeCadMatch();
     }
     this.renderDrawingAuditModal();
@@ -642,6 +747,22 @@ export class SetupWizard {
     this.applyActivePlanToWorkspace(this.dimensions);
     if (this.confirmCallback) {
       this.confirmCallback(this.dimensions);
+    }
+
+    if (typeof window !== 'undefined') {
+      const win = window as unknown as {
+        workflowRibbon?: { advanceToStep: (step: number) => void; mount: (c: string) => void };
+        open321Modal?: () => void;
+      };
+      if (win.workflowRibbon) {
+        win.workflowRibbon.advanceToStep(4);
+        win.workflowRibbon.mount('.app-ribbon');
+      }
+      if (typeof win.open321Modal === 'function') {
+        setTimeout(() => {
+          win.open321Modal?.();
+        }, 200);
+      }
     }
   }
 
@@ -889,7 +1010,7 @@ export class SetupWizard {
           </div>
           <div class="thumb-sheet-info">
             <span class="thumb-page-title">Sayfa ${p}</span>
-            <span class="thumb-page-sub">${balloonCount > 0 ? `${balloonCount} Ölçü Balonlandı` : 'Montaj & Datum'}</span>
+            <span class="thumb-page-sub">${balloonCount > 0 ? `${balloonCount} Ölçü Balonlandı` : 'Genel Notlar & 3D Model'}</span>
           </div>
         </div>
       `);
@@ -950,15 +1071,17 @@ export class SetupWizard {
     const desc = dim?.type_label || '';
     const page = dim?.page || this.pendingAddPage;
 
-    const typeOptions: Array<{ value: string; label: string }> = [
-      { value: 'DIAMETER', label: '⭕ Çap (DIAMETER)' },
-      { value: 'LINEAR', label: '📏 Doğrusal Boyut (LINEAR)' },
-      { value: 'RADIUS', label: '📐 Radyus / Kavis (RADIUS)' },
-      { value: 'ANGLE', label: '📐 Açı / Koniklik (ANGLE)' },
-      { value: 'CHAMFER', label: '✂️ Pah (CHAMFER)' },
-      { value: 'THREAD', label: '🔩 Vida / Diş (THREAD)' },
-      { value: 'POSITION', label: '🎯 Konum / GD&T (POSITION)' },
-    ];
+    const knownDatums = this.getKnownDatums();
+    const activeDatums = new Set(parseDatumReference(datum));
+    const typeOptions = getFeatureTypeOptions();
+    const currentSvg = getFeatureTypeSvg(type);
+
+    const datumChipsHtml = knownDatums
+      .map(
+        (d) =>
+          `<button type="button" class="datum-chip ${activeDatums.has(d) ? 'active' : ''}" data-datum="${escapeHtmlText(d)}">${escapeHtmlText(d)}</button>`
+      )
+      .join('');
 
     return `
       <div class="audit-pages-sidebar-header audit-inline-header">
@@ -971,45 +1094,59 @@ export class SetupWizard {
           <span class="audit-inline-editor-sub">Sayfa ${page} • Işık masası üzerinde canlı düzenleme</span>
         </div>
 
-        <label class="audit-inline-label">Unsur Tipi</label>
-        <select id="audit-inline-type" class="audit-inline-field">
-          ${typeOptions
-            .map((opt) => `<option value="${opt.value}" ${opt.value === type ? 'selected' : ''}>${opt.label}</option>`)
-            .join('')}
-        </select>
-
-        <label class="audit-inline-label">Teknik Resim İfadesi (Callout)</label>
-        <input type="text" id="audit-inline-callout" class="audit-inline-field" value="${escapeHtmlText(callout)}" placeholder="örn: Ø86 ±0.5, 3 x45°, R3" />
-        <div class="audit-inline-symbols">
-          ${['Ø', '±', '°', 'R', 'x45°']
-            .map((sym) => `<button type="button" class="audit-inline-symbol" data-symbol="${sym}">${sym}</button>`)
-            .join('')}
-        </div>
-
-        <div class="audit-inline-grid3">
-          <div>
-            <label class="audit-inline-label">Nominal</label>
-            <input type="number" step="any" id="audit-inline-nominal" class="audit-inline-field" value="${nominal}" />
-          </div>
-          <div>
-            <label class="audit-inline-label">Üst Tol</label>
-            <input type="text" id="audit-inline-upper" class="audit-inline-field" value="${escapeHtmlText(upper)}" placeholder="+0.100" />
-          </div>
-          <div>
-            <label class="audit-inline-label">Alt Tol</label>
-            <input type="text" id="audit-inline-lower" class="audit-inline-field" value="${escapeHtmlText(lower)}" placeholder="-0.100" />
+        <div class="audit-inline-section">
+          <label class="audit-inline-label">Unsur Tipi</label>
+          <div class="audit-type-select-wrapper">
+            <span class="audit-type-icon-preview" id="audit-type-icon-preview">
+              ${currentSvg}
+            </span>
+            <select id="audit-inline-type" class="audit-inline-field audit-type-select">
+              ${typeOptions
+                .map((opt) => `<option value="${opt.value}" ${opt.value === type ? 'selected' : ''}>${opt.label}</option>`)
+                .join('')}
+            </select>
           </div>
         </div>
 
-        <div class="audit-inline-grid2">
-          <div>
-            <label class="audit-inline-label">Datum Ref</label>
-            <input type="text" id="audit-inline-datum" class="audit-inline-field" value="${escapeHtmlText(datum)}" placeholder="[A]" />
+        <div class="audit-inline-section">
+          <label class="audit-inline-label">Teknik Resim İfadesi (Callout)</label>
+          <input type="text" id="audit-inline-callout" class="audit-inline-field" value="${escapeHtmlText(callout)}" placeholder="örn: Ø86 ±0.5, 3 x45°, R3" />
+          <div class="audit-inline-symbols">
+            ${['Ø', '±', '°', 'R', 'x45°']
+              .map((sym) => `<button type="button" class="audit-inline-symbol" data-symbol="${sym}">${sym}</button>`)
+              .join('')}
           </div>
-          <div>
-            <label class="audit-inline-label">Açıklama</label>
-            <input type="text" id="audit-inline-desc" class="audit-inline-field" value="${escapeHtmlText(desc)}" placeholder="örn: Ana Çap" />
+        </div>
+
+        <div class="audit-inline-section">
+          <label class="audit-inline-label">Nominal Değer (mm)</label>
+          <input type="number" step="any" id="audit-inline-nominal" class="audit-inline-field audit-field-stacked" value="${nominal}" placeholder="0.000" />
+        </div>
+
+        <div class="audit-inline-section">
+          <label class="audit-inline-label">Üst Tolerans (+mm)</label>
+          <input type="text" id="audit-inline-upper" class="audit-inline-field audit-field-stacked" value="${escapeHtmlText(upper)}" placeholder="+0.100" />
+        </div>
+
+        <div class="audit-inline-section">
+          <label class="audit-inline-label">Alt Tolerans (-mm)</label>
+          <input type="text" id="audit-inline-lower" class="audit-inline-field audit-field-stacked" value="${escapeHtmlText(lower)}" placeholder="-0.100" />
+        </div>
+
+        <div class="audit-inline-section">
+          <label class="audit-inline-label">Datum Referansı</label>
+          <div class="audit-datum-container">
+            <div class="audit-inline-datum-chips" id="audit-inline-datum-chips">
+              ${datumChipsHtml}
+            </div>
+            <button type="button" class="datum-chip-add" id="btn-inline-add-datum" title="Yeni Datum Harfi Ekle">+ Harf</button>
           </div>
+          <input type="hidden" id="audit-inline-datum" value="${escapeHtmlText(datum)}" />
+        </div>
+
+        <div class="audit-inline-section">
+          <label class="audit-inline-label">Açıklama / Unsur Adı</label>
+          <input type="text" id="audit-inline-desc" class="audit-inline-field audit-field-stacked" value="${escapeHtmlText(desc)}" placeholder="örn: Toplam Boy / Genişlik" />
         </div>
 
         <div class="audit-inline-actions">
@@ -1470,6 +1607,52 @@ export class SetupWizard {
       this.syncInlineCallout(calloutInput, typeSelect, nominalInput, upperInput, lowerInput);
     });
 
+    const datumHiddenInput = modalEl.querySelector<HTMLInputElement>('#audit-inline-datum');
+    const datumChipsContainer = modalEl.querySelector<HTMLElement>('#audit-inline-datum-chips');
+    const updateDatumFromChips = () => {
+      if (!datumHiddenInput || !datumChipsContainer) return;
+      const activeChips = Array.from(datumChipsContainer.querySelectorAll<HTMLButtonElement>('.datum-chip.active'));
+      const activeLetters = activeChips.map((c) => c.getAttribute('data-datum') || '').filter(Boolean);
+      datumHiddenInput.value = formatDatumReference(activeLetters);
+    };
+
+    datumChipsContainer?.querySelectorAll<HTMLButtonElement>('.datum-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        chip.classList.toggle('active');
+        updateDatumFromChips();
+      });
+    });
+
+    const addDatumBtn = modalEl.querySelector<HTMLButtonElement>('#btn-inline-add-datum');
+    addDatumBtn?.addEventListener('click', () => {
+      const letter = (typeof window !== 'undefined' && window.prompt ? window.prompt('Eklenecek Datum Harfi (örn: D, E):', '') : 'D')?.trim().toUpperCase();
+      if (letter && /^[A-Z][0-9]?$/.test(letter)) {
+        if (!this.knownDatums.includes(letter)) {
+          this.knownDatums.push(letter);
+        }
+        if (datumChipsContainer) {
+          const newChip = document.createElement('button');
+          newChip.type = 'button';
+          newChip.className = 'datum-chip active';
+          newChip.setAttribute('data-datum', letter);
+          newChip.textContent = letter;
+          newChip.addEventListener('click', () => {
+            newChip.classList.toggle('active');
+            updateDatumFromChips();
+          });
+          datumChipsContainer.appendChild(newChip);
+          updateDatumFromChips();
+        }
+      }
+    });
+
+    const iconPreview = modalEl.querySelector<HTMLElement>('#audit-type-icon-preview');
+    typeSelect?.addEventListener('change', () => {
+      if (iconPreview && typeSelect) {
+        iconPreview.innerHTML = getFeatureTypeSvg(typeSelect.value);
+      }
+    });
+
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       this.saveInlineEditor(form, calloutInput, typeSelect, nominalInput, upperInput, lowerInput, modalEl);
@@ -1612,15 +1795,24 @@ export class SetupWizard {
     const pageImg = this.pageImages.get(page);
 
     if (d.bbox && d.bbox.length >= 2) {
-      const x = d.bbox[0];
-      const y = d.bbox[1];
+      let x = d.bbox[0];
+      let y = d.bbox[1];
       if (pageImg) {
+        if (x > pageImg.width && pageImg.width > 0) {
+          const ratio = x / pageImg.width;
+          if (ratio > 1.3) {
+            x = (x / 2481) * pageImg.width;
+            y = (y / 1754) * pageImg.height;
+          }
+        }
         if (x <= 1200 && pageImg.width > 1200) {
           const scaleX = pageImg.width / 1190.55;
           const scaleY = pageImg.height / 841.89;
           return { cx: Math.round(x * scaleX), cy: Math.round(y * scaleY) };
         }
-        return { cx: Math.round(x), cy: Math.round(y) };
+        const cx = Math.max(25, Math.min(pageImg.width - 25, Math.round(x)));
+        const cy = Math.max(25, Math.min(pageImg.height - 25, Math.round(y)));
+        return { cx, cy };
       }
       if (this.pdfDoc) {
         return { cx: Math.round(x * 1.25), cy: Math.round(y * 1.25) };
@@ -1643,8 +1835,16 @@ export class SetupWizard {
       11: { cx: 940, cy: 430 },
       12: { cx: 1010, cy: 260 },
     };
+    const pageDims = this.dimensions.filter((item) => (item.page || 1) === (d.page || 1));
+    const localIdx = Math.max(1, pageDims.indexOf(d) + 1);
     const coordsMap = (d.page || 1) === 2 ? coordsMapP2 : coordsMapP3;
-    const pt = coordsMap[d.id] || { cx: 400, cy: 250 };
+    const pt =
+      coordsMap[d.id] ||
+      coordsMap[localIdx] ||
+      coordsMap[localIdx + 6] || {
+        cx: 250 + ((localIdx * 130) % 650),
+        cy: 180 + Math.floor(localIdx / 5) * 130,
+      };
     if (pageImg && pageImg.width > 1200) {
       const scaleX = pageImg.width / 1200;
       const scaleY = pageImg.height / 640;
@@ -1771,6 +1971,50 @@ export class SetupWizard {
       this.renderVerifiedFeaturesList(sidebarLeft, dims);
     }
 
+    const bbox = (this.currentCadMetadata?.bbox?.min && this.currentCadMetadata?.bbox?.max)
+      ? { min: this.currentCadMetadata.bbox.min, max: this.currentCadMetadata.bbox.max }
+      : { min: [0, 0, 0] as [number, number, number], max: [120, 60, 45] as [number, number, number] };
+
+    const pathFeatures: PathFeatureInput[] = dims.map((d) => {
+      const coords = d.cad_center
+        ? { x: d.cad_center[0], y: d.cad_center[1], z: d.cad_center[2] }
+        : InspectionSynchronizer.getFeatureCoordinates(d.id);
+      return {
+        id: d.id,
+        balloon: d.balloon,
+        type: d.type,
+        type_label: d.type_label,
+        nominal: typeof d.nominal === 'number' ? d.nominal : parseFloat(String(d.nominal)) || 10,
+        cad_center: [coords.x, coords.y, coords.z],
+        cad_normal: d.cad_normal || [0, 0, 1],
+        operation: (d.operation as 'OP10' | 'OP20') || 'OP10',
+      };
+    });
+
+    const activeOp = this.currentActiveOperation;
+    const plan = MeasurementPathGenerator.generatePlan(pathFeatures, bbox, {
+      activeOperation: activeOp,
+      verticalAxis: 'Y',
+      clearanceZMarginMm: 15.0,
+    });
+
+    const app = this.appInstance as { getCADViewer?: () => CADViewer } | null;
+    if (app && typeof app.getCADViewer === 'function') {
+      const cadViewer = app.getCADViewer();
+      cadViewer?.renderTrajectory(plan);
+      const simCtrl = cadViewer?.getSimulationController();
+      if (simCtrl) {
+        simCtrl.setWaypoints(plan.allWaypoints);
+        simCtrl.setSpeedMultiplier(1.0);
+        if (this.simUnregister) {
+          this.simUnregister();
+        }
+        this.simUnregister = simCtrl.onUpdate((state) => {
+          this.handleSimulationStateChange(state);
+        });
+      }
+    }
+
     const timeDisplay = document.getElementById('time-display');
     if (timeDisplay) {
       timeDisplay.innerText = '00:00 / 00:34';
@@ -1779,19 +2023,242 @@ export class SetupWizard {
     if (typeof window !== 'undefined') {
       const win = window as unknown as {
         isDualCanvas?: boolean;
-        blockGroup?: { visible: boolean };
-        trajLine?: { visible: boolean };
+        blockGroup?: THREE.Group & { visible: boolean };
+        uploadedMeshGroup?: THREE.Group | null;
+        currentUploadedCad?: { name?: string };
+        trajLine?: { visible: boolean; geometry?: { dispose?: () => void } };
+        touchPointMeshes?: Array<unknown>;
+        trajectoryPoints?: Array<unknown>;
         probeGroup?: { position: { set: (x: number, y: number, z: number) => void } };
+        scene?: THREE.Scene;
         requestRender?: () => void;
+        eval?: (code: string) => unknown;
+        dispatchEvent?: (e: Event) => boolean;
+        nuperApp?: { getCADViewer: () => { getSimulationController: () => { setWaypoints: (w: unknown[]) => void; bindProbeObject: (o: unknown, v: unknown) => void; reset: () => void; onUpdate: (fn: (state: SimulationState) => void) => () => void } } };
       };
 
       win.isDualCanvas = false;
-      if (win.trajLine) win.trajLine.visible = true;
 
-      window.dispatchEvent(new Event('resize'));
+      const cadName = win.currentUploadedCad?.name ||
+        this.activeCadModelName ||
+        this.currentCadMetadata?.model_name ||
+        (this.loadedFileName && StepModelTessellator.isDcModulPlaka(this.loadedFileName) ? this.loadedFileName : '') ||
+        (this.loadedFileName ? this.loadedFileName : 'active_part.stp');
+
+      applyStepModelToScene(cadName);
+
+      if (win.blockGroup) {
+        win.blockGroup.visible = true;
+      }
+      if (win.uploadedMeshGroup) {
+        win.uploadedMeshGroup.visible = true;
+      }
+
+      if (win.nuperApp) {
+        try {
+          const simCtrl = win.nuperApp.getCADViewer().getSimulationController();
+          if (this.simUnregister) {
+            this.simUnregister();
+          }
+          this.simUnregister = simCtrl.onUpdate((state) => {
+            this.handleSimulationStateChange(state);
+          });
+        } catch {}
+      }
+
+      if (typeof win.eval === 'function') {
+        try {
+          win.eval(`
+            if (typeof uploadedMeshGroup !== 'undefined') {
+              uploadedMeshGroup = window.uploadedMeshGroup;
+            }
+            if (typeof blockGroup !== 'undefined' && blockGroup) {
+              blockGroup.visible = true;
+            }
+            if (typeof camera !== 'undefined') window.camera = camera;
+            if (typeof controls !== 'undefined') window.controls = controls;
+            if (typeof renderer !== 'undefined') window.renderer = renderer;
+            if (typeof requestRender === 'function') {
+              window.requestRender = requestRender;
+              requestRender();
+            }
+            if (typeof focusPart === 'function') {
+              window.focusPart = focusPart;
+              focusPart();
+            }
+          `);
+        } catch {}
+      }
+
+      const toggleBtn = document.getElementById('btn-toggle-path');
+      if (toggleBtn) {
+        toggleBtn.classList.add('active');
+        toggleBtn.innerText = 'Prob Yolunu Gizle';
+      }
+
+      if (typeof win.dispatchEvent === 'function') {
+        try {
+          win.dispatchEvent(new Event('resize'));
+        } catch {}
+      }
       if (typeof win.requestRender === 'function') {
         win.requestRender();
       }
+    }
+  }
+
+  public getActiveOperation(): 'OP10' | 'OP20' {
+    return this.currentActiveOperation;
+  }
+
+  public switchOperationSetup(op: 'OP10' | 'OP20'): void {
+    this.currentActiveOperation = op;
+
+    if (typeof document !== 'undefined') {
+      const btnOp10 = document.getElementById('btn-setup-op10');
+      const btnOp20 = document.getElementById('btn-setup-op20');
+      if (btnOp10) btnOp10.classList.toggle('active', op === 'OP10');
+      if (btnOp20) btnOp20.classList.toggle('active', op === 'OP20');
+    }
+
+    const win = (typeof window !== 'undefined' ? window : {}) as unknown as {
+      uploadedMeshGroup?: THREE.Group | null;
+      blockGroup?: THREE.Group | null;
+      requestRender?: () => void;
+      showToast?: (msg: string) => void;
+      currentUploadedCad?: { name?: string };
+    };
+
+    const targetMesh = win.uploadedMeshGroup || win.blockGroup;
+    if (targetMesh) {
+      if (op === 'OP20') {
+        targetMesh.rotation.x = Math.PI;
+      } else {
+        targetMesh.rotation.x = 0;
+      }
+      targetMesh.updateMatrixWorld(true);
+
+      const box = new THREE.Box3().setFromObject(targetMesh);
+      targetMesh.position.y -= box.min.y;
+      targetMesh.updateMatrixWorld(true);
+    }
+
+    const app = this.appInstance as { getCADViewer?: () => CADViewer } | null;
+    if (app && typeof app.getCADViewer === 'function') {
+      const cadViewer = app.getCADViewer();
+      cadViewer?.applyOperationSetup(op);
+    }
+
+    const dims = this.matchResult ? this.matchResult.dimensions : this.dimensions;
+    const bbox = (this.currentCadMetadata?.bbox?.min && this.currentCadMetadata?.bbox?.max)
+      ? { min: this.currentCadMetadata.bbox.min, max: this.currentCadMetadata.bbox.max }
+      : { min: [0, 0, 0] as [number, number, number], max: [120, 60, 45] as [number, number, number] };
+
+    const pathFeatures: PathFeatureInput[] = dims.map((d) => {
+      const coords = d.cad_center
+        ? { x: d.cad_center[0], y: d.cad_center[1], z: d.cad_center[2] }
+        : InspectionSynchronizer.getFeatureCoordinates(d.id);
+      return {
+        id: d.id,
+        balloon: d.balloon,
+        type: d.type,
+        type_label: d.type_label,
+        nominal: typeof d.nominal === 'number' ? d.nominal : parseFloat(String(d.nominal)) || 10,
+        cad_center: [coords.x, coords.y, coords.z],
+        cad_normal: d.cad_normal || [0, 0, 1],
+        operation: (d.operation as 'OP10' | 'OP20') || 'OP10',
+      };
+    });
+
+    const plan = MeasurementPathGenerator.generatePlan(pathFeatures, bbox, {
+      activeOperation: op,
+      verticalAxis: 'Y',
+      clearanceZMarginMm: 15.0,
+    });
+
+    if (app && typeof app.getCADViewer === 'function') {
+      const cadViewer = app.getCADViewer();
+      cadViewer?.renderTrajectory(plan);
+      const simCtrl = cadViewer?.getSimulationController();
+      if (simCtrl) {
+        simCtrl.setWaypoints(plan.allWaypoints);
+        simCtrl.setSpeedMultiplier(1.0);
+        if (this.simUnregister) {
+          this.simUnregister();
+        }
+        this.simUnregister = simCtrl.onUpdate((state) => {
+          this.handleSimulationStateChange(state);
+        });
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      const wAny = window as unknown as {
+        trajLine?: { visible: boolean; geometry?: { dispose?: () => void } };
+        touchPointMeshes?: Array<unknown>;
+        trajectoryPoints?: Array<unknown>;
+        scene?: { add: (obj: unknown) => void; remove: (obj: unknown) => void };
+      };
+
+      if (wAny.trajLine) {
+        if (typeof wAny.trajLine.geometry?.dispose === 'function') {
+          wAny.trajLine.geometry.dispose();
+        }
+        if (plan.allWaypoints.length > 0) {
+          const waypoints = plan.allWaypoints.map((w) => w.position.clone());
+          (wAny.trajLine as unknown as { geometry: unknown }).geometry = new THREE.BufferGeometry().setFromPoints(waypoints);
+          wAny.trajLine.visible = true;
+          if (wAny.trajectoryPoints) {
+            wAny.trajectoryPoints.length = 0;
+            wAny.trajectoryPoints.push(...waypoints);
+          }
+        }
+      }
+
+      if (wAny.scene) {
+        if (wAny.touchPointMeshes) {
+          wAny.touchPointMeshes.forEach((m) => wAny.scene?.remove(m));
+        }
+        wAny.touchPointMeshes = [];
+
+        const dotGeo = new THREE.SphereGeometry(1.5, 12, 12);
+        for (const fp of plan.featurePaths) {
+          for (const tp of fp.touchPoints) {
+            const dotMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+            const dotMesh = new THREE.Mesh(dotGeo, dotMat);
+            dotMesh.position.set(tp.position[0], tp.position[1], tp.position[2]);
+            dotMesh.userData = { label: `${fp.balloon} Temas Noktası` };
+            wAny.scene.add(dotMesh);
+            wAny.touchPointMeshes.push(dotMesh);
+          }
+        }
+      }
+    }
+
+    if (typeof document !== 'undefined') {
+      const sidebarLeft = document.querySelector('.sidebar-left') as HTMLElement | null;
+      if (sidebarLeft) {
+        this.renderVerifiedFeaturesList(sidebarLeft, dims);
+      }
+
+      const badge = document.getElementById('part-name-badge');
+      const baseName = this.loadedFileName || win.currentUploadedCad?.name || 'Parça';
+      if (badge) {
+        badge.innerText = `${baseName} (${op === 'OP20' ? '180° Ters Çevrildi' : 'OP10'})`;
+        badge.style.color = op === 'OP20' ? '#D97706' : '#0284C7';
+      }
+    }
+
+    const opPoints = plan.allWaypoints.length;
+    const msg = op === 'OP20'
+      ? `🔄 OP20 Kurulumu: Parça CMM tablasında 180° ters çevrildi. Alt yüzey için ${opPoints} yol noktası oluşturuldu.`
+      : `🔄 OP10 Kurulumu: Üst ve yan yüzey için ${opPoints} yol noktası aktif.`;
+    if (typeof win.showToast === 'function') {
+      win.showToast(msg);
+    }
+
+    if (typeof win.requestRender === 'function') {
+      win.requestRender();
     }
   }
 
@@ -1822,7 +2289,7 @@ export class SetupWizard {
                   <span class="clean-balloon-badge ${isSel ? 'active' : ''}">${d.balloon}</span>
                   <span class="clean-feature-name">${d.icon || '📏'} ${d.type_label || d.nominal_str}</span>
                   <span class="clean-operation-pill ${(d.operation || 'OP10').toLowerCase()}">${d.operation || 'OP10'}</span>
-                  <span class="clean-status-pill ${d.status === 'PASS' ? 'pass' : 'warn'}">${d.status} ✓</span>
+                  <span class="clean-status-pill ${d.status === 'PASS' ? 'pass' : (d.status === 'UNMEASURED' ? 'unmeasured' : 'warn')}">${d.status} ✓</span>
                 </div>
                 <div class="clean-feature-bottom">
                   <span>Nominal: <b>${d.nominal_str}</b></span>
@@ -1856,13 +2323,16 @@ export class SetupWizard {
     const dim = this.dimensions.find((d) => d.id === id);
     if (!dim) return;
 
-    const coords = InspectionSynchronizer.getFeatureCoordinates(id);
+    const coords = dim.cad_center
+      ? { x: dim.cad_center[0], y: dim.cad_center[1], z: dim.cad_center[2] }
+      : InspectionSynchronizer.getFeatureCoordinates(id);
     const hudName = document.getElementById('hud-feature-name');
     const hudCoords = document.getElementById('hud-feature-coords');
     const hudDetails = document.getElementById('hud-feature-details');
 
     if (hudName) {
-      hudName.innerText = `${dim.balloon} [${dim.type_label || dim.nominal_str}]`;
+      const cadTag = dim.cad_feature_id ? ` ➔ CAD: ${dim.cad_feature_id}` : '';
+      hudName.innerText = `${dim.balloon} [${dim.type_label || dim.nominal_str}]${cadTag}`;
     }
     if (hudCoords) {
       hudCoords.innerText = `Prob (PCS): X: ${coords.x.toFixed(2)} | Y: ${coords.y.toFixed(2)} | Z: ${coords.z.toFixed(2)} mm`;
@@ -1891,6 +2361,102 @@ export class SetupWizard {
 
       if (typeof win.showToast === 'function') {
         win.showToast(`🎯 Balon ${dim.balloon}: ${dim.nominal_str} (Ölçülen: ${dim.measured}) ✓`);
+      }
+    }
+  }
+
+  public handleSimulationStateChange(state: SimulationState): void {
+    if (typeof document === 'undefined') return;
+
+    const playPauseBtn = document.getElementById('play-pause-btn');
+    if (playPauseBtn) {
+      playPauseBtn.innerText = state.isPlaying ? '❚❚' : '▶';
+    }
+
+    const timeSlider = document.getElementById('time-slider') as HTMLInputElement | null;
+    if (timeSlider && document.activeElement !== timeSlider) {
+      timeSlider.value = String(Math.round(state.progress * 100));
+    }
+
+    const timeDisplay = document.getElementById('time-display');
+    if (timeDisplay) {
+      const totalSec = 34;
+      const curSec = Math.floor(state.progress * totalSec);
+      const curStr = curSec < 10 ? `0${curSec}` : `${curSec}`;
+      timeDisplay.innerText = `00:${curStr} / 00:${totalSec}`;
+    }
+
+    const panel = document.getElementById('clean-features-panel');
+    if (!panel) return;
+
+    const featureItems = Array.from(panel.querySelectorAll<HTMLElement>('.clean-feature-item'));
+    if (featureItems.length === 0) return;
+
+    if (state.phase === 'COMPLETED') {
+      featureItems.forEach((item) => {
+        item.classList.remove('measuring-now');
+        const pill = item.querySelector('.clean-status-pill');
+        if (pill) {
+          pill.className = 'clean-status-pill pass';
+          pill.textContent = 'PASS ✓';
+        }
+      });
+      return;
+    }
+
+    const activeId = state.activeFeatureId;
+    if (activeId !== undefined && activeId !== null) {
+      if (this.lastActiveFeatureId !== activeId) {
+        this.lastActiveFeatureId = activeId;
+        let foundActive = false;
+
+        featureItems.forEach((item) => {
+          const id = Number(item.getAttribute('data-clean-id'));
+          const pill = item.querySelector('.clean-status-pill');
+
+          if (id === activeId) {
+            foundActive = true;
+            item.classList.add('measuring-now');
+            if (pill) {
+              pill.className = 'clean-status-pill measuring';
+              pill.textContent = '🎯 ÖLÇÜLÜYOR...';
+            }
+            if (typeof item.scrollIntoView === 'function') {
+              item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          } else {
+            item.classList.remove('measuring-now');
+            if (!foundActive) {
+              if (pill && !pill.classList.contains('pass')) {
+                pill.className = 'clean-status-pill pass';
+                pill.textContent = 'PASS ✓';
+              }
+            }
+          }
+        });
+
+        const dim = this.dimensions.find((d) => d.id === activeId);
+        if (dim) {
+          const hudName = document.getElementById('hud-feature-name');
+          const hudCoords = document.getElementById('hud-feature-coords');
+          const hudDetails = document.getElementById('hud-feature-details');
+
+          if (hudName) {
+            const cadTag = dim.cad_feature_id ? ` ➔ CAD: ${dim.cad_feature_id}` : '';
+            hudName.innerText = `${dim.balloon} [${dim.type_label || dim.nominal_str}]${cadTag}`;
+          }
+          if (hudCoords) {
+            hudCoords.innerText = `Prob (PCS): X: ${state.currentPosition.x.toFixed(2)} | Y: ${state.currentPosition.y.toFixed(2)} | Z: ${state.currentPosition.z.toFixed(2)} mm | Faz: ${state.phase}`;
+          }
+          if (hudDetails) {
+            hudDetails.innerText = `${dim.gdt || 'ASME Y14.5'} | Tol: ${dim.lower_tol} / ${dim.upper_tol} | Ölçülen: ${dim.measured}`;
+          }
+        }
+      } else {
+        const hudCoords = document.getElementById('hud-feature-coords');
+        if (hudCoords) {
+          hudCoords.innerText = `Prob (PCS): X: ${state.currentPosition.x.toFixed(2)} | Y: ${state.currentPosition.y.toFixed(2)} | Z: ${state.currentPosition.z.toFixed(2)} mm | Faz: ${state.phase}`;
+        }
       }
     }
   }
@@ -2401,6 +2967,12 @@ export class SetupWizard {
         border-color: #0284C7;
         box-shadow: 0 0 0 1px #0284C7;
       }
+      .clean-feature-item.measuring-now {
+        background: #F0FDF4 !important;
+        border-color: #10B981 !important;
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.35) !important;
+        transform: translateX(4px);
+      }
       .clean-feature-top {
         display: flex;
         align-items: center;
@@ -2446,6 +3018,21 @@ export class SetupWizard {
       .clean-status-pill.warn {
         background: #FEF3C7;
         color: #B45309;
+      }
+      .clean-status-pill.unmeasured {
+        background: #FEF3C7;
+        color: #B45309;
+      }
+      .clean-status-pill.measuring {
+        background: #DCFCE7 !important;
+        color: #15803D !important;
+        font-weight: 800 !important;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.4) !important;
+        animation: nuperPulseGlow 1.2s infinite ease-in-out !important;
+      }
+      @keyframes nuperPulseGlow {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(0.97); }
       }
       .clean-operation-pill {
         font-size: 8.5px;
@@ -2561,6 +3148,87 @@ export class SetupWizard {
         background: #E0F2FE;
         border-color: #0284C7;
       }
+      .audit-inline-section {
+        margin-bottom: 7px;
+      }
+      .audit-type-select-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #F8FAFC;
+        border: 1px solid #CBD5E1;
+        border-radius: 4px;
+        padding: 3px 8px;
+      }
+      .audit-type-icon-preview {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0284C7;
+        flex-shrink: 0;
+      }
+      .audit-type-select {
+        flex: 1;
+        border: none !important;
+        background: transparent !important;
+        padding: 3px 0 !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        color: #0F172A !important;
+        outline: none !important;
+      }
+      .audit-field-stacked {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .audit-datum-container {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .audit-inline-datum-chips {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .datum-chip {
+        padding: 3px 9px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        background: #F1F5F9;
+        border: 1px solid #CBD5E1;
+        color: #475569;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .datum-chip:hover {
+        background: #E2E8F0;
+        border-color: #94A3B8;
+      }
+      .datum-chip.active {
+        background: #0284C7;
+        border-color: #0284C7;
+        color: #FFFFFF;
+        box-shadow: 0 1px 3px rgba(2, 132, 199, 0.3);
+      }
+      .datum-chip-add {
+        padding: 3px 7px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        background: transparent;
+        border: 1px dashed #94A3B8;
+        color: #64748B;
+        cursor: pointer;
+      }
+      .datum-chip-add:hover {
+        border-color: #0284C7;
+        color: #0284C7;
+        background: #F0F9FF;
+      }
       .audit-inline-grid3 {
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
@@ -2621,6 +3289,10 @@ export class SetupWizard {
   }
 
   public destroy(): void {
+    if (this.simUnregister) {
+      this.simUnregister();
+      this.simUnregister = null;
+    }
     if (typeof window !== 'undefined') {
       if (this.activeMoveHandler) window.removeEventListener('mousemove', this.activeMoveHandler);
       if (this.activeUpHandler) window.removeEventListener('mouseup', this.activeUpHandler);

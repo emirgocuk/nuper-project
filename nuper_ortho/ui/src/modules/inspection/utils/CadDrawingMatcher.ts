@@ -23,6 +23,7 @@ export interface MatchedInspectionDimension {
   cad_center?: [number, number, number];
   cad_normal?: [number, number, number];
   operation: 'OP10' | 'OP20';
+  op_reason?: string;
   match_confidence: 'EXACT' | 'ENVELOPE' | 'RADIUS_HALF' | 'UNMATCHED';
 }
 
@@ -37,8 +38,9 @@ export interface CadDrawingMatchResult {
   dimensions: MatchedInspectionDimension[];
 }
 
-const EPSILON = 0.08;
+const EPSILON = 0.15;
 const ENVELOPE_EPSILON = 1.2;
+const FEATURE_MATCH_TOLERANCE = 0.85;
 
 export function matchCadWithDrawing(
   cad: CadMetadata,
@@ -64,29 +66,37 @@ export function matchCadWithDrawing(
     let assignedNormal: [number, number, number] | undefined;
     let confidence: 'EXACT' | 'ENVELOPE' | 'RADIUS_HALF' | 'UNMATCHED' = 'UNMATCHED';
 
-    if (dim.type === 'DIAMETER' || /dia|çap|delik/i.test(dim.type_label)) {
+    if (dim.type === 'DIAMETER' || /dia|çap|delik|bore|m3|m4/i.test(dim.type_label || '')) {
+      let bestFeat: (typeof cadFeatures)[0] | undefined;
+      let minDelta = Infinity;
+
       for (const feat of cadFeatures) {
         if (usedCadFeatureIds.has(feat.id)) continue;
         if (
           (feat.feature_type === 'INTERNAL_CYLINDER' || feat.feature_type === 'EXTERNAL_CYLINDER') &&
           feat.nominal_dimension !== undefined
         ) {
-          if (Math.abs(feat.nominal_dimension - nom) <= EPSILON) {
-            assignedCadId = feat.id;
-            assignedCenter = feat.center;
-            assignedNormal = feat.normal;
-            confidence = 'EXACT';
-            usedCadFeatureIds.add(feat.id);
-            break;
+          const delta = Math.abs(feat.nominal_dimension - nom);
+          if (delta < minDelta && delta <= FEATURE_MATCH_TOLERANCE) {
+            minDelta = delta;
+            bestFeat = feat;
           }
         }
       }
-    } else if (dim.type === 'RADIUS' || /radius|kavis|yarıçap/i.test(dim.type_label)) {
+
+      if (bestFeat) {
+        assignedCadId = bestFeat.id;
+        assignedCenter = bestFeat.center;
+        assignedNormal = bestFeat.normal;
+        confidence = minDelta <= EPSILON ? 'EXACT' : 'ENVELOPE';
+        usedCadFeatureIds.add(bestFeat.id);
+      }
+    } else if (dim.type === 'RADIUS' || /radius|kavis|yarıçap/i.test(dim.type_label || '')) {
       for (const feat of cadFeatures) {
         if (usedCadFeatureIds.has(feat.id)) continue;
         if (feat.nominal_dimension !== undefined) {
           const featRadius = feat.nominal_dimension / 2;
-          if (Math.abs(featRadius - nom) <= EPSILON || Math.abs(feat.nominal_dimension - nom) <= EPSILON) {
+          if (Math.abs(featRadius - nom) <= FEATURE_MATCH_TOLERANCE || Math.abs(feat.nominal_dimension - nom) <= FEATURE_MATCH_TOLERANCE) {
             assignedCadId = feat.id;
             assignedCenter = feat.center;
             assignedNormal = feat.normal;
@@ -96,46 +106,79 @@ export function matchCadWithDrawing(
           }
         }
       }
-    } else if (dim.type === 'LINEAR' || /boyut|mesafe|boy|uzunluk/i.test(dim.type_label)) {
+    } else if (dim.type === 'LINEAR' || /boyut|mesafe|boy|uzunluk|kalınlık/i.test(dim.type_label || '')) {
       if (Math.abs(sizeX - nom) <= ENVELOPE_EPSILON) {
         assignedCadId = 'CAD_BBOX_X';
-        assignedCenter = [cadBbox.min[0] + sizeX / 2, cadBbox.min[1], cadBbox.min[2]];
+        assignedCenter = [cadBbox.max[0], (cadBbox.min[1] + cadBbox.max[1]) / 2, (cadBbox.min[2] + cadBbox.max[2]) / 2];
         assignedNormal = [1, 0, 0];
-        confidence = 'ENVELOPE';
-      } else if (Math.abs(sizeY - nom) <= ENVELOPE_EPSILON) {
-        assignedCadId = 'CAD_BBOX_Y';
-        assignedCenter = [cadBbox.min[0], cadBbox.min[1] + sizeY / 2, cadBbox.min[2]];
-        assignedNormal = [0, 1, 0];
         confidence = 'ENVELOPE';
       } else if (Math.abs(sizeZ - nom) <= ENVELOPE_EPSILON) {
         assignedCadId = 'CAD_BBOX_Z';
-        assignedCenter = [cadBbox.min[0], cadBbox.min[1], cadBbox.min[2] + sizeZ / 2];
+        assignedCenter = [(cadBbox.min[0] + cadBbox.max[0]) / 2, (cadBbox.min[1] + cadBbox.max[1]) / 2, cadBbox.max[2]];
         assignedNormal = [0, 0, 1];
         confidence = 'ENVELOPE';
+      } else if (Math.abs(sizeY - nom) <= ENVELOPE_EPSILON) {
+        assignedCadId = 'CAD_BBOX_Y';
+        assignedCenter = [(cadBbox.min[0] + cadBbox.max[0]) / 2, cadBbox.max[1], (cadBbox.min[2] + cadBbox.max[2]) / 2];
+        assignedNormal = [0, 1, 0];
+        confidence = 'ENVELOPE';
       } else {
+        let bestFeat: (typeof cadFeatures)[0] | undefined;
+        let minDelta = Infinity;
+
         for (const feat of cadFeatures) {
           if (usedCadFeatureIds.has(feat.id)) continue;
-          if (feat.nominal_dimension !== undefined && Math.abs(feat.nominal_dimension - nom) <= EPSILON) {
-            assignedCadId = feat.id;
-            assignedCenter = feat.center;
-            assignedNormal = feat.normal;
-            confidence = 'EXACT';
-            usedCadFeatureIds.add(feat.id);
-            break;
+          if (feat.nominal_dimension !== undefined) {
+            const delta = Math.abs(feat.nominal_dimension - nom);
+            if (delta < minDelta && delta <= FEATURE_MATCH_TOLERANCE) {
+              minDelta = delta;
+              bestFeat = feat;
+            }
           }
+        }
+
+        if (bestFeat) {
+          assignedCadId = bestFeat.id;
+          assignedCenter = bestFeat.center;
+          assignedNormal = bestFeat.normal;
+          confidence = minDelta <= EPSILON ? 'EXACT' : 'ENVELOPE';
+          usedCadFeatureIds.add(bestFeat.id);
         }
       }
     }
 
     let operation: 'OP10' | 'OP20' = 'OP10';
+    let opReason = 'Z- probu ile OP10 üstten tek bağlamada ölçülebilir';
+
+    const descLower = `${dim.type_label || ''} ${dim.nominal_str || ''} ${dim.datum_reference || ''}`.toLowerCase();
+    const isRearOrBottomKeyword =
+      descLower.includes('arka') ||
+      descLower.includes('alt') ||
+      descLower.includes('bottom') ||
+      descLower.includes('rear') ||
+      descLower.includes('back') ||
+      descLower.includes('ters') ||
+      descLower.includes('taban') ||
+      descLower.includes('b-b') ||
+      descLower.includes('kesit b') ||
+      descLower.includes('datum d');
+
     if (assignedNormal) {
-      if (assignedNormal[2] < -0.3) {
+      if (assignedNormal[2] < -0.15) {
         operation = 'OP20';
+        opReason = 'Yüzey normali granit tablaya bakıyor (Normal Z < 0)';
       } else {
         operation = 'OP10';
       }
+    } else if (isRearOrBottomKeyword) {
+      operation = 'OP20';
+      opReason = 'Teknik resim ifadesinde alt/arka görünüş unsuru';
     } else if (dim.page && dim.page >= 3) {
       operation = 'OP20';
+      opReason = 'Sayfa 3 ters bağlama (OP20) unsuru';
+    } else if (dim.page && dim.page === 2 && (/delik|montaj|hole|bore|slot/i.test(descLower) || isRearOrBottomKeyword)) {
+      operation = 'OP20';
+      opReason = 'Sayfa 2 arka yüzey montaj / delik grubu (OP20)';
     }
 
     if (operation === 'OP10') {
@@ -170,6 +213,7 @@ export function matchCadWithDrawing(
       cad_center: assignedCenter,
       cad_normal: assignedNormal,
       operation,
+      op_reason: opReason,
       match_confidence: confidence,
     });
   }

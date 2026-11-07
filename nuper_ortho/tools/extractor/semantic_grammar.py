@@ -19,8 +19,26 @@ def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
     cleaned = re.sub(r"\b[Oo]([0-9]+(?:\.[0-9]+)?)\b", r"Ø\1", cleaned)
     cleaned = cleaned.replace("+-", "±").replace("+/-", "±")
 
-    # 1. Delik Grubu (Örn: 4x Ø2.5, 4X 2.5, 6x M5, R6.3(x2))
-    hole_group_match = re.search(r"(\d+)\s*[xX]\s*(?:Ø|DIA)?\s*([0-9]+(?:\.[0-9]+)?)", cleaned)
+    # 1. Diş Grubu (Örn: 4X M3, 2x M4)
+    thread_match = re.search(r"(\d+)\s*[xX]\s*M([0-9]+(?:\.[0-9]+)?)", cleaned, re.IGNORECASE)
+    if thread_match:
+        qty = int(thread_match.group(1))
+        nom = float(thread_match.group(2))
+        return {
+            "type": "HOLE",
+            "type_label": f"Montaj Diş/Delik Grubu ({qty}x)",
+            "count": qty,
+            "nominal": nom,
+            "nominal_str": f"{qty}x M{nom}",
+            "upper_tol": "+0.1",
+            "lower_tol": "-0.1",
+            "unit": "mm",
+            "op": "OP10",
+            "op_reason": "Dikey Z-probu ile üstten tek bağlamada ölçülebilir dişli delik.",
+        }
+
+    # 2. Delik Grubu (Örn: 4x Ø2.5, 2X DIA 10)
+    hole_group_match = re.search(r"(\d+)\s*[xX]\s*(?:Ø|DIA)\s*([0-9]+(?:\.[0-9]+)?)", cleaned, re.IGNORECASE)
     if hole_group_match:
         qty = int(hole_group_match.group(1))
         nom = float(hole_group_match.group(2))
@@ -78,7 +96,26 @@ def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
             "op_reason": "Parça dış/iç kavis yüzeyi.",
         }
 
-    # 4. Doğrusal Ölçü ve Tolerans (Örn: 12 +- 0.5, 12 ± 0.5, 35 +0.0/-0.2)
+    # 4. Tekrarlanan Doğrusal Ölçü (Örn: 2X 1.4±0.1, 2X 37.6±0.1, 2X 6.42)
+    rep_lin_match = re.search(r"(\d+)\s*[xX]\s*([0-9]+(?:\.[0-9]+)?)(?:\s*(?:±|\+-)\s*([0-9]+(?:\.[0-9]+)?))?", cleaned)
+    if rep_lin_match:
+        qty = int(rep_lin_match.group(1))
+        nom = float(rep_lin_match.group(2))
+        tol_val = float(rep_lin_match.group(3)) if rep_lin_match.group(3) else 0.1
+        return {
+            "type": "LINEAR",
+            "type_label": f"Doğrusal Boyut ({qty}x)",
+            "count": qty,
+            "nominal": nom,
+            "nominal_str": f"{qty}x {nom}" + (f" ±{tol_val}" if rep_lin_match.group(3) else ""),
+            "upper_tol": f"+{tol_val}",
+            "lower_tol": f"-{tol_val}",
+            "unit": "mm",
+            "op": "OP10",
+            "op_reason": "Ana sınır kutusu veya kademe boyutu.",
+        }
+
+    # 5. Doğrusal Ölçü ve Tolerans (Örn: 12 +- 0.5, 12 ± 0.5, 35 +0.0/-0.2)
     lin_tol_match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*(?:±|\+-)\s*([0-9]+(?:\.[0-9]+)?)", cleaned)
     if lin_tol_match:
         nom = float(lin_tol_match.group(1))

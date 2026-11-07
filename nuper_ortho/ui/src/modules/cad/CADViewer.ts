@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SceneCleaner } from './utils/SceneCleaner';
 import { SimulationController } from './SimulationController';
 import { SetupPrep, type BoundingBoxEnvelope, type SetupPrepOptions } from './utils/SetupPrep';
+import { type GeneratedMeasurementPlan } from './utils/MeasurementPathGenerator';
 
 export interface CADViewerOptions {
   antialias?: boolean;
@@ -21,6 +22,7 @@ export class CADViewer {
   private isDestroyed = false;
   private highlightedFeatureKey: string | null = null;
   private highlightGroup: THREE.Group;
+  private trajectoryGroup: THREE.Group;
 
   constructor(options: CADViewerOptions = {}) {
     this.scene = new THREE.Scene();
@@ -34,6 +36,9 @@ export class CADViewer {
 
     this.highlightGroup = new THREE.Group();
     this.scene.add(this.highlightGroup);
+
+    this.trajectoryGroup = new THREE.Group();
+    this.scene.add(this.trajectoryGroup);
 
     this.simulationController = new SimulationController();
 
@@ -118,6 +123,74 @@ export class CADViewer {
     return SetupPrep.computeBoundingBoxEnvelope(this.currentGeometry);
   }
 
+  public applyOperationSetup(
+    operation: 'OP10' | 'OP20',
+    datumNormal?: [number, number, number]
+  ): BoundingBoxEnvelope | null {
+    if (!this.currentGeometry || this.isDestroyed) return null;
+
+    if (operation === 'OP20') {
+      return this.applySetupOrientation({
+        rotateXDeg: 180,
+        datumNormal: datumNormal ? new THREE.Vector3(datumNormal[0], datumNormal[1], datumNormal[2]) : undefined,
+      });
+    }
+
+    return this.applySetupOrientation({
+      datumNormal: datumNormal ? new THREE.Vector3(datumNormal[0], datumNormal[1], datumNormal[2]) : undefined,
+    });
+  }
+
+  public renderTrajectory(plan: GeneratedMeasurementPlan): void {
+    if (this.isDestroyed) return;
+
+    SceneCleaner.disposeNode(this.trajectoryGroup);
+
+    if (plan.allWaypoints.length > 1) {
+      const points = plan.allWaypoints.map((w) => w.position.clone());
+      const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: 0x0284c7,
+        linewidth: 2,
+      });
+      const pathLine = new THREE.Line(lineGeo, lineMat);
+      this.trajectoryGroup.add(pathLine);
+    }
+
+    for (const fp of plan.featurePaths) {
+      for (const tp of fp.touchPoints) {
+        const dotGeo = new THREE.SphereGeometry(1.5, 8, 8);
+        const dotMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+        const dotMesh = new THREE.Mesh(dotGeo, dotMat);
+        dotMesh.position.set(tp.position[0], tp.position[1], tp.position[2]);
+        this.trajectoryGroup.add(dotMesh);
+      }
+    }
+
+    const probeGroup = new THREE.Group();
+    const rubyGeo = new THREE.SphereGeometry(1.5, 12, 12);
+    const rubyMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.1, roughness: 0.2 });
+    const ruby = new THREE.Mesh(rubyGeo, rubyMat);
+    probeGroup.add(ruby);
+
+    const stemGeo = new THREE.CylinderGeometry(0.6, 0.6, 20, 8);
+    const stemMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.3 });
+    const stem = new THREE.Mesh(stemGeo, stemMat);
+    stem.position.set(0, 10, 0);
+    probeGroup.add(stem);
+
+    this.trajectoryGroup.add(probeGroup);
+
+    this.simulationController.bindProbeObject(probeGroup, new THREE.Vector3(0, 0, 0));
+    this.simulationController.setWaypoints(plan.allWaypoints);
+
+    this.render();
+  }
+
+  public getTrajectoryGroup(): THREE.Group {
+    return this.trajectoryGroup;
+  }
+
   public getBoundingBoxEnvelope(): BoundingBoxEnvelope | null {
     if (!this.currentGeometry) return null;
     return SetupPrep.computeBoundingBoxEnvelope(this.currentGeometry);
@@ -199,6 +272,7 @@ export class CADViewer {
     }
 
     // Sahnedeki tüm modelleri ve vurguları temizle
+    SceneCleaner.disposeNode(this.trajectoryGroup);
     SceneCleaner.disposeNode(this.highlightGroup);
     SceneCleaner.disposeNode(this.modelGroup);
     SceneCleaner.disposeNode(this.scene);

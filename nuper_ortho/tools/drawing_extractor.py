@@ -16,11 +16,60 @@ if tools_dir not in sys.path:
 from extractor.title_block import extract_title_block_fields, extract_datum_labels
 from extractor.parse.dimension import parse_diameter_callouts, parse_radius_callouts, parse_linear_callouts
 from extractor.parse.thread import parse_thread_callout
-from extractor.spatial import match_spatial_bbox
-from extractor.vector_extractor import extract_vector_dimensions_from_page
+from extractor.spatial import match_spatial_bbox, find_spatial_tolerances_near
+from extractor.vector_extractor import extract_vector_dimensions_from_page, get_title_block_mask, is_inside_mask
 from extractor.semantic_grammar import normalize_engineering_callout, build_321_alignment, classify_operation_setup
 from extractor.brep_verifier import parse_step_file, verify_dimensions_against_step
 from extractor.vision_ai_extractor import run_local_or_hybrid_ai_extraction
+
+
+def is_feature_in_title_or_notes(box: List[float], items: List[Dict[str, Any]], masks: List[Tuple[float, float, float, float]], page_w: float, page_h: float) -> bool:
+    if is_inside_mask(tuple(box), masks):
+        return True
+    cx = (box[0] + box[2]) / 2.0
+    cy = (box[1] + box[3]) / 2.0
+    if cx < 65.0 or cx > page_w - 40.0 or cy < 40.0 or cy > page_h - 40.0:
+        return True
+    for it in items:
+        ib = it.get("bbox", [0, 0, 0, 0])
+        if max(ib[0], box[0]) <= min(ib[2], box[2]) and max(ib[1], box[1]) <= min(ib[3], box[3]):
+            txt = (it.get("text") or "").upper()
+            if any(k in txt for k in ["NOTLAR", "BAKINIZ", "NOTE", "STANDART", "STANDARD", "ARIAL", "BUYUKLUGU", "YUKSEKLIG", "MALZEME", "KAPLAMA", "BOYA", "DOKUMAN", "SAYFA", "SHEET", "OLCEK", "SCALE", "ASME", "ISO 2768", "TARALI"]):
+                return True
+    return False
+
+
+def resolve_feature_bbox(target_str: str, items: List[Dict[str, Any]], default_box: List[float]) -> List[float]:
+    clean_target = target_str.replace("Ø", "").replace("R", "").replace("±", "").strip()
+    if clean_target:
+        candidates = [target_str, clean_target]
+        ch_m = re.match(r"(\d+(?:\.\d+)?)\s*x\s*45", clean_target, re.I)
+        if ch_m:
+            ch_num = float(ch_m.group(1))
+            ch_int = str(int(ch_num)) if ch_num.is_integer() else str(ch_num)
+            candidates.insert(0, f"{ch_int} x45")
+            candidates.insert(1, f"{ch_int}x45")
+            candidates.insert(2, f"{ch_m.group(1)} x45")
+        try:
+            parts = clean_target.split()
+            first_num = parts[0].replace("x", "").strip()
+            if first_num:
+                candidates.append(first_num)
+            val = float(first_num)
+            if val >= 4.0:
+                if val.is_integer():
+                    candidates.append(str(int(val)))
+                candidates.append(f"{val:.1f}")
+        except Exception:
+            pass
+        for cand in dict.fromkeys(c for c in candidates if c):
+            if re.match(r"^[0-9]$", cand):
+                continue
+            pat = re.compile(r"(?<![A-Za-z0-9_\-\.])" + re.escape(cand) + r"(?![A-Za-z0-9_\-\.])", re.IGNORECASE)
+            for it in items:
+                if pat.search(it.get("text", "")):
+                    return it.get("bbox", default_box)
+    return match_spatial_bbox(target_str, items, default_box)
 
 
 def resolve_pdf_path(path_str: str) -> str:
@@ -217,13 +266,15 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
             if ocr_engine is not None:
                 pix = page.get_pixmap(dpi=150)
                 img_bytes = pix.tobytes("png")
+                scale_x = page.rect.width / pix.width if pix.width > 0 else 1.0
+                scale_y = page.rect.height / pix.height if pix.height > 0 else 1.0
                 res, _ = ocr_engine(img_bytes)
                 if res:
                     for box, text_val, score in res:
-                        x0 = min(pt[0] for pt in box)
-                        y0 = min(pt[1] for pt in box)
-                        x1 = max(pt[0] for pt in box)
-                        y1 = max(pt[1] for pt in box)
+                        x0 = min(pt[0] for pt in box) * scale_x
+                        y0 = min(pt[1] for pt in box) * scale_y
+                        x1 = max(pt[0] for pt in box) * scale_x
+                        y1 = max(pt[1] for pt in box) * scale_y
                         clean_t = text_val.replace("\ufffd", "±").replace("@", "Ø")
                         score_val = float(score) if isinstance(score, (int, float)) else 0.85
                         ocr_items.append({
@@ -232,6 +283,36 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
                             "confidence": score_val,
                         })
                         ocr_lines.append(clean_t)
+
+                try:
+                    import io
+                    from PIL import Image
+                    img = Image.open(io.BytesIO(img_bytes))
+                    w, h = img.size
+                    rot90 = img.rotate(90, expand=True)
+                    buf = io.BytesIO()
+                    rot90.save(buf, format="PNG")
+                    res90, _ = ocr_engine(buf.getvalue())
+                    if res90:
+                        for box, text_val, score in res90:
+                            x0_r = min(pt[0] for pt in box)
+                            y0_r = min(pt[1] for pt in box)
+                            x1_r = max(pt[0] for pt in box)
+                            y1_r = max(pt[1] for pt in box)
+                            orig_x0 = (w - y1_r) * scale_x
+                            orig_x1 = (w - y0_r) * scale_x
+                            orig_y0 = x0_r * scale_y
+                            orig_y1 = x1_r * scale_y
+                            clean_t = text_val.replace("\ufffd", "±").replace("@", "Ø")
+                            score_val = float(score) if isinstance(score, (int, float)) else 0.85
+                            ocr_items.append({
+                                "text": clean_t,
+                                "bbox": [round(orig_x0, 1), round(orig_y0, 1), round(orig_x1, 1), round(orig_y1, 1)],
+                                "confidence": score_val,
+                            })
+                            ocr_lines.append(clean_t)
+                except Exception:
+                    pass
 
             page_txt = "\n".join(ocr_lines) if ocr_lines else txt
             pages_data.append({"page": p_num, "text": page_txt, "items": ocr_items, "method": "ocr"})
@@ -297,10 +378,18 @@ def parse_text_to_metrology(
 
     page_entries = pages_data if pages_data and len(pages_data) > 0 else [{"page": 1, "text": text, "items": [], "method": "vector"}]
 
+    ref_w = 1190.55
+    ref_h = 841.89
+    if rendered_pages and len(rendered_pages) > 0:
+        ref_w = float(rendered_pages[0].get("width") or 1190.55)
+        ref_h = float(rendered_pages[0].get("height") or 841.89)
+    page_masks = get_title_block_mask(ref_w, ref_h)
+
     # 1. Katman 1'den gelen vektörel ölçüleri al
     has_vector_dims = False
     for p_info in page_entries:
         p_num = p_info.get("page", 1)
+        p_text = p_info.get("text", "")
         v_dims = p_info.get("vector_dims", [])
         if v_dims:
             has_vector_dims = True
@@ -354,13 +443,24 @@ def parse_text_to_metrology(
                 qty = parsed_dia["quantity"]
                 fit = parsed_dia["fit"] or ""
                 limit = parsed_dia["limit"] or ""
+                if any(abs(d.get("nominal", 0) - nom) < 0.6 and d.get("page") == p_num for d in dims):
+                    continue
                 key = f"DIA_{p_num}_{qty}_{nom}_{fit}_{limit}_{parsed_dia['upper_tol']}_{parsed_dia['lower_tol']}"
                 if key in seen_nominals:
+                    continue
+                box = resolve_feature_bbox(parsed_dia["nominal_str"], p_items, [200.0, 200.0, 250.0, 220.0])
+                if is_feature_in_title_or_notes(box, p_items, page_masks, ref_w, ref_h):
                     continue
                 seen_nominals.add(key)
 
                 norm = normalize_engineering_callout(f"{qty}x Ø{nom} {fit}")
-                box = match_spatial_bbox(str(nom), p_items, [200.0, 200.0, 250.0, 220.0])
+                dia_upper = parsed_dia["upper_tol"]
+                dia_lower = parsed_dia["lower_tol"]
+                if not dia_upper and not dia_lower:
+                    s_u, s_l = find_spatial_tolerances_near(box, p_items)
+                    if s_u or s_l:
+                        dia_upper = s_u or ""
+                        dia_lower = s_l or ""
 
                 dims.append({
                     "id": balloon_idx,
@@ -371,8 +471,8 @@ def parse_text_to_metrology(
                     "icon": "⭕",
                     "nominal": nom,
                     "nominal_str": parsed_dia["nominal_str"],
-                    "upper_tol": parsed_dia["upper_tol"],
-                    "lower_tol": parsed_dia["lower_tol"],
+                    "upper_tol": dia_upper,
+                    "lower_tol": dia_lower,
                     "measured": "",
                     "deviation": "",
                     "status": "UNMEASURED",
@@ -393,10 +493,12 @@ def parse_text_to_metrology(
                 key = f"RAD_{p_num}_{qty}_{r_val}"
                 if key in seen_nominals:
                     continue
+                box = resolve_feature_bbox(parsed_rad["nominal_str"], p_items, [500.0, 500.0, 550.0, 520.0])
+                if is_feature_in_title_or_notes(box, p_items, page_masks, ref_w, ref_h):
+                    continue
                 seen_nominals.add(key)
 
                 norm = normalize_engineering_callout(f"{qty}x R{r_val}")
-                box = match_spatial_bbox(str(r_val), p_items, [500.0, 500.0, 550.0, 520.0])
                 dims.append({
                     "id": balloon_idx,
                     "balloon": f"#{balloon_idx}",
@@ -428,8 +530,10 @@ def parse_text_to_metrology(
                 key = f"TH_{p_num}_{th}"
                 if key in seen_nominals:
                     continue
+                box = resolve_feature_bbox(th, p_items, [350.0, 200.0, 400.0, 220.0])
+                if is_feature_in_title_or_notes(box, p_items, page_masks, ref_w, ref_h):
+                    continue
                 seen_nominals.add(key)
-                box = match_spatial_bbox(th, p_items, [350.0, 200.0, 400.0, 220.0])
                 dims.append({
                     "id": balloon_idx,
                     "balloon": f"#{balloon_idx}",
@@ -457,33 +561,59 @@ def parse_text_to_metrology(
             # (D) Açık Toleranslı Doğrusal Boyutlar
             for parsed_lin in parse_linear_callouts(p_text):
                 val = parsed_lin["nominal"]
+                if any(abs(d.get("nominal", 0) - val) < 0.01 and d.get("page") == p_num for d in dims):
+                    continue
                 key = f"LIN_{p_num}_{val}_{parsed_lin['nominal_str']}"
                 if key in seen_nominals:
                     continue
+                box = resolve_feature_bbox(parsed_lin["nominal_str"], p_items, [400.0, 500.0, 450.0, 520.0])
+                if is_feature_in_title_or_notes(box, p_items, page_masks, ref_w, ref_h):
+                    continue
                 seen_nominals.add(key)
 
-                norm = normalize_engineering_callout(f"{val} {parsed_lin['upper_tol']}")
-                box = match_spatial_bbox(str(val), p_items, [400.0, 500.0, 450.0, 520.0])
+                feat_type = parsed_lin.get("type", "LINEAR")
+                if feat_type == "ANGULAR":
+                    type_label = "Açısal Boyut / Koniklik"
+                    icon = "📐"
+                    op_reason = "Açı ve konik kafa probu."
+                elif feat_type == "CHAMFER":
+                    type_label = "Pah Boyutu (Chamfer)"
+                    icon = "📐"
+                    op_reason = "Pah kenar taraması."
+                else:
+                    norm = normalize_engineering_callout(f"{val} {parsed_lin['upper_tol']}")
+                    type_label = norm.get("type_label", "Doğrusal Boyut (Linear Distance)")
+                    icon = "📏"
+                    op_reason = norm.get("op_reason", "Doğrusal mesafe probu.")
+
+                lin_upper = parsed_lin["upper_tol"]
+                lin_lower = parsed_lin["lower_tol"]
+                if not lin_upper or not lin_lower or lin_lower == "0.000":
+                    s_u, s_l = find_spatial_tolerances_near(box, p_items)
+                    if s_u and not lin_upper:
+                        lin_upper = s_u
+                    if s_l and (not lin_lower or lin_lower == "0.000"):
+                        lin_lower = s_l
                 dims.append({
                     "id": balloon_idx,
                     "balloon": f"#{balloon_idx}",
                     "page": p_num,
-                    "type": "LINEAR",
-                    "type_label": norm.get("type_label", "Doğrusal Boyut (Linear Distance)"),
-                    "icon": "📏",
+                    "type": feat_type,
+                    "type_label": type_label,
+                    "icon": icon,
                     "nominal": val,
                     "nominal_str": parsed_lin["nominal_str"],
-                    "upper_tol": parsed_lin["upper_tol"],
-                    "lower_tol": parsed_lin["lower_tol"],
+                    "upper_tol": lin_upper,
+                    "lower_tol": lin_lower,
                     "measured": "",
                     "deviation": "",
                     "status": "UNMEASURED",
                     "verification": "PARSED",
-                    "feature_key": f"lin_{val}_{balloon_idx}".replace(".", "_"),
+                    "feature_key": f"lin_{str(val).replace('.', '_')}_{balloon_idx}",
                     "gdt": "",
                     "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
-                    "op": norm.get("op", "OP10"),
-                    "op_reason": norm.get("op_reason", "Doğrusal mesafe probu."),
+                    "op": "OP10",
+                    "op_reason": op_reason,
                     "bbox": box,
                 })
                 balloon_idx += 1
@@ -495,7 +625,18 @@ def parse_text_to_metrology(
             verified, pruned = verify_dimensions_against_step(dims, step_data)
             dims = verified
 
-    # ID'leri ve balon etiketlerini sıralı güncelle
+    for d in dims:
+        b = d.get("bbox")
+        if b and len(b) >= 4:
+            if b[0] > ref_w * 1.2 or b[1] > ref_h * 1.2 or b[2] > ref_w * 1.2 or b[3] > ref_h * 1.2:
+                scale = ref_w / 2481.0
+                d["bbox"] = [
+                    round(b[0] * scale, 1),
+                    round(b[1] * scale, 1),
+                    round(b[2] * scale, 1),
+                    round(b[3] * scale, 1),
+                ]
+
     for idx, d in enumerate(dims, 1):
         d["id"] = idx
         d["balloon"] = f"#{idx}"

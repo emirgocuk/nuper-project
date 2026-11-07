@@ -79,4 +79,37 @@ describe('5 Eksen Bağlama ve Geometri Hazırlık Modülü (SetupPrep)', () => {
 
     viewer.destroy();
   });
+
+  it('recommendPartSetup en kararlı taban yüzeyini ve prob erişilebilirlik skorunu otomatik belirler', () => {
+    // 39 x 5.7 x 60.6 mm DC Modül Plaka simülasyonu
+    const bbox = { size: [39.0, 5.7, 60.6] as [number, number, number] };
+    const features = [
+      { id: 'hole_1', feature_type: 'INTERNAL_CYLINDER', normal: [0, 1, 0] as [number, number, number] },
+      { id: 'hole_2', feature_type: 'INTERNAL_CYLINDER', normal: [0, 1, 0] as [number, number, number] },
+      { id: 'plane_top', feature_type: 'PLANE', normal: [0, 1, 0] as [number, number, number] },
+      { id: 'plane_bottom', feature_type: 'PLANE', normal: [0, -1, 0] as [number, number, number] },
+    ];
+
+    const recommendation = SetupPrep.recommendPartSetup(bbox, features);
+
+    expect(recommendation.bestCandidate).toBeDefined();
+    expect(recommendation.bestCandidate.axis).toBe('y');
+    expect(recommendation.bestCandidate.heightMm).toBe(5.7);
+    expect(recommendation.bestCandidate.stabilityScore).toBe(100);
+    expect(recommendation.bestCandidate.compositeScore).toBeGreaterThanOrEqual(70);
+    expect(recommendation.rotationMatrix).toBeDefined();
+    expect(recommendation.summaryMessage).toContain('📐 Otomatik Bağlama');
+  });
+
+  it('recommendPartSetup tüm unsurlar tek yönden erişilebiliyorsa requiresOp20 false verir', () => {
+    const bbox = { size: [50, 20, 30] as [number, number, number] };
+    const features = [
+      { id: 'h1', feature_type: 'INTERNAL_CYLINDER', normal: [0, 1, 0] as [number, number, number] },
+      { id: 'h2', feature_type: 'INTERNAL_CYLINDER', normal: [0, 1, 0] as [number, number, number] },
+    ];
+
+    const recommendation = SetupPrep.recommendPartSetup(bbox, features);
+    expect(recommendation.bestCandidate.axis).toBe('y');
+    expect(recommendation.bestCandidate.requiresOp20).toBe(false);
+  });
 });

@@ -590,7 +590,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let drf = rec.to_datum_reference_frame("PCS_AUTO_321");
-    let mut plan = InspectionPlan::new("VALVE_BODY_OP10", step_file, drf);
+    let part_name = Path::new(step_file)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("PART_INSPECTION");
+    let mut plan = InspectionPlan::new(part_name, step_file, drf);
     plan.bounding_box_min = brep_model.bounding_box_min;
     plan.bounding_box_max = brep_model.bounding_box_max;
 
@@ -598,14 +602,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         plan.features.push(f.clone());
     }
 
-    // Modeldeki delikler için tolerans ekle
-    if let Some(bore) = brep_model.find_feature_by_name("BORE_25") {
+    let target_bore = brep_model.find_feature_by_name("BORE_25").or_else(|| {
+        brep_model
+            .features
+            .iter()
+            .filter(|f| f.feature_type == ortho_ast::FeatureType::InternalCylinder && f.diameter.unwrap_or(0.0) >= 3.0)
+            .max_by(|a, b| a.diameter.partial_cmp(&b.diameter).unwrap())
+    });
+
+    if let Some(bore) = target_bore {
         let tol_h7 = ToleranceConstraint::new_h7_hole(101, bore.id, bore.diameter.unwrap_or(25.0), 0.021);
         plan.tolerances.push(tol_h7);
-    }
-
-    // ASME Y14.5 Bileşik Konum Çerçevesi (Composite FCF)
-    if let Some(bore) = brep_model.find_feature_by_name("BORE_25") {
         let comp_tol = ortho_ast::CompositeTolerance::new_composite_position(
             201,
             "BORE_PATTERN_COMPOSITE",
@@ -642,16 +649,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   -> Planlanan Toplam Temas Noktası: {}", sampling_plan.total_contact_points);
     println!("   -> Kullanılan Benzersiz PH10 Açısı: {}", sampling_plan.distinct_angles.len());
 
-    let primary_plane_id = rec.primary_feature_id;
     let primary_plane = brep_model
-        .find_feature_by_id(primary_plane_id)
-        .unwrap_or_else(|| {
+        .features
+        .iter()
+        .find(|f| f.id == rec.primary_feature_id && f.feature_type == ortho_ast::FeatureType::Plane)
+        .or_else(|| {
             brep_model
                 .features
                 .iter()
                 .find(|f| f.feature_type == ortho_ast::FeatureType::Plane)
-                .unwrap()
-        });
+        })
+        .expect("En az bir duzlem bulunmali");
 
     let (top_angle, err_top) = ph10_lut.find_best_angle(primary_plane.approach_vector());
     println!(
@@ -676,7 +684,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let plane_pts = sample_plane_grid(primary_plane.centroid, primary_plane.normal_vector, 25.0);
 
     // Delik örnekleme
-    let hole_pts = if let Some(bore) = brep_model.find_feature_by_name("BORE_25") {
+    let hole_pts = if let Some(bore) = target_bore {
         sample_cylinder_2level(
             bore.centroid,
             bore.axis_vector.unwrap_or(DVec3::Z),
@@ -686,7 +694,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         Vec::new()
     };
-    println!("   -> BORE_25 için ISO 10360 standardında 8 temas noktası üretildi.");
+    if let Some(bore) = target_bore {
+        println!("   -> {} için ISO 10360 standardında {} temas noktası üretildi.", bore.name, hole_pts.len());
+    }
 
     // 2-Opt TSP Rota Optimizasyonu (Doc 08 Section 3)
     let centroids: Vec<DVec3> = brep_model.features.iter().map(|f| f.centroid).collect();
@@ -702,7 +712,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let stylus = ortho_router::StylusAssembly::default();
-    if let Some(bore) = brep_model.find_feature_by_name("BORE_25") {
+    if let Some(bore) = target_bore {
         stylus.validate_bore_clearance(
             bore.diameter.unwrap_or(25.0),
             bore.depth_or_length.unwrap_or(40.0),
@@ -710,12 +720,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   -> Prob Şaftı ve TP20 Gövde Güvenliği Doğrulandı (0 Şaft Sürtünmesi)");
     }
 
-    let clamp = ortho_router::KeepOutZone::new(
-        "FIXTURE_CLAMP_OP10",
-        DVec3::new(-35.0, 20.0, 0.0),
-        DVec3::new(-5.0, 60.0, 35.0),
-    );
-    let keep_outs = vec![clamp];
+    let keep_outs = vec![];
 
     let mut segments = Vec::new();
     segments.push(MotionSegment::RotateHead {
@@ -735,7 +740,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    for pt in hole_pts {
+    for pt in &hole_pts {
         segments.push(MotionSegment::TouchApproach {
             target: pt.touch_point,
             normal: pt.surface_normal,
@@ -753,7 +758,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     let machine_profile = CmmMachineProfile::default_hexagon_global_s();
-    machine_profile.validate_trajectory_envelope(&trajectory, DVec3::new(100.0, 100.0, 0.0))?;
+    let part_offset_on_granite = DVec3::new(
+        100.0 - brep_model.bounding_box_min.x,
+        100.0 - brep_model.bounding_box_min.y,
+        50.0 - brep_model.bounding_box_min.z,
+    );
+    machine_profile.validate_trajectory_envelope(&trajectory, part_offset_on_granite)?;
     println!(
         "   -> HAL: '{}' Eksen Strok Limitleri [0..900, 0..1200, 0..800] Teyit Edildi.",
         machine_profile.machine_id

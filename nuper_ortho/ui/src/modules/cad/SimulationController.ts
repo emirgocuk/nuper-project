@@ -5,6 +5,8 @@ export type ProbePhase = 'IDLE' | 'TRAVERSE' | 'TOUCH' | 'RETRACT' | 'COMPLETED'
 export interface Waypoint {
   position: THREE.Vector3;
   phase: ProbePhase;
+  featureId?: number;
+  balloon?: string;
 }
 
 export interface SimulationState {
@@ -14,15 +16,17 @@ export interface SimulationState {
   speedMultiplier: number;
   currentWaypointIndex: number;
   isPlaying: boolean;
+  activeFeatureId?: number;
+  activeBalloon?: string;
 }
 
 export const SUPPORTED_SPEEDS = [0.5, 1.0, 2.0, 5.0] as const;
 export type SupportedSpeed = (typeof SUPPORTED_SPEEDS)[number];
 
 export class SimulationController {
-  private speedMultiplier = 5.0;
+  private speedMultiplier = 1.0;
   private isPlaying = false;
-  private currentPosition: THREE.Vector3 = new THREE.Vector3(0, 100, 0);
+  private currentPosition: THREE.Vector3 = new THREE.Vector3(0, 23.63, 0);
   private waypoints: Waypoint[] = [];
   private currentWaypointIndex = 0;
   private currentPhase: ProbePhase = 'IDLE';
@@ -36,7 +40,7 @@ export class SimulationController {
   private boundObject: THREE.Object3D | null = null;
   private boundOffset: THREE.Vector3 = new THREE.Vector3(0, 20, 0);
 
-  constructor(initialSpeed = 5.0) {
+  constructor(initialSpeed = 1.0) {
     this.setSpeedMultiplier(initialSpeed);
   }
 
@@ -89,6 +93,16 @@ export class SimulationController {
     for (const listener of this.listeners) {
       listener(state);
     }
+    if (typeof window !== 'undefined') {
+      const win = window as unknown as { requestRender?: () => void; eval?: (c: string) => unknown };
+      if (typeof win.requestRender === 'function') {
+        win.requestRender();
+      } else if (typeof win.eval === 'function') {
+        try {
+          win.eval('if (typeof requestRender === "function") requestRender();');
+        } catch {}
+      }
+    }
   }
 
   public static wireSpeedButtons(
@@ -105,7 +119,7 @@ export class SimulationController {
 
     if (container) {
       const buttons = container.querySelectorAll<HTMLButtonElement>('button[data-speed]');
-      const activeSpeed = controller ? controller.getSpeedMultiplier() : 5.0;
+      const activeSpeed = controller ? controller.getSpeedMultiplier() : 1.0;
 
       buttons.forEach((btn) => {
         const speedAttr = btn.getAttribute('data-speed');
@@ -179,7 +193,10 @@ export class SimulationController {
         }
         const hudCoords = document.getElementById('hud-feature-coords');
         if (hudCoords) {
-          hudCoords.innerText = `Prob: X: ${state.currentPosition.x.toFixed(2)} mm | Y: ${state.currentPosition.y.toFixed(2)} mm | Z: ${state.currentPosition.z.toFixed(2)} mm | Faz: ${state.phase} | Hız: ${state.speedMultiplier}x`;
+          const posX = isFinite(state.currentPosition.x) ? state.currentPosition.x : 0.0;
+          const posY = isFinite(state.currentPosition.y) ? state.currentPosition.y : 23.63;
+          const posZ = isFinite(state.currentPosition.z) ? state.currentPosition.z : 0.0;
+          hudCoords.innerText = `Prob: X: ${posX.toFixed(2)} mm | Y: ${posY.toFixed(2)} mm | Z: ${posZ.toFixed(2)} mm | Faz: ${state.phase} | Hız: ${state.speedMultiplier}x`;
         }
         const codeLines = document.querySelectorAll('.code-line');
         if (codeLines.length > 0) {
@@ -374,6 +391,7 @@ export class SimulationController {
   public getState(): SimulationState {
     const totalWaypoints = this.waypoints.length;
     const progress = totalWaypoints > 1 ? Math.min(1.0, this.currentWaypointIndex / (totalWaypoints - 1)) : (totalWaypoints === 1 ? 1.0 : 0);
+    const currentWp = this.waypoints[this.currentWaypointIndex];
 
     return {
       currentPosition: this.currentPosition.clone(),
@@ -382,6 +400,8 @@ export class SimulationController {
       speedMultiplier: this.speedMultiplier,
       currentWaypointIndex: this.currentWaypointIndex,
       isPlaying: this.isPlaying,
+      activeFeatureId: currentWp?.featureId,
+      activeBalloon: currentWp?.balloon,
     };
   }
 

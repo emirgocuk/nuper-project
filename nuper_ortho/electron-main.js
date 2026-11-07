@@ -64,6 +64,28 @@ function createWindow() {
   });
   ipcMain.on('window-close', () => mainWindow && mainWindow.close());
 
+  async function parseStepMetadata(stepPath) {
+    try {
+      const { execFile } = require('child_process');
+      const verifierScript = path.join(__dirname, 'tools', 'extractor', 'brep_verifier.py');
+      return await new Promise((resolve) => {
+        execFile('python', [verifierScript, stepPath], { maxBuffer: 20 * 1024 * 1024 }, (err, stdout) => {
+          if (!err && stdout) {
+            try {
+              resolve(JSON.parse(stdout));
+            } catch (e) {
+              resolve(null);
+            }
+          } else {
+            resolve(null);
+          }
+        });
+      });
+    } catch (e) {
+      return null;
+    }
+  }
+
   // Native CAD File Chooser IPC
   ipcMain.handle('select-cad-file', async () => {
     if (!mainWindow) return null;
@@ -88,6 +110,7 @@ function createWindow() {
     const ext = path.extname(filePath).toLowerCase().replace('.', '');
     const name = path.basename(filePath);
     const buf = await fs.promises.readFile(filePath);
+    const metadata = (ext === 'step' || ext === 'stp') ? await parseStepMetadata(filePath) : null;
 
     return {
       filePath,
@@ -95,7 +118,8 @@ function createWindow() {
       ext,
       size: buf.length,
       dataText: (ext === 'step' || ext === 'stp' || ext === 'obj') ? buf.toString('utf8') : null,
-      dataBase64: buf.toString('base64')
+      dataBase64: buf.toString('base64'),
+      metadata: metadata || undefined
     };
   });
 
@@ -200,13 +224,15 @@ function createWindow() {
       const ext = path.extname(resolved).toLowerCase().replace('.', '');
       const name = path.basename(resolved);
       const buf = await fs.promises.readFile(resolved);
+      const metadata = (ext === 'step' || ext === 'stp') ? await parseStepMetadata(resolved) : null;
       return {
         filePath: resolved,
         name,
         ext,
         size: buf.length,
         dataText: (['step', 'stp', 'obj', 'svg', 'json'].includes(ext)) ? buf.toString('utf8') : null,
-        dataBase64: buf.toString('base64')
+        dataBase64: buf.toString('base64'),
+        metadata: metadata || undefined
       };
     } catch (e) {
       console.error('Error reading local CAD/asset:', e);
@@ -255,13 +281,15 @@ function createWindow() {
       if (fs.existsSync(cadFullPath)) {
         const cadBuf = await fs.promises.readFile(cadFullPath);
         const cadExt = path.extname(cadFullPath).toLowerCase().replace('.', '');
+        const metadata = (cadExt === 'step' || cadExt === 'stp') ? await parseStepMetadata(cadFullPath) : null;
         cadData = {
           name: path.basename(cadFullPath),
           filePath: cadFullPath,
           ext: cadExt,
           size: cadBuf.length,
           dataText: ['step', 'stp', 'obj'].includes(cadExt) ? cadBuf.toString('utf8') : null,
-          dataBase64: cadBuf.toString('base64')
+          dataBase64: cadBuf.toString('base64'),
+          metadata: metadata || undefined
         };
       }
 

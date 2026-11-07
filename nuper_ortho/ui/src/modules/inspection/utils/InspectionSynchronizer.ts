@@ -25,6 +25,8 @@ export interface InspectionDimension {
   op?: string;
   op_reason?: string;
   cad_feature_id?: string;
+  cad_center?: [number, number, number];
+  cad_normal?: [number, number, number];
   match_confidence?: 'EXACT' | 'ENVELOPE' | 'RADIUS_HALF' | 'UNMATCHED';
 }
 

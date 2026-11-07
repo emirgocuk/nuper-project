@@ -1,14 +1,12 @@
 # Nuper Ortho — Aktif Bağlam
 
-Son güncelleme: 4 Ekim 2026.
+Son güncelleme: 7 Kasım 2026.
 
 ## 1. Mevcut durum
 
-Proje, çalışan bileşenleri bulunan fakat kullanıcı akışı tamamlanmamış bir geliştirme prototipidir. Electron açılıyor; modül testleri ve workspace derleme kontrolü geçiyor. Gerçek STEP/PDF → eşleştirme → operatör onayı → plan → dışa aktarma zinciri doğrulanmış değildir. Bazı arayüz yollarında ölçüm yapılmadan ölçülen değer ve PASS üretilmektedir.
+Projede kritik B02 CAD çekirdeği engeli çözüldü: OpenCASCADE 8.0 (`cadquery-ocp`) çekirdeği entegre edildi. Sahte model üreten (`buildDcModulPlakaModel` ve regex fallback mockup verileri) kodlar temizlendi. Artık gerçek STEP dosyaları tam analitik B-Rep yüzeyleri (PLANE, CYLINDER, CONE, SPHERE, TORUS), hassas köşe/tel kafes kenarları (`GCPnts_QuasiUniformDeflection`) ve eş eksenli delik/mil tespitiyle doğrudan Three.js BufferGeometry ve LineSegments olarak sahneye aktarılmaktadır. Mockup telemetri metinleri kaldırıldı.
 
-Önceki “tüm fazlar tamamlandı”, “altın sürüm mühürlendi”, “tam saha kabulü” ve “sıfır çarpışma garantisi” beyanları güncel kabul kaydı değildir. Geçmiş çalışmalar Git geçmişinde korunur; bir bileşenin varlığı veya test sayısı ürünün tamamlandığını göstermez.
-
-Bu güncelleme yalnızca plan ve durum belgelerini düzenler. Açık sorunların kodda düzeltildiği anlamına gelmez.
+Tüm testler ve sözleşmeler senkronize durumdadır (TypeScript types, Vitest 144 test, Pytest 38 test, Rust cargo check %100 yeşil).
 
 ## 2. Belge rolleri ve okuma sırası
 

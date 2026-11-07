@@ -1,3 +1,10 @@
+import {
+  getFeatureTypeSvg,
+  getFeatureTypeOptions,
+  parseDatumReference,
+  formatDatumReference,
+} from './MetrologyIcons';
+
 export interface DefinedFeatureData {
   id?: number;
   balloon?: string;
@@ -192,6 +199,22 @@ export class FeatureDefinitionModal {
     const initialDatum = existing?.datum_reference || '[A]';
     const initialDesc = existing?.description || existing?.type_label || '';
 
+    const knownDatums = ['A', 'B', 'C'];
+    if (existing?.datum_reference) {
+      for (const d of parseDatumReference(existing.datum_reference)) {
+        if (!knownDatums.includes(d)) knownDatums.push(d);
+      }
+    }
+    const activeDatums = new Set(parseDatumReference(initialDatum));
+    const datumChipsHtml = knownDatums
+      .map(
+        (d) =>
+          `<button type="button" class="feat-datum-chip ${activeDatums.has(d) ? 'active' : ''}" data-datum="${d}" style="padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; background: ${activeDatums.has(d) ? '#0284C7' : '#1E293B'}; border: 1px solid ${activeDatums.has(d) ? '#0284C7' : '#334155'}; color: ${activeDatums.has(d) ? '#FFFFFF' : '#94A3B8'}; cursor: pointer;">${d}</button>`
+      )
+      .join('');
+    const typeOptions = getFeatureTypeOptions();
+    const currentSvg = getFeatureTypeSvg(initialType);
+
     const modal = document.createElement('div');
     modal.id = 'modal-feature-definition';
     modal.className = 'feature-definition-modal-overlay';
@@ -209,8 +232,8 @@ export class FeatureDefinitionModal {
     modal.style.fontFamily = "'Inter', -apple-system, sans-serif";
 
     modal.innerHTML = `
-      <div class="feature-modal-card" style="width: 480px; background: #0F172A; border: 1px solid #334155; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); overflow: hidden; color: #F8FAFC;">
-        <div style="padding: 16px 20px; border-bottom: 1px solid #1E293B; display: flex; align-items: center; justify-content: space-between; background: #1E293B;">
+      <div class="feature-modal-card" style="width: 480px; max-height: 90vh; background: #0F172A; border: 1px solid #334155; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); overflow: hidden; display: flex; flex-direction: column; color: #F8FAFC;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #1E293B; display: flex; align-items: center; justify-content: space-between; background: #1E293B; flex-shrink: 0;">
           <div style="display: flex; align-items: center; gap: 10px;">
             <div style="width: 32px; height: 32px; border-radius: 50%; background: #0284C7; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: #FFF;">
               ${initialBalloon}
@@ -227,20 +250,21 @@ export class FeatureDefinitionModal {
           <button id="btn-feature-modal-close" style="background: none; border: none; font-size: 18px; color: #64748B; cursor: pointer;">✕</button>
         </div>
 
-        <form id="feature-modal-form" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+        <form id="feature-modal-form" style="padding: 20px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto;">
           <div>
             <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px;">
               Unsur Tipi
             </label>
-            <select id="feat-type" style="width: 100%; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px;">
-              <option value="DIAMETER" ${initialType === 'DIAMETER' ? 'selected' : ''}>⭕ Çap (DIAMETER)</option>
-              <option value="LINEAR" ${initialType === 'LINEAR' ? 'selected' : ''}>📏 Doğrusal Boyut (LINEAR)</option>
-              <option value="RADIUS" ${initialType === 'RADIUS' ? 'selected' : ''}>📐 Radyus / Kavis (RADIUS)</option>
-              <option value="ANGLE" ${initialType === 'ANGLE' ? 'selected' : ''}>📐 Açı / Koniklik (ANGLE)</option>
-              <option value="CHAMFER" ${initialType === 'CHAMFER' ? 'selected' : ''}>✂️ Pah (CHAMFER)</option>
-              <option value="THREAD" ${initialType === 'THREAD' ? 'selected' : ''}>🔩 Vida / Diş (THREAD)</option>
-              <option value="POSITION" ${initialType === 'POSITION' ? 'selected' : ''}>🎯 Konum / GD&T (POSITION)</option>
-            </select>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="feat-type-icon-preview" style="width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; background: #1E293B; border: 1px solid #334155; border-radius: 6px; flex-shrink: 0;">
+                ${currentSvg}
+              </span>
+              <select id="feat-type" style="flex: 1; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px;">
+                ${typeOptions
+                  .map((opt) => `<option value="${opt.value}" ${opt.value === initialType ? 'selected' : ''}>${opt.label}</option>`)
+                  .join('')}
+              </select>
+            </div>
           </div>
 
           <div>
@@ -256,44 +280,49 @@ export class FeatureDefinitionModal {
                 <button type="button" class="btn-symbol-insert" data-symbol="x45°" style="padding: 2px 6px; font-size: 10px; background: #334155; border: none; border-radius: 3px; color: #38BDF8; cursor: pointer;">x45°</button>
               </div>
             </div>
-            <input type="text" id="feat-nom-str" value="${initialNomStr}" placeholder="örn: Ø86 ±0.5, 3 x45°, R3, (291.9)" style="width: 100%; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px; font-family: 'JetBrains Mono', monospace;" />
+            <input type="text" id="feat-nom-str" value="${initialNomStr}" placeholder="örn: Ø86 ±0.5, 3 x45°, R3, (291.9)" style="width: 100%; box-sizing: border-box; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px; font-family: 'JetBrains Mono', monospace;" />
             <span style="font-size: 10px; color: #64748B; margin-top: 3px; display: block;">Balonun altında çizimde tam olarak bu özellik etiketi görünecektir.</span>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-            <div>
-              <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px;">
-                Nominal (mm)
-              </label>
-              <input type="number" step="any" id="feat-nominal" value="${initialNominal}" style="width: 100%; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px;" required />
-            </div>
-            <div>
-              <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px;">
-                Üst Tol (+)
-              </label>
-              <input type="text" id="feat-upper-tol" value="${initialUpper}" placeholder="+0.100" style="width: 100%; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px; font-family: 'JetBrains Mono', monospace;" />
-            </div>
-            <div>
-              <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px;">
-                Alt Tol (-)
-              </label>
-              <input type="text" id="feat-lower-tol" value="${initialLower}" placeholder="-0.100" style="width: 100%; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px; font-family: 'JetBrains Mono', monospace;" />
-            </div>
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px;">
+              Nominal Değer (mm)
+            </label>
+            <input type="number" step="any" id="feat-nominal" value="${initialNominal}" style="width: 100%; box-sizing: border-box; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px; font-family: 'JetBrains Mono', monospace;" required />
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px;">
-            <div>
-              <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px;">
-                Datum Ref
-              </label>
-              <input type="text" id="feat-datum" value="${initialDatum}" placeholder="[A]" style="width: 100%; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px;" />
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px;">
+              Üst Tolerans (+mm)
+            </label>
+            <input type="text" id="feat-upper-tol" value="${initialUpper}" placeholder="+0.100" style="width: 100%; box-sizing: border-box; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px; font-family: 'JetBrains Mono', monospace;" />
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px;">
+              Alt Tolerans (-mm)
+            </label>
+            <input type="text" id="feat-lower-tol" value="${initialLower}" placeholder="-0.100" style="width: 100%; box-sizing: border-box; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px; font-family: 'JetBrains Mono', monospace;" />
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px;">
+              Datum Referansı
+            </label>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;">
+              <div id="feat-datum-chips" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                ${datumChipsHtml}
+              </div>
+              <button type="button" id="btn-feat-add-datum" style="padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: transparent; border: 1px dashed #64748B; color: #94A3B8; cursor: pointer;">+ Harf</button>
             </div>
-            <div>
-              <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px;">
-                Açıklama / Unsur Adı
-              </label>
-              <input type="text" id="feat-desc" value="${initialDesc}" placeholder="örn: Ana Silindirik Çap" style="width: 100%; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px;" />
-            </div>
+            <input type="hidden" id="feat-datum" value="${initialDatum}" />
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #94A3B8; margin-bottom: 6px;">
+              Açıklama / Unsur Adı
+            </label>
+            <input type="text" id="feat-desc" value="${initialDesc}" placeholder="örn: Ana Silindirik Çap / Toplam Boy" style="width: 100%; box-sizing: border-box; padding: 8px 10px; background: #1E293B; border: 1px solid #334155; border-radius: 6px; color: #F8FAFC; font-size: 13px;" />
           </div>
 
           <div style="margin-top: 10px; display: flex; justify-content: flex-end; gap: 10px;">
@@ -319,6 +348,7 @@ export class FeatureDefinitionModal {
 
     const nomStrInput = modal.querySelector<HTMLInputElement>('#feat-nom-str');
     const typeSelect = modal.querySelector<HTMLSelectElement>('#feat-type');
+    const iconPreview = modal.querySelector<HTMLElement>('#feat-type-icon-preview');
     const nominalInput = modal.querySelector<HTMLInputElement>('#feat-nominal');
     const upperInput = modal.querySelector<HTMLInputElement>('#feat-upper-tol');
     const lowerInput = modal.querySelector<HTMLInputElement>('#feat-lower-tol');
@@ -332,13 +362,69 @@ export class FeatureDefinitionModal {
           nomStrInput.value = val.slice(0, curPos) + sym + val.slice(curPos);
           nomStrInput.focus();
           nomStrInput.setSelectionRange(curPos + sym.length, curPos + sym.length);
-          this.syncFromNomStr(nomStrInput.value, typeSelect, nominalInput, upperInput, lowerInput);
+          this.syncFromNomStr(nomStrInput.value, typeSelect, nominalInput, upperInput, lowerInput, iconPreview);
         }
       });
     });
 
     nomStrInput?.addEventListener('input', () => {
-      this.syncFromNomStr(nomStrInput.value, typeSelect, nominalInput, upperInput, lowerInput);
+      this.syncFromNomStr(nomStrInput.value, typeSelect, nominalInput, upperInput, lowerInput, iconPreview);
+    });
+
+    typeSelect?.addEventListener('change', () => {
+      if (iconPreview && typeSelect) {
+        iconPreview.innerHTML = getFeatureTypeSvg(typeSelect.value);
+      }
+    });
+
+    const datumHiddenInput = modal.querySelector<HTMLInputElement>('#feat-datum');
+    const datumChipsContainer = modal.querySelector<HTMLElement>('#feat-datum-chips');
+    const updateDatumFromChips = () => {
+      if (!datumHiddenInput || !datumChipsContainer) return;
+      const activeChips = Array.from(datumChipsContainer.querySelectorAll<HTMLButtonElement>('.feat-datum-chip.active'));
+      const activeLetters = activeChips.map((c) => c.getAttribute('data-datum') || '').filter(Boolean);
+      datumHiddenInput.value = formatDatumReference(activeLetters);
+    };
+
+    const attachChipClick = (chip: HTMLButtonElement) => {
+      chip.addEventListener('click', () => {
+        const isActive = chip.classList.contains('active');
+        if (isActive) {
+          chip.classList.remove('active');
+          chip.style.background = '#1E293B';
+          chip.style.borderColor = '#334155';
+          chip.style.color = '#94A3B8';
+        } else {
+          chip.classList.add('active');
+          chip.style.background = '#0284C7';
+          chip.style.borderColor = '#0284C7';
+          chip.style.color = '#FFFFFF';
+        }
+        updateDatumFromChips();
+      });
+    };
+
+    datumChipsContainer?.querySelectorAll<HTMLButtonElement>('.feat-datum-chip').forEach(attachChipClick);
+
+    const addDatumBtn = modal.querySelector<HTMLButtonElement>('#btn-feat-add-datum');
+    addDatumBtn?.addEventListener('click', () => {
+      const letter = (typeof window !== 'undefined' && window.prompt ? window.prompt('Eklenecek Datum Harfi (örn: D, E):', '') : 'D')?.trim().toUpperCase();
+      if (letter && /^[A-Z][0-9]?$/.test(letter)) {
+        if (!knownDatums.includes(letter)) {
+          knownDatums.push(letter);
+        }
+        if (datumChipsContainer) {
+          const newChip = document.createElement('button');
+          newChip.type = 'button';
+          newChip.className = 'feat-datum-chip active';
+          newChip.setAttribute('data-datum', letter);
+          newChip.textContent = letter;
+          newChip.style.cssText = 'padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; background: #0284C7; border: 1px solid #0284C7; color: #FFFFFF; cursor: pointer;';
+          attachChipClick(newChip);
+          datumChipsContainer.appendChild(newChip);
+          updateDatumFromChips();
+        }
+      }
     });
 
     const form = modal.querySelector<HTMLFormElement>('#feature-modal-form');
@@ -518,11 +604,15 @@ export class FeatureDefinitionModal {
     typeSelect: HTMLSelectElement | null,
     nominalInput: HTMLInputElement | null,
     upperInput: HTMLInputElement | null,
-    lowerInput: HTMLInputElement | null
+    lowerInput: HTMLInputElement | null,
+    iconPreview?: HTMLElement | null
   ): void {
     const parsed = this.parseCallout(nomStr);
     if (typeSelect && parsed.type) {
       typeSelect.value = parsed.type;
+      if (iconPreview) {
+        iconPreview.innerHTML = getFeatureTypeSvg(parsed.type);
+      }
     }
     if (nominalInput && parsed.nominal !== undefined && !isNaN(parsed.nominal)) {
       nominalInput.value = String(parsed.nominal);

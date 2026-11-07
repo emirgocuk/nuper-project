@@ -35,7 +35,7 @@ describe('Production IPC Wiring & Schema Enforcement (IpcClient)', () => {
     expect(result?.title_block.part_number).toBe('050-164849-000');
     expect(result?.datums).toContain('A');
     expect(result?.dimensions.length).toBeGreaterThan(0);
-    expect(result?.dimensions[0].status).toBe('PASS');
+    expect(result?.dimensions[0].status).toBe('UNMEASURED');
   });
 
   it('loadBenchmarkSpecimen CAD ve Teknik Resim verilerini senkronize döner', async () => {

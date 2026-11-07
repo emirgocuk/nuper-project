@@ -6,8 +6,11 @@ import { InspectionTable } from './modules/inspection/InspectionTable';
 import { IpcClient, type SelectedCadFile, type SelectedDrawingFile, type BenchmarkSpecimenSuite } from './modules/ipc/IpcClient';
 import { PRECISION, isEqual } from './modules/core/math/precision';
 import type { DrawingExtractionResult } from './types/generated/drawing_data';
+import type { CadMetadata } from './types/generated/cad_metadata';
 import { SetupWizard } from './modules/inspection/utils/SetupWizard';
 import { AiStatusIndicator } from './modules/core/utils/AiStatusIndicator';
+import { installCadImportInterceptor, applyStepModelToScene } from './modules/cad/utils/CadImportManager';
+import { WorkflowRibbon } from './modules/core/utils/WorkflowRibbon';
 
 export class NuperApp {
   private cadViewer: CADViewer;
@@ -15,6 +18,7 @@ export class NuperApp {
   private inspectionTable: InspectionTable;
   private ipcClient: IpcClient;
   private setupWizard: SetupWizard;
+  private lastCadFilePath: string | null = null;
 
   constructor() {
     this.cadViewer = new CADViewer();
@@ -110,14 +114,31 @@ export class NuperApp {
   public async openAndLoadCadFile(): Promise<SelectedCadFile | null> {
     const cadFile = await this.ipcClient.selectCadFile();
     if (cadFile) {
-      if (cadFile.metadata) {
-        this.setupWizard.setCadMetadata(cadFile.metadata);
+      if (cadFile.filePath) {
+        this.lastCadFilePath = cadFile.filePath;
       }
-      const sx = cadFile.metadata?.bbox?.size?.[0] ?? 50;
-      const sy = cadFile.metadata?.bbox?.size?.[1] ?? 30;
-      const sz = cadFile.metadata?.bbox?.size?.[2] ?? 20;
-      const geometry = new THREE.BoxGeometry(sx, sy, sz);
+      const tess = applyStepModelToScene(cadFile.name, cadFile.dataText || '', cadFile.metadata);
+      const geometry = tess.geometry || new THREE.BoxGeometry(tess.bbox.size[0], tess.bbox.size[1], tess.bbox.size[2]);
       this.cadViewer.setModelGeometry(geometry);
+
+      const ext = (cadFile.name.split('.').pop()?.toLowerCase() || 'stp') as 'step' | 'stp' | 'stl' | 'obj';
+      this.setupWizard.setCadMetadata(cadFile.metadata || {
+        model_name: cadFile.name,
+        file_format: (['step', 'stp', 'stl', 'obj'].includes(ext) ? ext : 'stp') as 'step' | 'stp' | 'stl' | 'obj',
+        vertex_count: tess.geometry ? tess.geometry.attributes.position.count : 0,
+        triangle_count: tess.geometry && tess.geometry.index ? tess.geometry.index.count / 3 : 0,
+        bbox: {
+          min: tess.bbox.min,
+          max: tess.bbox.max,
+          size: tess.bbox.size,
+        },
+        features: (tess.cadFeatures as unknown as NonNullable<CadMetadata['features']>) || [],
+      });
+    } else {
+      const fileInput = document.getElementById('step-file-input') || document.getElementById('real-3d-file-input');
+      if (fileInput) {
+        fileInput.click();
+      }
     }
     return cadFile;
   }
@@ -144,7 +165,7 @@ export class NuperApp {
       } catch {}
     }
 
-    const result = await this.ipcClient.extractDrawingData(drawingFile.filePath);
+    const result = await this.ipcClient.extractDrawingData(drawingFile.filePath, this.lastCadFilePath || undefined);
     if (result) {
       this.loadDrawingData(result);
       this.setupWizard.setExtractedData(result, drawingFile.name);
@@ -160,18 +181,19 @@ export class NuperApp {
     }
 
     if (suite.cad) {
+      if (suite.cad.filePath) {
+        this.lastCadFilePath = suite.cad.filePath;
+      }
       if (suite.cad.metadata) {
         this.setupWizard.setCadMetadata(suite.cad.metadata);
       }
-      const sx = suite.cad.metadata?.bbox?.size?.[0] ?? 50;
-      const sy = suite.cad.metadata?.bbox?.size?.[1] ?? 30;
-      const sz = suite.cad.metadata?.bbox?.size?.[2] ?? 20;
-      const geometry = new THREE.BoxGeometry(sx, sy, sz);
+      const tess = applyStepModelToScene(suite.cad.name, suite.cad.dataText || '', suite.cad.metadata);
+      const geometry = tess.geometry || new THREE.BoxGeometry(tess.bbox.size[0], tess.bbox.size[1], tess.bbox.size[2]);
       this.cadViewer.setModelGeometry(geometry);
     }
 
     if (suite.drawing?.filePath) {
-      const extracted = await this.ipcClient.extractDrawingData(suite.drawing.filePath);
+      const extracted = await this.ipcClient.extractDrawingData(suite.drawing.filePath, this.lastCadFilePath || undefined);
       if (extracted) {
         this.loadDrawingData(extracted);
       }
@@ -223,8 +245,10 @@ if (typeof window !== 'undefined') {
       sessionStorage.clear();
     } catch {}
     const simCtrl = app.getCADViewer().getSimulationController();
-    simCtrl.setSpeedMultiplier(5.0);
+    simCtrl.setSpeedMultiplier(1.0);
     SimulationController.wireSpeedButtons('.speed-controls', simCtrl);
+    const speedBtns = document.querySelectorAll('.speed-controls button[data-speed]');
+    speedBtns.forEach((b) => b.classList.toggle('active', b.getAttribute('data-speed') === '1.0'));
 
     const win = window as unknown as {
       generateDynamicProbeTrajectory?: () => void;
@@ -233,6 +257,15 @@ if (typeof window !== 'undefined') {
       openAiInspectionModal?: () => void;
       trigger2dUpload?: () => void;
       setupWizard?: SetupWizard;
+      apply321Alignment?: () => void;
+      open321Modal?: () => void;
+      openClampingModal?: () => void;
+      openBenchmarkLabModal?: () => void;
+      toggleDiagnosticsDrawer?: () => void;
+      switchSetup?: (op: 'OP10' | 'OP20') => void;
+      requestRender?: () => void;
+      trajLine?: { visible: boolean };
+      blockGroup?: { visible: boolean };
     };
     win.isSimulating = false;
     simCtrl.pause();
@@ -265,6 +298,164 @@ if (typeof window !== 'undefined') {
     });
 
     wizard.startWorkflow();
+    installCadImportInterceptor();
+
+    const workflowRibbon = new WorkflowRibbon();
+    workflowRibbon.mount('.app-ribbon');
+    (win as unknown as { workflowRibbon?: WorkflowRibbon }).workflowRibbon = workflowRibbon;
+
+    const bindWorkflowEvents = () => {
+      const stepCadBtn = document.querySelector('[data-workflow-id="step_cad"]');
+      if (stepCadBtn) {
+        stepCadBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          app.openAndLoadCadFile().then((res) => {
+            if (res) {
+              const shortName = res.name.length > 20 ? res.name.substring(0, 18) + '...' : res.name;
+              workflowRibbon.setStepLabel('step_cad', `Katı Model: ${shortName}`);
+              workflowRibbon.advanceToStep(2);
+              workflowRibbon.mount('.app-ribbon');
+              bindWorkflowEvents();
+            }
+          });
+        });
+      }
+
+      const stepFixtureBtn = document.querySelector('[data-workflow-id="step_fixture"]');
+      if (stepFixtureBtn) {
+        stepFixtureBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (typeof win.openClampingModal === 'function') {
+            win.openClampingModal();
+          }
+          workflowRibbon.advanceToStep(3);
+          workflowRibbon.mount('.app-ribbon');
+          bindWorkflowEvents();
+        });
+      }
+
+      const stepDrawingBtn = document.querySelector('[data-workflow-id="step_drawing"]');
+      if (stepDrawingBtn) {
+        stepDrawingBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          wizard.handleTeknikResimClick();
+          workflowRibbon.advanceToStep(4);
+          workflowRibbon.mount('.app-ribbon');
+          bindWorkflowEvents();
+        });
+      }
+
+      const stepAlignBtn = document.querySelector('[data-workflow-id="step_align"]');
+      if (stepAlignBtn) {
+        stepAlignBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (typeof win.open321Modal === 'function') {
+            win.open321Modal();
+          } else if (typeof win.apply321Alignment === 'function') {
+            win.apply321Alignment();
+          }
+        });
+      }
+
+      const stepSimBtn = document.querySelector('[data-workflow-id="step_simulation"]');
+      if (stepSimBtn) {
+        stepSimBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          workflowRibbon.advanceToStep(5);
+          workflowRibbon.mount('.app-ribbon');
+          bindWorkflowEvents();
+          simCtrl.togglePlay();
+        });
+      }
+
+      const benchBtn = document.getElementById('wf-btn-bench');
+      if (benchBtn) {
+        benchBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (typeof win.openBenchmarkLabModal === 'function') {
+            win.openBenchmarkLabModal();
+          }
+        });
+      }
+
+      const diagBtn = document.getElementById('wf-btn-diag');
+      if (diagBtn) {
+        diagBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (typeof win.toggleDiagnosticsDrawer === 'function') {
+            win.toggleDiagnosticsDrawer();
+          }
+        });
+      }
+    };
+
+    bindWorkflowEvents();
+
+    const origApply321 = win.apply321Alignment;
+    win.apply321Alignment = () => {
+      if (typeof origApply321 === 'function') {
+        origApply321();
+      }
+      workflowRibbon.advanceToStep(5);
+      workflowRibbon.mount('.app-ribbon');
+      bindWorkflowEvents();
+    };
+
+    if (win.blockGroup) win.blockGroup.visible = true;
+    if (typeof win.generateDynamicProbeTrajectory === 'function') {
+      win.generateDynamicProbeTrajectory();
+    }
+    if (win.trajLine) win.trajLine.visible = true;
+
+    const togglePathBtn = document.getElementById('btn-toggle-path');
+    if (togglePathBtn) {
+      togglePathBtn.classList.add('active');
+      togglePathBtn.innerText = 'Prob Yolunu Gizle';
+      togglePathBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (win.trajLine) {
+          win.trajLine.visible = !win.trajLine.visible;
+          togglePathBtn.classList.toggle('active', win.trajLine.visible);
+          togglePathBtn.innerText = win.trajLine.visible ? 'Prob Yolunu Gizle' : 'Prob Yolunu Göster';
+          if (typeof win.requestRender === 'function') win.requestRender();
+        }
+      };
+    }
+
+    const ribbonSimBtns = document.querySelectorAll('button[onclick*="togglePlay"], .dropdown-row[onclick*="togglePlay"]');
+    ribbonSimBtns.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        simCtrl.togglePlay();
+      });
+    });
+
+    const btnOp10 = document.getElementById('btn-setup-op10');
+    const btnOp20 = document.getElementById('btn-setup-op20');
+    if (btnOp10) {
+      btnOp10.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        wizard.switchOperationSetup('OP10');
+      });
+    }
+    if (btnOp20) {
+      btnOp20.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        wizard.switchOperationSetup('OP20');
+      });
+    }
+    win.switchSetup = (op: 'OP10' | 'OP20') => {
+      wizard.switchOperationSetup(op);
+    };
+
+    if (typeof win.requestRender === 'function') {
+      win.requestRender();
+    }
+
     void AiStatusIndicator.mountOrUpdateBadge();
     setInterval(() => void AiStatusIndicator.mountOrUpdateBadge(), 15000);
   };

@@ -133,6 +133,8 @@ class MockElement {
     }
   }
 
+  public scrollIntoView(): void {}
+
   public querySelector(sel: string): MockElement | null {
     return this.querySelectorAll(sel)[0] || null;
   }
@@ -489,5 +491,66 @@ describe('SetupWizard — Sıfır Durum ve Beyaz Temalı Işık Masası Modalı'
 
     expect(mockApp.openAndLoadDrawingFile).toHaveBeenCalledTimes(1);
     expect(openModalSpy).not.toHaveBeenCalled();
+  });
+
+  it('Canlı simülasyon takibi: aktif unsuru anlık parlatan, önceki unsurları PASS yapan ve tamamlandığında tümünü doğrulayan PC-DMIS akışını sağlar', () => {
+    wizard = new SetupWizard();
+    wizard.loadDrawingSample();
+
+    const panel = new MockElement('div');
+    panel.id = 'clean-features-panel';
+    mockDoc.body.appendChild(panel);
+    mockDoc.register('clean-features-panel', panel);
+
+    const item1 = new MockElement('div');
+    item1.className = 'clean-feature-item';
+    item1.setAttribute('data-clean-id', '1');
+    const pill1 = new MockElement('span');
+    pill1.className = 'clean-status-pill unmeasured';
+    pill1.textContent = 'UNMEASURED ✓';
+    item1.appendChild(pill1);
+
+    const item2 = new MockElement('div');
+    item2.className = 'clean-feature-item';
+    item2.setAttribute('data-clean-id', '2');
+    const pill2 = new MockElement('span');
+    pill2.className = 'clean-status-pill unmeasured';
+    pill2.textContent = 'UNMEASURED ✓';
+    item2.appendChild(pill2);
+
+    panel.appendChild(item1);
+    panel.appendChild(item2);
+
+    wizard.handleSimulationStateChange({
+      currentPosition: { x: 10, y: 20, z: 30 } as unknown as import('three').Vector3,
+      phase: 'TOUCH',
+      progress: 0.15,
+      speedMultiplier: 5.0,
+      currentWaypointIndex: 3,
+      isPlaying: true,
+      activeFeatureId: 2,
+      activeBalloon: '#2',
+    });
+
+    expect(item2.classList.contains('measuring-now')).toBe(true);
+    expect(pill2.classList.contains('measuring')).toBe(true);
+    expect(pill2.textContent).toBe('🎯 ÖLÇÜLÜYOR...');
+
+    expect(item1.classList.contains('measuring-now')).toBe(false);
+    expect(pill1.classList.contains('pass')).toBe(true);
+    expect(pill1.textContent).toBe('PASS ✓');
+
+    wizard.handleSimulationStateChange({
+      currentPosition: { x: 0, y: 100, z: 0 } as unknown as import('three').Vector3,
+      phase: 'COMPLETED',
+      progress: 1.0,
+      speedMultiplier: 5.0,
+      currentWaypointIndex: 50,
+      isPlaying: false,
+    });
+
+    expect(item2.classList.contains('measuring-now')).toBe(false);
+    expect(pill2.classList.contains('pass')).toBe(true);
+    expect(pill2.textContent).toBe('PASS ✓');
   });
 });

@@ -27,7 +27,7 @@ describe('Mock IPC Sağlayıcısı ve İzole UI Geliştirme (FAZ 4 / Kural 1 & 4
     expect(drawing.datums).toContain('A');
     expect(drawing.dimensions.length).toBe(3);
     expect(drawing.dimensions[0].nominal).toBe(20.0);
-    expect(drawing.dimensions[0].status).toBe('PASS');
+    expect(drawing.dimensions[0].status).toBe('UNMEASURED');
 
     // 3. CAD metadata schema validation
     const cad = await win.ipcRenderer.invoke('select-cad-file') as CadMetadata;

@@ -6,6 +6,41 @@ export interface BoundingBoxEnvelope {
   size: [number, number, number];
 }
 
+export interface CadBboxInput {
+  size: [number, number, number];
+  min?: [number, number, number];
+  max?: [number, number, number];
+}
+
+export interface CadFeatureInput {
+  id: string;
+  feature_type: string;
+  nominal_dimension?: number;
+  center?: [number, number, number];
+  normal?: [number, number, number];
+}
+
+export interface SetupCandidateScore {
+  axis: 'x' | 'y' | 'z';
+  direction: 1 | -1;
+  faceNormal: [number, number, number];
+  heightMm: number;
+  stabilityScore: number;
+  accessibleFeatures: number;
+  totalFeatures: number;
+  coverageRatio: number;
+  compositeScore: number;
+  requiresOp20: boolean;
+  explanation: string;
+}
+
+export interface SetupRecommendation {
+  bestCandidate: SetupCandidateScore;
+  rotationMatrix: THREE.Matrix4;
+  candidates: SetupCandidateScore[];
+  summaryMessage: string;
+}
+
 export interface SetupPrepOptions {
   datumNormal?: THREE.Vector3;
   targetNormal?: THREE.Vector3;
@@ -111,6 +146,83 @@ export class SetupPrep {
       min: [box.min.x, box.min.y, box.min.z],
       max: [box.max.x, box.max.y, box.max.z],
       size: [size.x, size.y, size.z],
+    };
+  }
+
+  public static recommendPartSetup(
+    bbox: CadBboxInput,
+    features: CadFeatureInput[] = []
+  ): SetupRecommendation {
+    const sizeX = Math.max(0.1, bbox.size[0] || 10);
+    const sizeY = Math.max(0.1, bbox.size[1] || 10);
+    const sizeZ = Math.max(0.1, bbox.size[2] || 10);
+    const minDim = Math.min(sizeX, sizeY, sizeZ);
+
+    const candidates: SetupCandidateScore[] = [];
+
+    const dirs: Array<{ axis: 'x' | 'y' | 'z'; direction: 1 | -1; normal: [number, number, number]; height: number }> = [
+      { axis: 'y', direction: -1, normal: [0, -1, 0], height: sizeY },
+      { axis: 'y', direction: 1, normal: [0, 1, 0], height: sizeY },
+      { axis: 'z', direction: -1, normal: [0, 0, -1], height: sizeZ },
+      { axis: 'z', direction: 1, normal: [0, 0, 1], height: sizeZ },
+      { axis: 'x', direction: -1, normal: [-1, 0, 0], height: sizeX },
+      { axis: 'x', direction: 1, normal: [1, 0, 0], height: sizeX },
+    ];
+
+    const totalFeatures = features.length;
+
+    for (const d of dirs) {
+      const stabilityScore = Math.round((minDim / d.height) * 100);
+      const approach = [-d.normal[0], -d.normal[1], -d.normal[2]];
+      let accessible = 0;
+
+      if (totalFeatures > 0) {
+        for (const feat of features) {
+          const fn = feat.normal || [0, 1, 0];
+          const dot = fn[0] * approach[0] + fn[1] * approach[1] + fn[2] * approach[2];
+          if (dot >= -0.25) {
+            accessible++;
+          }
+        }
+      } else {
+        accessible = 1;
+      }
+
+      const coverageRatio = totalFeatures > 0 ? accessible / totalFeatures : 1.0;
+      const compositeScore = Math.round(coverageRatio * 60 + stabilityScore * 0.4);
+      const requiresOp20 = totalFeatures > 0 ? accessible < totalFeatures : false;
+
+      candidates.push({
+        axis: d.axis,
+        direction: d.direction,
+        faceNormal: d.normal,
+        heightMm: Math.round(d.height * 10) / 10,
+        stabilityScore,
+        accessibleFeatures: accessible,
+        totalFeatures,
+        coverageRatio: Math.round(coverageRatio * 1000) / 10,
+        compositeScore,
+        requiresOp20,
+        explanation: `Normal [${d.normal.join(', ')}] tabana oturur. Yükseklik: ${d.height.toFixed(1)} mm. Erişim: ${accessible}/${totalFeatures} unsur (%${(coverageRatio * 100).toFixed(0)}).`,
+      });
+    }
+
+    candidates.sort((a, b) => b.compositeScore - a.compositeScore);
+    const best = candidates[0];
+
+    const rotationMatrix = new THREE.Matrix4();
+    const currentNormal = new THREE.Vector3(...best.faceNormal).normalize();
+    const targetNormal = new THREE.Vector3(0, -1, 0);
+    const quat = new THREE.Quaternion().setFromUnitVectors(currentNormal, targetNormal);
+    rotationMatrix.makeRotationFromQuaternion(quat);
+
+    const summaryMessage = `📐 Otomatik Bağlama: Model en kararlı eksende [${best.faceNormal.join(', ')}] tabanına yatırıldı (Yükseklik: ${best.heightMm} mm, Kararlılık: %${best.stabilityScore}). OP10 erişim: %${best.coverageRatio}. ${best.requiresOp20 ? 'Alt yüzey için OP20 gerekecek.' : 'Tek bağlama yeterli.'}`;
+
+    return {
+      bestCandidate: best,
+      rotationMatrix,
+      candidates,
+      summaryMessage,
     };
   }
 }

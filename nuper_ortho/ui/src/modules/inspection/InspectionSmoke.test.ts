@@ -43,16 +43,16 @@ describe('Referans Numune Entegrasyon Duman Testi (Smoke Test)', () => {
     expect(result.filename).toBe('drawing.pdf');
     expect(result.datums).toEqual([]);
     expect(result.title_block.hardness).toBe('38-44 HRC');
-    expect(result.dimensions.length).toBe(13);
+    expect(result.dimensions.length).toBe(20);
 
     const radiusCallout = result.dimensions.find((d) => d.type === 'RADIUS');
     expect(radiusCallout).toBeDefined();
     expect(radiusCallout?.nominal_str).toContain('R');
     expect(radiusCallout?.status).toBe('UNMEASURED');
 
-    const linearCallout = result.dimensions.find((d) => d.nominal_str.includes('191.0'));
+    const linearCallout = result.dimensions.find((d) => d.nominal_str.includes('27.2'));
     expect(linearCallout).toBeDefined();
-    expect(linearCallout?.nominal).toBe(191.0);
+    expect(linearCallout?.nominal).toBe(27.2);
   });
 
   it('STEP B-Rep varlıkları doğrulanır ve Three.js sahnesine aktarılır', () => {
@@ -119,14 +119,14 @@ describe('Referans Numune Entegrasyon Duman Testi (Smoke Test)', () => {
     const table = app.getInspectionTable();
     const rows = table.getRows();
 
-    expect(rows.length).toBe(13);
+    expect(rows.length).toBe(20);
     expect(table.getDatums()).toEqual([]);
     expect(table.getTitleBlock().hardness).toBe('38-44 HRC');
 
     const summary = table.getSummary();
-    expect(summary.total).toBe(13);
+    expect(summary.total).toBe(20);
     expect(summary.pass).toBe(0);
-    expect(summary.unmeasured).toBe(13);
+    expect(summary.unmeasured).toBe(20);
     expect(summary.fail).toBe(0);
 
     const firstItem = result.dimensions[0];
