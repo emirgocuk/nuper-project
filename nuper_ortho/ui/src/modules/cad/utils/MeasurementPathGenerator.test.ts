@@ -45,7 +45,7 @@ describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Nok
     });
     expect(planOp10.operation).toBe('OP10');
     expect(planOp10.featurePaths.length).toBe(2);
-    expect(planOp10.featurePaths.map((p) => p.balloon)).toEqual(['#1', '#2']);
+    expect(planOp10.featurePaths.map((p) => p.balloon)).toEqual(['#2', '#1']);
 
     const planOp20 = MeasurementPathGenerator.generatePlan(sampleFeatures, mockBbox, {
       activeOperation: 'OP20',

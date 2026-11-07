@@ -149,8 +149,19 @@ Notlar:
 
 ---
 
-## 9. Açık sorular (kod yazmadan önce karara bağlanacak)
+## 9. Kararlar ve uygulama durumu
 
-1. Ø2.5 THRU deliğinin konum toleransı: antet genel `±0.2` mi, yoksa yalnızca çap ve "var/yok" kontrolü mü?
-2. Tolerans belirtilmemiş, kutusuz ölçüler (`16`, `25.9`, `30`, `49.4`, `48`, `26.3`, `20.3`): antet `±0.2` uygulansın mı yoksa EKLİ 3B MODEL'den profil kontrolüne mi bağlansın?
-3. Datum kenarlarında (1.2 mm yükseklik) kullanılacak top çapı ve hangi stylus ile alınacağı.
+**Kararlar (kullanıcı):**
+1. Delik konum toleransı ve toleransı verilmemiş ölçüler: ışık masasında "Genel Tolerans" alanından teknik resme göre seçilir (`ISO 2768-m`, `ISO 2768-mK`, `±0.2` vb.). Alan boşsa tolerans uydurulmaz, kayıt boş kalır.
+2. Stylus: varsayılan Ø2 top. Delik `0.6 × çap` kuralına sığmazsa Ø1 önerilir; Ø1 de sığmazsa "uygulanamaz" uyarısı verilir.
+
+| Kural | Durum | Yer |
+|---|---|---|
+| H1, H2 delik ayrıştırma ve yuvarlatma ayrımı | Uygulandı | `tools/extractor/brep_verifier.py` |
+| §3 genel tolerans seçimi (ISO 2768-1 tablosu, blok tolerans) | Uygulandı | `GeneralTolerance.ts`, `SetupWizard.ts` |
+| T7 aşama sırası (mesafe → konum → kalınlık) | Uygulandı | `MeasurementPhases.ts`, `MeasurementPathGenerator.ts` |
+| T3 stylus seçimi (Ø2 → Ø1) | Uygulandı | `StylusSelector.ts`, `MeasurementPathGenerator.ts` |
+| T1 dikey delik A0° B0° üstten | Mevcut, testle kilitlendi | `MeasurementPathRules.test.ts` |
+| §2 datum kurulum aşaması (A/B/C) | **Yapılmadı:** datum harfinin STEP yüzeyine bağlanması henüz yok | — |
+| T2 gövde koridoru çarpışma kontrolü, T4 daire derinliği, T8 hata durdurma | **Yapılmadı** | — |
+| Tolerans değerinin ölçüm sonucuna uygulanması (konum sapması hesabı) | **Yapılmadı** | — |

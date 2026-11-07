@@ -1,12 +1,15 @@
 import * as THREE from 'three';
 import { type Waypoint } from '../SimulationController';
 import { Ph10Kinematics, type PH10Angle } from './Ph10Kinematics';
+import { orderByMeasurementPhase } from './MeasurementPhases';
+import { selectStylusForHole, type StylusChoice } from './StylusSelector';
 
 export interface PathFeatureInput {
   id: number;
   balloon: string;
   type?: string;
   type_label?: string;
+  gdt?: string;
   nominal: number;
   cad_center?: [number, number, number];
   cad_normal?: [number, number, number];
@@ -34,6 +37,12 @@ export interface FeatureMeasurementPath {
   waypoints: Waypoint[];
 }
 
+export interface StylusRecommendation extends StylusChoice {
+  featureId: number;
+  balloon: string;
+  holeDiameterMm: number;
+}
+
 export interface GeneratedMeasurementPlan {
   operation: 'OP10' | 'OP20';
   zClearance: number;
@@ -42,6 +51,7 @@ export interface GeneratedMeasurementPlan {
   totalDistanceMm: number;
   estimatedDurationSec: number;
   probeHeadRotations: number;
+  stylusRecommendations: StylusRecommendation[];
 }
 
 export interface PathGeneratorOptions {
@@ -81,7 +91,8 @@ export class MeasurementPathGenerator {
     const yMinPart = bbox.min[1] ?? 0;
     const yMaxPart = bbox.max[1] ?? 50;
 
-    const opFeatures = features.filter((f) => (f.operation ?? 'OP10') === activeOp);
+    const opFeatures = orderByMeasurementPhase(features.filter((f) => (f.operation ?? 'OP10') === activeOp));
+    const stylusRecommendations: StylusRecommendation[] = [];
 
     const featurePaths: FeatureMeasurementPath[] = [];
     const allWaypoints: ExtendedWaypoint[] = [];
@@ -232,6 +243,14 @@ export class MeasurementPathGenerator {
           )
         );
       } else if (isDiameter && nom > 0.5) {
+        const isHole =
+          cadId.startsWith('CAD_HOLE_') ||
+          feat.feature_type === 'INTERNAL_CYLINDER' ||
+          /delik|hole/i.test(feat.type_label ?? '');
+        const stylus = selectStylusForHole(nom);
+        if (isHole && stylus.changedFromDefault) {
+          stylusRecommendations.push({ ...stylus, featureId: feat.id, balloon: feat.balloon, holeDiameterMm: nom });
+        }
         const isSideCrossHole = isYAxis && Math.abs(normal[1]) < 0.5 && center[1] < yMaxPart - 3.0;
         if (isSideCrossHole) {
           effectiveAngleLabel = 'A0° B90°';
@@ -500,6 +519,7 @@ export class MeasurementPathGenerator {
       totalDistanceMm: parseFloat(totalDist.toFixed(1)),
       estimatedDurationSec: parseFloat(duration.toFixed(1)),
       probeHeadRotations: headRotations,
+      stylusRecommendations,
     };
   }
 }

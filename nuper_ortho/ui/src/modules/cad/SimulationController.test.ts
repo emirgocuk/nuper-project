@@ -143,6 +143,7 @@ describe('Simülasyon Oynatma Hızı Kontrolü (SimulationController)', () => {
       totalDistanceMm: 120.0,
       estimatedDurationSec: 5.2,
       probeHeadRotations: 0,
+      stylusRecommendations: [],
     };
 
     viewer.renderTrajectory(mockPlan);
