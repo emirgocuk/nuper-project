@@ -23,9 +23,13 @@ export interface SelectedCadFileResult {
 }
 
 let isCadImporting = false;
+let cachedCadStepText = '';
+let cachedCadMetadata: CadMetadata | undefined = undefined;
 
 export function resetCadImportLock(): void {
   isCadImporting = false;
+  cachedCadStepText = '';
+  cachedCadMetadata = undefined;
 }
 
 export function updateCadModalTelemetry(customData?: CadTelemetryData): void {
@@ -174,13 +178,16 @@ export function generateSafeProbeTrajectory(tess: TessellatedModelResult): THREE
   return waypoints.map((w) => w.position);
 }
 
-let cachedCadStepText = '';
-
 export function applyStepModelToScene(filename: string, stepText = '', metadata?: CadMetadata): TessellatedModelResult {
   if (stepText) {
     cachedCadStepText = stepText;
   } else if (cachedCadStepText) {
     stepText = cachedCadStepText;
+  }
+  if (metadata) {
+    cachedCadMetadata = metadata;
+  } else if (cachedCadMetadata) {
+    metadata = cachedCadMetadata;
   }
   const tess = StepModelTessellator.buildStepSolidModel(stepText, filename, metadata);
   const win = (typeof window !== 'undefined' ? window : {}) as unknown as {
@@ -361,7 +368,30 @@ export function applyStepModelToScene(filename: string, stepText = '', metadata?
     win.workflowRibbon.mount('.app-ribbon');
   }
 
-  generateSafeProbeTrajectory(tess);
+  const wizardObj = (win as unknown as {
+    setupWizard?: {
+      isPlanConfirmed?: () => boolean;
+      getDimensions?: () => unknown[];
+    };
+    trajLine?: { visible: boolean };
+    touchPointMeshes?: THREE.Object3D[];
+  });
+
+  const hasConfirmedPlan =
+    typeof wizardObj.setupWizard?.isPlanConfirmed === 'function' &&
+    wizardObj.setupWizard.isPlanConfirmed() &&
+    typeof wizardObj.setupWizard?.getDimensions === 'function' &&
+    wizardObj.setupWizard.getDimensions().length > 0;
+
+  if (!hasConfirmedPlan) {
+    if (wizardObj.trajLine) {
+      wizardObj.trajLine.visible = false;
+    }
+    if (Array.isArray(wizardObj.touchPointMeshes) && win.scene) {
+      wizardObj.touchPointMeshes.forEach((m) => win.scene?.remove(m));
+      wizardObj.touchPointMeshes.length = 0;
+    }
+  }
 
   if (typeof win.eval === 'function') {
     try {
@@ -470,22 +500,93 @@ export function installCadImportInterceptor(): void {
   win.applyStepModelToScene = applyStepModelToScene;
 
   win.build3DModelFromStep = (stepText: string, filename: string) => {
-    applyStepModelToScene(filename, stepText);
+    applyStepModelToScene(filename, stepText, cachedCadMetadata);
   };
 
   win.generateDynamicProbeTrajectory = () => {
-    const fn = win.currentUploadedCad?.name || 'cad_model.stp';
-    const tess = StepModelTessellator.buildStepSolidModel('', fn);
-    generateSafeProbeTrajectory(tess);
+    const wWiz = win as unknown as {
+      setupWizard?: {
+        isPlanConfirmed?: () => boolean;
+        getDimensions?: () => unknown[];
+        applyActivePlanToWorkspace?: () => void;
+      };
+      trajLine?: { visible: boolean };
+    };
+    if (
+      wWiz.setupWizard &&
+      typeof wWiz.setupWizard.isPlanConfirmed === 'function' &&
+      wWiz.setupWizard.isPlanConfirmed() &&
+      typeof wWiz.setupWizard.applyActivePlanToWorkspace === 'function'
+    ) {
+      wWiz.setupWizard.applyActivePlanToWorkspace();
+    } else if (wWiz.trajLine) {
+      wWiz.trajLine.visible = false;
+    }
     if (typeof win.requestRender === 'function') {
       win.requestRender();
+    }
+  };
+
+  const wAlign = win as unknown as {
+    apply321Alignment?: () => void;
+    close321Modal?: () => void;
+    uploadedMeshGroup?: THREE.Group | null;
+    blockGroup?: THREE.Group | null;
+    setupWizard?: {
+      getDimensions?: () => unknown[];
+      applyActivePlanToWorkspace?: () => void;
+    };
+  };
+  const origApply321 = wAlign.apply321Alignment;
+  wAlign.apply321Alignment = () => {
+    const target = wAlign.uploadedMeshGroup || wAlign.blockGroup;
+    if (target) {
+      target.rotation.set(0, 0, 0);
+      target.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(target);
+      if (isFinite(box.min.y)) {
+        target.position.y -= box.min.y;
+        target.updateMatrixWorld(true);
+      }
+    }
+
+    if (typeof origApply321 === 'function') {
+      origApply321();
+    }
+
+    if (typeof document !== 'undefined') {
+      const modal321 = document.getElementById('modal-321-alignment');
+      if (modal321) {
+        modal321.classList.remove('active');
+      }
+    }
+
+    if (
+      wAlign.setupWizard &&
+      typeof wAlign.setupWizard.getDimensions === 'function' &&
+      wAlign.setupWizard.getDimensions().length > 0 &&
+      typeof wAlign.setupWizard.applyActivePlanToWorkspace === 'function'
+    ) {
+      wAlign.setupWizard.applyActivePlanToWorkspace();
+    }
+
+    if (win.workflowRibbon) {
+      win.workflowRibbon.advanceToStep(5);
+      win.workflowRibbon.mount('.app-ribbon');
+    }
+
+    if (typeof win.requestRender === 'function') {
+      win.requestRender();
+    }
+    if (typeof win.showToast === 'function') {
+      win.showToast('🎯 3-2-1 Datum Hizalama Tamamlandı: Parça granit tablaya (Y=0) oturtuldu ve takım yolları ölçülere kilitlendi.');
     }
   };
 
   win.applyUploadedCadToScene = () => {
     const cad = win.currentUploadedCad;
     const filename = cad?.name || 'cad_model.stp';
-    applyStepModelToScene(filename, '');
+    applyStepModelToScene(filename, '', cachedCadMetadata);
 
     if (typeof win.closeCadIngestionModal === 'function') {
       win.closeCadIngestionModal();

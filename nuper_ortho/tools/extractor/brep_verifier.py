@@ -59,6 +59,34 @@ def _dot(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> float:
     return sum(x * y for x, y in zip(a, b))
 
 
+def _cross(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    return (
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    )
+
+
+def _norm_vec(v: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    length = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+    if length < 1e-12:
+        return (0.0, 1.0, 0.0)
+    return (v[0] / length, v[1] / length, v[2] / length)
+
+
+def _apply_rot(
+    v: Tuple[float, float, float],
+    ex: Tuple[float, float, float],
+    ey: Tuple[float, float, float],
+    ez: Tuple[float, float, float],
+) -> Tuple[float, float, float]:
+    return (
+        v[0] * ex[0] + v[1] * ex[1] + v[2] * ex[2],
+        v[0] * ey[0] + v[1] * ey[1] + v[2] * ey[2],
+        v[0] * ez[0] + v[1] * ez[1] + v[2] * ez[2],
+    )
+
+
 def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
     if not OCP_AVAILABLE:
         return {"success": False, "error": "OpenCASCADE (OCP) modülü mevcut değil."}
@@ -314,6 +342,190 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
                 ])
         edge_exp.Next()
 
+    planes = [
+        f for f in extracted_features
+        if f.get("feature_type") == "PLANE" and f.get("normal") and f.get("area_or_length", 0) > 0
+    ]
+    planes.sort(key=lambda p: p.get("area_or_length", 0), reverse=True)
+
+    ex: Tuple[float, float, float] = (1.0, 0.0, 0.0)
+    ey: Tuple[float, float, float] = (0.0, 1.0, 0.0)
+    ez: Tuple[float, float, float] = (0.0, 0.0, 1.0)
+    base_plane_detected = False
+
+    if planes and len(all_positions) >= 3:
+        base_plane_detected = True
+        p0 = planes[0]
+        n0 = _norm_vec((float(p0["normal"][0]), float(p0["normal"][1]), float(p0["normal"][2])))
+
+        n_verts = len(all_positions) // 3
+        cx_part = sum(all_positions[0::3]) / n_verts
+        cy_part = sum(all_positions[1::3]) / n_verts
+        cz_part = sum(all_positions[2::3]) / n_verts
+        c0 = p0.get("center", [cx_part, cy_part, cz_part])
+        to_centroid = (cx_part - c0[0], cy_part - c0[1], cz_part - c0[2])
+
+        if _dot(to_centroid, n0) < -1e-4:
+            ey = (-n0[0], -n0[1], -n0[2])
+        else:
+            ey = n0
+
+        sec_groups: Dict[Tuple[float, float, float], Dict[str, Any]] = {}
+        for p_sec in planes[1:]:
+            ns = _norm_vec((float(p_sec["normal"][0]), float(p_sec["normal"][1]), float(p_sec["normal"][2])))
+            if abs(_dot(ns, ey)) < 0.25:
+                proj = _norm_vec((
+                    ns[0] - _dot(ns, ey) * ey[0],
+                    ns[1] - _dot(ns, ey) * ey[1],
+                    ns[2] - _dot(ns, ey) * ey[2],
+                ))
+                canon = _canon_vec(proj)
+                key = (round(canon[0], 2), round(canon[1], 2), round(canon[2], 2))
+                if key not in sec_groups:
+                    sec_groups[key] = {"vec": canon, "area": 0.0}
+                sec_groups[key]["area"] += float(p_sec.get("area_or_length", 0.0))
+
+        sec_cand: Optional[Tuple[float, float, float]] = None
+        if sec_groups:
+            best_sec = max(sec_groups.values(), key=lambda g: g["area"])
+            sec_cand = best_sec["vec"]
+
+        if sec_cand is None:
+            ref = (1.0, 0.0, 0.0) if abs(ey[0]) < 0.85 else (0.0, 0.0, 1.0)
+            proj = (
+                ref[0] - _dot(ref, ey) * ey[0],
+                ref[1] - _dot(ref, ey) * ey[1],
+                ref[2] - _dot(ref, ey) * ey[2],
+            )
+            sec_cand = _norm_vec(proj)
+
+        ez = sec_cand
+        ex = _norm_vec(_cross(ey, ez))
+        ez = _norm_vec(_cross(ex, ey))
+
+        xs_test = [all_positions[i] * ex[0] + all_positions[i + 1] * ex[1] + all_positions[i + 2] * ex[2] for i in range(0, len(all_positions), 3)]
+        zs_test = [all_positions[i] * ez[0] + all_positions[i + 1] * ez[1] + all_positions[i + 2] * ez[2] for i in range(0, len(all_positions), 3)]
+        span_x = max(xs_test) - min(xs_test)
+        span_z = max(zs_test) - min(zs_test)
+        if span_z > span_x + 1e-3:
+            ex, ez = ez, (-ex[0], -ex[1], -ex[2])
+
+        for i in range(0, len(all_positions), 3):
+            rx, ry, rz = _apply_rot((all_positions[i], all_positions[i + 1], all_positions[i + 2]), ex, ey, ez)
+            all_positions[i] = round(rx, 4)
+            all_positions[i + 1] = round(ry, 4)
+            all_positions[i + 2] = round(rz, 4)
+
+        for i in range(0, len(all_normals), 3):
+            nx, ny, nz = _apply_rot((all_normals[i], all_normals[i + 1], all_normals[i + 2]), ex, ey, ez)
+            all_normals[i] = round(nx, 4)
+            all_normals[i + 1] = round(ny, 4)
+            all_normals[i + 2] = round(nz, 4)
+
+        for i in range(0, len(all_edge_segments), 3):
+            ex_p, ey_p, ez_p = _apply_rot((all_edge_segments[i], all_edge_segments[i + 1], all_edge_segments[i + 2]), ex, ey, ez)
+            all_edge_segments[i] = round(ex_p, 4)
+            all_edge_segments[i + 1] = round(ey_p, 4)
+            all_edge_segments[i + 2] = round(ez_p, 4)
+
+        for feat in extracted_features:
+            if feat.get("center"):
+                fc = feat["center"]
+                rcx, rcy, rcz = _apply_rot((float(fc[0]), float(fc[1]), float(fc[2])), ex, ey, ez)
+                feat["center"] = [round(rcx, 4), round(rcy, 4), round(rcz, 4)]
+            if feat.get("normal"):
+                fn = feat["normal"]
+                rnx, rny, rnz = _apply_rot((float(fn[0]), float(fn[1]), float(fn[2])), ex, ey, ez)
+                feat["normal"] = [round(rnx, 4), round(rny, 4), round(rnz, 4)]
+
+        xs_aligned = all_positions[0::3]
+        ys_aligned = all_positions[1::3]
+        zs_aligned = all_positions[2::3]
+        min_x, max_x = min(xs_aligned), max(xs_aligned)
+        min_y, max_y = min(ys_aligned), max(ys_aligned)
+        min_z, max_z = min(zs_aligned), max(zs_aligned)
+        size_x = max_x - min_x
+        size_y = max_y - min_y
+        size_z = max_z - min_z
+
+        shift_x = (min_x + max_x) / 2.0
+        shift_y = min_y
+        shift_z = (min_z + max_z) / 2.0
+
+        for i in range(0, len(all_positions), 3):
+            all_positions[i] = round(all_positions[i] - shift_x, 4)
+            all_positions[i + 1] = round(all_positions[i + 1] - shift_y, 4)
+            all_positions[i + 2] = round(all_positions[i + 2] - shift_z, 4)
+
+        for i in range(0, len(all_edge_segments), 3):
+            all_edge_segments[i] = round(all_edge_segments[i] - shift_x, 4)
+            all_edge_segments[i + 1] = round(all_edge_segments[i + 1] - shift_y, 4)
+            all_edge_segments[i + 2] = round(all_edge_segments[i + 2] - shift_z, 4)
+
+        for feat in extracted_features:
+            if feat.get("center"):
+                fc = feat["center"]
+                feat["center"] = [
+                    round(float(fc[0]) - shift_x, 4),
+                    round(float(fc[1]) - shift_y, 4),
+                    round(float(fc[2]) - shift_z, 4),
+                ]
+
+        min_x, max_x = round(-size_x / 2.0, 4), round(size_x / 2.0, 4)
+        min_y, max_y = 0.0, round(size_y, 4)
+        min_z, max_z = round(-size_z / 2.0, 4), round(size_z / 2.0, 4)
+
+    cyl_features = [
+        f for f in extracted_features
+        if f.get("feature_type") in ("INTERNAL_CYLINDER", "EXTERNAL_CYLINDER") and f.get("center")
+    ]
+    seen_dists = set()
+    dist_idx = 1
+    for i_c in range(len(cyl_features)):
+        for j_c in range(i_c + 1, len(cyl_features)):
+            c1 = cyl_features[i_c]["center"]
+            c2 = cyl_features[j_c]["center"]
+            dx = c1[0] - c2[0]
+            dz = c1[2] - c2[2]
+            d_xz = round(math.sqrt(dx * dx + dz * dz), 2)
+            if d_xz > 1.0 and d_xz not in seen_dists:
+                seen_dists.add(d_xz)
+                extracted_features.append({
+                    "id": f"CAD_DIST_{d_xz:.2f}_{dist_idx}",
+                    "feature_type": "PLANE",
+                    "nominal_dimension": d_xz,
+                    "center": [round((c1[0] + c2[0]) / 2.0, 4), round(max(c1[1], c2[1]), 4), round((c1[2] + c2[2]) / 2.0, 4)],
+                    "normal": [0.0, 1.0, 0.0],
+                    "area_or_length": d_xz,
+                    "description": f"Eksenler Arası Mesafe ({d_xz:.2f} mm)",
+                })
+                dist_idx += 1
+
+    plane_features = [f for f in extracted_features if f.get("feature_type") == "PLANE" and f.get("normal") and f.get("center") and not f["id"].startswith("CAD_DIST_")]
+    for i_p in range(len(plane_features)):
+        for j_p in range(i_p + 1, len(plane_features)):
+            p1 = plane_features[i_p]
+            p2 = plane_features[j_p]
+            n1 = (float(p1["normal"][0]), float(p1["normal"][1]), float(p1["normal"][2]))
+            n2 = (float(p2["normal"][0]), float(p2["normal"][1]), float(p2["normal"][2]))
+            if abs(_dot(n1, n2)) > 0.98:
+                c1 = p1["center"]
+                c2 = p2["center"]
+                diff = (c1[0] - c2[0], c1[1] - c2[1], c1[2] - c2[2])
+                d_perp = round(abs(_dot(diff, n1)), 2)
+                if d_perp > 0.2 and d_perp not in seen_dists:
+                    seen_dists.add(d_perp)
+                    extracted_features.append({
+                        "id": f"CAD_STEP_DIST_{d_perp:.2f}_{dist_idx}",
+                        "feature_type": "PLANE",
+                        "nominal_dimension": d_perp,
+                        "center": [round((c1[0] + c2[0]) / 2.0, 4), round((c1[1] + c2[1]) / 2.0, 4), round((c1[2] + c2[2]) / 2.0, 4)],
+                        "normal": [round(abs(n1[0]), 4), round(abs(n1[1]), 4), round(abs(n1[2]), 4)],
+                        "area_or_length": d_perp,
+                        "description": f"Paralel Düzlemler Arası Mesafe ({d_perp:.2f} mm)",
+                    })
+                    dist_idx += 1
+
     pos_bytes = struct.pack(f"<{len(all_positions)}f", *all_positions)
     norm_bytes = struct.pack(f"<{len(all_normals)}f", *all_normals)
     idx_bytes = struct.pack(f"<{len(all_indices)}I", *all_indices)
@@ -348,6 +560,15 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
             "edges_b64": edges_b64,
             "linear_deflection": linear_deflection,
             "faces": mesh_faces,
+        },
+        "alignment": {
+            "base_plane_detected": base_plane_detected,
+            "table_clearance_min_z": 0.0,
+            "orientation_matrix": [
+                round(ex[0], 6), round(ex[1], 6), round(ex[2], 6),
+                round(ey[0], 6), round(ey[1], 6), round(ey[2], 6),
+                round(ez[0], 6), round(ez[1], 6), round(ez[2], 6),
+            ],
         },
     }
     if extract_pmi_schema_payload:

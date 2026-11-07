@@ -145,5 +145,104 @@ export class WorkflowRibbon {
     if (!el) return;
 
     el.innerHTML = this.renderRibbonHtml();
+
+    if (typeof el.querySelector === 'function' && typeof window !== 'undefined') {
+      const win = window as unknown as {
+        triggerCadImport?: () => void;
+        openClampingModal?: () => void;
+        open321Modal?: () => void;
+        apply321Alignment?: () => void;
+        openBenchmarkLabModal?: () => void;
+        toggleDiagnosticsDrawer?: () => void;
+        setupWizard?: { handleTeknikResimClick?: () => void };
+        nuperApp?: {
+          openAndLoadCadFile?: () => Promise<{ name: string } | null>;
+          getCADViewer?: () => { getSimulationController: () => { togglePlay: () => void } };
+        };
+      };
+
+      const stepCadBtn = el.querySelector<HTMLElement>('[data-workflow-id="step_cad"]');
+      if (stepCadBtn) {
+        stepCadBtn.onclick = (e) => {
+          e.preventDefault();
+          if (win.nuperApp?.openAndLoadCadFile) {
+            void win.nuperApp.openAndLoadCadFile().then((res) => {
+              if (res) {
+                const shortName = res.name.length > 20 ? res.name.substring(0, 18) + '...' : res.name;
+                this.setStepLabel('step_cad', `Katı Model: ${shortName}`);
+                this.advanceToStep(2);
+                this.mount(containerOrSelector);
+              }
+            });
+          } else if (typeof win.triggerCadImport === 'function') {
+            win.triggerCadImport();
+          }
+        };
+      }
+
+      const stepFixtureBtn = el.querySelector<HTMLElement>('[data-workflow-id="step_fixture"]');
+      if (stepFixtureBtn) {
+        stepFixtureBtn.onclick = (e) => {
+          e.preventDefault();
+          if (typeof win.openClampingModal === 'function') {
+            win.openClampingModal();
+          }
+          this.advanceToStep(3);
+          this.mount(containerOrSelector);
+        };
+      }
+
+      const stepDrawingBtn = el.querySelector<HTMLElement>('[data-workflow-id="step_drawing"]');
+      if (stepDrawingBtn) {
+        stepDrawingBtn.onclick = (e) => {
+          e.preventDefault();
+          if (win.setupWizard && typeof win.setupWizard.handleTeknikResimClick === 'function') {
+            win.setupWizard.handleTeknikResimClick();
+          }
+          this.advanceToStep(4);
+          this.mount(containerOrSelector);
+        };
+      }
+
+      const stepAlignBtn = el.querySelector<HTMLElement>('[data-workflow-id="step_align"]');
+      if (stepAlignBtn) {
+        stepAlignBtn.onclick = (e) => {
+          e.preventDefault();
+          if (typeof win.apply321Alignment === 'function') {
+            win.apply321Alignment();
+          } else if (typeof win.open321Modal === 'function') {
+            win.open321Modal();
+          }
+          this.advanceToStep(5);
+          this.mount(containerOrSelector);
+        };
+      }
+
+      const stepSimBtn = el.querySelector<HTMLElement>('[data-workflow-id="step_simulation"]');
+      if (stepSimBtn) {
+        stepSimBtn.onclick = (e) => {
+          e.preventDefault();
+          this.advanceToStep(5);
+          this.mount(containerOrSelector);
+          win.nuperApp?.getCADViewer?.()?.getSimulationController?.()?.togglePlay?.();
+        };
+      }
+
+      const benchBtn = el.querySelector<HTMLElement>('#wf-btn-bench');
+      if (benchBtn) {
+        benchBtn.onclick = (e) => {
+          e.preventDefault();
+          win.openBenchmarkLabModal?.();
+        };
+      }
+
+      const diagBtn = el.querySelector<HTMLElement>('#wf-btn-diag');
+      if (diagBtn) {
+        diagBtn.onclick = (e) => {
+          e.preventDefault();
+          win.toggleDiagnosticsDrawer?.();
+        };
+      }
+    }
   }
 }
