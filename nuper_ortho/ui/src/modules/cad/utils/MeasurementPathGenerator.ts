@@ -132,12 +132,20 @@ export class MeasurementPathGenerator {
           !cadId.startsWith('CAD_HOLE_') &&
           !/delik|bore|hole|m[0-9]/i.test(feat.type_label ?? ''));
 
-      let effectiveAngleLabel = 'A0° B0°';
-      let effectiveAngleObj = Ph10Kinematics.findBestAngle([-normal[0], -normal[1], -normal[2]]).angle;
+      let effectiveAngleObj = isYAxis
+        ? ({ aDeg: 0, bDeg: 0, direction: [0, -1, 0], label: 'A0° B0°' } as PH10Angle)
+        : Ph10Kinematics.findBestAngle([-normal[0], -normal[1], -normal[2]]).angle;
+      let effectiveAngleLabel = effectiveAngleObj.label;
+
+      const partHeight = Math.max(1.0, yMaxPart - yMinPart);
+      const isDeepFeature = isYAxis && (yMaxPart - center[1] > 18.0 || partHeight > 28.0);
 
       if (isYAxis && isExtCyl && nom > 0.5) {
-        effectiveAngleLabel = 'A0° B90°';
-        effectiveAngleObj = { aDeg: 0, bDeg: 90, direction: [-1, 0, 0], label: 'A0° B90°' };
+        const useHorizHead = isDeepFeature || nom > 45.0;
+        effectiveAngleLabel = useHorizHead ? 'A0° B90°' : 'A0° B0°';
+        effectiveAngleObj = useHorizHead
+          ? { aDeg: 0, bDeg: 90, direction: [-1, 0, 0], label: 'A0° B90°' }
+          : { aDeg: 0, bDeg: 0, direction: [0, -1, 0], label: 'A0° B0°' };
         const radius = nom / 2.0;
         const cy = Math.max(yMinPart + 1.5, Math.min(yMaxPart - 1.5, center[1]));
         const cx = Math.hypot(center[0], center[2]) < 3.0 ? 0 : center[0];
@@ -152,22 +160,29 @@ export class MeasurementPathGenerator {
         ];
 
         featWaypoints.push(
-          makeWp(new THREE.Vector3(cx + ringSafeR, zClearance, cz), 'TRAVERSE', feat.id, feat.balloon, [-1, 0, 0], 'A0° B90°')
+          makeWp(
+            new THREE.Vector3(cx + ringSafeR, zClearance, cz),
+            'TRAVERSE',
+            feat.id,
+            feat.balloon,
+            useHorizHead ? [-1, 0, 0] : [0, -1, 0],
+            effectiveAngleLabel
+          )
         );
 
         for (let idx = 0; idx < dirs.length; idx++) {
           const d = dirs[idx];
-          const sDir: [number, number, number] = [-d.ux, 0, -d.uz];
+          const sDir: [number, number, number] = useHorizHead ? [-d.ux, 0, -d.uz] : [0, -1, 0];
           const outerPos = new THREE.Vector3(cx + d.ux * ringSafeR, cy, cz + d.uz * ringSafeR);
           const standPos = new THREE.Vector3(cx + d.ux * (radius + approachDist), cy, cz + d.uz * (radius + approachDist));
           const touchPos = new THREE.Vector3(cx + d.ux * radius, cy, cz + d.uz * radius);
           const retPos = new THREE.Vector3(cx + d.ux * (radius + retractDist), cy, cz + d.uz * (radius + retractDist));
 
-          featWaypoints.push(makeWp(outerPos.clone(), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°'));
-          featWaypoints.push(makeWp(standPos, 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°'));
-          featWaypoints.push(makeWp(touchPos.clone(), 'TOUCH', feat.id, feat.balloon, sDir, 'A0° B90°'));
-          featWaypoints.push(makeWp(retPos, 'RETRACT', feat.id, feat.balloon, sDir, 'A0° B90°'));
-          featWaypoints.push(makeWp(outerPos.clone(), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°'));
+          featWaypoints.push(makeWp(outerPos.clone(), 'TRAVERSE', feat.id, feat.balloon, sDir, effectiveAngleLabel));
+          featWaypoints.push(makeWp(standPos, 'TRAVERSE', feat.id, feat.balloon, sDir, effectiveAngleLabel));
+          featWaypoints.push(makeWp(touchPos.clone(), 'TOUCH', feat.id, feat.balloon, sDir, effectiveAngleLabel));
+          featWaypoints.push(makeWp(retPos, 'RETRACT', feat.id, feat.balloon, sDir, effectiveAngleLabel));
+          featWaypoints.push(makeWp(outerPos.clone(), 'TRAVERSE', feat.id, feat.balloon, sDir, effectiveAngleLabel));
 
           if (idx < dirs.length - 1) {
             const nextD = dirs[idx + 1];
@@ -179,8 +194,8 @@ export class MeasurementPathGenerator {
                 'TRAVERSE',
                 feat.id,
                 feat.balloon,
-                [-midUx, 0, -midUz],
-                'A0° B90°'
+                useHorizHead ? [-midUx, 0, -midUz] : [0, -1, 0],
+                effectiveAngleLabel
               )
             );
           }
@@ -188,12 +203,19 @@ export class MeasurementPathGenerator {
           touchRecords.push({
             position: [touchPos.x, touchPos.y, touchPos.z],
             normal: [d.ux, 0, d.uz],
-            ph10Label: 'A0° B90°',
+            ph10Label: effectiveAngleLabel,
           });
         }
 
         featWaypoints.push(
-          makeWp(new THREE.Vector3(cx, zClearance, cz - ringSafeR), 'TRAVERSE', feat.id, feat.balloon, [0, 0, 1], 'A0° B90°')
+          makeWp(
+            new THREE.Vector3(cx, zClearance, cz - ringSafeR),
+            'TRAVERSE',
+            feat.id,
+            feat.balloon,
+            useHorizHead ? [0, 0, 1] : [0, -1, 0],
+            effectiveAngleLabel
+          )
         );
       } else if (isDiameter && nom > 0.5) {
         const isSideCrossHole = isYAxis && Math.abs(normal[1]) < 0.5 && center[1] < yMaxPart - 3.0;
@@ -329,7 +351,7 @@ export class MeasurementPathGenerator {
           normal: [0, -1, 0],
           ph10Label: 'A0° B90°',
         });
-      } else if (isYAxis && (center[1] < yMaxPart - 3.0 || Math.abs(normal[1]) < 0.85)) {
+      } else if (isYAxis && (isDeepFeature || normal[1] < -0.25)) {
         effectiveAngleLabel = 'A0° B90°';
         effectiveAngleObj = { aDeg: 0, bDeg: 90, direction: [-1, 0, 0], label: 'A0° B90°' };
 
@@ -368,7 +390,7 @@ export class MeasurementPathGenerator {
           ph10Label: 'A0° B90°',
         });
 
-        if (cadId.startsWith('CAD_STEP_DIST_') && yMinPart >= 10.0) {
+        if (cadId.startsWith('CAD_STEP_DIST_') && yMinPart >= 10.0 && Math.abs(normal[1]) > 0.7) {
           const underR = Math.max(6.0, Math.min(maxPartRadius * 0.55, 26.0));
           const underY = yMinPart;
           featWaypoints.push(makeWp(new THREE.Vector3(ux * safeOuterR, Math.max(1.0, underY - approachDist), uz * safeOuterR), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°'));

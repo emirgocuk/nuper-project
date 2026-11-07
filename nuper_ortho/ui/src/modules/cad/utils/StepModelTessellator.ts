@@ -9,13 +9,23 @@ export interface DetectedHoleItem {
 }
 
 export interface CadFeatureItem {
+  [k: string]: unknown;
   id: string;
   feature_type: 'PLANE' | 'INTERNAL_CYLINDER' | 'EXTERNAL_CYLINDER' | 'CONE' | 'SPHERE' | 'TORUS' | 'FREEFORM';
   nominal_dimension?: number;
   center?: [number, number, number];
   normal?: [number, number, number];
+  raw_center?: [number, number, number];
+  raw_normal?: [number, number, number];
   area_or_length?: number;
   description?: string;
+}
+
+export interface StandoffSupportItem {
+  x: number;
+  z: number;
+  radius: number;
+  height: number;
 }
 
 export interface TessellatedModelResult {
@@ -29,6 +39,7 @@ export interface TessellatedModelResult {
   detectedHoles: DetectedHoleItem[];
   primaryDatumNormal: [number, number, number];
   cadFeatures?: CadFeatureItem[];
+  standoffSupports?: StandoffSupportItem[];
 }
 
 function getThree(): typeof THREE {
@@ -72,6 +83,164 @@ export class StepModelTessellator {
     return this.buildGenericStepModel(stepText, filename);
   }
 
+  public static calculateStandoffSupports(
+    posAttr: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined,
+    sizeX: number,
+    sizeY: number,
+    sizeZ: number,
+    standoffHeight: number,
+    holes: DetectedHoleItem[]
+  ): StandoffSupportItem[] {
+    const pillarR = parseFloat(Math.max(2.0, Math.min(3.5, Math.min(sizeX, sizeZ) * 0.055)).toFixed(2));
+    const halfX = sizeX / 2;
+    const halfZ = sizeZ / 2;
+    const bottomPts: Array<[number, number]> = [];
+    const bandY = Math.max(1.8, Math.min(4.5, sizeY * 0.35));
+
+    let cornerHits = [false, false, false, false];
+    if (posAttr && posAttr.count > 0) {
+      for (let i = 0; i < posAttr.count; i++) {
+        const py = posAttr.getY(i);
+        if (py <= standoffHeight + bandY) {
+          const px = posAttr.getX(i);
+          const pz = posAttr.getZ(i);
+          bottomPts.push([px, pz]);
+          if (Math.abs(px) > halfX * 0.58 && Math.abs(pz) > halfZ * 0.58) {
+            if (px > 0 && pz > 0) cornerHits[0] = true;
+            if (px < 0 && pz > 0) cornerHits[1] = true;
+            if (px < 0 && pz < 0) cornerHits[2] = true;
+            if (px > 0 && pz < 0) cornerHits[3] = true;
+          }
+        }
+      }
+    }
+
+    const activeCorners = cornerHits.filter(Boolean).length;
+    const aspectDiff = Math.abs(sizeX - sizeZ) / Math.max(sizeX, sizeZ, 1);
+    const isRectangular = activeCorners >= 3 || aspectDiff > 0.14;
+
+    const rawTargets: Array<[number, number]> = [];
+    if (isRectangular) {
+      const tx = Math.max(pillarR + 1.5, halfX * 0.68);
+      const tz = Math.max(pillarR + 1.5, halfZ * 0.66);
+      rawTargets.push([tx, tz], [-tx, tz], [-tx, -tz], [tx, -tz]);
+      if (Math.max(sizeX, sizeZ) > 135) {
+        if (sizeX >= sizeZ) {
+          rawTargets.push([0, tz], [0, -tz]);
+        } else {
+          rawTargets.push([tx, 0], [-tx, 0]);
+        }
+      }
+    } else {
+      let maxBaseR = 0;
+      for (const [bx, bz] of bottomPts) {
+        const r = Math.hypot(bx, bz);
+        if (r > maxBaseR) maxBaseR = r;
+      }
+      if (maxBaseR < 2.0) maxBaseR = Math.min(halfX, halfZ) * 0.85;
+      const ringR = Math.max(pillarR + 2.0, maxBaseR * 0.66);
+      for (const ang of [Math.PI / 3, Math.PI, (5 * Math.PI) / 3]) {
+        rawTargets.push([Math.cos(ang) * ringR, Math.sin(ang) * ringR]);
+      }
+    }
+
+    const isSafeFromHoles = (cx: number, cz: number): boolean => {
+      for (const h of holes) {
+        if (Math.abs(h.normal[1]) > 0.5 && h.center[1] <= standoffHeight + sizeY * 0.65) {
+          const dist = Math.hypot(cx - h.center[0], cz - h.center[2]);
+          if (dist < h.radius + pillarR + 1.4) {
+            return false;
+          }
+        }
+      }
+      return true;
+    };
+
+    const marginX = Math.max(pillarR + 1.0, halfX - pillarR - 1.0);
+    const marginZ = Math.max(pillarR + 1.0, halfZ - pillarR - 1.0);
+
+    const supports: StandoffSupportItem[] = [];
+    for (const [tx, tz] of rawTargets) {
+      let bestX = Math.max(-marginX, Math.min(marginX, tx));
+      let bestZ = Math.max(-marginZ, Math.min(marginZ, tz));
+
+      if (!isSafeFromHoles(bestX, bestZ)) {
+        const offsets: Array<[number, number]> = [
+          [-pillarR * 2.2 * Math.sign(tx || 1), 0],
+          [0, -pillarR * 2.2 * Math.sign(tz || 1)],
+          [-pillarR * 2.0 * Math.sign(tx || 1), -pillarR * 2.0 * Math.sign(tz || 1)],
+          [-pillarR * 3.5 * Math.sign(tx || 1), 0],
+          [0, -pillarR * 3.5 * Math.sign(tz || 1)],
+        ];
+        for (const [dx, dz] of offsets) {
+          const candX = Math.max(-marginX, Math.min(marginX, tx + dx));
+          const candZ = Math.max(-marginZ, Math.min(marginZ, tz + dz));
+          if (isSafeFromHoles(candX, candZ)) {
+            bestX = candX;
+            bestZ = candZ;
+            break;
+          }
+        }
+      }
+
+      if (bottomPts.length > 12) {
+        let minSurfDist = Infinity;
+        for (const [bx, bz] of bottomPts) {
+          const d = Math.hypot(bestX - bx, bestZ - bz);
+          if (d < minSurfDist) minSurfDist = d;
+        }
+        if (minSurfDist > pillarR * 2.4) {
+          let bestPt: [number, number] | null = null;
+          let bestScore = Infinity;
+          for (const [bx, bz] of bottomPts) {
+            if (Math.abs(bx) <= marginX && Math.abs(bz) <= marginZ && isSafeFromHoles(bx, bz)) {
+              const dTarget = Math.hypot(bx - tx, bz - tz);
+              if (dTarget < bestScore) {
+                bestScore = dTarget;
+                bestPt = [bx, bz];
+              }
+            }
+          }
+          if (bestPt) {
+            bestX = bestPt[0];
+            bestZ = bestPt[1];
+          }
+        }
+      }
+
+      supports.push({
+        x: parseFloat(bestX.toFixed(2)),
+        z: parseFloat(bestZ.toFixed(2)),
+        radius: pillarR,
+        height: standoffHeight,
+      });
+    }
+
+    return supports;
+  }
+
+  private static createStandoffRiserGroup(supports: StandoffSupportItem[]): THREE.Group {
+    const T = getThree();
+    const standoffGroup = new T.Group();
+    standoffGroup.name = 'fixture_standoff_risers';
+    const riserMat = new T.MeshStandardMaterial({ color: 0x334155, metalness: 0.6, roughness: 0.35 });
+    const tapeMat = new T.MeshStandardMaterial({ color: 0x10b981, metalness: 0.1, roughness: 0.5 });
+
+    for (const sup of supports) {
+      const h = sup.height;
+      const r = sup.radius;
+      const bodyGeo = new T.CylinderGeometry(r, r * 1.12, h - 1.2, 18);
+      bodyGeo.translate(sup.x, (h - 1.2) / 2, sup.z);
+      standoffGroup.add(new T.Mesh(bodyGeo, riserMat));
+
+      const tapeGeo = new T.CylinderGeometry(r * 1.02, r * 1.02, 1.2, 18);
+      tapeGeo.translate(sup.x, h - 0.6, sup.z);
+      standoffGroup.add(new T.Mesh(tapeGeo, tapeMat));
+    }
+
+    return standoffGroup;
+  }
+
   public static buildFromMetadata(metadata: CadMetadata, filename = 'cad_model'): TessellatedModelResult {
     const T = getThree();
     const group = new T.Group();
@@ -94,15 +263,18 @@ export class StepModelTessellator {
       solidGeo.computeVertexNormals();
     }
     solidGeo.setIndex(new T.BufferAttribute(indices, 1));
+    solidGeo.computeBoundingBox();
 
-    const bboxMeta = metadata.bbox || { min: [0, 0, 0], max: [0, 0, 0], size: [0, 0, 0] };
-    const centerX = (bboxMeta.min[0] + bboxMeta.max[0]) / 2;
-    const bottomY = bboxMeta.min[1];
-    const centerZ = (bboxMeta.min[2] + bboxMeta.max[2]) / 2;
+    const rawBox = solidGeo.boundingBox;
+    const bboxMeta = metadata.bbox || { min: [0, 0, 0], max: [0, 0, 0], size: [50, 20, 50] };
     const sizeX = bboxMeta.size[0];
     const sizeY = bboxMeta.size[1];
     const sizeZ = bboxMeta.size[2];
-    const standoffHeight = 35.0;
+    const standoffHeight = 20.0;
+    const isAlreadyShiftedBbox = Math.abs(bboxMeta.min[1] - standoffHeight) < 0.05 && rawBox && Math.abs(rawBox.min.y - standoffHeight) > 1.0;
+    const centerX = isAlreadyShiftedBbox && rawBox ? (rawBox.min.x + rawBox.max.x) / 2 : (bboxMeta.min[0] + bboxMeta.max[0]) / 2;
+    const bottomY = isAlreadyShiftedBbox && rawBox ? rawBox.min.y : bboxMeta.min[1];
+    const centerZ = isAlreadyShiftedBbox && rawBox ? (rawBox.min.z + rawBox.max.z) / 2 : (bboxMeta.min[2] + bboxMeta.max[2]) / 2;
 
     solidGeo.translate(-centerX, -bottomY + standoffHeight, -centerZ);
 
@@ -155,38 +327,33 @@ export class StepModelTessellator {
       return maxR > 1.0 ? maxR : Math.max(sizeX, sizeZ) * 0.4;
     };
 
-    const baseRadius = getOuterRadiusAtY(standoffHeight + 1.5, 4.0);
-    const supportR = Math.max(4.0, Math.min(baseRadius * 0.62, Math.min(sizeX, sizeZ) * 0.35));
-    const pillarR = Math.max(2.2, Math.min(5.5, baseRadius * 0.14));
-    const standoffGroup = new T.Group();
-    standoffGroup.name = 'fixture_standoff_risers';
-    const riserMat = new T.MeshStandardMaterial({ color: 0x334155, metalness: 0.6, roughness: 0.35 });
-    const tapeMat = new T.MeshStandardMaterial({ color: 0x10b981, metalness: 0.1, roughness: 0.5 });
-    const riserAngles = [Math.PI / 3, Math.PI, (5 * Math.PI) / 3];
-    for (const ang of riserAngles) {
-      const rx = Math.cos(ang) * supportR;
-      const rz = Math.sin(ang) * supportR;
-      const bodyGeo = new T.CylinderGeometry(pillarR, pillarR * 1.15, standoffHeight - 1.2, 16);
-      bodyGeo.translate(rx, (standoffHeight - 1.2) / 2, rz);
-      standoffGroup.add(new T.Mesh(bodyGeo, riserMat));
-
-      const tapeGeo = new T.CylinderGeometry(pillarR * 1.02, pillarR * 1.02, 1.2, 16);
-      tapeGeo.translate(rx, standoffHeight - 0.6, rz);
-      standoffGroup.add(new T.Mesh(tapeGeo, tapeMat));
-    }
-    group.add(standoffGroup);
+    const isAxisymmetricShaft =
+      Math.abs(sizeX - sizeZ) <= Math.max(sizeX, sizeZ) * 0.12 &&
+      sizeY > Math.max(sizeX, sizeZ) * 0.65;
 
     const detectedHoles: DetectedHoleItem[] = [];
     const cadFeatures: CadFeatureItem[] = [];
 
     for (const feat of metadata.features || []) {
-      const origCenter = feat.center || [0, 0, 0];
+      const featWithRaw = feat as CadFeatureItem;
+      const origCenter: [number, number, number] = featWithRaw.raw_center
+        ? [featWithRaw.raw_center[0], featWithRaw.raw_center[1], featWithRaw.raw_center[2]]
+        : (feat.center ? [feat.center[0], feat.center[1], feat.center[2]] : [0, 0, 0]);
+      const origNormal: [number, number, number] = featWithRaw.raw_normal
+        ? [featWithRaw.raw_normal[0], featWithRaw.raw_normal[1], featWithRaw.raw_normal[2]]
+        : ((feat.normal ? [feat.normal[0], feat.normal[1], feat.normal[2]] : [0, 1, 0]) as [number, number, number]);
+
       let cx = parseFloat((origCenter[0] - centerX).toFixed(3));
       let cy = parseFloat((origCenter[1] - bottomY + standoffHeight).toFixed(3));
       let cz = parseFloat((origCenter[2] - centerZ).toFixed(3));
-      let norm = ((feat.normal ? [...feat.normal] : [0, 1, 0]) as [number, number, number]);
+      let norm: [number, number, number] = [origNormal[0], origNormal[1], origNormal[2]];
 
-      if (feat.id.startsWith('CAD_STEP_DIST_') && feat.nominal_dimension) {
+      if (
+        isAxisymmetricShaft &&
+        feat.id.startsWith('CAD_STEP_DIST_') &&
+        feat.nominal_dimension &&
+        Math.hypot(cx, cz) < 3.5
+      ) {
         if (Math.abs(cy - standoffHeight) < 2.0 && feat.nominal_dimension < sizeY - 1.0) {
           cy = parseFloat((standoffHeight + feat.nominal_dimension).toFixed(3));
         }
@@ -194,17 +361,18 @@ export class StepModelTessellator {
         cx = parseFloat(rStep.toFixed(3));
         cz = 0;
         norm = [1, 0, 0];
-      } else if (feat.feature_type === 'CONE') {
+      } else if (feat.feature_type === 'CONE' && Math.hypot(cx, cz) < 3.5) {
         const rCone = getOuterRadiusAtY(cy, 4.0);
         cx = parseFloat(rCone.toFixed(3));
         cz = 0;
         const isLowerChamfer = cy < standoffHeight + Math.min(15.0, sizeY * 0.25);
         norm = isLowerChamfer ? [0.707, -0.707, 0] : [0.85, 0.52, 0];
       } else if (
+        isAxisymmetricShaft &&
         feat.feature_type === 'PLANE' &&
         cy > standoffHeight + 1.8 &&
         cy < standoffHeight + sizeY - 1.8 &&
-        Math.hypot(cx, cz) < 3.0
+        Math.hypot(cx, cz) < 3.5
       ) {
         const rStep = getOuterRadiusAtY(cy, 3.0);
         const rAbove = getOuterRadiusAtY(cy + 4.0, 2.5);
@@ -215,7 +383,7 @@ export class StepModelTessellator {
       } else if (
         feat.feature_type === 'INTERNAL_CYLINDER' &&
         Math.abs(norm[1]) < 0.5 &&
-        Math.hypot(cx, cz) < 3.0
+        Math.hypot(cx, cz) < 3.5
       ) {
         const rCross = getOuterRadiusAtY(cy, 4.0);
         cx = parseFloat(rCross.toFixed(3));
@@ -231,6 +399,8 @@ export class StepModelTessellator {
         nominal_dimension: feat.nominal_dimension,
         center: shiftedCenter,
         normal: norm,
+        raw_center: origCenter,
+        raw_normal: origNormal,
         area_or_length: feat.area_or_length,
         description: feat.description || feat.id,
       };
@@ -246,9 +416,20 @@ export class StepModelTessellator {
       }
     }
 
+    const standoffSupports = this.calculateStandoffSupports(
+      posAttr,
+      sizeX,
+      sizeY,
+      sizeZ,
+      standoffHeight,
+      detectedHoles
+    );
+    group.add(this.createStandoffRiserGroup(standoffSupports));
+
     group.userData.detectedHoles = detectedHoles;
     group.userData.datumANormal = new T.Vector3(0, -1, 0);
     group.userData.standoffHeight = standoffHeight;
+    group.userData.standoffSupports = standoffSupports;
 
     return {
       group,
@@ -261,6 +442,7 @@ export class StepModelTessellator {
       detectedHoles,
       primaryDatumNormal: [0, -1, 0],
       cadFeatures,
+      standoffSupports,
     };
   }
 
@@ -942,7 +1124,7 @@ export class StepModelTessellator {
     const shiftX = isFinite(alignedMinX) ? (alignedMinX + alignedMaxX) / 2 : centerX;
     const shiftY = isFinite(alignedMinY) ? alignedMinY : bottomY;
     const shiftZ = isFinite(alignedMinZ) ? (alignedMinZ + alignedMaxZ) / 2 : centerZ;
-    const standoffHeight = 35.0;
+    const standoffHeight = 20.0;
 
     for (let i = 0; i < triPositions.length; i += 3) {
       triPositions[i] -= shiftX;
@@ -985,24 +1167,6 @@ export class StepModelTessellator {
       group.add(edgeLines);
     }
 
-    const supportR = Math.max(4.0, Math.min(finalSizeX, finalSizeZ) * 0.3);
-    const pillarR = Math.max(2.2, Math.min(5.0, supportR * 0.22));
-    const standoffGroup = new T.Group();
-    standoffGroup.name = 'fixture_standoff_risers';
-    const riserMat = new T.MeshStandardMaterial({ color: 0x334155, metalness: 0.6, roughness: 0.35 });
-    const tapeMat = new T.MeshStandardMaterial({ color: 0x10b981, metalness: 0.1, roughness: 0.5 });
-    for (const ang of [Math.PI / 3, Math.PI, (5 * Math.PI) / 3]) {
-      const rx = Math.cos(ang) * supportR;
-      const rz = Math.sin(ang) * supportR;
-      const bodyGeo = new T.CylinderGeometry(pillarR, pillarR * 1.15, standoffHeight - 1.2, 16);
-      bodyGeo.translate(rx, (standoffHeight - 1.2) / 2, rz);
-      standoffGroup.add(new T.Mesh(bodyGeo, riserMat));
-      const tapeGeo = new T.CylinderGeometry(pillarR * 1.02, pillarR * 1.02, 1.2, 16);
-      tapeGeo.translate(rx, standoffHeight - 0.6, rz);
-      standoffGroup.add(new T.Mesh(tapeGeo, tapeMat));
-    }
-    group.add(standoffGroup);
-
     const detectedHoles: DetectedHoleItem[] = [];
     let holeIdx = 1;
     circles.forEach((circ) => {
@@ -1035,9 +1199,20 @@ export class StepModelTessellator {
       }
     });
 
+    const standoffSupports = this.calculateStandoffSupports(
+      solidGeo.getAttribute('position'),
+      finalSizeX,
+      finalSizeY,
+      finalSizeZ,
+      standoffHeight,
+      detectedHoles
+    );
+    group.add(this.createStandoffRiserGroup(standoffSupports));
+
     group.userData.detectedHoles = detectedHoles;
     group.userData.datumANormal = new T.Vector3(0, -1, 0);
     group.userData.standoffHeight = standoffHeight;
+    group.userData.standoffSupports = standoffSupports;
 
     const genericCadFeatures: CadFeatureItem[] = [
       { id: 'CAD_BBOX_X', feature_type: 'PLANE', nominal_dimension: finalSizeX, center: [finalSizeX / 2, standoffHeight + finalSizeY / 2, 0], normal: [1, 0, 0] },
@@ -1088,6 +1263,7 @@ export class StepModelTessellator {
       detectedHoles,
       primaryDatumNormal: [0, -1, 0],
       cadFeatures: genericCadFeatures,
+      standoffSupports,
     };
   }
 }

@@ -252,11 +252,11 @@ export class SetupWizard {
     };
     this.matchResult = matchCadWithDrawing(this.currentCadMetadata, drawingPayload);
     const cadFeats = this.currentCadMetadata.features || [];
-    const bbox = this.currentCadMetadata.bbox || { min: [-25, 35, -25], max: [25, 85, 25], size: [50, 50, 50] };
+    const bbox = this.currentCadMetadata.bbox || { min: [-25, 20, -25], max: [25, 70, 25], size: [50, 50, 50] };
     const maxR = Math.max(Math.abs(bbox.min[0]), Math.abs(bbox.max[0]), Math.abs(bbox.min[2]), Math.abs(bbox.max[2]), 15);
-    const yMin = bbox.min[1] ?? 35;
-    const yMax = bbox.max[1] ?? 85;
-    const sizeY = Math.max(10, yMax - yMin);
+    const yMin = bbox.min[1] ?? 20;
+    const yMax = bbox.max[1] ?? 70;
+    const sizeY = Math.max(1.0, yMax - yMin);
 
     for (const matchedDim of this.matchResult.dimensions) {
       const target = this.dimensions.find((d) => d.id === matchedDim.id);
@@ -2066,6 +2066,7 @@ export class SetupWizard {
     } | undefined;
 
     let tessBbox: { min: [number, number, number]; max: [number, number, number] } | null = null;
+    let supportCount = 4;
     if (winRef) {
       winRef.isDualCanvas = false;
       const cadName = winRef.currentUploadedCad?.name ||
@@ -2077,6 +2078,15 @@ export class SetupWizard {
       const tess = applyStepModelToScene(cadName, '', this.currentCadMetadata || undefined);
       if (tess?.bbox?.min && tess?.bbox?.max) {
         tessBbox = { min: tess.bbox.min, max: tess.bbox.max };
+        if (this.currentCadMetadata) {
+          this.currentCadMetadata.bbox = tess.bbox;
+          if (tess.cadFeatures && tess.cadFeatures.length > 0) {
+            this.currentCadMetadata.features = tess.cadFeatures;
+          }
+        }
+      }
+      if (tess?.standoffSupports?.length) {
+        supportCount = tess.standoffSupports.length;
       }
     }
 
@@ -2089,9 +2099,14 @@ export class SetupWizard {
       this.renderVerifiedFeaturesList(sidebarLeft, activeDims);
     }
 
+    const hudDetails = document.getElementById('hud-feature-details');
+    if (hudDetails) {
+      hudDetails.textContent = `Katı model ${supportCount} adet çift taraflı bantlı destek (H=20.0 mm) üzerine bağlandı ve ${activeDims.length} ölçüye göre takım yolu üretildi.`;
+    }
+
     const bbox = (this.currentCadMetadata?.bbox?.min && this.currentCadMetadata?.bbox?.max)
       ? { min: this.currentCadMetadata.bbox.min, max: this.currentCadMetadata.bbox.max }
-      : (tessBbox || { min: [0, 35, 0] as [number, number, number], max: [120, 95, 45] as [number, number, number] });
+      : (tessBbox || { min: [0, 20, 0] as [number, number, number], max: [120, 80, 45] as [number, number, number] });
 
     const cadFeatList = this.currentCadMetadata?.features || [];
     const pathFeatures: PathFeatureInput[] = activeDims.map((d) => {
@@ -2674,7 +2689,8 @@ export class SetupWizard {
       if (win.probeGroup && win.nuperApp) {
         try {
           const wps = win.nuperApp.getCADViewer().getSimulationController().getWaypoints();
-          const curWp = wps[state.currentWaypointIndex] || wps[0];
+          const useHomeWp = !state.isPlaying && state.progress <= 0.001;
+          const curWp = useHomeWp ? wps[0] : (wps[state.currentWaypointIndex] || wps[0]);
           const sDir = curWp?.stylusDir || [0, -1, 0];
           const pLbl = curWp?.ph10Label || 'A0° B0°';
           this.orientProbeHead(win.probeGroup, state.currentPosition, sDir, pLbl);
