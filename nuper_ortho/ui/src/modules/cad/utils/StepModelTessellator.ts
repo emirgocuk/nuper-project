@@ -416,20 +416,29 @@ export class StepModelTessellator {
 
     const triPositions: number[] = [];
     const triNormals: number[] = [];
+    const loopInfos: Array<{ normal: [number, number, number]; area: number; center: [number, number, number] }> = [];
 
     for (const loopId of loopMap.keys()) {
       const loopPts = sampleLoop(loopId);
       if (loopPts.length < 3) continue;
 
       let nx = 0, ny = 0, nz = 0;
+      let cx = 0, cy = 0, cz = 0;
       for (let i = 0; i < loopPts.length; i++) {
         const c = loopPts[i], next = loopPts[(i + 1) % loopPts.length];
         nx += (c[1] - next[1]) * (c[2] + next[2]);
         ny += (c[2] - next[2]) * (c[0] + next[0]);
         nz += (c[0] - next[0]) * (c[1] + next[1]);
+        cx += c[0]; cy += c[1]; cz += c[2];
       }
-      const lenN = Math.hypot(nx, ny, nz) || 1;
+      const lenN = Math.hypot(nx, ny, nz);
+      if (lenN < 1e-6) continue;
       nx /= lenN; ny /= lenN; nz /= lenN;
+      loopInfos.push({
+        normal: [nx, ny, nz],
+        area: lenN * 0.5,
+        center: [cx / loopPts.length, cy / loopPts.length, cz / loopPts.length],
+      });
 
       let ux = 0, uy = 1, uz = 0;
       if (Math.abs(ny) > 0.9) { ux = 1; uy = 0; uz = 0; }
@@ -450,13 +459,146 @@ export class StepModelTessellator {
       const tris = earClip2D(pts2D);
       for (let k = 0; k < tris.length; k += 3) {
         const pA = loopPts[tris[k]], pB = loopPts[tris[k + 1]], pC = loopPts[tris[k + 2]];
-        triPositions.push(pA[0] - centerX, pA[1] - bottomY, pA[2] - centerZ);
-        triPositions.push(pB[0] - centerX, pB[1] - bottomY, pB[2] - centerZ);
-        triPositions.push(pC[0] - centerX, pC[1] - bottomY, pC[2] - centerZ);
+        triPositions.push(pA[0], pA[1], pA[2]);
+        triPositions.push(pB[0], pB[1], pB[2]);
+        triPositions.push(pC[0], pC[1], pC[2]);
         triNormals.push(nx, ny, nz);
         triNormals.push(nx, ny, nz);
         triNormals.push(nx, ny, nz);
       }
+    }
+
+    let ex: [number, number, number] = [1, 0, 0];
+    let ey: [number, number, number] = [0, 1, 0];
+    let ez: [number, number, number] = [0, 0, 1];
+
+    const canonVec = (v: [number, number, number]): [number, number, number] => {
+      for (const comp of v) {
+        if (Math.abs(comp) > 1e-4) {
+          return comp < 0 ? [-v[0], -v[1], -v[2]] : v;
+        }
+      }
+      return v;
+    };
+
+    if (loopInfos.length > 0 && triPositions.length >= 9) {
+      loopInfos.sort((a, b) => b.area - a.area);
+      const n0 = loopInfos[0].normal;
+      const c0 = loopInfos[0].center;
+      let partCx = 0, partCy = 0, partCz = 0;
+      const vCount = triPositions.length / 3;
+      for (let i = 0; i < triPositions.length; i += 3) {
+        partCx += triPositions[i];
+        partCy += triPositions[i + 1];
+        partCz += triPositions[i + 2];
+      }
+      partCx /= vCount; partCy /= vCount; partCz /= vCount;
+      const dotCentroid = (partCx - c0[0]) * n0[0] + (partCy - c0[1]) * n0[1] + (partCz - c0[2]) * n0[2];
+      ey = dotCentroid < -1e-4 ? [-n0[0], -n0[1], -n0[2]] : [n0[0], n0[1], n0[2]];
+
+      const secGroups = new Map<string, { vec: [number, number, number]; area: number }>();
+      for (let i = 1; i < loopInfos.length; i++) {
+        const ns = loopInfos[i].normal;
+        const d = ns[0] * ey[0] + ns[1] * ey[1] + ns[2] * ey[2];
+        if (Math.abs(d) < 0.25) {
+          let px = ns[0] - d * ey[0];
+          let py = ns[1] - d * ey[1];
+          let pz = ns[2] - d * ey[2];
+          const plen = Math.hypot(px, py, pz) || 1;
+          px /= plen; py /= plen; pz /= plen;
+          const cv = canonVec([px, py, pz]);
+          const key = `${cv[0].toFixed(2)},${cv[1].toFixed(2)},${cv[2].toFixed(2)}`;
+          const prev = secGroups.get(key);
+          if (prev) {
+            prev.area += loopInfos[i].area;
+          } else {
+            secGroups.set(key, { vec: cv, area: loopInfos[i].area });
+          }
+        }
+      }
+
+      if (secGroups.size > 0) {
+        let bestArea = -1;
+        for (const g of secGroups.values()) {
+          if (g.area > bestArea) {
+            bestArea = g.area;
+            ez = g.vec;
+          }
+        }
+      } else {
+        const ref: [number, number, number] = Math.abs(ey[0]) < 0.85 ? [1, 0, 0] : [0, 0, 1];
+        const d = ref[0] * ey[0] + ref[1] * ey[1] + ref[2] * ey[2];
+        const px = ref[0] - d * ey[0], py = ref[1] - d * ey[1], pz = ref[2] - d * ey[2];
+        const plen = Math.hypot(px, py, pz) || 1;
+        ez = [px / plen, py / plen, pz / plen];
+      }
+
+      const cxE = ey[1] * ez[2] - ey[2] * ez[1];
+      const cyE = ey[2] * ez[0] - ey[0] * ez[2];
+      const czE = ey[0] * ez[1] - ey[1] * ez[0];
+      const lenEx = Math.hypot(cxE, cyE, czE) || 1;
+      ex = [cxE / lenEx, cyE / lenEx, czE / lenEx];
+
+      let minRx = Infinity, maxRx = -Infinity, minRz = Infinity, maxRz = -Infinity;
+      for (let i = 0; i < triPositions.length; i += 3) {
+        const x = triPositions[i], y = triPositions[i + 1], z = triPositions[i + 2];
+        const rx = x * ex[0] + y * ex[1] + z * ex[2];
+        const rz = x * ez[0] + y * ez[1] + z * ez[2];
+        if (rx < minRx) minRx = rx;
+        if (rx > maxRx) maxRx = rx;
+        if (rz < minRz) minRz = rz;
+        if (rz > maxRz) maxRz = rz;
+      }
+      if (maxRz - minRz > maxRx - minRx + 1e-3) {
+        const oldEx = ex;
+        ex = ez;
+        ez = [-oldEx[0], -oldEx[1], -oldEx[2]];
+      }
+    }
+
+    let alignedMinX = Infinity, alignedMaxX = -Infinity;
+    let alignedMinY = Infinity, alignedMaxY = -Infinity;
+    let alignedMinZ = Infinity, alignedMaxZ = -Infinity;
+
+    for (let i = 0; i < triPositions.length; i += 3) {
+      const x = triPositions[i], y = triPositions[i + 1], z = triPositions[i + 2];
+      const rx = x * ex[0] + y * ex[1] + z * ex[2];
+      const ry = x * ey[0] + y * ey[1] + z * ey[2];
+      const rz = x * ez[0] + y * ez[1] + z * ez[2];
+      triPositions[i] = rx;
+      triPositions[i + 1] = ry;
+      triPositions[i + 2] = rz;
+      if (rx < alignedMinX) alignedMinX = rx;
+      if (rx > alignedMaxX) alignedMaxX = rx;
+      if (ry < alignedMinY) alignedMinY = ry;
+      if (ry > alignedMaxY) alignedMaxY = ry;
+      if (rz < alignedMinZ) alignedMinZ = rz;
+      if (rz > alignedMaxZ) alignedMaxZ = rz;
+
+      const nx = triNormals[i], ny = triNormals[i + 1], nz = triNormals[i + 2];
+      triNormals[i] = nx * ex[0] + ny * ex[1] + nz * ex[2];
+      triNormals[i + 1] = nx * ey[0] + ny * ey[1] + nz * ey[2];
+      triNormals[i + 2] = nx * ez[0] + ny * ez[1] + nz * ez[2];
+    }
+
+    const finalSizeX = isFinite(alignedMaxX - alignedMinX) && alignedMaxX > alignedMinX
+      ? parseFloat((alignedMaxX - alignedMinX).toFixed(2))
+      : sizeX;
+    const finalSizeY = isFinite(alignedMaxY - alignedMinY) && alignedMaxY > alignedMinY
+      ? parseFloat((alignedMaxY - alignedMinY).toFixed(2))
+      : sizeY;
+    const finalSizeZ = isFinite(alignedMaxZ - alignedMinZ) && alignedMaxZ > alignedMinZ
+      ? parseFloat((alignedMaxZ - alignedMinZ).toFixed(2))
+      : sizeZ;
+
+    const shiftX = isFinite(alignedMinX) ? (alignedMinX + alignedMaxX) / 2 : centerX;
+    const shiftY = isFinite(alignedMinY) ? alignedMinY : bottomY;
+    const shiftZ = isFinite(alignedMinZ) ? (alignedMinZ + alignedMaxZ) / 2 : centerZ;
+
+    for (let i = 0; i < triPositions.length; i += 3) {
+      triPositions[i] -= shiftX;
+      triPositions[i + 1] -= shiftY;
+      triPositions[i + 2] -= shiftZ;
     }
 
     const metalMat = new T.MeshStandardMaterial({
@@ -483,8 +625,8 @@ export class StepModelTessellator {
       const edgeLines = new T.LineSegments(edgesGeo, edgeMat);
       group.add(edgeLines);
     } else {
-      solidGeo = new T.BoxGeometry(sizeX, sizeY, sizeZ);
-      solidGeo.translate(0, sizeY / 2, 0);
+      solidGeo = new T.BoxGeometry(finalSizeX, finalSizeY, finalSizeZ);
+      solidGeo.translate(0, finalSizeY / 2, 0);
       const boxMesh = new T.Mesh(solidGeo, metalMat);
       boxMesh.name = 'step_bbox_solid';
       group.add(boxMesh);
@@ -498,17 +640,27 @@ export class StepModelTessellator {
     let holeIdx = 1;
     circles.forEach((circ) => {
       if (circ.radius >= 0.5 && circ.radius <= 60.0) {
-        const ox = circ.placement?.origin ? circ.placement.origin[0] - centerX : 0;
-        const oy = circ.placement?.origin ? circ.placement.origin[1] - bottomY : sizeY;
-        const oz = circ.placement?.origin ? circ.placement.origin[2] - centerZ : 0;
-        const norm = circ.placement?.axis || [0, 1, 0];
+        const orig = circ.placement?.origin;
+        let ox = 0, oy = finalSizeY, oz = 0;
+        if (orig) {
+          const rx = orig[0] * ex[0] + orig[1] * ex[1] + orig[2] * ex[2];
+          const ry = orig[0] * ey[0] + orig[1] * ey[1] + orig[2] * ey[2];
+          const rz = orig[0] * ez[0] + orig[1] * ez[1] + orig[2] * ez[2];
+          ox = rx - shiftX;
+          oy = ry - shiftY;
+          oz = rz - shiftZ;
+        }
+        const rawNorm = circ.placement?.axis || [0, 1, 0];
+        const rnx = rawNorm[0] * ex[0] + rawNorm[1] * ex[1] + rawNorm[2] * ex[2];
+        const rny = rawNorm[0] * ey[0] + rawNorm[1] * ey[1] + rawNorm[2] * ey[2];
+        const rnz = rawNorm[0] * ez[0] + rawNorm[1] * ez[1] + rawNorm[2] * ez[2];
         const isDuplicate = detectedHoles.some(
           (h) => Math.hypot(h.center[0] - ox, h.center[1] - oy, h.center[2] - oz) < 1.0 && Math.abs(h.radius - circ.radius) < 0.2
         );
         if (!isDuplicate) {
           detectedHoles.push({
             center: [parseFloat(ox.toFixed(2)), parseFloat(oy.toFixed(2)), parseFloat(oz.toFixed(2))],
-            normal: [parseFloat(norm[0].toFixed(2)), parseFloat(norm[1].toFixed(2)), parseFloat(norm[2].toFixed(2))],
+            normal: [parseFloat(rnx.toFixed(2)), parseFloat(rny.toFixed(2)), parseFloat(rnz.toFixed(2))],
             radius: parseFloat(circ.radius.toFixed(2)),
             name: `DELIK_Ø${(circ.radius * 2).toFixed(2)}_${holeIdx++}`,
           });
@@ -520,9 +672,9 @@ export class StepModelTessellator {
     group.userData.datumANormal = new T.Vector3(0, -1, 0);
 
     const genericCadFeatures: CadFeatureItem[] = [
-      { id: 'CAD_BBOX_X', feature_type: 'PLANE', nominal_dimension: sizeX, center: [sizeX / 2, sizeY / 2, 0], normal: [1, 0, 0] },
-      { id: 'CAD_BBOX_Y', feature_type: 'PLANE', nominal_dimension: sizeY, center: [0, sizeY, 0], normal: [0, 1, 0] },
-      { id: 'CAD_BBOX_Z', feature_type: 'PLANE', nominal_dimension: sizeZ, center: [0, sizeY / 2, sizeZ / 2], normal: [0, 0, 1] },
+      { id: 'CAD_BBOX_X', feature_type: 'PLANE', nominal_dimension: finalSizeX, center: [finalSizeX / 2, finalSizeY / 2, 0], normal: [1, 0, 0] },
+      { id: 'CAD_BBOX_Y', feature_type: 'PLANE', nominal_dimension: finalSizeY, center: [0, finalSizeY, 0], normal: [0, 1, 0] },
+      { id: 'CAD_BBOX_Z', feature_type: 'PLANE', nominal_dimension: finalSizeZ, center: [0, finalSizeY / 2, finalSizeZ / 2], normal: [0, 0, 1] },
       ...detectedHoles.map((h, i) => ({
         id: `CAD_HOLE_${i + 1}`,
         feature_type: 'INTERNAL_CYLINDER' as const,
@@ -533,13 +685,37 @@ export class StepModelTessellator {
       })),
     ];
 
+    let distIdx = 1;
+    const seenDists = new Set<number>();
+    for (let i = 0; i < detectedHoles.length; i++) {
+      for (let j = i + 1; j < detectedHoles.length; j++) {
+        const h1 = detectedHoles[i], h2 = detectedHoles[j];
+        const dXz = parseFloat(Math.hypot(h1.center[0] - h2.center[0], h1.center[2] - h2.center[2]).toFixed(2));
+        if (dXz > 1.0 && !seenDists.has(dXz)) {
+          seenDists.add(dXz);
+          genericCadFeatures.push({
+            id: `CAD_DIST_${dXz.toFixed(2)}_${distIdx++}`,
+            feature_type: 'PLANE',
+            nominal_dimension: dXz,
+            center: [
+              parseFloat(((h1.center[0] + h2.center[0]) / 2).toFixed(2)),
+              Math.max(h1.center[1], h2.center[1]),
+              parseFloat(((h1.center[2] + h2.center[2]) / 2).toFixed(2)),
+            ],
+            normal: [0, 1, 0],
+            description: `Eksenler Arası Mesafe (${dXz.toFixed(2)} mm)`,
+          });
+        }
+      }
+    }
+
     return {
       group,
       geometry: solidGeo,
       bbox: {
-        min: [-sizeX / 2, 0, -sizeZ / 2],
-        max: [sizeX / 2, sizeY, sizeZ / 2],
-        size: [sizeX, sizeY, sizeZ],
+        min: [-finalSizeX / 2, 0, -finalSizeZ / 2],
+        max: [finalSizeX / 2, finalSizeY, finalSizeZ / 2],
+        size: [finalSizeX, finalSizeY, finalSizeZ],
       },
       detectedHoles,
       primaryDatumNormal: [0, -1, 0],

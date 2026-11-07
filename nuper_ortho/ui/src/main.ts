@@ -370,10 +370,10 @@ if (typeof window !== 'undefined') {
       if (stepAlignBtn) {
         stepAlignBtn.addEventListener('click', (e) => {
           e.preventDefault();
-          if (typeof win.open321Modal === 'function') {
-            win.open321Modal();
-          } else if (typeof win.apply321Alignment === 'function') {
+          if (typeof win.apply321Alignment === 'function') {
             win.apply321Alignment();
+          } else if (typeof win.open321Modal === 'function') {
+            win.open321Modal();
           }
         });
       }
@@ -414,19 +414,31 @@ if (typeof window !== 'undefined') {
 
     const origApply321 = win.apply321Alignment;
     win.apply321Alignment = () => {
+      const wAny = win as unknown as { optimizePartOrientation?: () => void };
+      if (typeof wAny.optimizePartOrientation === 'function') {
+        try {
+          wAny.optimizePartOrientation();
+        } catch {}
+      }
       if (typeof origApply321 === 'function') {
         origApply321();
+      }
+      if (wizard.isPlanConfirmed() && wizard.getDimensions().length > 0) {
+        wizard.applyActivePlanToWorkspace(wizard.getDimensions());
       }
       workflowRibbon.advanceToStep(5);
       workflowRibbon.mount('.app-ribbon');
       bindWorkflowEvents();
     };
 
-    if (win.blockGroup) win.blockGroup.visible = true;
-    if (typeof win.generateDynamicProbeTrajectory === 'function') {
-      win.generateDynamicProbeTrajectory();
-    }
-    if (win.trajLine) win.trajLine.visible = true;
+    win.open321Modal = () => {
+      if (typeof win.apply321Alignment === 'function') {
+        win.apply321Alignment();
+      }
+    };
+
+    if (win.blockGroup) win.blockGroup.visible = false;
+    if (win.trajLine) win.trajLine.visible = false;
 
     const togglePathBtn = document.getElementById('btn-toggle-path');
     if (togglePathBtn) {

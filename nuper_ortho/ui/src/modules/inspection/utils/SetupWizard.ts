@@ -1967,15 +1967,54 @@ export class SetupWizard {
 
       const drawScroll = document.getElementById('sidebar-drawing-scroll');
       if (drawScroll) drawScroll.style.setProperty('display', 'none', 'important');
+    }
 
-      this.renderVerifiedFeaturesList(sidebarLeft, dims);
+    const winRef = (typeof window !== 'undefined' ? window : undefined) as unknown as {
+      isDualCanvas?: boolean;
+      blockGroup?: THREE.Group & { visible: boolean };
+      uploadedMeshGroup?: THREE.Group | null;
+      currentUploadedCad?: { name?: string };
+      trajLine?: { visible: boolean; geometry?: { dispose?: () => void } };
+      touchPointMeshes?: Array<unknown>;
+      trajectoryPoints?: Array<unknown>;
+      probeGroup?: { position: { set: (x: number, y: number, z: number) => void } };
+      scene?: THREE.Scene;
+      requestRender?: () => void;
+      eval?: (code: string) => unknown;
+      dispatchEvent?: (e: Event) => boolean;
+      generateDynamicProbeTrajectory?: () => void;
+      nuperApp?: { getCADViewer: () => { getSimulationController: () => { setWaypoints: (w: unknown[]) => void; bindProbeObject: (o: unknown, v: unknown) => void; reset: () => void; onUpdate: (fn: (state: SimulationState) => void) => () => void } } };
+    } | undefined;
+
+    let tessBbox: { min: [number, number, number]; max: [number, number, number] } | null = null;
+    if (winRef) {
+      winRef.isDualCanvas = false;
+      const cadName = winRef.currentUploadedCad?.name ||
+        this.activeCadModelName ||
+        this.currentCadMetadata?.model_name ||
+        (this.loadedFileName && StepModelTessellator.isDcModulPlaka(this.loadedFileName) ? this.loadedFileName : '') ||
+        (this.loadedFileName ? this.loadedFileName : 'active_part.stp');
+
+      const tess = applyStepModelToScene(cadName, '', this.currentCadMetadata || undefined);
+      if (tess?.bbox?.min && tess?.bbox?.max) {
+        tessBbox = { min: tess.bbox.min, max: tess.bbox.max };
+      }
+    }
+
+    if (this.currentCadMetadata && this.dimensions.length > 0) {
+      this.recomputeCadMatch();
+    }
+
+    const activeDims = this.dimensions.length > 0 ? this.dimensions : dims;
+    if (sidebarLeft) {
+      this.renderVerifiedFeaturesList(sidebarLeft, activeDims);
     }
 
     const bbox = (this.currentCadMetadata?.bbox?.min && this.currentCadMetadata?.bbox?.max)
       ? { min: this.currentCadMetadata.bbox.min, max: this.currentCadMetadata.bbox.max }
-      : { min: [0, 0, 0] as [number, number, number], max: [120, 60, 45] as [number, number, number] };
+      : (tessBbox || { min: [0, 0, 0] as [number, number, number], max: [120, 60, 45] as [number, number, number] });
 
-    const pathFeatures: PathFeatureInput[] = dims.map((d) => {
+    const pathFeatures: PathFeatureInput[] = activeDims.map((d) => {
       const coords = d.cad_center
         ? { x: d.cad_center[0], y: d.cad_center[1], z: d.cad_center[2] }
         : InspectionSynchronizer.getFeatureCoordinates(d.id);
@@ -2020,32 +2059,53 @@ export class SetupWizard {
       timeDisplay.innerText = '00:00 / 00:34';
     }
 
-    if (typeof window !== 'undefined') {
-      const win = window as unknown as {
-        isDualCanvas?: boolean;
-        blockGroup?: THREE.Group & { visible: boolean };
-        uploadedMeshGroup?: THREE.Group | null;
-        currentUploadedCad?: { name?: string };
-        trajLine?: { visible: boolean; geometry?: { dispose?: () => void } };
-        touchPointMeshes?: Array<unknown>;
-        trajectoryPoints?: Array<unknown>;
-        probeGroup?: { position: { set: (x: number, y: number, z: number) => void } };
-        scene?: THREE.Scene;
-        requestRender?: () => void;
-        eval?: (code: string) => unknown;
-        dispatchEvent?: (e: Event) => boolean;
-        nuperApp?: { getCADViewer: () => { getSimulationController: () => { setWaypoints: (w: unknown[]) => void; bindProbeObject: (o: unknown, v: unknown) => void; reset: () => void; onUpdate: (fn: (state: SimulationState) => void) => () => void } } };
+    if (winRef) {
+      const win = winRef;
+      const syncMeasurementSceneTrajectory = () => {
+        if (win.trajLine) {
+          if (typeof win.trajLine.geometry?.dispose === 'function') {
+            win.trajLine.geometry.dispose();
+          }
+          if (plan.allWaypoints.length > 0) {
+            const waypoints = plan.allWaypoints.map((w) => w.position.clone());
+            (win.trajLine as unknown as { geometry: unknown }).geometry = new THREE.BufferGeometry().setFromPoints(waypoints);
+            win.trajLine.visible = true;
+            if (win.trajectoryPoints) {
+              win.trajectoryPoints.length = 0;
+              win.trajectoryPoints.push(...waypoints);
+            }
+          } else {
+            win.trajLine.visible = false;
+          }
+        }
+
+        if (win.scene) {
+          if (win.touchPointMeshes) {
+            win.touchPointMeshes.forEach((m) => win.scene?.remove(m as THREE.Object3D));
+          }
+          win.touchPointMeshes = [];
+
+          const dotGeo = new THREE.SphereGeometry(1.1, 12, 12);
+          for (const fp of plan.featurePaths) {
+            for (const tp of fp.touchPoints) {
+              const dotMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+              const dotMesh = new THREE.Mesh(dotGeo, dotMat);
+              dotMesh.position.set(tp.position[0], tp.position[1], tp.position[2]);
+              dotMesh.userData = { label: `${fp.balloon} Temas Noktası` };
+              win.scene.add(dotMesh);
+              win.touchPointMeshes.push(dotMesh);
+            }
+          }
+        }
+
+        if (win.probeGroup && plan.allWaypoints.length > 0) {
+          const firstPos = plan.allWaypoints[0].position;
+          win.probeGroup.position.set(firstPos.x, firstPos.y + 20, firstPos.z);
+        }
       };
 
-      win.isDualCanvas = false;
-
-      const cadName = win.currentUploadedCad?.name ||
-        this.activeCadModelName ||
-        this.currentCadMetadata?.model_name ||
-        (this.loadedFileName && StepModelTessellator.isDcModulPlaka(this.loadedFileName) ? this.loadedFileName : '') ||
-        (this.loadedFileName ? this.loadedFileName : 'active_part.stp');
-
-      applyStepModelToScene(cadName);
+      syncMeasurementSceneTrajectory();
+      win.generateDynamicProbeTrajectory = syncMeasurementSceneTrajectory;
 
       if (win.blockGroup) {
         win.blockGroup.visible = true;
@@ -2057,6 +2117,11 @@ export class SetupWizard {
       if (win.nuperApp) {
         try {
           const simCtrl = win.nuperApp.getCADViewer().getSimulationController();
+          simCtrl.setWaypoints(plan.allWaypoints);
+          if (win.probeGroup) {
+            simCtrl.bindProbeObject(win.probeGroup, new THREE.Vector3(0, 20, 0));
+          }
+          simCtrl.reset();
           if (this.simUnregister) {
             this.simUnregister();
           }
