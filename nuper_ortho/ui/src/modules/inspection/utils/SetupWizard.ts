@@ -2186,6 +2186,17 @@ export class SetupWizard {
         ? { x: d.cad_center[0], y: d.cad_center[1], z: d.cad_center[2] }
         : InspectionSynchronizer.getFeatureCoordinates(d.id);
       const matchedCadFeat = d.cad_feature_id ? cadFeatList.find((cf) => cf.id === d.cad_feature_id) : undefined;
+      const dExt = d as InspectionDimension & {
+        axial_min?: number;
+        axial_max?: number;
+        stem_blocked?: boolean;
+        cad_instances?: PathFeatureInput['cad_instances'];
+      };
+      const cfExt = matchedCadFeat as (typeof matchedCadFeat & {
+        axial_min?: number;
+        axial_max?: number;
+        stem_blocked?: boolean;
+      }) | undefined;
       return {
         id: d.id,
         balloon: d.balloon,
@@ -2198,6 +2209,10 @@ export class SetupWizard {
         cad_feature_id: d.cad_feature_id,
         feature_type: matchedCadFeat?.feature_type,
         operation: (d.operation as 'OP10' | 'OP20') || 'OP10',
+        axial_min: dExt.axial_min ?? cfExt?.axial_min,
+        axial_max: dExt.axial_max ?? cfExt?.axial_max,
+        stem_blocked: dExt.stem_blocked ?? cfExt?.stem_blocked,
+        cad_instances: dExt.cad_instances,
       };
     });
 
@@ -2206,6 +2221,7 @@ export class SetupWizard {
       activeOperation: activeOp,
       verticalAxis: 'Y',
       clearanceZMarginMm: 15.0,
+      includeDatumSetup: true,
     });
     this.lastGeneratedPlan = plan;
     this.announceStylusRecommendations(plan);
@@ -2235,51 +2251,18 @@ export class SetupWizard {
     if (winRef) {
       const win = winRef;
       const syncMeasurementSceneTrajectory = () => {
-        if (win.trajLine) {
-          if (typeof win.trajLine.geometry?.dispose === 'function') {
-            win.trajLine.geometry.dispose();
-          }
-          const lineMat = (win.trajLine as unknown as {
-            material?: { color?: { setHex?: (c: number) => void }; opacity?: number; linewidth?: number };
-          }).material;
-          if (lineMat?.color?.setHex) {
-            lineMat.color.setHex(0x10b981);
-          }
-          if (lineMat) {
-            lineMat.opacity = 0.95;
-            lineMat.linewidth = 2.5;
-          }
-          if (plan.allWaypoints.length > 0) {
-            const waypoints = plan.allWaypoints.map((w) => w.position.clone());
-            (win.trajLine as unknown as { geometry: unknown }).geometry = new THREE.BufferGeometry().setFromPoints(waypoints);
-            win.trajLine.visible = true;
-            if (win.trajectoryPoints) {
-              win.trajectoryPoints.length = 0;
-              win.trajectoryPoints.push(...waypoints);
-            }
-          } else {
-            win.trajLine.visible = false;
+        const allTouches: Array<{ position: [number, number, number]; label?: string; isDatum?: boolean }> = [];
+        if (plan.datumTouchPoints) {
+          for (const dt of plan.datumTouchPoints) {
+            allTouches.push({ position: dt.position, label: dt.label || 'DATUM', isDatum: true });
           }
         }
-
-        if (win.scene) {
-          if (win.touchPointMeshes) {
-            win.touchPointMeshes.forEach((m) => win.scene?.remove(m as THREE.Object3D));
-          }
-          win.touchPointMeshes = [];
-
-          const dotGeo = new THREE.SphereGeometry(1.3, 12, 12);
-          for (const fp of plan.featurePaths) {
-            for (const tp of fp.touchPoints) {
-              const dotMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
-              const dotMesh = new THREE.Mesh(dotGeo, dotMat);
-              dotMesh.position.set(tp.position[0], tp.position[1], tp.position[2]);
-              dotMesh.userData = { label: `${fp.balloon} Temas Noktası` };
-              win.scene.add(dotMesh);
-              win.touchPointMeshes.push(dotMesh);
-            }
+        for (const fp of plan.featurePaths) {
+          for (const tp of fp.touchPoints) {
+            allTouches.push({ position: tp.position, label: `${fp.balloon} Temas Noktası`, isDatum: false });
           }
         }
+        this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], allTouches, 0.34);
 
         if (win.probeGroup && plan.allWaypoints.length > 0) {
           const firstWp = plan.allWaypoints[0] as ExtendedWaypoint;
@@ -2355,6 +2338,109 @@ export class SetupWizard {
     }
   }
 
+  private renderSceneTrajectoryAndTouches(
+    waypoints: ExtendedWaypoint[],
+    touches: Array<{ position: [number, number, number]; label?: string; isDatum?: boolean }>,
+    tubeRadius = 0.35
+  ): void {
+    if (typeof window === 'undefined') return;
+    const win = window as unknown as {
+      THREE?: typeof THREE;
+      scene?: THREE.Scene;
+      trajLine?: {
+        visible: boolean;
+        geometry?: { dispose?: () => void };
+        material?: { color?: { setHex?: (c: number) => void }; opacity?: number; linewidth?: number };
+      };
+      touchPointMeshes?: THREE.Object3D[];
+      nuperTrajectoryGroup?: THREE.Group;
+      trajectoryPoints?: unknown[];
+      requestRender?: () => void;
+    };
+    const T = win.THREE || THREE;
+    const tPoints = waypoints.map((w) => new T.Vector3(w.position.x, w.position.y, w.position.z));
+
+    if (win.trajLine) {
+      if (typeof win.trajLine.geometry?.dispose === 'function') {
+        win.trajLine.geometry.dispose();
+      }
+      if (win.trajLine.material?.color?.setHex) {
+        win.trajLine.material.color.setHex(0x10b981);
+      }
+      if (win.trajLine.material) {
+        win.trajLine.material.opacity = 0.98;
+        win.trajLine.material.linewidth = 2.5;
+      }
+      if (tPoints.length > 0) {
+        (win.trajLine as unknown as { geometry: unknown }).geometry = new T.BufferGeometry().setFromPoints(tPoints);
+        win.trajLine.visible = true;
+        if (win.trajectoryPoints) {
+          win.trajectoryPoints.length = 0;
+          win.trajectoryPoints.push(...tPoints);
+        }
+      } else {
+        win.trajLine.visible = false;
+      }
+    }
+
+    if (win.scene) {
+      if (win.nuperTrajectoryGroup) {
+        win.scene.remove(win.nuperTrajectoryGroup);
+      }
+      if (Array.isArray(win.touchPointMeshes)) {
+        win.touchPointMeshes.forEach((m) => win.scene?.remove(m));
+      }
+      win.touchPointMeshes = [];
+
+      const pathGroup = new T.Group();
+      pathGroup.name = 'NuperMeasurementTrajectoryGroup';
+
+      if (tPoints.length >= 2) {
+        const lineGeo = new T.BufferGeometry().setFromPoints(tPoints);
+        const lineMat = new T.LineBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.98 });
+        pathGroup.add(new T.Line(lineGeo, lineMat));
+
+        const upAxis = new T.Vector3(0, 1, 0);
+        const matMeas = new T.MeshBasicMaterial({ color: 0x10b981 });
+        const matDatum = new T.MeshBasicMaterial({ color: 0xf59e0b });
+
+        for (let i = 0; i < tPoints.length - 1; i++) {
+          const pA = tPoints[i];
+          const pB = tPoints[i + 1];
+          const diff = new T.Vector3().subVectors(pB, pA);
+          const segLen = diff.length();
+          if (segLen < 0.05) continue;
+
+          const isDatumSeg = Boolean(waypoints[i + 1]?.balloon?.startsWith('DATUM_'));
+          const cylGeo = new T.CylinderGeometry(tubeRadius, tubeRadius, segLen, 8);
+          const cylMesh = new T.Mesh(cylGeo, isDatumSeg ? matDatum : matMeas);
+          const mid = new T.Vector3().addVectors(pA, pB).multiplyScalar(0.5);
+          cylMesh.position.copy(mid);
+          cylMesh.quaternion.setFromUnitVectors(upAxis, diff.normalize());
+          pathGroup.add(cylMesh);
+        }
+      }
+
+      const dotGeo = new T.SphereGeometry(Math.max(1.2, tubeRadius * 3.6), 14, 14);
+      const dotMatMeas = new T.MeshBasicMaterial({ color: 0x10b981 });
+      const dotMatDatum = new T.MeshBasicMaterial({ color: 0xf59e0b });
+      for (const tp of touches) {
+        const dotMesh = new T.Mesh(dotGeo, tp.isDatum ? dotMatDatum : dotMatMeas);
+        dotMesh.position.set(tp.position[0], tp.position[1], tp.position[2]);
+        dotMesh.userData = { label: tp.label || 'Temas Noktası' };
+        pathGroup.add(dotMesh);
+        win.touchPointMeshes.push(dotMesh);
+      }
+
+      win.nuperTrajectoryGroup = pathGroup;
+      win.scene.add(pathGroup);
+    }
+
+    if (typeof win.requestRender === 'function') {
+      win.requestRender();
+    }
+  }
+
   private orientProbeHead(
     probeGroup: THREE.Object3D | undefined,
     tipPos: { x: number; y: number; z: number },
@@ -2362,6 +2448,10 @@ export class SetupWizard {
     ph10Label = 'A0° B0°'
   ): void {
     if (!probeGroup) return;
+    const T =
+      typeof window !== 'undefined' && (window as unknown as { THREE?: typeof THREE }).THREE
+        ? (window as unknown as { THREE: typeof THREE }).THREE
+        : THREE;
     const len = Math.hypot(stylusDir[0], stylusDir[1], stylusDir[2]) || 1;
     const dx = stylusDir[0] / len;
     const dy = stylusDir[1] / len;
@@ -2369,8 +2459,8 @@ export class SetupWizard {
 
     const pivot = probeGroup.children && probeGroup.children.length > 1 ? probeGroup.children[1] : null;
     if (pivot && pivot.quaternion) {
-      const fromVec = new THREE.Vector3(0, -1, 0);
-      const toVec = new THREE.Vector3(dx, dy, dz).normalize();
+      const fromVec = new T.Vector3(0, -1, 0);
+      const toVec = new T.Vector3(dx, dy, dz).normalize();
       pivot.quaternion.setFromUnitVectors(fromVec, toVec);
       probeGroup.position.set(tipPos.x - 46 * dx, tipPos.y - 26 - 46 * dy, tipPos.z - 46 * dz);
     } else if (probeGroup.position) {
@@ -2459,6 +2549,7 @@ export class SetupWizard {
       activeOperation: op,
       verticalAxis: 'Y',
       clearanceZMarginMm: 15.0,
+      includeDatumSetup: true,
     });
     this.lastGeneratedPlan = plan;
     this.announceStylusRecommendations(plan);
@@ -2479,54 +2570,18 @@ export class SetupWizard {
       }
     }
 
-    if (typeof window !== 'undefined') {
-      const wAny = window as unknown as {
-        trajLine?: { visible: boolean; geometry?: { dispose?: () => void }; material?: { color?: { setHex?: (c: number) => void }; opacity?: number } };
-        touchPointMeshes?: Array<unknown>;
-        trajectoryPoints?: Array<unknown>;
-        scene?: { add: (obj: unknown) => void; remove: (obj: unknown) => void };
-      };
-
-      if (wAny.trajLine) {
-        if (typeof wAny.trajLine.geometry?.dispose === 'function') {
-          wAny.trajLine.geometry.dispose();
-        }
-        if (wAny.trajLine.material?.color?.setHex) {
-          wAny.trajLine.material.color.setHex(0x10b981);
-        }
-        if (wAny.trajLine.material) {
-          wAny.trajLine.material.opacity = 0.95;
-        }
-        if (plan.allWaypoints.length > 0) {
-          const waypoints = plan.allWaypoints.map((w) => w.position.clone());
-          (wAny.trajLine as unknown as { geometry: unknown }).geometry = new THREE.BufferGeometry().setFromPoints(waypoints);
-          wAny.trajLine.visible = true;
-          if (wAny.trajectoryPoints) {
-            wAny.trajectoryPoints.length = 0;
-            wAny.trajectoryPoints.push(...waypoints);
-          }
-        }
-      }
-
-      if (wAny.scene) {
-        if (wAny.touchPointMeshes) {
-          wAny.touchPointMeshes.forEach((m) => wAny.scene?.remove(m));
-        }
-        wAny.touchPointMeshes = [];
-
-        const dotGeo = new THREE.SphereGeometry(1.5, 12, 12);
-        for (const fp of plan.featurePaths) {
-          for (const tp of fp.touchPoints) {
-            const dotMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
-            const dotMesh = new THREE.Mesh(dotGeo, dotMat);
-            dotMesh.position.set(tp.position[0], tp.position[1], tp.position[2]);
-            dotMesh.userData = { label: `${fp.balloon} Temas Noktası` };
-            wAny.scene.add(dotMesh);
-            wAny.touchPointMeshes.push(dotMesh);
-          }
-        }
+    const opTouches: Array<{ position: [number, number, number]; label?: string; isDatum?: boolean }> = [];
+    if (plan.datumTouchPoints) {
+      for (const dt of plan.datumTouchPoints) {
+        opTouches.push({ position: dt.position, label: dt.label || 'DATUM', isDatum: true });
       }
     }
+    for (const fp of plan.featurePaths) {
+      for (const tp of fp.touchPoints) {
+        opTouches.push({ position: tp.position, label: `${fp.balloon} Temas Noktası`, isDatum: false });
+      }
+    }
+    this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], opTouches, 0.34);
 
     if (typeof document !== 'undefined') {
       const sidebarLeft = document.querySelector('.sidebar-left') as HTMLElement | null;
@@ -2672,36 +2727,12 @@ export class SetupWizard {
       };
 
       if (fp && fp.waypoints.length > 0) {
-        if (win.trajLine) {
-          if (typeof win.trajLine.geometry?.dispose === 'function') {
-            win.trajLine.geometry.dispose();
-          }
-          if (win.trajLine.material?.color?.setHex) {
-            win.trajLine.material.color.setHex(0x10b981);
-          }
-          if (win.trajLine.material) {
-            win.trajLine.material.opacity = 1.0;
-            win.trajLine.material.linewidth = 3.0;
-          }
-          const wpPts = fp.waypoints.map((w) => w.position.clone());
-          (win.trajLine as unknown as { geometry: unknown }).geometry = new THREE.BufferGeometry().setFromPoints(wpPts);
-          win.trajLine.visible = true;
-        }
-
-        if (win.scene) {
-          if (win.touchPointMeshes) {
-            win.touchPointMeshes.forEach((m) => win.scene?.remove(m));
-          }
-          win.touchPointMeshes = [];
-          const dotGeo = new THREE.SphereGeometry(1.6, 14, 14);
-          for (const tp of fp.touchPoints) {
-            const dotMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
-            const dotMesh = new THREE.Mesh(dotGeo, dotMat);
-            dotMesh.position.set(tp.position[0], tp.position[1], tp.position[2]);
-            win.scene.add(dotMesh);
-            win.touchPointMeshes.push(dotMesh);
-          }
-        }
+        const singleTouches = fp.touchPoints.map((tp) => ({
+          position: tp.position,
+          label: `${fp.balloon} Temas Noktası`,
+          isDatum: false,
+        }));
+        this.renderSceneTrajectoryAndTouches(fp.waypoints as ExtendedWaypoint[], singleTouches, 0.45);
 
         const touchWp = (fp.waypoints.find((w) => w.phase === 'TOUCH') || fp.waypoints[0]) as ExtendedWaypoint;
         this.orientProbeHead(win.probeGroup, touchWp.position, touchWp.stylusDir || [0, -1, 0], touchWp.ph10Label || headAngleStr);

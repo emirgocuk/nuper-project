@@ -83,4 +83,54 @@ describe('Ölçüm kuralları: delik yolu, aşama sırası ve stylus', () => {
     expect(recs.map((r) => r.featureId)).toEqual([1, 2]);
     expect(recs.every((r) => r.ballDiameterMm === 1.0 && r.feasible)).toBe(true);
   });
+
+  it('includeDatumSetup açıkken rotanın başında DATUM_A (3), DATUM_B (2), DATUM_C (1) olmak üzere 6 datum noktası üretir', () => {
+    const plan = MeasurementPathGenerator.generatePlan([hole(1, 23.6, 13.08, 3.0)], plateBbox, {
+      verticalAxis: 'Y',
+      includeDatumSetup: true,
+    });
+    expect(plan.datumTouchPoints).toBeDefined();
+    expect(plan.datumTouchPoints).toHaveLength(6);
+    expect(plan.datumTouchPoints?.filter((d) => d.label?.startsWith('DATUM_A'))).toHaveLength(3);
+    expect(plan.datumTouchPoints?.filter((d) => d.label?.startsWith('DATUM_B'))).toHaveLength(2);
+    expect(plan.datumTouchPoints?.filter((d) => d.label?.startsWith('DATUM_C'))).toHaveLength(1);
+  });
+
+  it('prob kafa açısı (A0° B0° ↔ A0° B90°) değişirken parçadan uzak ve yüksek güvenli dönüş bölgesine (zClearance + 20) çıkar', () => {
+    const topHole = hole(1, 23.6, 13.08, 3.0);
+    const thicknessFeat: PathFeatureInput = {
+      id: 2,
+      balloon: '#2',
+      type: 'LINEAR',
+      type_label: 'Kalınlık',
+      nominal: 5.7,
+      cad_center: [0, 5.7, 0],
+      cad_normal: [0, 1, 0],
+      cad_feature_id: 'CAD_BBOX_Y',
+      operation: 'OP10',
+    };
+    const plan = MeasurementPathGenerator.generatePlan([topHole, thicknessFeat], plateBbox, {
+      verticalAxis: 'Y',
+      clearanceZMarginMm: 15.0,
+    });
+    const safeHeadY = plan.zClearance + 20.0;
+    const highIndexWaypoints = plan.allWaypoints.filter((wp) => Math.abs(wp.position.y - safeHeadY) < 0.05);
+    expect(highIndexWaypoints.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('çoklu unsur (cad_instances: 4X delik) verildiğinde 4 deliğin tamamı için toplam 16 temas noktası üretir', () => {
+    const multiHole: PathFeatureInput = {
+      ...hole(1, 23.6, 13.08, 3.0),
+      cad_instances: [
+        { center: [23.6, 1.75, 13.08], normal: [0, -1, 0], axial_min: 0.4, axial_max: 3.9 },
+        { center: [-23.6, 1.75, 13.08], normal: [0, -1, 0], axial_min: 0.4, axial_max: 3.9 },
+        { center: [-23.6, 1.75, -13.08], normal: [0, -1, 0], axial_min: 0.4, axial_max: 3.9 },
+        { center: [23.6, 1.75, -13.08], normal: [0, -1, 0], axial_min: 0.4, axial_max: 3.9 },
+      ],
+    };
+    const plan = MeasurementPathGenerator.generatePlan([multiHole], plateBbox, { verticalAxis: 'Y' });
+    expect(plan.featurePaths[0].touchPoints).toHaveLength(16);
+    expect(plan.featurePaths[0].touchPoints[0].position[1]).toBeCloseTo(2.15, 2);
+  });
 });
+
