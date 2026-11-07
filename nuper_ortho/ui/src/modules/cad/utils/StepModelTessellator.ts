@@ -99,8 +99,12 @@ export class StepModelTessellator {
     const centerX = (bboxMeta.min[0] + bboxMeta.max[0]) / 2;
     const bottomY = bboxMeta.min[1];
     const centerZ = (bboxMeta.min[2] + bboxMeta.max[2]) / 2;
+    const sizeX = bboxMeta.size[0];
+    const sizeY = bboxMeta.size[1];
+    const sizeZ = bboxMeta.size[2];
+    const standoffHeight = 35.0;
 
-    solidGeo.translate(-centerX, -bottomY, -centerZ);
+    solidGeo.translate(-centerX, -bottomY + standoffHeight, -centerZ);
 
     const metalMat = new T.MeshStandardMaterial({
       color: 0x94a3b8,
@@ -117,7 +121,7 @@ export class StepModelTessellator {
       if (edgesFloats.length >= 6) {
         const edgeGeo = new T.BufferGeometry();
         edgeGeo.setAttribute('position', new T.BufferAttribute(edgesFloats, 3));
-        edgeGeo.translate(-centerX, -bottomY, -centerZ);
+        edgeGeo.translate(-centerX, -bottomY + standoffHeight, -centerZ);
         const edgeMat = new T.LineBasicMaterial({
           color: 0x0f172a,
           linewidth: 1.5,
@@ -128,17 +132,98 @@ export class StepModelTessellator {
       }
     }
 
+    const posAttr = solidGeo.getAttribute('position');
+    const getOuterRadiusAtY = (targetY: number, band = 4.0): number => {
+      if (!posAttr) return Math.max(sizeX, sizeZ) / 2;
+      let maxR = 0;
+      for (let i = 0; i < posAttr.count; i++) {
+        const py = posAttr.getY(i);
+        if (Math.abs(py - targetY) <= band) {
+          const r = Math.hypot(posAttr.getX(i), posAttr.getZ(i));
+          if (r > maxR) maxR = r;
+        }
+      }
+      if (maxR < 1.0) {
+        for (let i = 0; i < posAttr.count; i++) {
+          const py = posAttr.getY(i);
+          if (Math.abs(py - targetY) <= band * 3.5) {
+            const r = Math.hypot(posAttr.getX(i), posAttr.getZ(i));
+            if (r > maxR) maxR = r;
+          }
+        }
+      }
+      return maxR > 1.0 ? maxR : Math.max(sizeX, sizeZ) * 0.4;
+    };
+
+    const baseRadius = getOuterRadiusAtY(standoffHeight + 1.5, 4.0);
+    const supportR = Math.max(4.0, Math.min(baseRadius * 0.62, Math.min(sizeX, sizeZ) * 0.35));
+    const pillarR = Math.max(2.2, Math.min(5.5, baseRadius * 0.14));
+    const standoffGroup = new T.Group();
+    standoffGroup.name = 'fixture_standoff_risers';
+    const riserMat = new T.MeshStandardMaterial({ color: 0x334155, metalness: 0.6, roughness: 0.35 });
+    const tapeMat = new T.MeshStandardMaterial({ color: 0x10b981, metalness: 0.1, roughness: 0.5 });
+    const riserAngles = [Math.PI / 3, Math.PI, (5 * Math.PI) / 3];
+    for (const ang of riserAngles) {
+      const rx = Math.cos(ang) * supportR;
+      const rz = Math.sin(ang) * supportR;
+      const bodyGeo = new T.CylinderGeometry(pillarR, pillarR * 1.15, standoffHeight - 1.2, 16);
+      bodyGeo.translate(rx, (standoffHeight - 1.2) / 2, rz);
+      standoffGroup.add(new T.Mesh(bodyGeo, riserMat));
+
+      const tapeGeo = new T.CylinderGeometry(pillarR * 1.02, pillarR * 1.02, 1.2, 16);
+      tapeGeo.translate(rx, standoffHeight - 0.6, rz);
+      standoffGroup.add(new T.Mesh(tapeGeo, tapeMat));
+    }
+    group.add(standoffGroup);
+
     const detectedHoles: DetectedHoleItem[] = [];
     const cadFeatures: CadFeatureItem[] = [];
 
     for (const feat of metadata.features || []) {
       const origCenter = feat.center || [0, 0, 0];
-      const shiftedCenter: [number, number, number] = [
-        parseFloat((origCenter[0] - centerX).toFixed(3)),
-        parseFloat((origCenter[1] - bottomY).toFixed(3)),
-        parseFloat((origCenter[2] - centerZ).toFixed(3)),
-      ];
-      const norm = (feat.normal || [0, 1, 0]) as [number, number, number];
+      let cx = parseFloat((origCenter[0] - centerX).toFixed(3));
+      let cy = parseFloat((origCenter[1] - bottomY + standoffHeight).toFixed(3));
+      let cz = parseFloat((origCenter[2] - centerZ).toFixed(3));
+      let norm = ((feat.normal ? [...feat.normal] : [0, 1, 0]) as [number, number, number]);
+
+      if (feat.id.startsWith('CAD_STEP_DIST_') && feat.nominal_dimension) {
+        if (Math.abs(cy - standoffHeight) < 2.0 && feat.nominal_dimension < sizeY - 1.0) {
+          cy = parseFloat((standoffHeight + feat.nominal_dimension).toFixed(3));
+        }
+        const rStep = getOuterRadiusAtY(cy, 3.5);
+        cx = parseFloat(rStep.toFixed(3));
+        cz = 0;
+        norm = [1, 0, 0];
+      } else if (feat.feature_type === 'CONE') {
+        const rCone = getOuterRadiusAtY(cy, 4.0);
+        cx = parseFloat(rCone.toFixed(3));
+        cz = 0;
+        const isLowerChamfer = cy < standoffHeight + Math.min(15.0, sizeY * 0.25);
+        norm = isLowerChamfer ? [0.707, -0.707, 0] : [0.85, 0.52, 0];
+      } else if (
+        feat.feature_type === 'PLANE' &&
+        cy > standoffHeight + 1.8 &&
+        cy < standoffHeight + sizeY - 1.8 &&
+        Math.hypot(cx, cz) < 3.0
+      ) {
+        const rStep = getOuterRadiusAtY(cy, 3.0);
+        const rAbove = getOuterRadiusAtY(cy + 4.0, 2.5);
+        const rBelow = getOuterRadiusAtY(cy - 4.0, 2.5);
+        cx = parseFloat((Math.max(rStep, rAbove, rBelow) * 0.92).toFixed(3));
+        cz = 0;
+        norm = rAbove > rBelow + 1.0 ? [0.707, -0.707, 0] : [0.707, 0.707, 0];
+      } else if (
+        feat.feature_type === 'INTERNAL_CYLINDER' &&
+        Math.abs(norm[1]) < 0.5 &&
+        Math.hypot(cx, cz) < 3.0
+      ) {
+        const rCross = getOuterRadiusAtY(cy, 4.0);
+        cx = parseFloat(rCross.toFixed(3));
+        cz = 0;
+        norm = [1, 0, 0];
+      }
+
+      const shiftedCenter: [number, number, number] = [cx, cy, cz];
 
       const item: CadFeatureItem = {
         id: feat.id,
@@ -161,19 +246,16 @@ export class StepModelTessellator {
       }
     }
 
-    const sizeX = bboxMeta.size[0];
-    const sizeY = bboxMeta.size[1];
-    const sizeZ = bboxMeta.size[2];
-
     group.userData.detectedHoles = detectedHoles;
     group.userData.datumANormal = new T.Vector3(0, -1, 0);
+    group.userData.standoffHeight = standoffHeight;
 
     return {
       group,
       geometry: solidGeo,
       bbox: {
-        min: [-sizeX / 2, 0, -sizeZ / 2],
-        max: [sizeX / 2, sizeY, sizeZ / 2],
+        min: [-sizeX / 2, standoffHeight, -sizeZ / 2],
+        max: [sizeX / 2, standoffHeight + sizeY, sizeZ / 2],
         size: [sizeX, sizeY, sizeZ],
       },
       detectedHoles,
@@ -860,10 +942,11 @@ export class StepModelTessellator {
     const shiftX = isFinite(alignedMinX) ? (alignedMinX + alignedMaxX) / 2 : centerX;
     const shiftY = isFinite(alignedMinY) ? alignedMinY : bottomY;
     const shiftZ = isFinite(alignedMinZ) ? (alignedMinZ + alignedMaxZ) / 2 : centerZ;
+    const standoffHeight = 35.0;
 
     for (let i = 0; i < triPositions.length; i += 3) {
       triPositions[i] -= shiftX;
-      triPositions[i + 1] -= shiftY;
+      triPositions[i + 1] = triPositions[i + 1] - shiftY + standoffHeight;
       triPositions[i + 2] -= shiftZ;
     }
 
@@ -892,7 +975,7 @@ export class StepModelTessellator {
       group.add(edgeLines);
     } else {
       solidGeo = new T.BoxGeometry(finalSizeX, finalSizeY, finalSizeZ);
-      solidGeo.translate(0, finalSizeY / 2, 0);
+      solidGeo.translate(0, standoffHeight + finalSizeY / 2, 0);
       const boxMesh = new T.Mesh(solidGeo, metalMat);
       boxMesh.name = 'step_bbox_solid';
       group.add(boxMesh);
@@ -902,18 +985,36 @@ export class StepModelTessellator {
       group.add(edgeLines);
     }
 
+    const supportR = Math.max(4.0, Math.min(finalSizeX, finalSizeZ) * 0.3);
+    const pillarR = Math.max(2.2, Math.min(5.0, supportR * 0.22));
+    const standoffGroup = new T.Group();
+    standoffGroup.name = 'fixture_standoff_risers';
+    const riserMat = new T.MeshStandardMaterial({ color: 0x334155, metalness: 0.6, roughness: 0.35 });
+    const tapeMat = new T.MeshStandardMaterial({ color: 0x10b981, metalness: 0.1, roughness: 0.5 });
+    for (const ang of [Math.PI / 3, Math.PI, (5 * Math.PI) / 3]) {
+      const rx = Math.cos(ang) * supportR;
+      const rz = Math.sin(ang) * supportR;
+      const bodyGeo = new T.CylinderGeometry(pillarR, pillarR * 1.15, standoffHeight - 1.2, 16);
+      bodyGeo.translate(rx, (standoffHeight - 1.2) / 2, rz);
+      standoffGroup.add(new T.Mesh(bodyGeo, riserMat));
+      const tapeGeo = new T.CylinderGeometry(pillarR * 1.02, pillarR * 1.02, 1.2, 16);
+      tapeGeo.translate(rx, standoffHeight - 0.6, rz);
+      standoffGroup.add(new T.Mesh(tapeGeo, tapeMat));
+    }
+    group.add(standoffGroup);
+
     const detectedHoles: DetectedHoleItem[] = [];
     let holeIdx = 1;
     circles.forEach((circ) => {
       if (circ.radius >= 0.5 && circ.radius <= 60.0) {
         const orig = circ.placement?.origin;
-        let ox = 0, oy = finalSizeY, oz = 0;
+        let ox = 0, oy = standoffHeight + finalSizeY, oz = 0;
         if (orig) {
           const rx = orig[0] * ex[0] + orig[1] * ex[1] + orig[2] * ex[2];
           const ry = orig[0] * ey[0] + orig[1] * ey[1] + orig[2] * ey[2];
           const rz = orig[0] * ez[0] + orig[1] * ez[1] + orig[2] * ez[2];
           ox = rx - shiftX;
-          oy = ry - shiftY;
+          oy = ry - shiftY + standoffHeight;
           oz = rz - shiftZ;
         }
         const rawNorm = circ.placement?.axis || [0, 1, 0];
@@ -936,11 +1037,12 @@ export class StepModelTessellator {
 
     group.userData.detectedHoles = detectedHoles;
     group.userData.datumANormal = new T.Vector3(0, -1, 0);
+    group.userData.standoffHeight = standoffHeight;
 
     const genericCadFeatures: CadFeatureItem[] = [
-      { id: 'CAD_BBOX_X', feature_type: 'PLANE', nominal_dimension: finalSizeX, center: [finalSizeX / 2, finalSizeY / 2, 0], normal: [1, 0, 0] },
-      { id: 'CAD_BBOX_Y', feature_type: 'PLANE', nominal_dimension: finalSizeY, center: [0, finalSizeY, 0], normal: [0, 1, 0] },
-      { id: 'CAD_BBOX_Z', feature_type: 'PLANE', nominal_dimension: finalSizeZ, center: [0, finalSizeY / 2, finalSizeZ / 2], normal: [0, 0, 1] },
+      { id: 'CAD_BBOX_X', feature_type: 'PLANE', nominal_dimension: finalSizeX, center: [finalSizeX / 2, standoffHeight + finalSizeY / 2, 0], normal: [1, 0, 0] },
+      { id: 'CAD_BBOX_Y', feature_type: 'PLANE', nominal_dimension: finalSizeY, center: [0, standoffHeight + finalSizeY, 0], normal: [0, 1, 0] },
+      { id: 'CAD_BBOX_Z', feature_type: 'PLANE', nominal_dimension: finalSizeZ, center: [0, standoffHeight + finalSizeY / 2, finalSizeZ / 2], normal: [0, 0, 1] },
       ...detectedHoles.map((h, i) => ({
         id: `CAD_HOLE_${i + 1}`,
         feature_type: 'INTERNAL_CYLINDER' as const,
@@ -979,8 +1081,8 @@ export class StepModelTessellator {
       group,
       geometry: solidGeo,
       bbox: {
-        min: [-finalSizeX / 2, 0, -finalSizeZ / 2],
-        max: [finalSizeX / 2, finalSizeY, finalSizeZ / 2],
+        min: [-finalSizeX / 2, standoffHeight, -finalSizeZ / 2],
+        max: [finalSizeX / 2, standoffHeight + finalSizeY, finalSizeZ / 2],
         size: [finalSizeX, finalSizeY, finalSizeZ],
       },
       detectedHoles,
