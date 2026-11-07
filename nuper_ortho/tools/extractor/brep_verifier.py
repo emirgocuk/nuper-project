@@ -261,6 +261,21 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
             )
             u_min, u_max, _v_min, _v_max = BRepTools.UVBounds_s(face)
             face_span = u_max - u_min
+            proj_min_f = float("inf")
+            proj_max_f = float("-inf")
+            if tri is not None:
+                trsf_cyl = loc.Transformation()
+                for n_i in range(1, tri.NbNodes() + 1):
+                    pnt_cyl = tri.Node(n_i).Transformed(trsf_cyl)
+                    t_val = (
+                        (pnt_cyl.X() - loc_pnt.X()) * canon_axis[0]
+                        + (pnt_cyl.Y() - loc_pnt.Y()) * canon_axis[1]
+                        + (pnt_cyl.Z() - loc_pnt.Z()) * canon_axis[2]
+                    )
+                    if t_val < proj_min_f:
+                        proj_min_f = t_val
+                    if t_val > proj_max_f:
+                        proj_max_f = t_val
 
             grp_key = (round(diameter, 3), canon_axis_r, ortho_vec, ftype)
             if grp_key not in cylinder_groups:
@@ -273,13 +288,26 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
                     "centers": [center_vec],
                     "total_area": area,
                     "total_span": face_span,
+                    "proj_min": proj_min_f,
+                    "proj_max": proj_max_f,
                     "face_ids": [face_id],
                 }
             else:
-                cylinder_groups[grp_key]["centers"].append(center_vec)
-                cylinder_groups[grp_key]["total_area"] += area
-                cylinder_groups[grp_key]["total_span"] += face_span
-                cylinder_groups[grp_key]["face_ids"].append(face_id)
+                grp_ref = cylinder_groups[grp_key]
+                grp_ref["centers"].append(center_vec)
+                grp_ref["total_area"] += area
+                grp_ref["total_span"] += face_span
+                o_ref = grp_ref["axis_origin"]
+                origin_shift = (
+                    (loc_pnt.X() - o_ref[0]) * canon_axis[0]
+                    + (loc_pnt.Y() - o_ref[1]) * canon_axis[1]
+                    + (loc_pnt.Z() - o_ref[2]) * canon_axis[2]
+                )
+                if proj_min_f + origin_shift < grp_ref["proj_min"]:
+                    grp_ref["proj_min"] = proj_min_f + origin_shift
+                if proj_max_f + origin_shift > grp_ref["proj_max"]:
+                    grp_ref["proj_max"] = proj_max_f + origin_shift
+                grp_ref["face_ids"].append(face_id)
 
         elif stype_enum == GeomAbs_Cone:
             cone = adaptor.Cone()
@@ -393,7 +421,10 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
         mean_z = sum(c[2] for c in c_list) / len(c_list)
         o = grp["axis_origin"]
         a = grp["axis"]
-        t = (mean_x - o[0]) * a[0] + (mean_y - o[1]) * a[1] + (mean_z - o[2]) * a[2]
+        if math.isfinite(grp["proj_min"]) and math.isfinite(grp["proj_max"]) and grp["proj_max"] >= grp["proj_min"]:
+            t = (grp["proj_min"] + grp["proj_max"]) / 2.0
+        else:
+            t = (mean_x - o[0]) * a[0] + (mean_y - o[1]) * a[1] + (mean_z - o[2]) * a[2]
         avg_x = o[0] + t * a[0]
         avg_y = o[1] + t * a[1]
         avg_z = o[2] + t * a[2]

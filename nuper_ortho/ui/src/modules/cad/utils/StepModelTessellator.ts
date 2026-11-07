@@ -17,6 +17,9 @@ export interface CadFeatureItem {
   normal?: [number, number, number];
   raw_center?: [number, number, number];
   raw_normal?: [number, number, number];
+  axial_min?: number;
+  axial_max?: number;
+  stem_blocked?: boolean;
   area_or_length?: number;
   description?: string;
 }
@@ -400,6 +403,49 @@ export class StepModelTessellator {
       return { cy: safeCy, norm: finalNorm };
     };
 
+    const analyzeVerticalCylinderCorridor = (
+      cx: number,
+      cy: number,
+      cz: number,
+      cylRadius: number
+    ): { axialMin: number; axialMax: number; stemBlocked: boolean } => {
+      let axialMin = Infinity;
+      let axialMax = -Infinity;
+      let overhangCount = 0;
+
+      if (posAttr && posAttr.count > 0 && cylRadius > 0.2) {
+        const minWallR = cylRadius * 0.78;
+        const maxWallR = cylRadius * 1.28;
+        const maxCorridorR = Math.max(0.35, cylRadius - 0.25);
+
+        for (let i = 0; i < posAttr.count; i++) {
+          const r = Math.hypot(posAttr.getX(i) - cx, posAttr.getZ(i) - cz);
+          const py = posAttr.getY(i);
+          if (r >= minWallR && r <= maxWallR) {
+            if (py < axialMin) axialMin = py;
+            if (py > axialMax) axialMax = py;
+          }
+          if (r < maxCorridorR && py > cy + 1.2) {
+            overhangCount++;
+          }
+        }
+      }
+
+      if (!isFinite(axialMin) || !isFinite(axialMax) || axialMax < axialMin) {
+        axialMin = parseFloat(Math.max(standoffHeight, cy - 1.5).toFixed(3));
+        axialMax = parseFloat(Math.min(standoffHeight + sizeY, cy + 1.5).toFixed(3));
+      } else {
+        axialMin = parseFloat(axialMin.toFixed(3));
+        axialMax = parseFloat(axialMax.toFixed(3));
+      }
+
+      return {
+        axialMin,
+        axialMax,
+        stemBlocked: overhangCount >= 3,
+      };
+    };
+
     const detectedHoles: DetectedHoleItem[] = [];
     const cadFeatures: CadFeatureItem[] = [];
 
@@ -464,6 +510,22 @@ export class StepModelTessellator {
         norm = resolved.norm;
       }
 
+      let axialMin: number | undefined;
+      let axialMax: number | undefined;
+      let stemBlocked: boolean | undefined;
+
+      if (
+        (feat.feature_type === 'INTERNAL_CYLINDER' || feat.feature_type === 'EXTERNAL_CYLINDER') &&
+        feat.nominal_dimension &&
+        Math.abs(norm[1]) >= 0.7
+      ) {
+        const corridor = analyzeVerticalCylinderCorridor(cx, cy, cz, feat.nominal_dimension / 2);
+        axialMin = corridor.axialMin;
+        axialMax = corridor.axialMax;
+        stemBlocked = corridor.stemBlocked;
+        cy = parseFloat(((axialMin + axialMax) / 2).toFixed(3));
+      }
+
       const shiftedCenter: [number, number, number] = [cx, cy, cz];
 
       const item: CadFeatureItem = {
@@ -474,6 +536,9 @@ export class StepModelTessellator {
         normal: norm,
         raw_center: origCenter,
         raw_normal: origNormal,
+        axial_min: axialMin,
+        axial_max: axialMax,
+        stem_blocked: stemBlocked,
         area_or_length: feat.area_or_length,
         description: feat.description || feat.id,
       };

@@ -1,6 +1,39 @@
 import type { CadMetadata } from '../../../types/generated/cad_metadata';
 import type { DrawingExtractionResult } from '../../../types/generated/drawing_data';
 
+export interface MatchedCadInstance {
+  id: string;
+  center: [number, number, number];
+  normal: [number, number, number];
+  axial_min?: number;
+  axial_max?: number;
+  stem_blocked?: boolean;
+}
+
+export interface TruePositionResult {
+  deviationDia: number;
+  radialError: number;
+  withinTolerance: boolean;
+}
+
+export function evaluateTruePositionDeviation(
+  nominalX: number,
+  nominalZ: number,
+  measuredX: number,
+  measuredZ: number,
+  toleranceDia: number
+): TruePositionResult {
+  const dx = measuredX - nominalX;
+  const dz = measuredZ - nominalZ;
+  const radialError = Math.hypot(dx, dz);
+  const deviationDia = parseFloat((2.0 * radialError).toFixed(4));
+  return {
+    deviationDia,
+    radialError: parseFloat(radialError.toFixed(4)),
+    withinTolerance: deviationDia <= Math.abs(toleranceDia) + 1e-6,
+  };
+}
+
 export interface MatchedInspectionDimension {
   id: number;
   balloon: string;
@@ -22,6 +55,11 @@ export interface MatchedInspectionDimension {
   cad_feature_id?: string;
   cad_center?: [number, number, number];
   cad_normal?: [number, number, number];
+  cad_instances?: MatchedCadInstance[];
+  axial_min?: number;
+  axial_max?: number;
+  stem_blocked?: boolean;
+  true_position_deviation?: number;
   operation: 'OP10' | 'OP20';
   op_reason?: string;
   match_confidence: 'EXACT' | 'ENVELOPE' | 'RADIUS_HALF' | 'UNMATCHED';
@@ -64,7 +102,14 @@ export function matchCadWithDrawing(
     let assignedCadId: string | undefined;
     let assignedCenter: [number, number, number] | undefined;
     let assignedNormal: [number, number, number] | undefined;
+    let assignedInstances: MatchedCadInstance[] | undefined;
+    let assignedAxialMin: number | undefined;
+    let assignedAxialMax: number | undefined;
+    let assignedStemBlocked: boolean | undefined;
     let confidence: 'EXACT' | 'ENVELOPE' | 'RADIUS_HALF' | 'UNMATCHED' = 'UNMATCHED';
+
+    const countMatch = `${dim.nominal_str || ''} ${dim.type_label || ''}`.match(/\b(\d+)\s*[xX×]\b/);
+    const explicitCount = countMatch ? Math.max(1, parseInt(countMatch[1], 10)) : 1;
 
     if (dim.type === 'DIAMETER' || /dia|çap|delik|bore|m3|m4/i.test(dim.type_label || '')) {
       let bestFeat: (typeof cadFeatures)[0] | undefined;
@@ -85,11 +130,44 @@ export function matchCadWithDrawing(
       }
 
       if (bestFeat) {
+        const extBest = bestFeat as (typeof cadFeatures)[0] & {
+          axial_min?: number;
+          axial_max?: number;
+          stem_blocked?: boolean;
+        };
         assignedCadId = bestFeat.id;
         assignedCenter = bestFeat.center;
         assignedNormal = bestFeat.normal;
+        assignedAxialMin = extBest.axial_min;
+        assignedAxialMax = extBest.axial_max;
+        assignedStemBlocked = extBest.stem_blocked;
         confidence = minDelta <= EPSILON ? 'EXACT' : 'ENVELOPE';
         usedCadFeatureIds.add(bestFeat.id);
+
+        const groupCandidates = cadFeatures.filter(
+          (f) =>
+            f.feature_type === bestFeat.feature_type &&
+            f.nominal_dimension !== undefined &&
+            bestFeat.nominal_dimension !== undefined &&
+            Math.abs(f.nominal_dimension - bestFeat.nominal_dimension) <= 0.05 &&
+            f.center &&
+            f.normal
+        );
+        if (groupCandidates.length > 1) {
+          const maxInstances = explicitCount > 1 ? explicitCount : groupCandidates.length;
+          assignedInstances = groupCandidates.slice(0, maxInstances).map((f) => {
+            const ef = f as typeof extBest;
+            usedCadFeatureIds.add(f.id);
+            return {
+              id: f.id,
+              center: f.center as [number, number, number],
+              normal: f.normal as [number, number, number],
+              axial_min: ef.axial_min,
+              axial_max: ef.axial_max,
+              stem_blocked: ef.stem_blocked,
+            };
+          });
+        }
       }
     } else if (dim.type === 'RADIUS' || /radius|kavis|yarıçap/i.test(dim.type_label || '')) {
       for (const feat of cadFeatures) {
@@ -212,6 +290,10 @@ export function matchCadWithDrawing(
       cad_feature_id: assignedCadId,
       cad_center: assignedCenter,
       cad_normal: assignedNormal,
+      cad_instances: assignedInstances,
+      axial_min: assignedAxialMin,
+      axial_max: assignedAxialMax,
+      stem_blocked: assignedStemBlocked,
       operation,
       op_reason: opReason,
       match_confidence: confidence,
