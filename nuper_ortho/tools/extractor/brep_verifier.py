@@ -605,12 +605,18 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
                 d_perp = round(abs(_dot(diff, n1)), 2)
                 if d_perp > 0.2 and d_perp not in seen_dists:
                     seen_dists.add(d_perp)
+                    out_nx = round(n1[0], 4)
+                    out_ny = round(abs(n1[1]), 4)
+                    out_nz = round(n1[2], 4)
+                    if c1[0] * out_nx + c1[2] * out_nz < -1.0:
+                        out_nx = -out_nx
+                        out_nz = -out_nz
                     extracted_features.append({
                         "id": f"CAD_STEP_DIST_{d_perp:.2f}_{dist_idx}",
                         "feature_type": "PLANE",
                         "nominal_dimension": d_perp,
                         "center": [round(float(c1[0]), 4), round(float(c1[1]), 4), round(float(c1[2]), 4)],
-                        "normal": [round(abs(n1[0]), 4), round(abs(n1[1]), 4), round(abs(n1[2]), 4)],
+                        "normal": [out_nx, out_ny, out_nz],
                         "area_or_length": d_perp,
                         "description": f"Paralel Düzlemler Arası Mesafe ({d_perp:.2f} mm)",
                     })

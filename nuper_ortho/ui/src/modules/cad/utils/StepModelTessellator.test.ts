@@ -105,4 +105,46 @@ describe('StepModelTessellator', () => {
     expect(res.detectedHoles.length).toBe(1);
     expect(res.detectedHoles[0].radius).toBe(2.5);
   });
+
+  it('soldaki duvar yüzeyinin (cx < 0) yaklaşma normalini dışarıya (-X) çevirir', () => {
+    const positions = new Float32Array([
+      -30, 0, -20, 30, 0, -20, 30, 0, 20,
+      -30, 5, -20, 30, 5, -20, 30, 5, 20,
+    ]);
+    const normals = new Float32Array([
+      0, 1, 0, 0, 1, 0, 0, 1, 0,
+      0, 1, 0, 0, 1, 0, 0, 1, 0,
+    ]);
+    const indices = new Uint32Array([0, 1, 2, 3, 4, 5]);
+    const meta: CadMetadata = {
+      model_name: 'left_wall_plate.stp',
+      file_format: 'step',
+      vertex_count: 6,
+      triangle_count: 2,
+      bbox: { min: [-30, 0, -20], max: [30, 5, 20], size: [60, 5, 40] },
+      features: [
+        {
+          id: 'CAD_STEP_DIST_16.00_1',
+          feature_type: 'PLANE',
+          nominal_dimension: 16.0,
+          center: [-30, 2.5, 0],
+          normal: [1, 0, 0],
+          area_or_length: 16.0,
+        },
+      ],
+      mesh: {
+        positions_b64: Buffer.from(positions.buffer).toString('base64'),
+        normals_b64: Buffer.from(normals.buffer).toString('base64'),
+        indices_b64: Buffer.from(indices.buffer).toString('base64'),
+        edges_b64: '',
+        linear_deflection: 0.05,
+        faces: [],
+      },
+    };
+
+    const res = StepModelTessellator.buildFromMetadata(meta, 'left_wall_plate.stp');
+    const feat = res.cadFeatures?.find((f) => f.id === 'CAD_STEP_DIST_16.00_1');
+    expect(feat).toBeDefined();
+    expect(feat?.normal?.[0]).toBeLessThan(0);
+  });
 });
