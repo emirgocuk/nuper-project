@@ -6,6 +6,12 @@ export interface BoundingBoxEnvelope {
   size: [number, number, number];
 }
 
+export interface ClampBox {
+  id: string;
+  min: [number, number, number];
+  max: [number, number, number];
+}
+
 export interface CadBboxInput {
   size: [number, number, number];
   min?: [number, number, number];
@@ -281,5 +287,102 @@ export class SetupPrep {
       candidates,
       summaryMessage,
     };
+  }
+
+  public static computeStandardClampBoxes(bbox: BoundingBoxEnvelope): ClampBox[] {
+    const minX = bbox.min[0];
+    const maxX = bbox.max[0];
+    const minZ = bbox.min[2];
+    const maxZ = bbox.max[2];
+    const sizeZ = bbox.size[2];
+    const tableY = 0;
+    const clampHeight = 18.0;
+    const clampWidthX = 25.0;
+    const clampDepthZ = 20.0;
+
+    const z1 = minZ + sizeZ * 0.25;
+    const z2 = maxZ - sizeZ * 0.25;
+
+    return [
+      {
+        id: 'CLAMP_LEFT_FRONT',
+        min: [minX - clampWidthX, tableY, z1 - clampDepthZ / 2],
+        max: [minX, tableY + clampHeight, z1 + clampDepthZ / 2],
+      },
+      {
+        id: 'CLAMP_LEFT_REAR',
+        min: [minX - clampWidthX, tableY, z2 - clampDepthZ / 2],
+        max: [minX, tableY + clampHeight, z2 + clampDepthZ / 2],
+      },
+      {
+        id: 'CLAMP_RIGHT_FRONT',
+        min: [maxX, tableY, z1 - clampDepthZ / 2],
+        max: [maxX + clampWidthX, tableY + clampHeight, z1 + clampDepthZ / 2],
+      },
+      {
+        id: 'CLAMP_RIGHT_REAR',
+        min: [maxX, tableY, z2 - clampDepthZ / 2],
+        max: [maxX + clampWidthX, tableY + clampHeight, z2 + clampDepthZ / 2],
+      },
+    ];
+  }
+
+  public static isPointInsideClampBox(
+    pt: [number, number, number],
+    box: ClampBox,
+    margin = 5.0
+  ): boolean {
+    return (
+      pt[0] >= box.min[0] - margin &&
+      pt[0] <= box.max[0] + margin &&
+      pt[1] >= box.min[1] - margin &&
+      pt[1] <= box.max[1] + margin &&
+      pt[2] >= box.min[2] - margin &&
+      pt[2] <= box.max[2] + margin
+    );
+  }
+
+  public static lineIntersectsClampBox(
+    p1: [number, number, number],
+    p2: [number, number, number],
+    box: ClampBox,
+    margin = 5.0
+  ): boolean {
+    const minX = box.min[0] - margin;
+    const maxX = box.max[0] + margin;
+    const minY = box.min[1] - margin;
+    const maxY = box.max[1] + margin;
+    const minZ = box.min[2] - margin;
+    const maxZ = box.max[2] + margin;
+
+    const dx = p2[0] - p1[0];
+    const dy = p2[1] - p1[1];
+    const dz = p2[2] - p1[2];
+
+    let tMin = 0.0;
+    let tMax = 1.0;
+
+    const checkAxis = (origin: number, dir: number, bMin: number, bMax: number): boolean => {
+      if (Math.abs(dir) < 1e-8) {
+        return origin >= bMin && origin <= bMax;
+      }
+      const invD = 1.0 / dir;
+      let t0 = (bMin - origin) * invD;
+      let t1 = (bMax - origin) * invD;
+      if (t0 > t1) {
+        const tmp = t0;
+        t0 = t1;
+        t1 = tmp;
+      }
+      tMin = Math.max(tMin, t0);
+      tMax = Math.min(tMax, t1);
+      return tMin <= tMax;
+    };
+
+    if (!checkAxis(p1[0], dx, minX, maxX)) return false;
+    if (!checkAxis(p1[1], dy, minY, maxY)) return false;
+    if (!checkAxis(p1[2], dz, minZ, maxZ)) return false;
+
+    return tMin <= tMax && tMax >= 0.0 && tMin <= 1.0;
   }
 }

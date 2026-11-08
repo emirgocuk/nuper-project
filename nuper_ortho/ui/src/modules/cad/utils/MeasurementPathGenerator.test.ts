@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MeasurementPathGenerator, type PathFeatureInput } from './MeasurementPathGenerator';
+import { SetupPrep } from './SetupPrep';
 import { GOBEK_ALL_12_DIMENSIONS } from '../../inspection/utils/InspectionSynchronizer';
 
 describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Noktası Üretici', () => {
@@ -301,6 +302,53 @@ describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Nok
     });
     expect(plan.estimatedDurationSec).toBeGreaterThan(0);
     expect(plan.totalDistanceMm).toBeGreaterThan(0);
+  });
+
+  it('prevents touches inside clamp keep-out zones and avoids clamp boxes during transitions', () => {
+    const bbox = { min: [-30, 0, -20] as [number, number, number], max: [30, 25, 20] as [number, number, number] };
+    const clamps = SetupPrep.computeStandardClampBoxes({
+      min: bbox.min,
+      max: bbox.max,
+      size: [60, 25, 40],
+    });
+
+    expect(clamps.length).toBe(4);
+    expect(clamps[0].id).toBe('CLAMP_LEFT_FRONT');
+
+    const pointInside = SetupPrep.isPointInsideClampBox([-32, 10, -10], clamps[0], 5.0);
+    expect(pointInside).toBe(true);
+
+    const pointFar = SetupPrep.isPointInsideClampBox([0, 15, 0], clamps[0], 5.0);
+    expect(pointFar).toBe(false);
+
+    const lineThrough = SetupPrep.lineIntersectsClampBox([-40, 10, -10], [0, 10, -10], clamps[0], 5.0);
+    expect(lineThrough).toBe(true);
+
+    const feat: PathFeatureInput = {
+      id: 1,
+      balloon: '#1',
+      nominal: 60.0,
+      cad_center: [-30, 10, -10],
+      cad_normal: [-1, 0, 0],
+      feature_type: 'PLANE',
+    };
+
+    const plan = MeasurementPathGenerator.generatePlan([feat], bbox, {
+      verticalAxis: 'Y',
+      clampBoxes: clamps,
+    });
+
+    expect(plan.clampBoxes).toBeDefined();
+    expect(plan.clampBoxes?.length).toBe(4);
+
+    for (const fp of plan.featurePaths) {
+      for (const tp of fp.touchPoints) {
+        for (const cb of clamps) {
+          const inside = SetupPrep.isPointInsideClampBox(tp.position, cb, 0.0);
+          expect(inside).toBe(false);
+        }
+      }
+    }
   });
 });
 

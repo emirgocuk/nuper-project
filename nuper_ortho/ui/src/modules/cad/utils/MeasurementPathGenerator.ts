@@ -3,6 +3,7 @@ import { type Waypoint, type ProbePhase } from '../SimulationController';
 import { Ph10Kinematics, type PH10Angle } from './Ph10Kinematics';
 import { orderFeaturesByMetrologyDiscipline } from './MeasurementPhases';
 import { selectStylusForHole, type StylusChoice } from './StylusSelector';
+import { SetupPrep, type ClampBox } from './SetupPrep';
 
 export interface PathFeatureInstance {
   center: [number, number, number];
@@ -85,6 +86,7 @@ export interface GeneratedMeasurementPlan {
   probeHeadRotations: number;
   stylusRecommendations: StylusRecommendation[];
   datumTouchPoints?: TouchPointRecord[];
+  clampBoxes?: ClampBox[];
 }
 
 export interface PathGeneratorOptions {
@@ -96,6 +98,7 @@ export interface PathGeneratorOptions {
   includeDatumSetup?: boolean;
   probeTipRadiusMm?: number;
   stylusEwlMm?: number;
+  clampBoxes?: ClampBox[];
   datumSurfacePoints?: Array<{
     balloon: 'DATUM_A' | 'DATUM_B' | 'DATUM_C';
     position: [number, number, number];
@@ -193,6 +196,14 @@ export class MeasurementPathGenerator {
       options.verticalAxis ?? 'Y'
     );
 
+    const clampBoxes =
+      options.clampBoxes ??
+      SetupPrep.computeStandardClampBoxes({
+        min: bbox.min,
+        max: bbox.max,
+        size: [bbox.max[0] - bbox.min[0], bbox.max[1] - bbox.min[1], bbox.max[2] - bbox.min[2]],
+      });
+
     const stylusRecommendations: StylusRecommendation[] = [];
     const featurePaths: FeatureMeasurementPath[] = [];
     const allWaypoints: ExtendedWaypoint[] = [];
@@ -244,10 +255,18 @@ export class MeasurementPathGenerator {
         const nextDir = next.stylusDir ?? (isYAxis ? [0, -1, 0] : [0, 0, -1]);
 
         const isHeadAngleChange = prevLabel !== nextLabel;
+        const intersectsClamp = clampBoxes.some((cb) =>
+          SetupPrep.lineIntersectsClampBox(
+            [prev.position.x, prev.position.y, prev.position.z],
+            [next.position.x, next.position.y, next.position.z],
+            cb,
+            5.0
+          )
+        );
 
-        if (isHeadAngleChange) {
-          headRotations++;
-          const retractY = safeHeadIndexAltitude;
+        if (isHeadAngleChange || intersectsClamp) {
+          if (isHeadAngleChange) headRotations++;
+          const retractY = Math.max(safeHeadIndexAltitude, isHeadAngleChange ? safeHeadIndexAltitude : zClearance);
           const exitPos = isYAxis
             ? new THREE.Vector3(prev.position.x, retractY, prev.position.z)
             : new THREE.Vector3(prev.position.x, prev.position.y, retractY);
@@ -256,7 +275,7 @@ export class MeasurementPathGenerator {
           const rotationPos = isYAxis
             ? new THREE.Vector3(next.position.x, retractY, next.position.z)
             : new THREE.Vector3(next.position.x, next.position.y, retractY);
-          dest.push(makeWp(rotationPos, 'TRAVERSE', next.featureId, next.balloon, nextDir, nextLabel, 'HEAD_ROTATION', 150.0));
+          dest.push(makeWp(rotationPos, 'TRAVERSE', next.featureId, next.balloon, nextDir, nextLabel, isHeadAngleChange ? 'HEAD_ROTATION' : 'SAFE_TRAVERSE', 150.0));
 
           const plungeTarget = next.position.clone();
           const safeTraverseTarget = isYAxis
@@ -837,26 +856,35 @@ export class MeasurementPathGenerator {
             if (isYAxis && activeOp === 'OP20' && fn[1] > 0.35) {
               continue;
             }
-            const touchY = isYAxis ? Math.max(yMinPart + 1.0, Math.min(yMaxPart, fc.c[1])) : fc.c[1];
-            const surfPoint: [number, number, number] = [fc.c[0], touchY, fc.c[2]];
+            let touchY = isYAxis ? Math.max(yMinPart + 1.0, Math.min(yMaxPart, fc.c[1])) : fc.c[1];
+            let touchX = fc.c[0];
+            let touchZ = fc.c[2];
+
+            for (const cb of clampBoxes) {
+              if (SetupPrep.isPointInsideClampBox([touchX, touchY, touchZ], cb, 5.0)) {
+                if (touchX < 0) touchX = cb.max[0] + 6.0;
+                else touchX = cb.min[0] - 6.0;
+              }
+            }
+            const surfPoint: [number, number, number] = [touchX, touchY, touchZ];
             const tAngleObj = isYAxis
               ? (Math.abs(fn[1]) > 0.7 ? { aDeg: 0, bDeg: 0, direction: [0, -1, 0], label: 'A0° B0°' } : Ph10Kinematics.findBestAngle([-fn[0], -fn[1], -fn[2]]).angle)
               : Ph10Kinematics.findBestAngle([-fn[0], -fn[1], -fn[2]]).angle;
 
             const tipCenterPos = new THREE.Vector3(
-              fc.c[0] + fn[0] * probeTipRadius,
+              touchX + fn[0] * probeTipRadius,
               isYAxis ? Math.max(yMinPart + 1.0, touchY + fn[1] * probeTipRadius) : touchY + fn[1] * probeTipRadius,
-              fc.c[2] + fn[2] * probeTipRadius
+              touchZ + fn[2] * probeTipRadius
             );
             const standoffPos = new THREE.Vector3(
-              fc.c[0] + fn[0] * (probeTipRadius + approachDist),
+              touchX + fn[0] * (probeTipRadius + approachDist),
               isYAxis ? Math.max(yMinPart + 1.0, touchY + fn[1] * (probeTipRadius + approachDist)) : touchY + fn[1] * (probeTipRadius + approachDist),
-              fc.c[2] + fn[2] * (probeTipRadius + approachDist)
+              touchZ + fn[2] * (probeTipRadius + approachDist)
             );
             const retractPos = new THREE.Vector3(
-              fc.c[0] + fn[0] * (probeTipRadius + retractDist),
+              touchX + fn[0] * (probeTipRadius + retractDist),
               isYAxis ? Math.max(yMinPart + 1.0, touchY + fn[1] * (probeTipRadius + retractDist)) : touchY + fn[1] * (probeTipRadius + retractDist),
-              fc.c[2] + fn[2] * (probeTipRadius + retractDist)
+              touchZ + fn[2] * (probeTipRadius + retractDist)
             );
 
             const overheadPos = isYAxis
@@ -882,21 +910,29 @@ export class MeasurementPathGenerator {
           if (isYAxis && (cadId === 'CAD_BBOX_X' || cadId === 'CAD_BBOX_Z')) {
             safeTouchY = yMinPart + Math.min(1.2, Math.max(0.6, partHeight * 0.22));
           }
-          const surfPoint: [number, number, number] = [center[0], safeTouchY, center[2]];
+          let touchX = center[0];
+          let touchZ = center[2];
+          for (const cb of clampBoxes) {
+            if (SetupPrep.isPointInsideClampBox([touchX, safeTouchY, touchZ], cb, 5.0)) {
+              if (touchX < 0) touchX = cb.max[0] + 6.0;
+              else touchX = cb.min[0] - 6.0;
+            }
+          }
+          const surfPoint: [number, number, number] = [touchX, safeTouchY, touchZ];
           const tipCenterPos = new THREE.Vector3(
-            center[0] + normal[0] * probeTipRadius,
+            touchX + normal[0] * probeTipRadius,
             isYAxis ? Math.max(yMinPart + 1.0, safeTouchY + normal[1] * probeTipRadius) : safeTouchY + normal[1] * probeTipRadius,
-            center[2] + normal[2] * probeTipRadius
+            touchZ + normal[2] * probeTipRadius
           );
           const standoffPos = new THREE.Vector3(
-            center[0] + normal[0] * (probeTipRadius + approachDist),
+            touchX + normal[0] * (probeTipRadius + approachDist),
             isYAxis ? Math.max(yMinPart + 1.0, safeTouchY + normal[1] * (probeTipRadius + approachDist)) : safeTouchY + normal[1] * (probeTipRadius + approachDist),
-            center[2] + normal[2] * (probeTipRadius + approachDist)
+            touchZ + normal[2] * (probeTipRadius + approachDist)
           );
           const retractPos = new THREE.Vector3(
-            center[0] + normal[0] * (probeTipRadius + retractDist),
+            touchX + normal[0] * (probeTipRadius + retractDist),
             isYAxis ? Math.max(yMinPart + 1.0, safeTouchY + normal[1] * (probeTipRadius + retractDist)) : safeTouchY + normal[1] * (probeTipRadius + retractDist),
-            center[2] + normal[2] * (probeTipRadius + retractDist)
+            touchZ + normal[2] * (probeTipRadius + retractDist)
           );
 
           const overheadPos = isYAxis
@@ -972,6 +1008,7 @@ export class MeasurementPathGenerator {
       probeHeadRotations: headRotations,
       stylusRecommendations,
       datumTouchPoints,
+      clampBoxes,
     };
   }
 }
