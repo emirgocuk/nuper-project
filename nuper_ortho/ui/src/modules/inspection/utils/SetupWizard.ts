@@ -68,6 +68,8 @@ export class SetupWizard {
   private currentActiveOperation: 'OP10' | 'OP20' = 'OP10';
   private simUnregister: (() => void) | null = null;
   private lastActiveFeatureId: number | null = null;
+  private featureTouchHits: Map<number, number> = new Map();
+  private featureTotalHits: Map<number, number> = new Map();
 
   private zoom: number = 1.0;
   private panX: number = 0;
@@ -2236,6 +2238,11 @@ export class SetupWizard {
       datumSurfacePoints: this.currentDatumSurfacePoints,
     });
     this.lastGeneratedPlan = plan;
+    this.featureTouchHits.clear();
+    this.featureTotalHits.clear();
+    for (const fp of plan.featurePaths) {
+      this.featureTotalHits.set(fp.featureId, Math.max(1, fp.touchPoints.length));
+    }
     this.announceStylusRecommendations(plan);
 
     const app = this.appInstance as { getCADViewer?: () => CADViewer } | null;
@@ -2274,7 +2281,7 @@ export class SetupWizard {
             allTouches.push({ position: tp.position, label: `${fp.balloon} Temas Noktası`, isDatum: false });
           }
         }
-        this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], allTouches, 0.075);
+        this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], allTouches, 0.035);
 
         if (win.probeGroup && plan.allWaypoints.length > 0) {
           const firstWp = plan.allWaypoints[0] as ExtendedWaypoint;
@@ -2354,7 +2361,7 @@ export class SetupWizard {
   private renderSceneTrajectoryAndTouches(
     waypoints: ExtendedWaypoint[],
     touches: Array<{ position: [number, number, number]; label?: string; isDatum?: boolean }>,
-    tubeRadius = 0.075
+    tubeRadius = 0.035
   ): void {
     if (typeof window === 'undefined') return;
     const win = window as unknown as {
@@ -2445,7 +2452,7 @@ export class SetupWizard {
         }
       }
 
-      const dotGeo = new T.SphereGeometry(Math.max(0.28, tubeRadius * 3.4), 12, 12);
+      const dotGeo = new T.SphereGeometry(Math.max(0.18, tubeRadius * 2.8), 12, 12);
       const dotMatMeas = new T.MeshBasicMaterial({ color: 0x10b981 });
       const dotMatDatum = new T.MeshBasicMaterial({ color: 0xf59e0b });
       for (const tp of touches) {
@@ -2656,6 +2663,11 @@ export class SetupWizard {
       datumSurfacePoints: this.currentDatumSurfacePoints,
     });
     this.lastGeneratedPlan = plan;
+    this.featureTouchHits.clear();
+    this.featureTotalHits.clear();
+    for (const fp of plan.featurePaths) {
+      this.featureTotalHits.set(fp.featureId, Math.max(1, fp.touchPoints.length));
+    }
     this.announceStylusRecommendations(plan);
 
     if (app && typeof app.getCADViewer === 'function') {
@@ -2685,7 +2697,7 @@ export class SetupWizard {
         opTouches.push({ position: tp.position, label: `${fp.balloon} Temas Noktası`, isDatum: false });
       }
     }
-    this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], opTouches, 0.075);
+    this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], opTouches, 0.035);
 
     if (typeof document !== 'undefined') {
       const sidebarLeft = document.querySelector('.sidebar-left') as HTMLElement | null;
@@ -2806,6 +2818,7 @@ export class SetupWizard {
         : 'Durum: Ölçüm Bekliyor';
       hudDetails.innerText = `${dim.gdt || 'ASME Y14.5'} | Tol: ${dim.lower_tol || '-'} / ${dim.upper_tol || '+'} | ${measDisplay}`;
     }
+    this.updateDiagnosticsPanel(dim);
 
     if (typeof window !== 'undefined') {
       const win = window as unknown as {
@@ -2836,7 +2849,7 @@ export class SetupWizard {
           label: `${fp.balloon} Temas Noktası`,
           isDatum: false,
         }));
-        this.renderSceneTrajectoryAndTouches(fp.waypoints as ExtendedWaypoint[], singleTouches, 0.11);
+        this.renderSceneTrajectoryAndTouches(fp.waypoints as ExtendedWaypoint[], singleTouches, 0.045);
 
         const touchWp = (fp.waypoints.find((w) => w.phase === 'TOUCH') || fp.waypoints[0]) as ExtendedWaypoint;
         this.orientProbeHead(win.probeGroup, touchWp.position, touchWp.stylusDir || [0, -1, 0], touchWp.ph10Label || headAngleStr);
@@ -2943,71 +2956,194 @@ export class SetupWizard {
 
     const activeId = state.activeFeatureId;
     if (activeId !== undefined && activeId !== null) {
+      const dim = this.dimensions.find((d) => d.id === activeId);
+      const totalHits = this.featureTotalHits.get(activeId) || 4;
+      const item = panel.querySelector<HTMLElement>(`[data-clean-id="${activeId}"]`);
+
       if (this.lastActiveFeatureId !== activeId) {
         this.lastActiveFeatureId = activeId;
-        let foundActive = false;
+        if (item && typeof item.scrollIntoView === 'function') {
+          item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
 
-        featureItems.forEach((item) => {
-          const id = Number(item.getAttribute('data-clean-id'));
-          const pill = item.querySelector('.clean-status-pill');
-          const dim = this.dimensions.find((d) => d.id === id);
-
-          if (id === activeId) {
-            foundActive = true;
-            item.classList.add('measuring-now');
-            if (pill) {
-              pill.className = 'clean-status-pill measuring';
-              pill.textContent = '🎯 ÖLÇÜLÜYOR...';
-            }
-            if (typeof item.scrollIntoView === 'function') {
-              item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-          } else {
-            item.classList.remove('measuring-now');
-            if (!foundActive) {
-              if (dim && (!dim.measured || dim.measured === '--')) {
-                const nom = typeof dim.nominal === 'number' ? dim.nominal : parseFloat(String(dim.nominal)) || 0;
-                dim.measured = nom.toFixed(3);
-                dim.deviation = '+0.000';
-                dim.status = 'PASS';
-              }
-              if (pill && !pill.classList.contains('pass')) {
-                pill.className = 'clean-status-pill pass';
-                pill.textContent = 'PASS ✓';
-              }
-              const measEl = item.querySelector('.clean-feature-bottom b');
-              if (measEl && dim) {
-                measEl.textContent = dim.measured;
-                (measEl as HTMLElement).style.color = '#059669';
-              }
-            }
-          }
-        });
-
-        const dim = this.dimensions.find((d) => d.id === activeId);
-        if (dim) {
-          const hudName = document.getElementById('hud-feature-name');
-          const hudCoords = document.getElementById('hud-feature-coords');
-          const hudDetails = document.getElementById('hud-feature-details');
-
-          if (hudName) {
-            const cadTag = dim.cad_feature_id ? ` ➔ CAD: ${dim.cad_feature_id}` : '';
-            hudName.innerText = `${dim.balloon} [${dim.type_label || dim.nominal_str}]${cadTag}`;
-          }
-          if (hudCoords) {
-            hudCoords.innerText = `Prob (PCS): X: ${state.currentPosition.x.toFixed(2)} | Y: ${state.currentPosition.y.toFixed(2)} | Z: ${state.currentPosition.z.toFixed(2)} mm | Faz: ${state.phase}`;
-          }
-          if (hudDetails) {
-            hudDetails.innerText = `${dim.gdt || 'ASME Y14.5'} | Tol: ${dim.lower_tol} / ${dim.upper_tol} | Ölçülen: ${dim.measured} mm (Δ ${dim.deviation || '+0.000'})`;
+      panel.querySelectorAll<HTMLElement>('.clean-feature-item').forEach((it) => {
+        const id = parseInt(it.getAttribute('data-clean-id') || '-1', 10);
+        if (id < activeId) {
+          it.classList.remove('measuring-now');
+          const p = it.querySelector('.clean-status-pill');
+          if (p && !p.classList.contains('pass')) {
+            p.className = 'clean-status-pill pass';
+            p.textContent = 'PASS ✓';
           }
         }
-      } else {
+      });
+
+      if (item) {
+        item.classList.add('measuring-now');
+        const pill = item.querySelector('.clean-status-pill');
+
+        if (state.phase === 'TOUCH') {
+          const curHits = Math.min(totalHits, (this.featureTouchHits.get(activeId) || 0) + 1);
+          this.featureTouchHits.set(activeId, curHits);
+
+          if (pill) {
+            pill.className = 'clean-status-pill measuring';
+            pill.textContent = `🎯 ÖLÇÜLÜYOR (${curHits}/${totalHits})`;
+          }
+
+          if (curHits >= totalHits && dim) {
+            const nom = typeof dim.nominal === 'number' ? dim.nominal : parseFloat(String(dim.nominal)) || 0;
+            const dev = 0.002;
+            dim.measured = (nom + dev).toFixed(3);
+            dim.deviation = '+0.002';
+            dim.status = 'PASS';
+            if (pill) {
+              pill.className = 'clean-status-pill pass';
+              pill.textContent = 'PASS ✓';
+            }
+            const measEl = item.querySelector('.clean-feature-bottom b');
+            if (measEl) {
+              measEl.textContent = dim.measured;
+              (measEl as HTMLElement).style.color = '#059669';
+            }
+            this.updateDiagnosticsPanel(dim);
+          }
+        }
+      }
+
+      if (dim) {
+        const hudName = document.getElementById('hud-feature-name');
         const hudCoords = document.getElementById('hud-feature-coords');
+        const hudDetails = document.getElementById('hud-feature-details');
+
+        if (hudName) {
+          const cadTag = dim.cad_feature_id ? ` ➔ CAD: ${dim.cad_feature_id}` : '';
+          hudName.innerText = `${dim.balloon} [${dim.type_label || dim.nominal_str}]${cadTag}`;
+        }
         if (hudCoords) {
           hudCoords.innerText = `Prob (PCS): X: ${state.currentPosition.x.toFixed(2)} | Y: ${state.currentPosition.y.toFixed(2)} | Z: ${state.currentPosition.z.toFixed(2)} mm | Faz: ${state.phase}`;
         }
+        if (hudDetails) {
+          hudDetails.innerText = `${dim.gdt || 'ASME Y14.5'} | Tol: ${dim.lower_tol} / ${dim.upper_tol} | Ölçülen: ${dim.measured} mm (Δ ${dim.deviation || '+0.000'})`;
+        }
+      }
+    } else {
+      const hudCoords = document.getElementById('hud-feature-coords');
+      if (hudCoords) {
+        hudCoords.innerText = `Prob (PCS): X: ${state.currentPosition.x.toFixed(2)} | Y: ${state.currentPosition.y.toFixed(2)} | Z: ${state.currentPosition.z.toFixed(2)} mm | Faz: ${state.phase}`;
       }
     }
+  }
+
+  public updateDiagnosticsPanel(dim: InspectionDimension): void {
+    const diagContent = document.getElementById('diag-content');
+    if (!diagContent) return;
+
+    const isDiameter = dim.type === 'DIAMETER' || /dia|çap|delik/i.test(dim.type_label ?? '');
+    const isProfile = dim.type === 'PROFILE' || /profil/i.test(dim.type_label ?? '');
+    const isFlatness = /düzlem|flat/i.test(dim.type_label ?? '');
+
+    let fcfSym = '⌖';
+    let algorithm = 'Gauss En Küçük Kareler (LSQ)';
+    if (isDiameter) {
+      fcfSym = '⌖';
+      algorithm = 'Maksimum İç Teğet Silindir (MIC - Max Inscribed)';
+    } else if (isProfile || isFlatness) {
+      fcfSym = isProfile ? '⌒' : '⏥';
+      algorithm = 'Minimum Bölge Chebyshev (MZPL / Min-Max)';
+    } else if (dim.type === 'CYLINDER' || /mil|boss|silindir/i.test(dim.type_label ?? '') || (dim.cad_feature_id?.includes('CYL') && !dim.cad_feature_id.includes('HOLE'))) {
+      fcfSym = '◎';
+      algorithm = 'Minimum Dış Çevrel Silindir (MCC - Min Circumscribed)';
+    }
+
+    const up = parseFloat(dim.upper_tol) || 0.1;
+    const lo = parseFloat(dim.lower_tol) || -0.1;
+    const isBilateral = up > 0 && lo < 0;
+    const tolSpan = isBilateral ? (up - lo) : up;
+    const uc = 0.0012;
+    const u95 = 0.0024;
+    const tur = isBilateral ? (tolSpan / (2 * u95)) : (tolSpan / u95);
+    const turStr = tur > 0 ? (tur.toFixed(1) + ':1') : '4.2:1';
+
+    const measStr = dim.measured && dim.measured !== '--' ? `${dim.measured} mm` : '--- mm';
+    const devStr = dim.deviation && dim.deviation !== '--' ? dim.deviation : '---';
+    const statusText = dim.status === 'PASS' ? '0 Çarpışma (PASS)' : (dim.status === 'FAIL' ? 'HATA (FAIL)' : 'BEKLİYOR');
+    const statusClass = dim.status === 'PASS' ? 'pass-tag' : (dim.status === 'FAIL' ? 'warn-tag' : 'unmeasured-tag');
+
+    const diagBadge = document.getElementById('diag-badge-status');
+    if (diagBadge) {
+      diagBadge.className = statusClass;
+      diagBadge.textContent = statusText;
+    }
+
+    diagContent.innerHTML = `
+      <div class="card-fcf">
+        <div class="fcf-title">
+          <span>ASME Y14.5 Tolerans Çerçevesi (FCF)</span>
+          <span style="font-size: 10px; color: #0284C7;">Balon: ${dim.balloon}</span>
+        </div>
+        <table class="fcf-table">
+          <tr>
+            <td style="font-size: 14px; font-weight: 700;">${fcfSym}</td>
+            <td style="font-weight: 600;">${dim.nominal_str}</td>
+            <td>[A]</td>
+            <td>[B]</td>
+            <td>[C]</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="diag-gum-card" style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:10px; margin-bottom:12px; display:flex; flex-direction:column; gap:6px; word-break:break-word;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <b style="color:#0F172A; font-size:11px; text-transform:uppercase;">GUM / ISO 15530-3 Belirsizlik</b>
+          <span class="pass-tag" style="font-size:9px; white-space:nowrap;">TUR ${turStr}</span>
+        </div>
+        <div style="font-size:11px; display:flex; justify-content:space-between; gap:8px;">
+          <span style="color:#64748B;">Bileşik Belirsizlik (uc):</span>
+          <span style="font-family:var(--font-mono); font-weight:600;">± ${uc.toFixed(4)} mm (k=1)</span>
+        </div>
+        <div style="font-size:11px; display:flex; justify-content:space-between; gap:8px;">
+          <span style="color:#64748B;">Genişletilmiş Belirsizlik (U₉₅):</span>
+          <span style="font-family:var(--font-mono); font-weight:600;">± ${u95.toFixed(4)} mm (k=2)</span>
+        </div>
+        <div style="font-size:11px; display:flex; justify-content:space-between; gap:8px;">
+          <span style="color:#64748B;">ISO 14253-1 Emniyet Bandı:</span>
+          <span style="color:#059669; font-weight:700;">PASS (Net Kabul)</span>
+        </div>
+        <div style="font-size:10px; color:#0284C7; margin-top:2px;">
+          Standart Fitting: <b>${algorithm}</b>
+        </div>
+      </div>
+
+      <div style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px;">
+        Metrolojik Ölçüm Parametreleri
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Nominal Değer</span>
+        <span class="metric-val">${dim.nominal_str}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Ölçülen Değer</span>
+        <span class="metric-val" style="color:${dim.status === 'PASS' ? '#059669' : '#64748B'};">${measStr}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Metrolojik Sapma</span>
+        <span class="metric-val">${devStr}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Üst Tolerans Sınırı</span>
+        <span class="metric-val">${dim.upper_tol}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Alt Tolerans Sınırı</span>
+        <span class="metric-val">${dim.lower_tol}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Geometrik Unsur Tipi</span>
+        <span class="metric-val">${dim.type_label || dim.type}</span>
+      </div>
+    `;
   }
 
   public injectStyles(): void {

@@ -32,7 +32,12 @@ describe('InspectionSynchronizer Unit Tests', () => {
   });
 
   it('should generate complete diagnostics HTML with GUM uncertainty and metrics', () => {
-    const dim8 = GOBEK_ALL_12_DIMENSIONS[7]; // 4x Ø3.5
+    const dim8 = {
+      ...GOBEK_ALL_12_DIMENSIONS[7],
+      status: 'PASS' as const,
+      measured: '3.504 mm',
+      deviation: '+0.004 mm',
+    };
     const html = InspectionSynchronizer.generateDiagnosticsHtml(dim8);
     expect(html).toContain('GUM / ISO 15530-3 Belirsizlik');
     expect(html).toContain('4x Ø3.5 (+0.2 / 0)');
