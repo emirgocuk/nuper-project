@@ -69,6 +69,14 @@ pub struct OrientedSamplingPlan {
 }
 
 impl OrientedSamplingPlan {
+    pub fn compute_clearance_z(&self, max_z: f64) -> f64 {
+        max_z + 25.0
+    }
+
+    pub fn compute_safe_index_z(&self, max_z: f64) -> f64 {
+        max_z + 50.0
+    }
+
     /// B-Rep/AST unsurlarını ve prob donanımını alarak yönlendirilmiş örnekleme planını otomatik kurar
     pub fn build(
         part_id: impl Into<String>,

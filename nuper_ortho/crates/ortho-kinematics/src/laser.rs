@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn test_laser_stripe_generation() {
-        let face = ParametricFace::sample_plane_z50();
+        let face = ParametricFace::new_plane(1, DVec3::new(0.0, 0.0, 50.0), DVec3::Z, 100.0, 100.0);
         let laser = SensorType::OpticalLaserLine {
             stripe_width_mm: 50.0,
             standoff_distance_mm: 80.0,
