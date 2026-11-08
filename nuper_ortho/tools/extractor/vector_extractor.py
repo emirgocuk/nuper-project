@@ -208,6 +208,27 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             combined_str = f"{txt} {t_txt}"
 
         used_spans.add(i)
+        rot_val = abs(float(s.get("rotation", 0.0))) % 180.0
+        if rot_val <= 25.0 or rot_val >= 155.0:
+            dim_orientation = "HORIZONTAL"
+        elif 65.0 <= rot_val <= 115.0:
+            dim_orientation = "VERTICAL"
+        else:
+            dim_orientation = "ANGLED"
+
+        dim_cx = (main_bbox[0] + main_bbox[2]) / 2.0
+        dim_cy = (main_bbox[1] + main_bbox[3]) / 2.0
+
+        if dim_cy < page_h * 0.5:
+            dim_view = "VIEW_TOP_XY"
+            dim_axis = "X" if dim_orientation == "HORIZONTAL" else "Z"
+        elif dim_cx < page_w * 0.55:
+            dim_view = "VIEW_FRONT_XZ"
+            dim_axis = "X" if dim_orientation == "HORIZONTAL" else "Y"
+        else:
+            dim_view = "VIEW_SIDE_YZ"
+            dim_axis = "Z" if dim_orientation == "HORIZONTAL" else "Y"
+
         grouped_dimensions.append({
             "raw_text": combined_str,
             "nominal": base_nom,
@@ -217,6 +238,9 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             "rotation": s["rotation"],
             "font_size": s["size"],
             "page": page_num,
+            "orientation": dim_orientation,
+            "view_cluster": dim_view,
+            "inferred_axis": dim_axis,
         })
 
     # 2. FCF Kutuları ile sembol ve datum kesişimi (box.contains(point))

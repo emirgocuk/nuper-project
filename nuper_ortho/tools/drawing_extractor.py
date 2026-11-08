@@ -426,6 +426,7 @@ def parse_text_to_metrology(
                     "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
                     "op": norm.get("op", "OP10"),
                     "op_reason": norm.get("op_reason", "Standart üst kurulum."),
+                    "inferred_axis": vd.get("inferred_axis"),
                     "bbox": vd.get("bbox", [100.0, 100.0, 150.0, 120.0]),
                 })
                 balloon_idx += 1

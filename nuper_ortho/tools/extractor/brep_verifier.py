@@ -640,23 +640,33 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
             dx = c1[0] - c2[0]
             dz = c1[2] - c2[2]
             d_xz = round(math.sqrt(dx * dx + dz * dz), 2)
-            if d_xz > 1.0 and d_xz not in seen_dists:
-                seen_dists.add(d_xz)
-                extracted_features.append({
-                    "id": f"CAD_DIST_{d_xz:.2f}_{dist_idx}",
-                    "feature_type": "PLANE",
-                    "nominal_dimension": d_xz,
-                    "center": [round((c1[0] + c2[0]) / 2.0, 4), round(max(c1[1], c2[1]), 4), round((c1[2] + c2[2]) / 2.0, 4)],
-                    "normal": [0.0, 1.0, 0.0],
-                    "area_or_length": d_xz,
-                    "description": f"Eksenler Arası Mesafe ({d_xz:.2f} mm)",
-                })
-                dist_idx += 1
+            if d_xz >= 1.0:
+                cyl_key = (min(cyl_features[i_c].get("id", ""), cyl_features[j_c].get("id", "")), max(cyl_features[i_c].get("id", ""), cyl_features[j_c].get("id", "")), d_xz)
+                if cyl_key not in seen_dists:
+                    seen_dists.add(cyl_key)
+                    extracted_features.append({
+                        "id": f"CAD_DIST_{d_xz:.2f}_{dist_idx}",
+                        "feature_type": "PLANE",
+                        "nominal_dimension": d_xz,
+                        "center": [round((c1[0] + c2[0]) / 2.0, 4), round(max(c1[1], c2[1]), 4), round((c1[2] + c2[2]) / 2.0, 4)],
+                        "normal": [0.0, 1.0, 0.0],
+                        "area_or_length": d_xz,
+                        "description": f"Eksenler Arasi Mesafe ({d_xz:.2f} mm)",
+                        "axis": "XZ",
+                        "distance_type": "AXIS_DISTANCE",
+                        "faceA_id": cyl_features[i_c].get("id", ""),
+                        "faceB_id": cyl_features[j_c].get("id", ""),
+                        "faceA_center": [round(float(c1[0]), 4), round(float(c1[1]), 4), round(float(c1[2]), 4)],
+                        "faceB_center": [round(float(c2[0]), 4), round(float(c2[1]), 4), round(float(c2[2]), 4)],
+                        "faceA_normal": cyl_features[i_c].get("normal", [0.0, 1.0, 0.0]),
+                        "faceB_normal": cyl_features[j_c].get("normal", [0.0, 1.0, 0.0]),
+                    })
+                    dist_idx += 1
 
     plane_features = [f for f in extracted_features if f.get("feature_type") == "PLANE" and f.get("normal") and f.get("center") and not f["id"].startswith("CAD_DIST_")]
     virtual_extremes = [
-        {"center": [0.0, 0.0, 0.0], "normal": [0.0, -1.0, 0.0]},
-        {"center": [0.0, round(size_y, 4), 0.0], "normal": [0.0, 1.0, 0.0]},
+        {"id": "VIRTUAL_BOTTOM_Y0", "center": [0.0, 0.0, 0.0], "normal": [0.0, -1.0, 0.0]},
+        {"id": "VIRTUAL_TOP_YMAX", "center": [0.0, round(size_y, 4), 0.0], "normal": [0.0, 1.0, 0.0]},
     ]
     all_ref_planes = plane_features + virtual_extremes
     for i_p in range(len(plane_features)):
@@ -665,29 +675,47 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
             p2 = all_ref_planes[j_p]
             n1 = (float(p1["normal"][0]), float(p1["normal"][1]), float(p1["normal"][2]))
             n2 = (float(p2["normal"][0]), float(p2["normal"][1]), float(p2["normal"][2]))
-            if abs(_dot(n1, n2)) > 0.98:
+            dot_n = _dot(n1, n2)
+            if abs(dot_n) > 0.98:
                 c1 = p1["center"]
                 c2 = p2["center"]
                 diff = (c1[0] - c2[0], c1[1] - c2[1], c1[2] - c2[2])
                 d_perp = round(abs(_dot(diff, n1)), 2)
-                if d_perp > 0.2 and d_perp not in seen_dists:
-                    seen_dists.add(d_perp)
-                    out_nx = round(n1[0], 4)
-                    out_ny = round(abs(n1[1]), 4)
-                    out_nz = round(n1[2], 4)
-                    if c1[0] * out_nx + c1[2] * out_nz < -1.0:
-                        out_nx = -out_nx
-                        out_nz = -out_nz
-                    extracted_features.append({
-                        "id": f"CAD_STEP_DIST_{d_perp:.2f}_{dist_idx}",
-                        "feature_type": "PLANE",
-                        "nominal_dimension": d_perp,
-                        "center": [round(float(c1[0]), 4), round(float(c1[1]), 4), round(float(c1[2]), 4)],
-                        "normal": [out_nx, out_ny, out_nz],
-                        "area_or_length": d_perp,
-                        "description": f"Paralel Düzlemler Arası Mesafe ({d_perp:.2f} mm)",
-                    })
-                    dist_idx += 1
+                if d_perp >= 0.5:
+                    axis_name = "Y" if abs(n1[1]) > 0.85 else ("X" if abs(n1[0]) > 0.85 else "Z")
+                    if dot_n > 0.95:
+                        dist_type = "STEP_HEIGHT"
+                    else:
+                        v12 = (c2[0] - c1[0], c2[1] - c1[1], c2[2] - c1[2])
+                        dist_type = "INTERNAL_SLOT" if _dot(n1, v12) > 0.01 else "EXTERNAL_WIDTH"
+
+                    pair_key = (min(p1.get("id", ""), p2.get("id", "")), max(p1.get("id", ""), p2.get("id", "")), d_perp)
+                    if pair_key not in seen_dists:
+                        seen_dists.add(pair_key)
+                        out_nx = round(n1[0], 4)
+                        out_ny = round(abs(n1[1]), 4)
+                        out_nz = round(n1[2], 4)
+                        if c1[0] * out_nx + c1[2] * out_nz < -1.0:
+                            out_nx = -out_nx
+                            out_nz = -out_nz
+                        extracted_features.append({
+                            "id": f"CAD_STEP_DIST_{d_perp:.2f}_{dist_idx}",
+                            "feature_type": "PLANE",
+                            "nominal_dimension": d_perp,
+                            "center": [round(float(c1[0]), 4), round(float(c1[1]), 4), round(float(c1[2]), 4)],
+                            "normal": [out_nx, out_ny, out_nz],
+                            "area_or_length": d_perp,
+                            "description": f"Dogrusal Boyut / {dist_type} ({d_perp:.2f} mm - Eksen {axis_name})",
+                            "axis": axis_name,
+                            "distance_type": dist_type,
+                            "faceA_id": p1.get("id", f"FACE_A_{i_p}"),
+                            "faceB_id": p2.get("id", f"FACE_B_{j_p}"),
+                            "faceA_center": [round(float(c1[0]), 4), round(float(c1[1]), 4), round(float(c1[2]), 4)],
+                            "faceB_center": [round(float(c2[0]), 4), round(float(c2[1]), 4), round(float(c2[2]), 4)],
+                            "faceA_normal": [round(float(n1[0]), 4), round(float(n1[1]), 4), round(float(n1[2]), 4)],
+                            "faceB_normal": [round(float(n2[0]), 4), round(float(n2[1]), 4), round(float(n2[2]), 4)],
+                        })
+                        dist_idx += 1
 
     pos_bytes = struct.pack(f"<{len(all_positions)}f", *all_positions)
     norm_bytes = struct.pack(f"<{len(all_normals)}f", *all_normals)
