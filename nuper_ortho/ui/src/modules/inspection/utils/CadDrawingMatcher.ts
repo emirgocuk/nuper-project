@@ -63,6 +63,14 @@ export interface MatchedInspectionDimension {
   operation: 'OP10' | 'OP20';
   op_reason?: string;
   match_confidence: 'EXACT' | 'ENVELOPE' | 'RADIUS_HALF' | 'UNMATCHED';
+  match_score?: number;
+  match_status?: 'VERIFIED_EXACT' | 'VERIFIED_TOPOLOGY' | 'NEEDS_REVIEW' | 'UNMATCHED' | 'ENGINEER_LOCKED';
+  inferred_axis?: 'X' | 'Y' | 'Z';
+  distance_type?: string;
+  faceA_center?: [number, number, number];
+  faceB_center?: [number, number, number];
+  faceA_normal?: [number, number, number];
+  faceB_normal?: [number, number, number];
 }
 
 export interface CadDrawingMatchResult {
@@ -110,10 +118,19 @@ export function matchCadWithDrawing(
 
     const countMatch = `${dim.nominal_str || ''} ${dim.type_label || ''}`.match(/\b(\d+)\s*[xX×]\b/);
     const explicitCount = countMatch ? Math.max(1, parseInt(countMatch[1], 10)) : 1;
+    let matchScore = 0;
+    let matchStatus: 'VERIFIED_EXACT' | 'VERIFIED_TOPOLOGY' | 'NEEDS_REVIEW' | 'UNMATCHED' | 'ENGINEER_LOCKED' = 'UNMATCHED';
+    let assignedFaceACenter: [number, number, number] | undefined;
+    let assignedFaceBCenter: [number, number, number] | undefined;
+    let assignedFaceANormal: [number, number, number] | undefined;
+    let assignedFaceBNormal: [number, number, number] | undefined;
+    let assignedDistType: string | undefined;
+    let assignedAxis: 'X' | 'Y' | 'Z' | undefined;
 
     if (dim.type === 'DIAMETER' || /dia|çap|delik|bore|m3|m4/i.test(dim.type_label || '')) {
       let bestFeat: (typeof cadFeatures)[0] | undefined;
       let minDelta = Infinity;
+      let bestScore = 0;
 
       for (const feat of cadFeatures) {
         if (usedCadFeatureIds.has(feat.id)) continue;
@@ -122,9 +139,15 @@ export function matchCadWithDrawing(
           feat.nominal_dimension !== undefined
         ) {
           const delta = Math.abs(feat.nominal_dimension - nom);
-          if (delta < minDelta && delta <= FEATURE_MATCH_TOLERANCE) {
-            minDelta = delta;
-            bestFeat = feat;
+          if (delta <= FEATURE_MATCH_TOLERANCE) {
+            const deltaScore = delta <= 0.02 ? 40 : (delta <= 0.05 ? 35 : (delta <= 0.15 ? 25 : (delta <= 0.50 ? 15 : 5)));
+            const typeScore = 20;
+            const score = deltaScore + typeScore + 25;
+            if (score > bestScore || (score === bestScore && delta < minDelta)) {
+              bestScore = score;
+              minDelta = delta;
+              bestFeat = feat;
+            }
           }
         }
       }
@@ -142,6 +165,8 @@ export function matchCadWithDrawing(
         assignedAxialMax = extBest.axial_max;
         assignedStemBlocked = extBest.stem_blocked;
         confidence = minDelta <= EPSILON ? 'EXACT' : 'ENVELOPE';
+        matchScore = bestScore;
+        matchStatus = bestScore >= 85 ? 'VERIFIED_EXACT' : (bestScore >= 70 ? 'VERIFIED_TOPOLOGY' : 'NEEDS_REVIEW');
         usedCadFeatureIds.add(bestFeat.id);
 
         const groupCandidates = cadFeatures.filter(
@@ -172,54 +197,112 @@ export function matchCadWithDrawing(
     } else if (dim.type === 'RADIUS' || /radius|kavis|yarıçap/i.test(dim.type_label || '')) {
       for (const feat of cadFeatures) {
         if (usedCadFeatureIds.has(feat.id)) continue;
+        if (feat.feature_type === 'INTERNAL_CYLINDER') continue;
         if (feat.nominal_dimension !== undefined) {
           const featRadius = feat.nominal_dimension / 2;
-          if (Math.abs(featRadius - nom) <= FEATURE_MATCH_TOLERANCE || Math.abs(feat.nominal_dimension - nom) <= FEATURE_MATCH_TOLERANCE) {
+          const deltaHalf = Math.abs(featRadius - nom);
+          const deltaDirect = Math.abs(feat.nominal_dimension - nom);
+          if (deltaHalf <= FEATURE_MATCH_TOLERANCE || deltaDirect <= FEATURE_MATCH_TOLERANCE) {
             assignedCadId = feat.id;
             assignedCenter = feat.center;
             assignedNormal = feat.normal;
             confidence = 'RADIUS_HALF';
+            matchScore = 92;
+            matchStatus = 'VERIFIED_EXACT';
             usedCadFeatureIds.add(feat.id);
             break;
           }
         }
       }
     } else if (dim.type === 'LINEAR' || /boyut|mesafe|boy|uzunluk|kalınlık/i.test(dim.type_label || '')) {
+      const dimAxis = (dim as unknown as { inferred_axis?: 'X' | 'Y' | 'Z' }).inferred_axis;
       if (Math.abs(sizeX - nom) <= ENVELOPE_EPSILON) {
         assignedCadId = 'CAD_BBOX_X';
         assignedCenter = [cadBbox.max[0], (cadBbox.min[1] + cadBbox.max[1]) / 2, (cadBbox.min[2] + cadBbox.max[2]) / 2];
         assignedNormal = [1, 0, 0];
         confidence = 'ENVELOPE';
+        matchScore = 90;
+        matchStatus = 'VERIFIED_EXACT';
+        assignedAxis = 'X';
+        assignedDistType = 'EXTERNAL_WIDTH';
+        assignedFaceACenter = [cadBbox.min[0], (cadBbox.min[1] + cadBbox.max[1]) / 2, (cadBbox.min[2] + cadBbox.max[2]) / 2];
+        assignedFaceBCenter = [cadBbox.max[0], (cadBbox.min[1] + cadBbox.max[1]) / 2, (cadBbox.min[2] + cadBbox.max[2]) / 2];
+        assignedFaceANormal = [-1, 0, 0];
+        assignedFaceBNormal = [1, 0, 0];
       } else if (Math.abs(sizeZ - nom) <= ENVELOPE_EPSILON) {
         assignedCadId = 'CAD_BBOX_Z';
         assignedCenter = [(cadBbox.min[0] + cadBbox.max[0]) / 2, (cadBbox.min[1] + cadBbox.max[1]) / 2, cadBbox.max[2]];
         assignedNormal = [0, 0, 1];
         confidence = 'ENVELOPE';
+        matchScore = 90;
+        matchStatus = 'VERIFIED_EXACT';
+        assignedAxis = 'Z';
+        assignedDistType = 'EXTERNAL_WIDTH';
+        assignedFaceACenter = [(cadBbox.min[0] + cadBbox.max[0]) / 2, (cadBbox.min[1] + cadBbox.max[1]) / 2, cadBbox.min[2]];
+        assignedFaceBCenter = [(cadBbox.min[0] + cadBbox.max[0]) / 2, (cadBbox.min[1] + cadBbox.max[1]) / 2, cadBbox.max[2]];
+        assignedFaceANormal = [0, 0, -1];
+        assignedFaceBNormal = [0, 0, 1];
       } else if (Math.abs(sizeY - nom) <= ENVELOPE_EPSILON) {
         assignedCadId = 'CAD_BBOX_Y';
         assignedCenter = [(cadBbox.min[0] + cadBbox.max[0]) / 2, cadBbox.max[1], (cadBbox.min[2] + cadBbox.max[2]) / 2];
         assignedNormal = [0, 1, 0];
         confidence = 'ENVELOPE';
+        matchScore = 90;
+        matchStatus = 'VERIFIED_EXACT';
+        assignedAxis = 'Y';
+        assignedDistType = 'EXTERNAL_WIDTH';
+        assignedFaceACenter = [(cadBbox.min[0] + cadBbox.max[0]) / 2, cadBbox.min[1], (cadBbox.min[2] + cadBbox.max[2]) / 2];
+        assignedFaceBCenter = [(cadBbox.min[0] + cadBbox.max[0]) / 2, cadBbox.max[1], (cadBbox.min[2] + cadBbox.max[2]) / 2];
+        assignedFaceANormal = [0, -1, 0];
+        assignedFaceBNormal = [0, 1, 0];
       } else {
         let bestFeat: (typeof cadFeatures)[0] | undefined;
         let minDelta = Infinity;
+        let bestScore = 0;
 
         for (const feat of cadFeatures) {
           if (usedCadFeatureIds.has(feat.id)) continue;
           if (feat.nominal_dimension !== undefined) {
             const delta = Math.abs(feat.nominal_dimension - nom);
-            if (delta < minDelta && delta <= FEATURE_MATCH_TOLERANCE) {
-              minDelta = delta;
-              bestFeat = feat;
+            if (delta <= FEATURE_MATCH_TOLERANCE) {
+              const deltaScore = delta <= 0.02 ? 40 : (delta <= 0.05 ? 35 : (delta <= 0.15 ? 25 : (delta <= 0.50 ? 15 : 5)));
+              const isStepDist = feat.id.startsWith('CAD_STEP_DIST_') || feat.id.startsWith('CAD_DIST_');
+              const typeScore = isStepDist ? 20 : (feat.feature_type === 'PLANE' ? 15 : 5);
+              const featExt = feat as typeof feat & { axis?: 'X' | 'Y' | 'Z' };
+              const axisScore = dimAxis && featExt.axis ? (dimAxis === featExt.axis ? 15 : 0) : 8;
+              const countScore = explicitCount > 1 ? 15 : 10;
+              const score = deltaScore + typeScore + axisScore + countScore;
+
+              if (score > bestScore || (score === bestScore && delta < minDelta)) {
+                bestScore = score;
+                minDelta = delta;
+                bestFeat = feat;
+              }
             }
           }
         }
 
         if (bestFeat) {
+          const bfExt = bestFeat as typeof bestFeat & {
+            axis?: 'X' | 'Y' | 'Z';
+            distance_type?: string;
+            faceA_center?: [number, number, number];
+            faceB_center?: [number, number, number];
+            faceA_normal?: [number, number, number];
+            faceB_normal?: [number, number, number];
+          };
           assignedCadId = bestFeat.id;
           assignedCenter = bestFeat.center;
           assignedNormal = bestFeat.normal;
+          assignedAxis = bfExt.axis;
+          assignedDistType = bfExt.distance_type;
+          assignedFaceACenter = bfExt.faceA_center;
+          assignedFaceBCenter = bfExt.faceB_center;
+          assignedFaceANormal = bfExt.faceA_normal;
+          assignedFaceBNormal = bfExt.faceB_normal;
           confidence = minDelta <= EPSILON ? 'EXACT' : 'ENVELOPE';
+          matchScore = bestScore;
+          matchStatus = bestScore >= 85 ? 'VERIFIED_EXACT' : (bestScore >= 70 ? 'VERIFIED_TOPOLOGY' : 'NEEDS_REVIEW');
           usedCadFeatureIds.add(bestFeat.id);
         }
       }
@@ -297,6 +380,14 @@ export function matchCadWithDrawing(
       operation,
       op_reason: opReason,
       match_confidence: confidence,
+      match_score: matchScore,
+      match_status: matchStatus,
+      inferred_axis: assignedAxis,
+      distance_type: assignedDistType,
+      faceA_center: assignedFaceACenter,
+      faceB_center: assignedFaceBCenter,
+      faceA_normal: assignedFaceANormal,
+      faceB_normal: assignedFaceBNormal,
     });
   }
 

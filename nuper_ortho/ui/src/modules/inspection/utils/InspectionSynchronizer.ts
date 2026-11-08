@@ -28,6 +28,15 @@ export interface InspectionDimension {
   cad_center?: [number, number, number];
   cad_normal?: [number, number, number];
   match_confidence?: 'EXACT' | 'ENVELOPE' | 'RADIUS_HALF' | 'UNMATCHED';
+  match_score?: number;
+  match_status?: 'VERIFIED_EXACT' | 'VERIFIED_TOPOLOGY' | 'NEEDS_REVIEW' | 'UNMATCHED' | 'ENGINEER_LOCKED';
+  verification?: string;
+  inferred_axis?: 'X' | 'Y' | 'Z';
+  distance_type?: string;
+  faceA_center?: [number, number, number];
+  faceB_center?: [number, number, number];
+  faceA_normal?: [number, number, number];
+  faceB_normal?: [number, number, number];
 }
 
 export interface FeatureCoordinates {

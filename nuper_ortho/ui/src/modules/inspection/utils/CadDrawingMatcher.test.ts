@@ -177,4 +177,53 @@ describe('CadDrawingMatcher — STEP-Güdümlü Deterministik Eşleme Motoru', (
       expect(iterRun).toBe(firstRun);
     }
   });
+
+  it('6. Doğrusal adımlı düzlemleri (CAD_STEP_DIST) çift yüzey merkezleriyle ve güven skoruyla eşler', () => {
+    const stepCad: CadMetadata = {
+      ...sampleCad,
+      features: [
+        ...(sampleCad.features || []),
+        {
+          id: 'CAD_STEP_DIST_35.00_1',
+          feature_type: 'PLANE',
+          nominal_dimension: 35.0,
+          center: [15, 35, 10],
+          normal: [0, 1, 0],
+          axis: 'Y',
+          distance_type: 'STEP_HEIGHT',
+          faceA_center: [15, 0, 10],
+          faceB_center: [15, 35, 10],
+          faceA_normal: [0, -1, 0],
+          faceB_normal: [0, 1, 0],
+        },
+      ],
+    };
+    const stepDrawing: DrawingExtractionResult = {
+      ...sampleDrawing,
+      dimensions: [
+        {
+          id: 10,
+          balloon: '#10',
+          page: 1,
+          type: 'LINEAR',
+          type_label: 'Basamak Yüksekliği',
+          nominal: 35.0,
+          nominal_str: '35.0 ±0.1',
+          upper_tol: '+0.1',
+          lower_tol: '-0.1',
+          measured: '',
+          deviation: '',
+          status: 'UNMEASURED',
+          inferred_axis: 'Y',
+        },
+      ],
+    };
+    const res = matchCadWithDrawing(stepCad, stepDrawing);
+    const matched = res.dimensions[0];
+    expect(matched.cad_feature_id).toBe('CAD_STEP_DIST_35.00_1');
+    expect(matched.match_status).toBe('VERIFIED_EXACT');
+    expect(matched.match_score).toBeGreaterThanOrEqual(85);
+    expect(matched.faceA_center).toEqual([15, 0, 10]);
+    expect(matched.faceB_center).toEqual([15, 35, 10]);
+  });
 });
