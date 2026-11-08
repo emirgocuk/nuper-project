@@ -29,6 +29,23 @@ export class Ph10Kinematics {
     ];
   }
 
+  public static computeStylusTipOffset(
+    aDeg: number,
+    bDeg: number,
+    stylusLengthMm = 50.0
+  ): [number, number, number] {
+    const aRad = (aDeg * Math.PI) / 180.0;
+    const bRad = (bDeg * Math.PI) / 180.0;
+    const x = stylusLengthMm * Math.sin(aRad) * Math.sin(bRad);
+    const y = -stylusLengthMm * Math.sin(aRad) * Math.cos(bRad);
+    const z = -stylusLengthMm * Math.cos(aRad);
+    return [
+      parseFloat(x.toFixed(6)),
+      parseFloat(y.toFixed(6)),
+      parseFloat(z.toFixed(6)),
+    ];
+  }
+
   public static getLookUpTable(): readonly PH10Angle[] {
     if (!this.cachedLut) {
       const angles: PH10Angle[] = [];
