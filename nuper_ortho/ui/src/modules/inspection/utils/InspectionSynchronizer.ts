@@ -37,6 +37,7 @@ export interface InspectionDimension {
   faceB_center?: [number, number, number];
   faceA_normal?: [number, number, number];
   faceB_normal?: [number, number, number];
+  tolerance_source?: string;
 }
 
 export interface FeatureCoordinates {

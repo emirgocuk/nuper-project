@@ -31,6 +31,7 @@ import * as THREE from 'three';
 import {
   MeasurementPathGenerator,
   type PathFeatureInput,
+  type PathFeatureInstance,
   type GeneratedMeasurementPlan,
   type ExtendedWaypoint,
 } from '../../cad/utils/MeasurementPathGenerator';
@@ -2232,13 +2233,15 @@ export class SetupWizard {
         axial_min: dExt.axial_min ?? cfExt?.axial_min,
         axial_max: dExt.axial_max ?? cfExt?.axial_max,
         stem_blocked: dExt.stem_blocked ?? cfExt?.stem_blocked,
-        cad_instances: dExt.cad_instances,
-        faceA_center: dExt.faceA_center ?? (matchedCadFeat as unknown as { faceA_center?: [number, number, number] })?.faceA_center,
-        faceB_center: dExt.faceB_center ?? (matchedCadFeat as unknown as { faceB_center?: [number, number, number] })?.faceB_center,
-        faceA_normal: dExt.faceA_normal ?? (matchedCadFeat as unknown as { faceA_normal?: [number, number, number] })?.faceA_normal,
-        faceB_normal: dExt.faceB_normal ?? (matchedCadFeat as unknown as { faceB_normal?: [number, number, number] })?.faceB_normal,
-        distance_type: dExt.distance_type ?? (matchedCadFeat as unknown as { distance_type?: string })?.distance_type,
-        axis: (dExt.inferred_axis ?? (matchedCadFeat as unknown as { axis?: 'X' | 'Y' | 'Z' })?.axis) as 'X' | 'Y' | 'Z' | undefined,
+        cad_instances: (matchedCadFeat as unknown as { cad_instances?: PathFeatureInstance[] })?.cad_instances ?? dExt.cad_instances,
+        faceA_center: (matchedCadFeat as unknown as { faceA_center?: [number, number, number] })?.faceA_center ?? dExt.faceA_center,
+        faceB_center: (matchedCadFeat as unknown as { faceB_center?: [number, number, number] })?.faceB_center ?? dExt.faceB_center,
+        faceA_normal: (matchedCadFeat as unknown as { faceA_normal?: [number, number, number] })?.faceA_normal ?? dExt.faceA_normal,
+        faceB_normal: (matchedCadFeat as unknown as { faceB_normal?: [number, number, number] })?.faceB_normal ?? dExt.faceB_normal,
+        distance_type: (matchedCadFeat as unknown as { distance_type?: string })?.distance_type ?? dExt.distance_type,
+        axis: ((matchedCadFeat as unknown as { axis?: 'X' | 'Y' | 'Z' })?.axis ?? dExt.inferred_axis) as 'X' | 'Y' | 'Z' | undefined,
+        is_blind: (matchedCadFeat as unknown as { is_blind?: boolean })?.is_blind ?? (dExt as unknown as { is_blind?: boolean })?.is_blind,
+        floor_z: (matchedCadFeat as unknown as { floor_z?: number })?.floor_z ?? (dExt as unknown as { floor_z?: number })?.floor_z,
       };
     });
 

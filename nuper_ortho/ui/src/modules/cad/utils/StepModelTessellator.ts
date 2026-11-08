@@ -22,6 +22,20 @@ export interface CadFeatureItem {
   stem_blocked?: boolean;
   area_or_length?: number;
   description?: string;
+  faceA_center?: [number, number, number];
+  faceB_center?: [number, number, number];
+  faceA_normal?: [number, number, number];
+  faceB_normal?: [number, number, number];
+  distance_type?: 'STEP_HEIGHT' | 'INTERNAL_SLOT' | 'EXTERNAL_WIDTH' | 'AXIS_DISTANCE';
+  is_blind?: boolean;
+  floor_z?: number;
+  cad_instances?: Array<{
+    center: [number, number, number];
+    normal: [number, number, number];
+    axial_min?: number;
+    axial_max?: number;
+    stem_blocked?: boolean;
+  }>;
 }
 
 export interface StandoffSupportItem {
@@ -603,6 +617,55 @@ export class StepModelTessellator {
         cy = parseFloat(((axialMin + axialMax) / 2).toFixed(3));
       }
 
+      const featExt = feat as {
+        faceA_center?: [number, number, number];
+        faceB_center?: [number, number, number];
+        faceA_normal?: [number, number, number];
+        faceB_normal?: [number, number, number];
+        distance_type?: string;
+        is_blind?: boolean;
+        floor_z?: number;
+        cad_instances?: Array<{
+          center: [number, number, number];
+          normal: [number, number, number];
+          axial_min?: number;
+          axial_max?: number;
+          stem_blocked?: boolean;
+        }>;
+      };
+
+      let shiftedFaceACenter: [number, number, number] | undefined;
+      let shiftedFaceBCenter: [number, number, number] | undefined;
+      if (featExt.faceA_center) {
+        shiftedFaceACenter = [
+          parseFloat((featExt.faceA_center[0] - centerX).toFixed(3)),
+          parseFloat((featExt.faceA_center[1] - bottomY + standoffHeight).toFixed(3)),
+          parseFloat((featExt.faceA_center[2] - centerZ).toFixed(3)),
+        ];
+      }
+      if (featExt.faceB_center) {
+        shiftedFaceBCenter = [
+          parseFloat((featExt.faceB_center[0] - centerX).toFixed(3)),
+          parseFloat((featExt.faceB_center[1] - bottomY + standoffHeight).toFixed(3)),
+          parseFloat((featExt.faceB_center[2] - centerZ).toFixed(3)),
+        ];
+      }
+      let shiftedFloorZ = featExt.floor_z;
+      if (shiftedFloorZ !== undefined) {
+        shiftedFloorZ = parseFloat((shiftedFloorZ - bottomY + standoffHeight).toFixed(3));
+      }
+      let shiftedInstances = featExt.cad_instances;
+      if (shiftedInstances && shiftedInstances.length > 0) {
+        shiftedInstances = shiftedInstances.map((inst) => ({
+          ...inst,
+          center: [
+            parseFloat((inst.center[0] - centerX).toFixed(3)),
+            parseFloat((inst.center[1] - bottomY + standoffHeight).toFixed(3)),
+            parseFloat((inst.center[2] - centerZ).toFixed(3)),
+          ],
+        }));
+      }
+
       const shiftedCenter: [number, number, number] = [cx, cy, cz];
 
       const item: CadFeatureItem = {
@@ -618,6 +681,14 @@ export class StepModelTessellator {
         stem_blocked: stemBlocked,
         area_or_length: feat.area_or_length,
         description: feat.description || feat.id,
+        faceA_center: shiftedFaceACenter,
+        faceB_center: shiftedFaceBCenter,
+        faceA_normal: featExt.faceA_normal,
+        faceB_normal: featExt.faceB_normal,
+        distance_type: featExt.distance_type as CadFeatureItem['distance_type'],
+        is_blind: featExt.is_blind,
+        floor_z: shiftedFloorZ,
+        cad_instances: shiftedInstances,
       };
       cadFeatures.push(item);
 
