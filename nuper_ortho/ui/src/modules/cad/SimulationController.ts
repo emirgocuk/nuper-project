@@ -12,6 +12,9 @@ export interface Waypoint {
 export interface SimulationState {
   currentPosition: THREE.Vector3;
   phase: ProbePhase;
+  subPhase?: string;
+  feedRate?: number;
+  ph10Label?: string;
   progress: number;
   speedMultiplier: number;
   currentWaypointIndex: number;
@@ -198,6 +201,30 @@ export class SimulationController {
           const posZ = isFinite(state.currentPosition.z) ? state.currentPosition.z : 0.0;
           hudCoords.innerText = `Prob: X: ${posX.toFixed(2)} mm | Y: ${posY.toFixed(2)} mm | Z: ${posZ.toFixed(2)} mm | Faz: ${state.phase} | Hız: ${state.speedMultiplier}x`;
         }
+        const footerSpans = document.querySelectorAll('footer span');
+        footerSpans.forEach((s) => {
+          const txt = s.textContent || '';
+          if (txt.includes('İntikal:')) {
+            const b = s.querySelector('b');
+            if (b) {
+              const speed = state.phase === 'TRAVERSE' ? (state.feedRate || 150.0) : 0;
+              b.innerText = `${speed.toFixed(0)} mm/s`;
+            }
+          } else if (txt.includes('Dokunma:')) {
+            const b = s.querySelector('b');
+            if (b) {
+              if (state.phase === 'TOUCH') b.innerText = '5.0 mm/s';
+              else if (state.phase === 'RETRACT') b.innerText = '50.0 mm/s';
+              else if (state.phase === 'TRAVERSE') b.innerText = `${(state.feedRate || 150.0).toFixed(0)} mm/s`;
+              else b.innerText = '5.0 mm/s';
+            }
+          } else if (txt.includes('Kafa Dönüş:')) {
+            const b = s.querySelector('b');
+            if (b && state.ph10Label) {
+              b.innerText = state.ph10Label;
+            }
+          }
+        });
         const codeLines = document.querySelectorAll('.code-line');
         if (codeLines.length > 0) {
           const activeLineIdx = Math.min(Math.floor(state.progress * Math.min(codeLines.length, 25)), codeLines.length - 1);
@@ -334,7 +361,8 @@ export class SimulationController {
     const targetWaypoint = this.waypoints[this.currentWaypointIndex];
     this.currentPhase = targetWaypoint.phase;
 
-    const currentSpeed = this.currentPhase === 'TOUCH' ? this.baseTouchSpeed : this.baseTraverseSpeed;
+    const targetWp = targetWaypoint as (Waypoint & { feedRate?: number });
+    const currentSpeed = targetWp.feedRate ?? (this.currentPhase === 'TOUCH' ? this.baseTouchSpeed : this.baseTraverseSpeed);
     const maxMoveDistance = currentSpeed * effectiveDelta;
 
     const toTarget = new THREE.Vector3().subVectors(targetWaypoint.position, this.currentPosition);
@@ -392,10 +420,14 @@ export class SimulationController {
     const totalWaypoints = this.waypoints.length;
     const progress = totalWaypoints > 1 ? Math.min(1.0, this.currentWaypointIndex / (totalWaypoints - 1)) : (totalWaypoints === 1 ? 1.0 : 0);
     const currentWp = this.waypoints[this.currentWaypointIndex];
+    const extWp = currentWp as (Waypoint & { subPhase?: string; feedRate?: number; ph10Label?: string }) | undefined;
 
     return {
       currentPosition: this.currentPosition.clone(),
       phase: this.currentPhase,
+      subPhase: extWp?.subPhase,
+      feedRate: extWp?.feedRate,
+      ph10Label: extWp?.ph10Label,
       progress,
       speedMultiplier: this.speedMultiplier,
       currentWaypointIndex: this.currentWaypointIndex,
