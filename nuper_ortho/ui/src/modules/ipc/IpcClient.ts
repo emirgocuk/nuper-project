@@ -226,4 +226,25 @@ export class IpcClient {
       ipc.send('window-close');
     }
   }
+
+  public async checkPythonRuntime(): Promise<{
+    ok: boolean;
+    data?: { python: string; ocp: boolean; pymupdf: boolean; rapidocr: boolean };
+    error?: string;
+  }> {
+    const ipc = this.ensureIpc();
+    if (!ipc) {
+      return { ok: true, data: { python: 'Mock / Dev', ocp: true, pymupdf: true, rapidocr: true } };
+    }
+    try {
+      const res = (await ipc.invoke('check-python-runtime')) as {
+        ok: boolean;
+        data?: { python: string; ocp: boolean; pymupdf: boolean; rapidocr: boolean };
+        error?: string;
+      };
+      return res || { ok: false, error: 'Bilinmeyen IPC yanıtı' };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  }
 }

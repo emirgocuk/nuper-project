@@ -1,0 +1,22 @@
+# Nuper Ortho — Sovereign Autonomous Metrology System
+# Python Çekirdek Bağımlılıkları (Pinned Core Dependencies)
+# Python 3.10 - 3.13 uyumlu
+
+# 1. B-Rep CAD Geometri Çekirdeği (OpenCASCADE 8.0)
+cadquery-ocp==8.0.1.1.0
+
+# 2. 2D Teknik Resim Vektör & Render Çekirdeği
+pymupdf==1.28.2
+
+# 3. Yerel OCR Çekirdeği (Taranmış / Raster Teknik Resimler)
+rapidocr-onnxruntime==1.2.3
+onnxruntime==1.30.0
+
+# 4. Sayısal İşleme, Veri Doğrulama ve Tip Yönetimi
+numpy==2.2.6
+pydantic==2.12.5
+jsonschema==4.26.0
+
+# 5. Doğrulama ve Birim Testler
+pytest==9.1.1
+

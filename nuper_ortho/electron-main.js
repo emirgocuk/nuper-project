@@ -64,27 +64,104 @@ function createWindow() {
   });
   ipcMain.on('window-close', () => mainWindow && mainWindow.close());
 
+  let cachedPythonPath = null;
+  async function resolvePythonPath() {
+    if (cachedPythonPath) return cachedPythonPath;
+    const { execFile } = require('child_process');
+    const candidates = ['python', 'py -3', 'python3'];
+    for (const cmd of candidates) {
+      const parts = cmd.split(' ');
+      const bin = parts[0];
+      const args = parts.slice(1).concat(['-c', 'import sys; print(sys.executable)']);
+      try {
+        const found = await new Promise((resolve) => {
+          execFile(bin, args, { timeout: 3000 }, (err, stdout) => {
+            if (!err && stdout && stdout.trim()) {
+              resolve(bin);
+            } else {
+              resolve(null);
+            }
+          });
+        });
+        if (found) {
+          cachedPythonPath = found;
+          return found;
+        }
+      } catch {}
+    }
+    cachedPythonPath = 'python';
+    return 'python';
+  }
+
   async function parseStepMetadata(stepPath) {
     try {
       const { execFile } = require('child_process');
+      const pyBin = await resolvePythonPath();
       const verifierScript = path.join(__dirname, 'tools', 'extractor', 'brep_verifier.py');
       return await new Promise((resolve) => {
-        execFile('python', [verifierScript, stepPath], { maxBuffer: 20 * 1024 * 1024 }, (err, stdout) => {
+        execFile(pyBin, [verifierScript, stepPath], { maxBuffer: 25 * 1024 * 1024 }, (err, stdout, stderr) => {
           if (!err && stdout) {
             try {
-              resolve(JSON.parse(stdout));
+              const parsed = JSON.parse(stdout);
+              resolve(parsed);
             } catch (e) {
-              resolve(null);
+              console.error('[Nuper B-Rep] JSON ayrıştırma hatası:', e, stdout.slice(0, 300));
+              resolve({ success: false, error: 'JSON parse error: ' + e.message });
             }
           } else {
-            resolve(null);
+            console.error('[Nuper B-Rep] brep_verifier çalıştırılamadı:', err?.message, stderr?.slice(0, 300));
+            resolve({ success: false, error: err?.message || stderr || 'B-Rep çıkarım hatası' });
           }
         });
       });
     } catch (e) {
-      return null;
+      console.error('[Nuper B-Rep] Kritik hata:', e);
+      return { success: false, error: e.message };
     }
   }
+
+  // Python Çekirdek ve OCP Çalışma Zamanı Sağlık Kontrolü IPC
+  ipcMain.handle('check-python-runtime', async () => {
+    try {
+      const { execFile } = require('child_process');
+      const pyBin = await resolvePythonPath();
+      return await new Promise((resolve) => {
+        const code = `
+import json, sys
+res = {"python": sys.version.split()[0], "ocp": False, "pymupdf": False, "rapidocr": False}
+try:
+    import OCP
+    res["ocp"] = True
+except Exception as e:
+    res["ocp_error"] = str(e)
+try:
+    import pymupdf
+    res["pymupdf"] = True
+except Exception as e:
+    res["pymupdf_error"] = str(e)
+try:
+    import rapidocr_onnxruntime
+    res["rapidocr"] = True
+except Exception as e:
+    res["rapidocr_error"] = str(e)
+print(json.dumps(res))
+`;
+        execFile(pyBin, ['-c', code], { timeout: 5000 }, (err, stdout, stderr) => {
+          if (!err && stdout) {
+            try {
+              resolve({ ok: true, data: JSON.parse(stdout) });
+            } catch (e) {
+              resolve({ ok: false, error: 'JSON Parse Error: ' + stdout });
+            }
+          } else {
+            resolve({ ok: false, error: err?.message || stderr || 'Python bulunamadı' });
+          }
+        });
+      });
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
 
   // Native CAD File Chooser IPC
   ipcMain.handle('select-cad-file', async () => {
@@ -159,29 +236,30 @@ function createWindow() {
   ipcMain.handle('extract-drawing-data', async (event, targetPath, stepPath) => {
     try {
       const { execFile } = require('child_process');
+      const pyBin = await resolvePythonPath();
       const scriptPath = path.join(__dirname, 'tools', 'drawing_extractor.py');
       const args = [scriptPath, targetPath];
       if (stepPath) {
         args.push(stepPath);
       }
       return new Promise((resolve) => {
-        execFile('python', args, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+        execFile(pyBin, args, { maxBuffer: 15 * 1024 * 1024 }, (err, stdout, stderr) => {
           if (err) {
-            console.warn('drawing_extractor.py failed, error:', err);
-            resolve(null);
+            console.error('[Nuper Drawing] drawing_extractor.py başarısız oldu:', err?.message, stderr?.slice(0, 300));
+            resolve({ success: false, error: err?.message || stderr || 'Teknik resim çıkarım hatası' });
           } else {
             try {
               resolve(JSON.parse(stdout));
             } catch (e) {
-              console.warn('JSON parse error from drawing_extractor:', e);
-              resolve(null);
+              console.error('[Nuper Drawing] JSON parse error from drawing_extractor:', e, stdout.slice(0, 300));
+              resolve({ success: false, error: 'JSON parse hatası: ' + e.message });
             }
           }
         });
       });
     } catch (e) {
-      console.error('Error extracting drawing data:', e);
-      return null;
+      console.error('[Nuper Drawing] Error extracting drawing data:', e);
+      return { success: false, error: e.message };
     }
   });
 
