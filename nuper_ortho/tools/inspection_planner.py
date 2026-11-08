@@ -45,6 +45,151 @@ def compute_plan_audit_hash(part_number: str, items: List[Item]) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
+def classify_dim_phase(dim: Dict[str, Any]) -> str:
+    text = f"{dim.get('type', '')} {dim.get('type_label', '')} {dim.get('feature_key', '')}".lower()
+    if "kalinlik" in text or "thickness" in text or "yukseklik" in text:
+        return "THICKNESS"
+    if dim.get("type") == "DIAMETER" or "delik" in text or "hole" in text or "konum" in text:
+        return "POSITION"
+    return "DISTANCE"
+
+
+def solve_tsp_nearest_neighbor_items(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if len(entries) <= 1:
+        return list(entries)
+    remaining = list(entries)
+    ordered = [remaining.pop(0)]
+    while remaining:
+        curr_center = ordered[-1]["dim"].get("cad_center") or ordered[-1]["dim"].get("center") or [0.0, 0.0, 0.0]
+        best_idx = 0
+        min_sq = float("inf")
+        for idx, cand in enumerate(remaining):
+            cand_center = cand["dim"].get("cad_center") or cand["dim"].get("center") or [0.0, 0.0, 0.0]
+            dx = cand_center[0] - curr_center[0]
+            dz = cand_center[2] - curr_center[2] if len(cand_center) > 2 else cand_center[1] - curr_center[1]
+            d_sq = dx * dx + dz * dz
+            if d_sq < min_sq:
+                min_sq = d_sq
+                best_idx = idx
+        ordered.append(remaining.pop(best_idx))
+    return ordered
+
+
+def generate_cmm_waypoints(
+    features: List[Dict[str, Any]],
+    bbox: Dict[str, List[float]],
+    clearance_margin: float = 25.0
+) -> List[Dict[str, Any]]:
+    min_pt = bbox.get("min", [0.0, 0.0, 0.0])
+    max_pt = bbox.get("max", [100.0, 100.0, 50.0])
+    max_z = max_pt[2] if len(max_pt) > 2 else 50.0
+    safe_z = max_z + clearance_margin
+    safe_index_z = max_z + 50.0
+    waypoints: List[Dict[str, Any]] = []
+    current_angle = "A0B0"
+
+    for feat in features:
+        center = feat.get("center") or feat.get("cad_center") or [0.0, 0.0, 0.0]
+        is_hole = feat.get("feature_type") == "INTERNAL_CYLINDER" or feat.get("type") == "DIAMETER"
+        dia = float(feat.get("nominal_dimension") or feat.get("nominal") or 10.0)
+        radius = dia / 2.0
+        target_angle = feat.get("ph10_angle", "A0B0")
+
+        if target_angle != current_angle:
+            waypoints.append({
+                "sub_phase": "RETRACT_TO_SAFE",
+                "position": [center[0], center[1], safe_index_z],
+                "ph10_angle": current_angle,
+                "feed_rate": 150.0,
+            })
+            waypoints.append({
+                "sub_phase": "HEAD_ROTATION",
+                "position": [center[0], center[1], safe_index_z],
+                "ph10_angle": target_angle,
+                "feed_rate": 150.0,
+            })
+            current_angle = target_angle
+
+        waypoints.append({
+            "sub_phase": "SAFE_TRAVERSE",
+            "position": [center[0], center[1], safe_z],
+            "ph10_angle": current_angle,
+            "feed_rate": 150.0,
+        })
+
+        if is_hole:
+            z_top = feat.get("z_top", max_z)
+            z_meas = z_top - min(dia * 0.5, max(3.0, dia * 0.4))
+            p_above = [center[0], center[1], z_top + 12.0]
+            p_center = [center[0], center[1], z_meas]
+
+            waypoints.append({
+                "sub_phase": "PLUNGE_TO_ENTRY",
+                "position": p_above,
+                "ph10_angle": current_angle,
+                "feed_rate": 80.0,
+            })
+            waypoints.append({
+                "sub_phase": "AXIAL_ENTRY",
+                "position": p_center,
+                "ph10_angle": current_angle,
+                "feed_rate": 20.0,
+            })
+
+            for angle_deg in [0.0, 90.0, 180.0, 270.0]:
+                rad = math.radians(angle_deg)
+                tx = center[0] + radius * math.cos(rad)
+                ty = center[1] + radius * math.sin(rad)
+                waypoints.append({
+                    "sub_phase": "APPROACH",
+                    "position": [tx - 1.0 * math.cos(rad), ty - 1.0 * math.sin(rad), z_meas],
+                    "ph10_angle": current_angle,
+                    "feed_rate": 20.0,
+                })
+                waypoints.append({
+                    "sub_phase": "TOUCH",
+                    "position": [tx, ty, z_meas],
+                    "ph10_angle": current_angle,
+                    "feed_rate": 5.0,
+                })
+                waypoints.append({
+                    "sub_phase": "RETRACT",
+                    "position": p_center,
+                    "ph10_angle": current_angle,
+                    "feed_rate": 50.0,
+                })
+
+            waypoints.append({
+                "sub_phase": "AXIAL_EXIT",
+                "position": p_above,
+                "ph10_angle": current_angle,
+                "feed_rate": 50.0,
+            })
+        else:
+            p_entry = [center[0], center[1], center[2] + 5.0]
+            waypoints.append({
+                "sub_phase": "PLUNGE_TO_ENTRY",
+                "position": p_entry,
+                "ph10_angle": current_angle,
+                "feed_rate": 80.0,
+            })
+            waypoints.append({
+                "sub_phase": "TOUCH",
+                "position": [center[0], center[1], center[2]],
+                "ph10_angle": current_angle,
+                "feed_rate": 5.0,
+            })
+
+        waypoints.append({
+            "sub_phase": "RETRACT_TO_SAFE",
+            "position": [center[0], center[1], safe_z],
+            "ph10_angle": current_angle,
+            "feed_rate": 150.0,
+        })
+
+    return waypoints
+
+
 def generate_inspection_plan(
     drawing_data: Dict[str, Any],
     cad_reference: Optional[str] = None,
@@ -146,7 +291,6 @@ def generate_inspection_plan(
                 "type": Type.LINEAR_DIM,
             })
 
-    # Sıralama: Önce datum bağımlılığına göre geometrik toleranslar (A -> AB -> ABC)
     def datum_sort_key(entry: Dict[str, Any]) -> int:
         d_list = entry["datums"]
         if "C" in d_list:
@@ -159,7 +303,15 @@ def generate_inspection_plan(
 
     geometric_items.sort(key=datum_sort_key)
 
-    all_sorted = geometric_items + linear_items
+    dist_items = [e for e in geometric_items + linear_items if classify_dim_phase(e["dim"]) == "DISTANCE"]
+    pos_items = [e for e in geometric_items + linear_items if classify_dim_phase(e["dim"]) == "POSITION"]
+    thick_items = [e for e in geometric_items + linear_items if classify_dim_phase(e["dim"]) == "THICKNESS"]
+
+    all_sorted = (
+        solve_tsp_nearest_neighbor_items(dist_items)
+        + solve_tsp_nearest_neighbor_items(pos_items)
+        + solve_tsp_nearest_neighbor_items(thick_items)
+    )
 
     for entry in all_sorted:
         dim = entry["dim"]

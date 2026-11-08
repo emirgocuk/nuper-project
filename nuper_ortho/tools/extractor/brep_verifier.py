@@ -135,6 +135,7 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
     size_x = max(0.0, max_x - min_x)
     size_y = max(0.0, max_y - min_y)
     size_z = max(0.0, max_z - min_z)
+    solid_centroid = [(min_x + max_x) / 2.0, (min_y + max_y) / 2.0, (min_z + max_z) / 2.0]
 
     max_span = max(size_x, size_y, size_z, 1.0)
     linear_deflection = max(0.01, min(0.08, max_span * 0.001))
@@ -230,6 +231,10 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
             d = pln.Axis().Direction()
             sign = -1.0 if is_rev else 1.0
             normal = [round(d.X() * sign, 4), round(d.Y() * sign, 4), round(d.Z() * sign, 4)]
+            to_face = [center_vec[0] - solid_centroid[0], center_vec[1] - solid_centroid[1], center_vec[2] - solid_centroid[2]]
+            dot_out = to_face[0] * normal[0] + to_face[1] * normal[1] + to_face[2] * normal[2]
+            if dot_out < -1e-3 and (abs(to_face[0]) > 0.5 or abs(to_face[1]) > 0.5 or abs(to_face[2]) > 0.5):
+                normal = [-normal[0], -normal[1], -normal[2]]
             extracted_features.append({
                 "id": f"CAD_PLANE_{face_idx}",
                 "feature_type": "PLANE",
@@ -423,8 +428,15 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
         a = grp["axis"]
         if math.isfinite(grp["proj_min"]) and math.isfinite(grp["proj_max"]) and grp["proj_max"] >= grp["proj_min"]:
             t = (grp["proj_min"] + grp["proj_max"]) / 2.0
+            p_start = [o[i] + grp["proj_min"] * a[i] for i in range(3)]
+            p_end = [o[i] + grp["proj_max"] * a[i] for i in range(3)]
+            axial_axis = 1 if abs(a[1]) >= abs(a[2]) and abs(a[1]) >= abs(a[0]) else (2 if abs(a[2]) >= abs(a[0]) else 0)
+            ax_min = min(p_start[axial_axis], p_end[axial_axis])
+            ax_max = max(p_start[axial_axis], p_end[axial_axis])
         else:
             t = (mean_x - o[0]) * a[0] + (mean_y - o[1]) * a[1] + (mean_z - o[2]) * a[2]
+            ax_min = avg_y if abs(a[1]) >= abs(a[2]) else avg_z
+            ax_max = ax_min
         avg_x = o[0] + t * a[0]
         avg_y = o[1] + t * a[1]
         avg_z = o[2] + t * a[2]
@@ -437,6 +449,10 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
             "center": [round(avg_x, 4), round(avg_y, 4), round(avg_z, 4)],
             "normal": grp["axis"],
             "area_or_length": round(grp["total_area"], 4),
+            "axial_min": round(ax_min, 4),
+            "axial_max": round(ax_max, 4),
+            "z_top": round(ax_max, 4),
+            "z_bottom": round(ax_min, 4),
             "face_ids": grp["face_ids"],
             "description": f"{label} Ø{grp['diameter']:.2f} mm ({len(grp['face_ids'])} yüzey parçası)",
         })
