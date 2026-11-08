@@ -7,8 +7,8 @@ tools_dir = os.path.dirname(current_dir)
 if tools_dir not in sys.path:
     sys.path.insert(0, tools_dir)
 
-from extractor.parse.tolerance import resolve_iso_fit, parse_symmetric_tolerance, parse_bilateral_tolerance
-from extractor.parse.thread import parse_thread_callout
+from extractor.parse.tolerance import resolve_iso_fit, parse_symmetric_tolerance, parse_bilateral_tolerance, apply_iso2768_tolerance
+from extractor.parse.thread import parse_thread_callout, compute_thread_minor_diameter
 from extractor.parse.dimension import parse_diameter_callouts, parse_radius_callouts, parse_linear_callouts
 from extractor.title_block import extract_title_block_fields, extract_datum_labels
 from extractor.spatial import find_spatial_tolerances_near
@@ -139,3 +139,37 @@ def test_page1_feature_discrimination():
     note_box = [150.0, 150.0, 180.0, 165.0]
     note_items = [{"text": "BOYA NOTLARI: 1- MASKELENECEKTIR", "bbox": [150.0, 150.0, 350.0, 165.0]}]
     assert is_feature_in_title_or_notes(note_box, note_items, masks, page_w, page_h)
+
+
+def test_iso2768_table_assignment():
+    u1, l1, src1 = apply_iso2768_tolerance(2.5, "m")
+    assert u1 == "+0.1"
+    assert l1 == "-0.1"
+    assert src1 == "ISO_2768_M"
+
+    u2, l2, src2 = apply_iso2768_tolerance(25.0, "m")
+    assert u2 == "+0.2"
+    assert l2 == "-0.2"
+
+    u3, l3, src3 = apply_iso2768_tolerance(150.0, "m")
+    assert u3 == "+0.5"
+    assert l3 == "-0.5"
+
+    u_f, l_f, src_f = apply_iso2768_tolerance(25.0, "f")
+    assert u_f == "+0.1"
+    assert l_f == "-0.1"
+    assert src_f == "ISO_2768_F"
+
+
+def test_thread_minor_diameter_computation():
+    d_m6 = compute_thread_minor_diameter(6.0, 1.0)
+    assert abs(d_m6 - 4.9175) < 0.01
+
+    d_m8 = compute_thread_minor_diameter(8.0, 1.25)
+    assert abs(d_m8 - (8.0 - 1.082532 * 1.25)) < 0.01
+
+    parsed = parse_thread_callout("4x M6x1-6H Delik")
+    assert parsed is not None
+    assert parsed["nominal_dia"] == 6.0
+    assert parsed["pitch"] == 1.0
+    assert abs(parsed["minor_dia"] - 4.9175) < 0.01

@@ -440,6 +440,9 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
         avg_x = o[0] + t * a[0]
         avg_y = o[1] + t * a[1]
         avg_z = o[2] + t * a[2]
+        axial_min_bound = min_y if axial_axis == 1 else (min_z if axial_axis == 2 else min_x)
+        is_blind = is_int and (ax_min > axial_min_bound + 0.8)
+        floor_z = ax_min if is_blind else None
         label = "Delik" if is_int else "Mil / Silindir"
         feat_id = f"CAD_{'HOLE' if is_int else 'CYL'}_Ø{grp['diameter']:.2f}_{cyl_idx}"
         extracted_features.append({
@@ -453,6 +456,8 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
             "axial_max": round(ax_max, 4),
             "z_top": round(ax_max, 4),
             "z_bottom": round(ax_min, 4),
+            "is_blind": is_blind,
+            "floor_z": round(floor_z, 4) if floor_z is not None else None,
             "face_ids": grp["face_ids"],
             "description": f"{label} Ø{grp['diameter']:.2f} mm ({len(grp['face_ids'])} yüzey parçası)",
         })

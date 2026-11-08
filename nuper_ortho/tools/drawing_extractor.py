@@ -21,6 +21,8 @@ from extractor.vector_extractor import extract_vector_dimensions_from_page, get_
 from extractor.semantic_grammar import normalize_engineering_callout, build_321_alignment, classify_operation_setup
 from extractor.brep_verifier import parse_step_file, verify_dimensions_against_step
 from extractor.vision_ai_extractor import run_local_or_hybrid_ai_extraction
+from extractor.parse.tolerance import apply_iso2768_tolerance
+from extractor.pmi_extractor import parse_step_pmi
 
 
 def is_feature_in_title_or_notes(box: List[float], items: List[Dict[str, Any]], masks: List[Tuple[float, float, float, float]], page_w: float, page_h: float) -> bool:
@@ -621,10 +623,53 @@ def parse_text_to_metrology(
 
     # 3. KATMAN 3: 3D STEP B-Rep Çapraz Doğrulama & Hakem Katmanı (Sanity Check)
     if step_path and os.path.exists(step_path):
+        pmi_data = parse_step_pmi(step_path)
+        if pmi_data.get("is_ap242") and pmi_data.get("tolerances"):
+            for pmi_tol in pmi_data["tolerances"]:
+                dims.append({
+                    "id": balloon_idx,
+                    "balloon": f"#{balloon_idx}",
+                    "page": 1,
+                    "type": pmi_tol.get("type", "GEOMETRIC_TOLERANCE"),
+                    "type_label": f"AP242 {pmi_tol.get('type')}",
+                    "icon": "📐",
+                    "nominal": pmi_tol.get("value", 0.0),
+                    "nominal_str": f"{pmi_tol.get('value', 0.0):.3f}",
+                    "upper_tol": f"+{pmi_tol.get('value', 0.0):.3f}",
+                    "lower_tol": "0.000",
+                    "measured": "",
+                    "deviation": "",
+                    "status": "UNMEASURED",
+                    "verification": "AP242_VALIDATED",
+                    "match_confidence": 100.0,
+                    "match_status": "AP242_NATIVE_PMI",
+                    "tolerance_source": "AP242_PMI",
+                    "feature_key": f"pmi_{pmi_tol.get('step_id')}_{balloon_idx}",
+                    "gdt": pmi_tol.get("type", ""),
+                    "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
+                    "op": "OP10",
+                    "op_reason": "AP242 Gömülü 3D PMI Geometrik Toleransı",
+                    "bbox": [100.0, 100.0, 200.0, 150.0],
+                })
+                balloon_idx += 1
         step_data = parse_step_file(step_path)
         if step_data.get("success"):
             verified, pruned = verify_dimensions_against_step(dims, step_data)
             dims = verified
+
+    iso_cls = result.get("title_block", {}).get("iso_class", "m")
+    for d in dims:
+        u_tol = str(d.get("upper_tol", "")).strip()
+        l_tol = str(d.get("lower_tol", "")).strip()
+        if (not u_tol or u_tol == "0.000" or u_tol == "0") and (not l_tol or l_tol == "0.000" or l_tol == "0"):
+            nom = d.get("nominal", 0.0)
+            if isinstance(nom, (int, float)) and nom > 0.0:
+                calc_u, calc_l, src_tag = apply_iso2768_tolerance(float(nom), iso_cls)
+                d["upper_tol"] = calc_u
+                d["lower_tol"] = calc_l
+                d["tolerance_source"] = src_tag
+        elif not d.get("tolerance_source"):
+            d["tolerance_source"] = "EXPLICIT_DRAWING"
 
     for d in dims:
         b = d.get("bbox")
