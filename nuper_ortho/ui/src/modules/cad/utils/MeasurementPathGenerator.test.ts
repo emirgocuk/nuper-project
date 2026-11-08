@@ -110,5 +110,94 @@ describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Nok
       expect(wp.position.y).toBeGreaterThanOrEqual(0);
     }
   });
+
+  it('iki delik arasında emniyet düzlemi intikali (z >= maxPart + 20) uygular', () => {
+    const twoHoles: PathFeatureInput[] = [
+      {
+        id: 10,
+        balloon: '#10',
+        type: 'DIAMETER',
+        type_label: 'Delik 1',
+        nominal: 10.0,
+        cad_center: [20, 20, 50],
+        cad_normal: [0, 0, 1],
+        operation: 'OP10',
+      },
+      {
+        id: 11,
+        balloon: '#11',
+        type: 'DIAMETER',
+        type_label: 'Delik 2',
+        nominal: 10.0,
+        cad_center: [80, 80, 50],
+        cad_normal: [0, 0, 1],
+        operation: 'OP10',
+      },
+    ];
+    const plan = MeasurementPathGenerator.generatePlan(twoHoles, mockBbox, { verticalAxis: 'Z' });
+    const maxPartZ = mockBbox.max[2];
+    const clearanceWaypoints = plan.allWaypoints.filter((wp) => wp.position.z >= maxPartZ + 20.0);
+    expect(clearanceWaypoints.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('deliğin eksenel giriş ve çıkış waypointlerinin delik merkezinde olduğunu doğrular', () => {
+    const singleHole: PathFeatureInput = {
+      id: 20,
+      balloon: '#20',
+      type: 'DIAMETER',
+      type_label: 'Delik',
+      nominal: 12.0,
+      cad_center: [45, 45, 50],
+      cad_normal: [0, 0, 1],
+      operation: 'OP10',
+    };
+    const plan = MeasurementPathGenerator.generatePlan([singleHole], mockBbox, { verticalAxis: 'Z' });
+    const featurePath = plan.featurePaths[0];
+    const axialEntries = featurePath.waypoints.filter(
+      (wp) => (wp as any).subPhase === 'AXIAL_ENTRY' || (wp as any).subPhase === 'PLUNGE_TO_ENTRY'
+    );
+    expect(axialEntries.length).toBeGreaterThanOrEqual(1);
+    for (const wp of axialEntries) {
+      expect(wp.position.x).toBeCloseTo(45.0, 1);
+      expect(wp.position.y).toBeCloseTo(45.0, 1);
+    }
+  });
+
+  it('kafa açısı değişiminde safeIndexZ emniyet seviyesinde kafa dönüş waypointi üretir', () => {
+    const multiAngle: PathFeatureInput[] = [
+      {
+        id: 30,
+        balloon: '#30',
+        type: 'DIAMETER',
+        type_label: 'Delik Dikey',
+        nominal: 10.0,
+        cad_center: [20, 1.75, 20],
+        cad_normal: [0, -1, 0],
+        operation: 'OP10',
+      },
+      {
+        id: 31,
+        balloon: '#31',
+        type: 'LINEAR',
+        type_label: 'Kalınlık',
+        nominal: 5.7,
+        cad_center: [0, 5.7, 0],
+        cad_normal: [0, 1, 0],
+        cad_feature_id: 'CAD_BBOX_Y',
+        operation: 'OP10',
+      },
+    ];
+    const yBbox = {
+      min: [-30, 0, -20] as [number, number, number],
+      max: [30, 5.7, 20] as [number, number, number],
+    };
+    const plan = MeasurementPathGenerator.generatePlan(multiAngle, yBbox, { verticalAxis: 'Y' });
+    expect(plan.safeIndexZ).toBeDefined();
+    const safeZ = plan.safeIndexZ!;
+    const rotationWps = plan.allWaypoints.filter(
+      (wp) => Math.abs(wp.position.y - safeZ) < 0.1
+    );
+    expect(rotationWps.length).toBeGreaterThanOrEqual(1);
+  });
 });
 
