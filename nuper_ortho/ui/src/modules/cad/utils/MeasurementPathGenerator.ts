@@ -29,6 +29,12 @@ export interface PathFeatureInput {
   axial_max?: number;
   stem_blocked?: boolean;
   cad_instances?: PathFeatureInstance[];
+  faceA_center?: [number, number, number];
+  faceB_center?: [number, number, number];
+  faceA_normal?: [number, number, number];
+  faceB_normal?: [number, number, number];
+  distance_type?: string;
+  axis?: 'X' | 'Y' | 'Z';
 }
 
 export interface TouchPointRecord {
@@ -741,6 +747,54 @@ export class MeasurementPathGenerator {
             normal: [ux, 0, uz],
             ph10Label: 'A0° B90°',
           });
+        } else if (feat.faceA_center && feat.faceB_center) {
+          const facesToTouch = [
+            { c: feat.faceA_center, n: feat.faceA_normal || normal },
+            { c: feat.faceB_center, n: feat.faceB_normal || [-normal[0], -normal[1], -normal[2]] },
+          ];
+          for (let fIdx = 0; fIdx < facesToTouch.length; fIdx++) {
+            const fc = facesToTouch[fIdx];
+            const fn = fc.n;
+            const touchY = isYAxis ? Math.max(yMinPart + 1.0, Math.min(yMaxPart, fc.c[1])) : fc.c[1];
+            const surfPoint: [number, number, number] = [fc.c[0], touchY, fc.c[2]];
+            const tAngleObj = isYAxis
+              ? (Math.abs(fn[1]) > 0.7 ? { aDeg: 0, bDeg: 0, direction: [0, -1, 0], label: 'A0° B0°' } : Ph10Kinematics.findBestAngle([-fn[0], -fn[1], -fn[2]]).angle)
+              : Ph10Kinematics.findBestAngle([-fn[0], -fn[1], -fn[2]]).angle;
+
+            const tipCenterPos = new THREE.Vector3(
+              fc.c[0] + fn[0] * probeTipRadius,
+              isYAxis ? Math.max(yMinPart + 1.0, touchY + fn[1] * probeTipRadius) : touchY + fn[1] * probeTipRadius,
+              fc.c[2] + fn[2] * probeTipRadius
+            );
+            const standoffPos = new THREE.Vector3(
+              fc.c[0] + fn[0] * (probeTipRadius + approachDist),
+              isYAxis ? Math.max(yMinPart + 1.0, touchY + fn[1] * (probeTipRadius + approachDist)) : touchY + fn[1] * (probeTipRadius + approachDist),
+              fc.c[2] + fn[2] * (probeTipRadius + approachDist)
+            );
+            const retractPos = new THREE.Vector3(
+              fc.c[0] + fn[0] * (probeTipRadius + retractDist),
+              isYAxis ? Math.max(yMinPart + 1.0, touchY + fn[1] * (probeTipRadius + retractDist)) : touchY + fn[1] * (probeTipRadius + retractDist),
+              fc.c[2] + fn[2] * (probeTipRadius + retractDist)
+            );
+
+            const overheadPos = isYAxis
+              ? new THREE.Vector3(standoffPos.x, zClearance, standoffPos.z)
+              : new THREE.Vector3(standoffPos.x, standoffPos.y, zClearance);
+
+            featWaypoints.push(makeWp(overheadPos.clone(), 'TRAVERSE', feat.id, subBalloon, tAngleObj.direction as [number, number, number], tAngleObj.label, 'SAFE_TRAVERSE', 150.0));
+            featWaypoints.push(makeWp(standoffPos, 'TRAVERSE', feat.id, subBalloon, tAngleObj.direction as [number, number, number], tAngleObj.label, 'APPROACH', 80.0));
+            featWaypoints.push(makeWp(tipCenterPos.clone(), 'TOUCH', feat.id, subBalloon, tAngleObj.direction as [number, number, number], tAngleObj.label, 'TOUCH', 5.0));
+            featWaypoints.push(makeWp(retractPos, 'RETRACT', feat.id, subBalloon, tAngleObj.direction as [number, number, number], tAngleObj.label, 'RETRACT', 50.0));
+            featWaypoints.push(makeWp(overheadPos.clone(), 'RETRACT', feat.id, subBalloon, tAngleObj.direction as [number, number, number], tAngleObj.label, 'RETRACT_TO_SAFE', 150.0));
+
+            touchRecords.push({
+              position: surfPoint,
+              surfacePoint: surfPoint,
+              tipCenterPosition: [tipCenterPos.x, tipCenterPos.y, tipCenterPos.z],
+              normal: [fn[0], fn[1], fn[2]],
+              ph10Label: tAngleObj.label,
+            });
+          }
         } else {
           let safeTouchY = isYAxis ? Math.max(yMinPart + 1.0, Math.min(yMaxPart, center[1])) : center[1];
           if (isYAxis && (cadId === 'CAD_BBOX_X' || cadId === 'CAD_BBOX_Z')) {
@@ -800,9 +854,11 @@ export class MeasurementPathGenerator {
     allWaypoints.push(makeWp(returnHome, 'TRAVERSE', undefined, undefined, isYAxis ? [0, -1, 0] : [0, 0, -1], currentAngleLabel || 'A0° B0°', 'HOME', 150.0));
 
     for (const wp of allWaypoints) {
-      if (wp.position.x < 0 && Math.abs(wp.position.x) < 1e-4) wp.position.x = 0;
-      if (wp.position.y < 0) wp.position.y = 0;
-      if (wp.position.z < 0) wp.position.z = 0;
+      if (isYAxis) {
+        if (wp.position.y < 0) wp.position.y = 0;
+      } else {
+        if (wp.position.z < 0) wp.position.z = 0;
+      }
     }
 
     let totalDist = 0;

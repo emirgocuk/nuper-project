@@ -2233,6 +2233,12 @@ export class SetupWizard {
         axial_max: dExt.axial_max ?? cfExt?.axial_max,
         stem_blocked: dExt.stem_blocked ?? cfExt?.stem_blocked,
         cad_instances: dExt.cad_instances,
+        faceA_center: dExt.faceA_center ?? (matchedCadFeat as unknown as { faceA_center?: [number, number, number] })?.faceA_center,
+        faceB_center: dExt.faceB_center ?? (matchedCadFeat as unknown as { faceB_center?: [number, number, number] })?.faceB_center,
+        faceA_normal: dExt.faceA_normal ?? (matchedCadFeat as unknown as { faceA_normal?: [number, number, number] })?.faceA_normal,
+        faceB_normal: dExt.faceB_normal ?? (matchedCadFeat as unknown as { faceB_normal?: [number, number, number] })?.faceB_normal,
+        distance_type: dExt.distance_type ?? (matchedCadFeat as unknown as { distance_type?: string })?.distance_type,
+        axis: (dExt.inferred_axis ?? (matchedCadFeat as unknown as { axis?: 'X' | 'Y' | 'Z' })?.axis) as 'X' | 'Y' | 'Z' | undefined,
       };
     });
 
@@ -2288,7 +2294,7 @@ export class SetupWizard {
             allTouches.push({ position: tp.position, label: `${fp.balloon} Temas Noktası`, isDatum: false });
           }
         }
-        this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], allTouches, 0.035);
+        this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], allTouches, 0.015);
 
         if (win.probeGroup && plan.allWaypoints.length > 0) {
           const firstWp = plan.allWaypoints[0] as ExtendedWaypoint;
@@ -2368,7 +2374,7 @@ export class SetupWizard {
   private renderSceneTrajectoryAndTouches(
     waypoints: ExtendedWaypoint[],
     touches: Array<{ position: [number, number, number]; label?: string; isDatum?: boolean }>,
-    tubeRadius = 0.035
+    tubeRadius = 0.015
   ): void {
     if (typeof window === 'undefined') return;
     const win = window as unknown as {
@@ -2424,13 +2430,13 @@ export class SetupWizard {
 
       if (tPoints.length >= 2) {
         const lineGeo = new T.BufferGeometry().setFromPoints(tPoints);
-        const lineMat = new T.LineBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.75 });
+        const lineMat = new T.LineBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.55 });
         pathGroup.add(new T.Line(lineGeo, lineMat));
 
         const upAxis = new T.Vector3(0, 1, 0);
-        const matTraverse = new T.MeshBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.75 });
+        const matTraverse = new T.MeshBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.60 });
         const matTouch = new T.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.85 });
-        const matMeas = new T.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.82 });
+        const matMeas = new T.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.70 });
         const matDatum = new T.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.85 });
 
         for (let i = 0; i < tPoints.length - 1; i++) {
@@ -2459,7 +2465,7 @@ export class SetupWizard {
         }
       }
 
-      const dotGeo = new T.SphereGeometry(Math.max(0.18, tubeRadius * 2.8), 12, 12);
+      const dotGeo = new T.SphereGeometry(Math.max(0.12, tubeRadius * 2.2), 12, 12);
       const dotMatMeas = new T.MeshBasicMaterial({ color: 0x10b981 });
       const dotMatDatum = new T.MeshBasicMaterial({ color: 0xf59e0b });
       for (const tp of touches) {
@@ -2650,7 +2656,7 @@ export class SetupWizard {
         opTouches.push({ position: tp.position, label: `${fp.balloon} Temas Noktası`, isDatum: false });
       }
     }
-    this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], opTouches, 0.035);
+    this.renderSceneTrajectoryAndTouches(plan.allWaypoints as ExtendedWaypoint[], opTouches, 0.015);
 
     if (typeof document !== 'undefined') {
       const sidebarLeft = document.querySelector('.sidebar-left') as HTMLElement | null;
@@ -2708,12 +2714,36 @@ export class SetupWizard {
             const measColor = isPass ? '#059669' : (isFail ? '#DC2626' : '#64748B');
             const measStr = d.measured && d.measured !== '--' && d.measured !== 'UNMEASURED' ? d.measured : '--';
             const devStr = d.deviation && d.deviation !== '--' ? `(${d.deviation})` : '';
+
+            const dExt = d as unknown as { match_status?: string; match_score?: number };
+            const mStatus = dExt.match_status || (d.cad_feature_id ? 'VERIFIED_EXACT' : 'UNMATCHED');
+            const mScore = dExt.match_score ?? (d.cad_feature_id ? 95 : 0);
+            const badgeLabel = mStatus === 'ENGINEER_LOCKED'
+              ? '🔒 %100 Kilitli'
+              : mStatus === 'VERIFIED_EXACT'
+              ? `✓ %${mScore}`
+              : mStatus === 'VERIFIED_TOPOLOGY'
+              ? `~ %${mScore}`
+              : mStatus === 'NEEDS_REVIEW'
+              ? `⚠ %${mScore}`
+              : '✕ Eşleşmedi';
+            const badgeClass = mStatus === 'ENGINEER_LOCKED'
+              ? 'locked'
+              : mStatus === 'VERIFIED_EXACT'
+              ? 'exact'
+              : mStatus === 'VERIFIED_TOPOLOGY'
+              ? 'topology'
+              : mStatus === 'NEEDS_REVIEW'
+              ? 'review'
+              : 'unmatched';
+
             return `
               <div class="clean-feature-item ${isSel ? 'active' : ''}" data-clean-id="${d.id}">
                 <div class="clean-feature-top">
                   <span class="clean-balloon-badge ${isSel ? 'active' : ''}">${d.balloon}</span>
                   <span class="clean-feature-name">${d.icon || '📏'} ${d.type_label || d.nominal_str}</span>
                   <span class="clean-operation-pill ${(d.operation || 'OP10').toLowerCase()}">${d.operation || 'OP10'}</span>
+                  <span class="clean-match-pill ${badgeClass}">${badgeLabel}</span>
                   <span class="clean-status-pill ${statusClass}">${statusLabel}</span>
                 </div>
                 <div class="clean-feature-bottom">
@@ -2724,6 +2754,7 @@ export class SetupWizard {
                       ? `<span class="clean-cad-tag" title="CAD B-Rep Eşlendi: ${d.cad_feature_id}">🎯 ${d.cad_feature_id}</span>`
                       : `<span>Datum: ${d.datum_reference || '[A]'}</span>`
                   }
+                  <button class="clean-snap-btn" data-snap-id="${d.id}" title="3D CAD Modelinde Yüzeye Kilitle">🎯 Yüzey Seç</button>
                 </div>
               </div>
             `;
@@ -2742,6 +2773,34 @@ export class SetupWizard {
         }
       });
     });
+
+    container.querySelectorAll<HTMLElement>('.clean-snap-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idAttr = btn.getAttribute('data-snap-id');
+        if (idAttr) {
+          this.triggerSurfacePickingForDimension(parseInt(idAttr, 10));
+        }
+      });
+    });
+  }
+
+  public triggerSurfacePickingForDimension(id: number): void {
+    const dim = this.dimensions.find((d) => d.id === id);
+    if (!dim) return;
+    const app = this.appInstance as { getCADViewer?: () => CADViewer } | null;
+    const cadViewer = app?.getCADViewer?.();
+    if (!cadViewer) return;
+
+    cadViewer.highlightFeature(dim.cad_feature_id || `feat_${id}`);
+    const dExt = dim as unknown as { match_status?: string; match_score?: number };
+    dExt.match_status = 'ENGINEER_LOCKED';
+    dExt.match_score = 100;
+    dim.verification = 'HUMAN_VERIFIED';
+    const sidebar = document.getElementById('clean-features-panel')?.parentElement;
+    if (sidebar) {
+      this.renderVerifiedFeaturesList(sidebar, this.dimensions);
+    }
   }
 
   public activateDimensionIn3d(id: number): void {
@@ -2802,7 +2861,7 @@ export class SetupWizard {
           label: `${fp.balloon} Temas Noktası`,
           isDatum: false,
         }));
-        this.renderSceneTrajectoryAndTouches(fp.waypoints as ExtendedWaypoint[], singleTouches, 0.045);
+        this.renderSceneTrajectoryAndTouches(fp.waypoints as ExtendedWaypoint[], singleTouches, 0.018);
 
         const touchWp = (fp.waypoints.find((w) => w.phase === 'TOUCH') || fp.waypoints[0]) as ExtendedWaypoint;
         this.orientProbeHead(win.probeGroup, touchWp.position, touchWp.stylusDir || [0, -1, 0], touchWp.ph10Label || headAngleStr);
@@ -3741,6 +3800,50 @@ export class SetupWizard {
         color: #059669;
         font-weight: 700;
         font-size: 9.5px;
+      }
+      .clean-match-pill {
+        font-size: 8.5px;
+        font-weight: 700;
+        padding: 1px 5px;
+        border-radius: 3px;
+        letter-spacing: 0.2px;
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .clean-match-pill.locked {
+        background: #DBEAFE;
+        color: #1D4ED8;
+      }
+      .clean-match-pill.exact {
+        background: #D1FAE5;
+        color: #047857;
+      }
+      .clean-match-pill.topology {
+        background: #CCFBF1;
+        color: #0F766E;
+      }
+      .clean-match-pill.review {
+        background: #FEF3C7;
+        color: #B45309;
+      }
+      .clean-match-pill.unmatched {
+        background: #FFE4E6;
+        color: #BE123C;
+      }
+      .clean-snap-btn {
+        padding: 1px 6px;
+        font-size: 9px;
+        font-weight: 600;
+        background: #F1F5F9;
+        color: #0F172A;
+        border: 1px solid #CBD5E1;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .clean-snap-btn:hover {
+        background: #0284C7;
+        color: #FFFFFF;
+        border-color: #0284C7;
       }
       .clean-feature-bottom {
         display: flex;

@@ -199,14 +199,13 @@ describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Nok
     expect(rotationWps.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('hiçbir waypoint koordinatında z < 0 veya y < 0 olamaz (granit tabla çarpışmasızlık)', () => {
+  it('hiçbir waypoint koordinatında y < 0 olamaz (granit tabla Y=0 çarpışmasızlık)', () => {
     const plan = MeasurementPathGenerator.generatePlan(sampleFeatures, mockBbox, {
       verticalAxis: 'Y',
       includeDatumSetup: true,
     });
     for (const wp of plan.allWaypoints) {
       expect(wp.position.y).toBeGreaterThanOrEqual(0);
-      expect(wp.position.z).toBeGreaterThanOrEqual(0);
     }
   });
 
