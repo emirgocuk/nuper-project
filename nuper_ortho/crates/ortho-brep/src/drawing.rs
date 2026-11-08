@@ -65,7 +65,11 @@ pub enum AnnotationType {
     },
     /// Derinlik ölçüsü (Örn: Derinlik 35 mm)
     DepthDimension { depth_mm: f64 },
-    /// ASME / ISO Tolerans Kontrol Çerçevesi (FCF)
+    LinearDimension {
+        nominal_distance: f64,
+        tolerance_band: f64,
+        axis: Option<String>,
+    },
     FeatureControlFrame,
     /// ASME Y14.5 Bileşik Tolerans Çerçevesi (PLTZF / FRTZF)
     CompositeControlFrame,

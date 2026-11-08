@@ -107,6 +107,31 @@ impl DrawingToStepMatcher {
                 }
                 score
             }
+            AnnotationType::DepthDimension { depth_mm } => {
+                if let Some(d) = feature.depth_or_length {
+                    let diff = (d - *depth_mm).abs();
+                    if diff < 0.05 {
+                        0.95
+                    } else if diff < 0.5 {
+                        0.70
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                }
+            }
+            AnnotationType::LinearDimension { nominal_distance, .. } => {
+                let feat_dim = feature.depth_or_length.or(feature.diameter).unwrap_or(0.0);
+                let diff = (feat_dim - *nominal_distance).abs();
+                if diff < 0.05 {
+                    0.95
+                } else if diff < 0.5 {
+                    0.70
+                } else {
+                    0.0
+                }
+            }
             AnnotationType::FeatureControlFrame | AnnotationType::CompositeControlFrame => {
                 // FCF'ler doğrudan yüzey tipine göre eşleşir
                 0.75
