@@ -181,3 +181,11 @@ Notlar:
 | ASME Y14.5 Maksimum Malzeme Şartı (Ⓜ - MMC) Dinamik Bonus Tolerans Hesabı | Uygulandı ve kilitlendi | `tolerance.rs`, `InspectionCardFormatter.ts`, `SetupWizard.ts` |
 | OP10 ⟷ OP20 (180° Ters Bağlama) Sahne ve Koordinat Dönüşümü | Uygulandı ve kilitlendi | `SetupWizard.ts`, `WorkflowRibbon.ts`, `CADViewer.ts` |
 | 10 Konsol Sekmesinin Canlı Dinamik Veriyle Üretilmesi (DMIS, Calypso, Wenzel, Mastar vb.) | Uygulandı ve kilitlendi | `CodeSnippetGenerator.ts`, `CodeSnippetGenerator.test.ts`, `SetupWizard.ts` |
+| Gerçek B-Rep Yüzey Kimlikli (`faceId`) Üçgenleme ve Hassas Raycasting | Uygulandı ve kilitlendi | `StepModelTessellator.ts`, `CADViewer.ts`, `StylusSelector.ts` |
+| Fikstür ve Bağlama Pabuçları (`ClampKeepOutZones`) 5.0mm Emniyet Marjı ve Lift-and-Hop | Uygulandı ve kilitlendi | `SetupPrep.ts`, `MeasurementPathGenerator.ts` |
+| 5 Uçlu Yıldız Prob (`Star5Way`) Kinematiği ve Ø25.000mm Seramik Küre Doğrulaması | Uygulandı ve kilitlendi | `stylus.rs`, `CodeSnippetGenerator.ts` |
+| 3-Sigma Grubbs Çapak/Toz Aykırı Değer Filtresi (`SUSPECTED_BURR_OUTLIER`) | Uygulandı ve kilitlendi | `fitting.rs`, `metrology_fitting.py` |
+| Kapalı Döngü CNC (G10) Isıl Genleşme (ISO 1: 20°C CTE) Koruma Kalkanı | Uygulandı ve kilitlendi | `closed_loop.rs`, `CodeSnippetGenerator.ts` |
+| SHA-256 Tabanlı Kalıcı Proje ve Balon Hafızası (`BalloonSessionState`) | Uygulandı ve kilitlendi | `BalloonEditing.ts`, `electron-main.js` |
+| Kibar Çizgiler (`LineSegments`) ve Zemin/Tabla Koruma Kalkanı ($Y \ge Y_{\min} + 0.5$) | Uygulandı ve kilitlendi | `MeasurementPathGenerator.ts`, `SetupWizard.ts` |
+| Kafa Açısı Değişiminde Güvenli Alan Retract Protokolü (`safeHeadIndexAltitude`) | Uygulandı ve kilitlendi | `MeasurementPathGenerator.ts` |

@@ -157,5 +157,41 @@ Detaylar için bakınız: [developmentInfrastructureRules.md](file:///d:/Project
   - Düzlemsellik/profil (`FLATNESS`, `PROFILE`) $\to$ Minimum Bölge Chebyshev (MZPL).
   - Doğrusal boyut/mesafe (`DISTANCE`, `LINEAR`) $\to$ Gauss En Küçük Kareler (LSQ).
 
+---
+
+## 7. Faz 5: Endüstriyel Mükemmellik, Fiziksel AI ve Atölye Güvenliği Mimarisi
+
+### A. Gerçek B-Rep Yüzey Kimlikli (`faceId`) Üçgenleme ve Hassas Raycasting
+- `StepModelTessellator.ts`: Her üçgen köşesine `faceId` ve `surfaceType` (DÜZLEM, SİLİNDİR, KONİK, TORUS) öznitelikleri (vertex attributes) enjekte edilir.
+- `StylusSelector.ts` & `CADViewer.ts`: `extractFaceDetailsFromHit` ile tıklanan yüzeyin geometrik kimliği, analitik normali, çapı ve merkezi çıkarılır; `highlightFaceById` ile seçilen yüzey anında vurgulanır.
+
+### B. Fikstür ve Bağlama Pabuçları (`ClampKeepOutZones`) Çarpışma Önleyicisi
+- `SetupPrep.ts`: Parça çevresinde standart bağlama pabuçları ($25\text{ mm} \times 20\text{ mm} \times 18\text{ mm}$) hesaplanır (`computeStandardClampBoxes`).
+- `MeasurementPathGenerator.ts`: Pabuçlara $5.0\text{ mm}$ emniyet mesafesi (`margin`) uygulanır. Pabuç kesen tüm intikallerde otomatik `safeZ` (`zClearance`) seviyesine dikey kalkış (`lift-and-hop`) tetiklenir.
+
+### C. Yıldız Prob (`Star5Way`) ve Ø25.000 mm Kalibrasyon Küresi Matrisi
+- `crates/ortho-router/src/stylus.rs` & `StylusSelector.ts`: 5 uçlu yıldız prob (`Star5Way`, Tip 1: -Z, Tip 2: +X, Tip 3: +Y, Tip 4: -X, Tip 5: -Y) kinematik modeli.
+- `CodeSnippetGenerator.ts`: DMIS ve prob sekmesinde standart Ø25.000 mm Seramik Kalibrasyon Küresi doğrulama matrisi ve sapma raporu (`StdDev <= 0.0008 mm`, `EffectiveDia`) üretilir.
+
+### D. 3-Sigma Grubbs Çapak ve Toz Aykırı Değer Filtresi
+- `crates/ortho-kinematics/src/fitting.rs` & `tools/extractor/metrology_fitting.py`: Düzlem ve silindir fitting işlemlerinde $|e_i - \bar{e}| > 2.5\sigma_e$ ve $|e_i| > 0.015\text{ mm}$ şartını sağlayan noktalar `SUSPECTED_BURR_OUTLIER` olarak elenir ve temiz veriyle fitting yeniden hesaplanır.
+
+### E. Kapalı Döngü CNC (G10) Isıl Genleşme (ISO 1: 20°C CTE) Koruma Kalkanı
+- `crates/ortho-emitter/src/closed_loop.rs` & `CodeSnippetGenerator.ts`: Parça sıcaklığı ($T_{\text{part}}$) ile CMM cetvel sıcaklığı ($T_{\text{cmm}}$) farkı ISO 1 20°C referansına göre kompanze edilir:
+  $$\Delta_{\text{thermal}} = L_{\text{nominal}} \cdot [\alpha_{\text{part}}(T_{\text{part}} - 20) - \alpha_{\text{cmm}}(T_{\text{cmm}} - 20)]$$
+  $$\Delta_{\text{net\_wear}} = \Delta_{\text{raw}} - \Delta_{\text{thermal}}$$
+- Fanuc `G10 L12` ve Siemens `$TC_DP12` komutları yalnızca $\Delta_{\text{net\_wear}}$ kullanılarak derlenir.
+
+### F. SHA-256 Tabanlı Kalıcı Proje ve Balon Hafızası (State Persistence)
+- `BalloonEditing.ts` & `electron-main.js`: Çizim parmak izi (`ortho_cache_<hash>`) üzerinden balon düzenlemeleri, kullanıcı eşleştirmeleri ve `ENGINEER_LOCKED` durumları `localStorage` ve `.ortho-session.json` dosyasına kaydedilir.
+
+### G. Kibar Çizgiler (Hairline Trajectory Rendering) ve Zemin Koruma Kalkanı
+- `SetupWizard.ts`: Kalın 3D silindir tüp örgüleri tamamen kaldırılarak yüksek hassasiyetli, ince ve şık `THREE.LineSegments` katmanları (hızlı intikal için saydam camgöbeği, yaklaşma/temas için kehribar, ölçüm için zümrüt yeşili) ve kompakt yakut temas küreleri ($R = 0.35\text{ mm}$) devreye alınmıştır.
+- `MeasurementPathGenerator.ts`: OP10 dikey modda $Y \ge Y_{\min} + 0.5\text{ mm}$ zemin kalkanı uygulanır; probun fikstür ayakları arasına dalması ve taban altına girmesi kesin olarak engellenir.
+- Havada kalan noktaları önlemek için tüm dokunma noktaları parça bounding box sınırları içerisine hapsedilir.
+
+### H. Kafa Açısı Değişiminde Güvenli Alan Retract Protokolü
+- PH10 kafa açısı değiştiğinde prob önce parçanın en yüksek noktasının üzerindeki güvenli tavan kotuna (`safeHeadIndexAltitude`) dikey olarak çıkar, dönüş hareketini açık alanda tamamlar ve kilitlendikten sonra hedef unsura iner.
+
 
 
