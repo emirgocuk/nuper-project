@@ -161,7 +161,11 @@ Notlar:
 | §3 genel tolerans seçimi (ISO 2768-1 tablosu, blok tolerans) | Uygulandı | `GeneralTolerance.ts`, `SetupWizard.ts` |
 | T7 aşama sırası (mesafe → konum → kalınlık) | Uygulandı | `MeasurementPhases.ts`, `MeasurementPathGenerator.ts` |
 | T3 stylus seçimi (Ø2 → Ø1) | Uygulandı | `StylusSelector.ts`, `MeasurementPathGenerator.ts` |
-| T1 dikey delik A0° B0° üstten | Mevcut, testle kilitlendi | `MeasurementPathRules.test.ts` |
-| §2 datum kurulum aşaması (A/B/C) | **Yapılmadı:** datum harfinin STEP yüzeyine bağlanması henüz yok | — |
-| T2 gövde koridoru çarpışma kontrolü, T4 daire derinliği, T8 hata durdurma | **Yapılmadı** | — |
-| Tolerans değerinin ölçüm sonucuna uygulanması (konum sapması hesabı) | **Yapılmadı** | — |
+| T1 dikey delik A0° B0° üstten | Uygulandı ve kilitlendi | `MeasurementPathGenerator.ts`, `MeasurementPathRules.test.ts` |
+| §2 datum kurulum aşaması (A:3, B:2, C:1) | Uygulandı ve kilitlendi | `MeasurementPhases.ts`, `MeasurementPathGenerator.ts`, `SetupWizard.ts` |
+| Clearance Box (`safeZ = maxZ + 25mm`) & 3 Aşamalı Köprü İntikali | Uygulandı ve kilitlendi | `MeasurementPathGenerator.ts`, `MeasurementPathGenerator.test.ts` |
+| Eksenel Delik İnişi (`AXIAL_ENTRY` -> 4 Nokta -> `AXIAL_EXIT`) | Uygulandı ve kilitlendi | `MeasurementPathGenerator.ts`, `MeasurementPathGenerator.test.ts` |
+| Güvenli Kafa İndeksi (`safeIndexZ = maxZ + 50mm`) | Uygulandı ve kilitlendi | `MeasurementPathGenerator.ts`, `MeasurementPathRules.test.ts` |
+| Düzlem delik dışlama maskesi (`edgeMargin = 5.0mm`) | Uygulandı | `MeasurementPathGenerator.ts` |
+| Çift Renkli Trajektori (Traverse: Camgöbeği, Temas: Neon Turuncu) | Uygulandı | `SetupWizard.ts` |
+| Canlı DMIS 5.3 ve Kapalı Döngü Fanuc/Siemens G10 Derleyici | Uygulandı | `SetupWizard.ts`, `closed_loop.rs` |

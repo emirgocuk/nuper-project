@@ -104,4 +104,29 @@ Detaylar için bakınız: [developmentInfrastructureRules.md](file:///d:/Project
 6. **Pre-Commit / Pre-Push Kalkanı:** Husky git hook'ları ile `ui/index.html`'e satır ekleme ve `scratch/*` commit'leri otomatik engellenir.
 7. **AI Ajan Koruma Protokolü:** Tek prompt'ta maksimum 3 modül değişikliği limiti; yeni fonksiyonların `utils/` altında saf (pure) ve birim testli yazılması; ölü kodun yoruma alınmadan doğrudan silinmesi.
 
+---
+
+## 5. Üç Çekirdekli Senkronizasyon (Tri-Engine Sync) ve Kapalı Döngü CNC Mimarisi
+
+### A. Tri-Engine Sorumluluk Dağılımı ve Senkronizasyon Protokolü
+1. **TypeScript / WebGL Katmanı (`ui/src/modules/cad/`):**
+   - Kullanıcı etkileşimi, 60 FPS Three.js render, anlık CMM kinematik simülasyonu.
+   - Global Emniyet Zarfı (`safeZ = bbox.max.z + 25.0 mm`), güvenli intikal köprüleri (`RETRACT_TO_SAFE` $\to$ `SAFE_TRAVERSE` $\to$ `PLUNGE_TO_ENTRY`), delik eksenel inişi (`AXIAL_ENTRY`), PH10 güvenli indeksleme rotası (`safeIndexZ = bbox.max.z + 50.0 mm`).
+   - AS9102 / ASME Y14.5 teftiş sırası: 3-2-1 Datumlar (A:3, B:2, C:1) $\to$ OP10 Dikey Yüzey ve Delikler (DISTANCE $\to$ POSITION $\to$ THICKNESS, her biri kendi içinde Nearest-Neighbor TSP ile optimize) $\to$ OP20 Açılı Unsurlar.
+2. **Python B-Rep Katmanı (`tools/extractor/brep_verifier.py`, `tools/inspection_planner.py`):**
+   - OpenCASCADE (cadquery-ocp) ile analitik B-Rep ayrıştırma, yüzey normali yöneliminin katı centroid'ine göre doğrulanması (`outward normal verification`).
+   - Silindirik delik derinlik başlangıç ve bitiş sınırlarının (`axial_min`, `axial_max`, `z_top`, `z_bottom`) çıkarılması.
+   - Python tarafında da aynı 3 aşamalı köprü intikali ve eksenel delik inişi ile deterministik teftiş planı derleme.
+3. **Rust Yüksek Güvenilirlik Çekirdeği (`crates/ortho-kinematics/`, `crates/ortho-router/`, `crates/ortho-emitter/`):**
+   - IEEE 754 çift duyarlıklı (`f64`) deterministik kinematik hesaplama, Renishaw PH10 lookup tablosu, Gauss ve Chebyshev (PTB onaylı) en küçük kareler ve minimum bölge unsur oturtması.
+   - Kademeli delik ağaçları (`CompoundHoleFeature`), vida dişi koruma baypası (`ThreadBypassStrategy`).
+   - Güvenlik kotları (`compute_clearance_z`, `compute_safe_index_z`) ile TypeScript motoruyla birebir matematiksel eşleşme.
+
+### B. Kapalı Döngü CNC Kalite Geri Beslemesi (Closed-Loop CNC & Tool Wear Offset)
+- CMM ölçümünde tespit edilen sapmalar ($\Delta = \text{measured} - \text{nominal}$), CNC tezgâhlarına doğrudan enjekte edilebilir aşınma kompanzasyon koduna derlenir:
+  - **Fanuc 0i / 31i:** `G90 G10 L12 P{tool} R{wear_delta}` (iç çap için $-\Delta / 2$, dış çap için $+\Delta / 2$).
+  - **Siemens Sinumerik 840D / ONE:** `$TC_DP12[{tool}, 1] = $TC_DP12[{tool}, 1] + ({wear_delta})`.
+- **Fail-Safe Guardian (Takım Kırılma Emniyeti):** Ölçülen sapma $|\Delta| > 0.050\text{ mm}$ (veya belirlenen kritik eşik) ise kompanzasyon enjeksiyonu anında kilitlenir ve operatöre alarm verilir.
+
+
 
