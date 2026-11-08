@@ -86,6 +86,17 @@
           "gdt": { "type": "string" },
           "op": { "type": "string" },
           "op_reason": { "type": "string" },
+          "match_confidence": { "type": "number" },
+          "match_status": {
+            "type": "string",
+            "enum": ["VERIFIED_EXACT", "VERIFIED_TOPOLOGY", "NEEDS_REVIEW", "UNMATCHED", "ENGINEER_LOCKED"]
+          },
+          "inferred_axis": { "type": "string", "enum": ["X", "Y", "Z"] },
+          "distance_type": { "type": "string" },
+          "faceA_center": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "faceB_center": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "faceA_normal": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "faceB_normal": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
           "bbox": {
             "type": "array",
             "items": { "type": "number" },

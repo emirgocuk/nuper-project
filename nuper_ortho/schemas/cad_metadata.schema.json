@@ -34,7 +34,15 @@
           "area_or_length": { "type": "number" },
           "angular_span_deg": { "type": "number", "description": "Dönel yüzeyin toplam açısal kapsamı (360 = tam delik/mil)." },
           "description": { "type": "string" },
-          "face_ids": { "type": "array", "items": { "type": "string" }, "description": "Unsuru oluşturan B-Rep yüzey kimlikleri (mesh.faces[].id)." }
+          "face_ids": { "type": "array", "items": { "type": "string" }, "description": "Unsuru oluşturan B-Rep yüzey kimlikleri (mesh.faces[].id)." },
+          "axis": { "type": "string", "enum": ["X", "Y", "Z"] },
+          "distance_type": { "type": "string", "enum": ["INTERNAL_SLOT", "EXTERNAL_WIDTH", "STEP_HEIGHT", "AXIS_DISTANCE"] },
+          "faceA_id": { "type": "string" },
+          "faceB_id": { "type": "string" },
+          "faceA_center": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "faceB_center": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "faceA_normal": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "faceB_normal": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
         }
       }
     },

@@ -60,6 +60,30 @@ export interface CadMetadata {
      * Unsuru oluşturan B-Rep yüzey kimlikleri (mesh.faces[].id).
      */
     face_ids?: string[];
+    axis?: "X" | "Y" | "Z";
+    distance_type?: "INTERNAL_SLOT" | "EXTERNAL_WIDTH" | "STEP_HEIGHT" | "AXIS_DISTANCE";
+    faceA_id?: string;
+    faceB_id?: string;
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
+    faceA_center?: [number, number, number];
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
+    faceB_center?: [number, number, number];
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
+    faceA_normal?: [number, number, number];
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
+    faceB_normal?: [number, number, number];
     [k: string]: unknown;
   }[];
   /**

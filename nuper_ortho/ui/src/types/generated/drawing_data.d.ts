@@ -67,6 +67,30 @@ export interface DrawingExtractionResult {
     gdt?: string;
     op?: string;
     op_reason?: string;
+    match_confidence?: number;
+    match_status?: "VERIFIED_EXACT" | "VERIFIED_TOPOLOGY" | "NEEDS_REVIEW" | "UNMATCHED" | "ENGINEER_LOCKED";
+    inferred_axis?: "X" | "Y" | "Z";
+    distance_type?: string;
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
+    faceA_center?: [number, number, number];
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
+    faceB_center?: [number, number, number];
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
+    faceA_normal?: [number, number, number];
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
+    faceB_normal?: [number, number, number];
     /**
      * @minItems 4
      * @maxItems 4
