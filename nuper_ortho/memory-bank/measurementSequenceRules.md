@@ -175,3 +175,9 @@ Notlar:
 | Canlı Ölçüm Durum Makinesi (UNMEASURED -> 🎯 ÖLÇÜLÜYOR (k/N) -> PASS/FAIL) | Uygulandı ve kilitlendi | `SetupWizard.ts`, `InspectionSynchronizer.ts` |
 | GUM ISO 15530-3 (uc: 0.0012, U95: 0.0024, TUR) & Standart Fitting (MIC/MCC/MZPL/LSQ) | Uygulandı ve kilitlendi | `SetupWizard.ts`, `InspectionSynchronizer.ts`, `index.html` |
 | Electron Native IPC Köprüsü (ortho:extract-drawing, ortho:parse-step, ortho:compile-dmis) | Uygulandı ve kilitlendi | `electron-main.js`, `IpcClient.ts` |
+| 3-2-1 Doğrusallık (Collinearity) Önleme & det(R) = +1.000000 Sağ El Matris Kilidi | Uygulandı ve kilitlendi | `alignment.rs`, `SetupPrep.ts`, `SetupPrep.test.ts` |
+| PH10 7.5° Mekanik İndeksleme Kuantizasyonu & Küresel Süpürme Zarfı Denetimi | Uygulandı ve kilitlendi | `ph10.rs`, `Ph10Kinematics.ts`, `Ph10Kinematics.test.ts` |
+| Çoklu Unsur Kalıplarının (4x, 2x, 3x) Tamamının (#4.1..#4.N) Ölçülmesi ve En Kötü Sapma | Uygulandı ve kilitlendi | `MeasurementPathGenerator.ts`, `SetupWizard.ts` |
+| ASME Y14.5 Maksimum Malzeme Şartı (Ⓜ - MMC) Dinamik Bonus Tolerans Hesabı | Uygulandı ve kilitlendi | `tolerance.rs`, `InspectionCardFormatter.ts`, `SetupWizard.ts` |
+| OP10 ⟷ OP20 (180° Ters Bağlama) Sahne ve Koordinat Dönüşümü | Uygulandı ve kilitlendi | `SetupWizard.ts`, `WorkflowRibbon.ts`, `CADViewer.ts` |
+| 10 Konsol Sekmesinin Canlı Dinamik Veriyle Üretilmesi (DMIS, Calypso, Wenzel, Mastar vb.) | Uygulandı ve kilitlendi | `CodeSnippetGenerator.ts`, `CodeSnippetGenerator.test.ts`, `SetupWizard.ts` |

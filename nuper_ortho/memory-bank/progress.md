@@ -14,9 +14,10 @@ Fiziksel temas ve kinematik kuralları doğrulanmış olup, sahte/tahmini (mock)
 | **CMM Yol Planlayıcı & Kinematik** | Kabul edildi | `safeZ = maxZ + 25mm` emniyet düzlemi, 3 aşamalı köprü (`RETRACT_TO_SAFE` $\to$ `SAFE_TRAVERSE` $\to$ `PLUNGE_TO_ENTRY`), eksenel delik inişi (`AXIAL_ENTRY`), `safeIndexZ = maxZ + 50mm` kafa açısı indeksi, AS9102 3-2-1 datum sıralaması, yakut küre yarıçap telafisi ($\vec{P}_{\text{center}} = \vec{P}_{\text{surf}} + R_{\text{tip}}\hat{n}$), EWL stilus boyu denetimi (Ø3x50 önerisi) ve Z>=0 granit tabla çarpışmasızlığı. |
 | **Physical AI & Kapalı Döngü CNC** | Kabul edildi | Gerçek zamanlı ANSI DMIS 5.3 blok üretimi, Fanuc 0i/31i `G10 L12` ve Siemens Sinumerik 840D/ONE `$TC_DP12` takım aşınma kompanzasyonu, fail-safe guardian ($|\Delta| > 0.050\text{ mm}$ kilit), anlık hız ($150\text{ mm/s}$ / $5\text{ mm/s}$) telemetrisi, çift renkli trajektori tüpü ve canlı ölçüm durum makinesi (`UNMEASURED` $\to$ `🎯 ÖLÇÜLÜYOR (k/N)` $\to$ `PASS/FAIL`). |
 | **CAD Çekirdeği & STEP Görünümü** | Kabul edildi | OpenCASCADE 8.0 (OCP) çekirdeği entegre. Analitik B-Rep yüzeyleri, dışa bakan normal doğrulaması, silindirik delik eksenel derinlikleri (`axial_min`, `axial_max`, `z_top`, `z_bottom`). |
-| **Vite / TypeScript / Vitest** | Kabul edildi | `npm run check:types` hatasız; 30 test dosyasında 174 birim/entegrasyon testi %100 yeşil. |
+| **Vite / TypeScript / Vitest** | Kabul edildi | `npm run check:types` hatasız; 31 test dosyasında 180 birim/entegrasyon testi %100 yeşil (`npm run build` 601ms). |
 | **Python Çekirdeği & Pytest** | Kabul edildi | `brep_verifier.py`, `drawing_extractor.py`, `inspection_planner.py`; 47 pytest testi %100 yeşil. |
-| **Rust Workspace & Cargo** | Kabul edildi | `ortho-kinematics`, `ortho-router`, `ortho-emitter`; 28 test başarılı, `cargo check --workspace` hatasız. |
+| **Rust Workspace & Cargo** | Kabul edildi | `ortho-ast`, `ortho-kinematics`, `ortho-router`, `ortho-emitter`; 28 test başarılı, `cargo check --workspace` hatasız. |
+| **İleri Mühendislik & ASME Y14.5** | Kabul edildi | 3-2-1 Doğrusallık (Collinearity) önleme, det(R)=+1.000000 sağ el kilidi, PH10 7.5° kuantizasyonu, desen unsurlarının (4x, 2x, 3x) tam taranması, ASME Y14.5 MMC bonus toleransı, OP10/OP20 bağlama değişimi, 10 konsol sekmesinin canlı veri üretimi. |
 | **PDF / Ölçü Çıkarımı** | Kabul edildi | Deterministik 2D vektör + RapidOCR; `measured` veya `status: PASS` uydurmayan temiz menşe zinciri. |
 
 | Rust workspace | Kısmi | cargo check geçti; bu incelemede cargo test çalıştırılmadı |
