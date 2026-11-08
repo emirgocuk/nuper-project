@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { CodeSnippetGenerator, type CodeSnippetContext } from './CodeSnippetGenerator';
+import {
+  CodeSnippetGenerator,
+  compensateThermalExpansion,
+  type CodeSnippetContext,
+} from './CodeSnippetGenerator';
 import type { InspectionDimension } from './InspectionSynchronizer';
 
 describe('CodeSnippetGenerator (Pure Utility)', () => {
@@ -83,5 +87,12 @@ describe('CodeSnippetGenerator (Pure Utility)', () => {
     expect(snippets.calibration).toContain('RENISHAW PH10M / TP20');
     expect(snippets.license).toContain('AS9100 REV D');
     expect(snippets.ipc).toContain('TAURI ZERO-COPY IPC RING BUFFER');
+  });
+
+  it('compensateThermalExpansion computes ISO 1 20C thermal expansion and net wear offset', () => {
+    const res = compensateThermalExpansion(395.5, 0.0800, 'ALUMINUM', 28.0, 20.0);
+    expect(res.thermalExpansionMm).toBeCloseTo(0.0731, 3);
+    expect(res.netWearDeviationMm).toBeCloseTo(0.0800 - 0.0731, 3);
+    expect(res.netWearOffsetMm).toBeCloseTo(-(0.0800 - 0.0731) / 2.0, 3);
   });
 });

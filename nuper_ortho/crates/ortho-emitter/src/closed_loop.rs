@@ -246,6 +246,42 @@ impl ClosedLoopEngine {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum WorkpieceMaterial {
+    Aluminum,
+    Steel,
+    Titanium,
+}
+
+impl WorkpieceMaterial {
+    pub fn cte(&self) -> f64 {
+        match self {
+            WorkpieceMaterial::Aluminum => 23.1e-6,
+            WorkpieceMaterial::Steel => 11.5e-6,
+            WorkpieceMaterial::Titanium => 8.6e-6,
+        }
+    }
+}
+
+pub fn compensate_thermal_expansion(
+    nominal_length_mm: f64,
+    raw_deviation_mm: f64,
+    material: WorkpieceMaterial,
+    part_temp_c: f64,
+    cmm_temp_c: f64,
+) -> (f64, f64, f64) {
+    let alpha_part = material.cte();
+    let alpha_cmm = 8.0e-6;
+    let delta_part = part_temp_c - 20.0;
+    let delta_cmm = cmm_temp_c - 20.0;
+
+    let thermal_expansion = nominal_length_mm * (alpha_part * delta_part - alpha_cmm * delta_cmm);
+    let net_wear_deviation = raw_deviation_mm - thermal_expansion;
+    let net_wear_offset = -net_wear_deviation / 2.0;
+
+    (thermal_expansion, net_wear_deviation, net_wear_offset)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,5 +353,20 @@ PIN_10_M6, 10.0000, 9.9940, 10.0090, 9.9910
             result,
             Err(ClosedLoopError::ToolBreakageDetected { .. })
         ));
+    }
+
+    #[test]
+    fn test_thermal_expansion_compensation_aluminum_28c() {
+        let (thermal_expansion, net_wear_dev, net_wear_offset) = compensate_thermal_expansion(
+            395.5,
+            0.0800,
+            WorkpieceMaterial::Aluminum,
+            28.0,
+            20.0,
+        );
+        let diff = (thermal_expansion - 0.0731).abs();
+        assert!(diff < 0.001);
+        assert!((net_wear_dev - (0.0800 - thermal_expansion)).abs() < 1e-6);
+        assert!((net_wear_offset - (-net_wear_dev / 2.0)).abs() < 1e-6);
     }
 }

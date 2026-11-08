@@ -141,45 +141,107 @@ pub struct ReachabilityReport {
     pub failure_reason: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum StylusType {
+    StraightSingle { length_mm: f64, ball_radius_mm: f64 },
+    Star5Way { arm_length_mm: f64, ball_radius_mm: f64 },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StylusConfiguration {
+    pub stylus_type: StylusType,
+    pub active_tip_index: usize,
+    pub ph10_a_deg: f64,
+    pub ph10_b_deg: f64,
+    pub ph10_label: String,
+    pub effective_diameter_mm: f64,
+}
+
+pub fn select_optimal_stylus_configuration(
+    housing_collision: bool,
+    feature_normal: [f64; 3],
+) -> StylusConfiguration {
+    if housing_collision {
+        let nx = feature_normal[0];
+        let ny = feature_normal[1];
+        let nz = feature_normal[2];
+        let ax = nx.abs();
+        let ay = ny.abs();
+        let az = nz.abs();
+
+        let tip_index = if az >= ax && az >= ay {
+            1
+        } else if ax >= ay && ax >= az {
+            if nx >= 0.0 { 2 } else { 4 }
+        } else {
+            if ny >= 0.0 { 3 } else { 5 }
+        };
+
+        StylusConfiguration {
+            stylus_type: StylusType::Star5Way { arm_length_mm: 30.0, ball_radius_mm: 1.0 },
+            active_tip_index: tip_index,
+            ph10_a_deg: 0.0,
+            ph10_b_deg: 0.0,
+            ph10_label: "A0.0° B0.0°".to_string(),
+            effective_diameter_mm: 1.9992,
+        }
+    } else {
+        StylusConfiguration {
+            stylus_type: StylusType::StraightSingle { length_mm: 20.0, ball_radius_mm: 1.0 },
+            active_tip_index: 1,
+            ph10_a_deg: 0.0,
+            ph10_b_deg: 0.0,
+            ph10_label: "A0.0° B0.0°".to_string(),
+            effective_diameter_mm: 1.9996,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_valid_bore_access() {
-        let stylus = StylusAssembly::default(); // 20mm şaft, Ø2mm bilye, 6.6mm modül
-        // Ø15mm delik, 15mm derinlik -> Güvenli
+        let stylus = StylusAssembly::default();
         assert!(stylus.validate_bore_clearance(15.0, 15.0).is_ok());
     }
 
     #[test]
     fn test_shank_rubbing_detected() {
-        let stylus = StylusAssembly::default(); // stem_radius = 0.75mm
-        // Ø1.6mm delik -> radial_clearance = 0.8 - 0.75 = 0.05mm < 0.5mm -> Sürtünme hatası!
+        let stylus = StylusAssembly::default();
         let res = stylus.validate_bore_clearance(1.6, 10.0);
         assert!(matches!(res, Err(StylusError::ShankRubbing { .. })));
     }
 
     #[test]
     fn test_module_gouging_detected() {
-        let stylus = StylusAssembly::default(); // stem_length = 20mm, module_radius = 6.6mm
-        // Ø10mm delik (radius=5.0mm < 7.6mm), 35mm derinlik (>20mm) -> Gövde deliğe çarpar!
+        let stylus = StylusAssembly::default();
         let res = stylus.validate_bore_clearance(10.0, 35.0);
         assert!(matches!(res, Err(StylusError::ModuleGouging { .. })));
     }
 
     #[test]
     fn test_reachability_report_flagging() {
-        let stylus = StylusAssembly::default(); // 20mm şaft, 6.6mm modül
-
-        // Erişilebilir delik
+        let stylus = StylusAssembly::default();
         let rep1 = stylus.check_feature_reachability(1, Some(15.0), Some(15.0));
         assert!(rep1.is_reachable);
         assert!(rep1.failure_reason.is_none());
 
-        // Erişilemeyen derin delik (Derinlik 35mm > 20mm şaft)
         let rep2 = stylus.check_feature_reachability(2, Some(10.0), Some(35.0));
         assert!(!rep2.is_reachable);
         assert!(rep2.failure_reason.is_some());
+    }
+
+    #[test]
+    fn test_optimal_stylus_configuration_star_selection() {
+        let cfg_normal = select_optimal_stylus_configuration(false, [0.0, 0.0, 1.0]);
+        assert_eq!(cfg_normal.active_tip_index, 1);
+        assert!(matches!(cfg_normal.stylus_type, StylusType::StraightSingle { .. }));
+
+        let cfg_collision_x = select_optimal_stylus_configuration(true, [1.0, 0.0, 0.0]);
+        assert_eq!(cfg_collision_x.active_tip_index, 2);
+        assert_eq!(cfg_collision_x.ph10_label, "A0.0° B0.0°");
+        assert!(matches!(cfg_collision_x.stylus_type, StylusType::Star5Way { .. }));
     }
 }
