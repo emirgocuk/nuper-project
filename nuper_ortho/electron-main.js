@@ -510,6 +510,32 @@ print(json.dumps(res))
       return { success: false, error: e.message };
     }
   });
+
+  ipcMain.handle('ortho:save-session', async (event, sessionData) => {
+    try {
+      const sessionFile = path.join(__dirname, '.ortho-session.json');
+      fs.writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2), 'utf-8');
+      return { success: true, path: sessionFile };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('ortho:load-session', async (event, fingerprint) => {
+    try {
+      const sessionFile = path.join(__dirname, '.ortho-session.json');
+      if (fs.existsSync(sessionFile)) {
+        const content = fs.readFileSync(sessionFile, 'utf-8');
+        const data = JSON.parse(content);
+        if (!fingerprint || data.fingerprint === fingerprint) {
+          return { success: true, session: data };
+        }
+      }
+      return { success: false, error: 'Session not found' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
 }
 
 app.whenReady().then(createWindow);

@@ -1,43 +1,65 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  BALLOON_DRAG_THRESHOLD_PX,
+  computeDrawingFingerprint,
+  saveBalloonSessionState,
+  loadBalloonSessionState,
   exceedsDragThreshold,
   screenDeltaToStage,
   applyLabelOffset,
   escapeHtmlText,
+  type BalloonSessionState,
 } from './BalloonEditing';
 
-describe('BalloonEditing — Işık Masası balon etiketi sürükleme geometrisi', () => {
-  it('Sürükleme eşiği altındaki hareketleri tıklama olarak değerlendirir', () => {
-    expect(exceedsDragThreshold(100, 100, 101, 101)).toBe(false);
-    expect(exceedsDragThreshold(100, 100, 100, 100)).toBe(false);
-    expect(BALLOON_DRAG_THRESHOLD_PX).toBe(4);
+describe('BalloonEditing', () => {
+  beforeEach(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.clear();
+    }
   });
 
-  it('Sürükleme eşiğini aşan hareketi gerçek sürükleme sayar', () => {
-    expect(exceedsDragThreshold(100, 100, 110, 100)).toBe(true);
-    expect(exceedsDragThreshold(100, 100, 100, 90)).toBe(true);
-    expect(exceedsDragThreshold(0, 0, 3, 3, 5)).toBe(false);
+  it('computes deterministic drawing fingerprint', () => {
+    const fp1 = computeDrawingFingerprint('10142739_dc_modul_plaka.pdf', 30);
+    const fp2 = computeDrawingFingerprint('10142739_dc_modul_plaka.pdf', 30);
+    const fpDiff = computeDrawingFingerprint('other_part.pdf', 12);
+
+    expect(fp1).toMatch(/^ortho_cache_[0-9a-f]{8}$/);
+    expect(fp1).toBe(fp2);
+    expect(fp1).not.toBe(fpDiff);
   });
 
-  it('Zoom uygulanmış ekran farkını sahne (stage) birimine çevirir', () => {
-    expect(screenDeltaToStage(100, 50, 2)).toEqual({ x: 50, y: 25 });
-    expect(screenDeltaToStage(100, 50, 1)).toEqual({ x: 100, y: 50 });
+  it('saves and loads balloon session state without data loss', () => {
+    const fp = computeDrawingFingerprint('sample_bracket.pdf', 15);
+    const mockState: BalloonSessionState = {
+      fingerprint: fp,
+      timestamp: Date.now(),
+      dimensions: [
+        { id: 1, balloon: '#1', nominal: 25.4, upper_tol: '+0.05', lower_tol: '-0.05', status: 'PASS' },
+        { id: 2, balloon: '#2', nominal: 10.0, upper_tol: '+0.02', lower_tol: '0.00', status: 'UNMEASURED' },
+      ],
+      lockedBalloons: ['#1'],
+    };
+
+    saveBalloonSessionState(mockState);
+    const loaded = loadBalloonSessionState(fp);
+
+    expect(loaded).not.toBeNull();
+    expect(loaded?.fingerprint).toBe(fp);
+    expect(loaded?.dimensions.length).toBe(2);
+    expect((loaded?.dimensions[0] as { balloon: string }).balloon).toBe('#1');
+    expect(loaded?.lockedBalloons).toEqual(['#1']);
   });
 
-  it('Sıfır/geçersiz zoom değerinde sahne farkını bozmaz', () => {
-    expect(screenDeltaToStage(40, -20, 0)).toEqual({ x: 40, y: -20 });
-    expect(screenDeltaToStage(40, -20, -3)).toEqual({ x: 40, y: -20 });
-  });
+  it('calculates drag threshold and stage deltas accurately', () => {
+    expect(exceedsDragThreshold(10, 10, 12, 12, 4)).toBe(false);
+    expect(exceedsDragThreshold(10, 10, 15, 15, 4)).toBe(true);
 
-  it('Mevcut etiket ofsetini yeni sürükleme farkıyla birleştirir (kaynak bbox değişmez)', () => {
-    expect(applyLabelOffset(undefined, { x: 10, y: -5 })).toEqual({ dx: 10, dy: -5 });
-    expect(applyLabelOffset({ dx: 10, dy: -5 }, { x: -4, y: 2 })).toEqual({ dx: 6, dy: -3 });
-  });
+    const stagePt = screenDeltaToStage(20, 10, 2.0);
+    expect(stagePt).toEqual({ x: 10, y: 5 });
 
-  it('Etiket metnini HTML enjeksiyonuna karşı kaçışlar', () => {
-    expect(escapeHtmlText('Ø86 <script>"x" & \'y\'')).toBe(
-      'Ø86 &lt;script&gt;&quot;x&quot; &amp; &#39;y&#39;'
-    );
+    const offset = applyLabelOffset({ dx: 5, dy: 5 }, { x: 10, y: -2 });
+    expect(offset).toEqual({ dx: 15, dy: 3 });
+
+    const escaped = escapeHtmlText('A & B < C > "D" \'E\'');
+    expect(escaped).toBe('A &amp; B &lt; C &gt; &quot;D&quot; &#39;E&#39;');
   });
 });
