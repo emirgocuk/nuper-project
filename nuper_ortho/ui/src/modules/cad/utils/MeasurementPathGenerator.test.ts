@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MeasurementPathGenerator, type PathFeatureInput } from './MeasurementPathGenerator';
+import { GOBEK_ALL_12_DIMENSIONS } from '../../inspection/utils/InspectionSynchronizer';
 
 describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Noktası Üretici', () => {
   const mockBbox = {
@@ -59,7 +60,6 @@ describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Nok
     const plan = MeasurementPathGenerator.generatePlan(sampleFeatures, mockBbox, {
       clearanceZMarginMm: 35.0,
     });
-    // bbox.max[2] = 50 + 35 = 85.0 mm
     expect(plan.zClearance).toBe(85.0);
     expect(plan.allWaypoints[0].position.z).toBe(85.0);
   });
@@ -69,9 +69,8 @@ describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Nok
     const featPath = plan.featurePaths[0];
 
     expect(featPath.touchPoints.length).toBe(4);
-    // Yarıçap = 20 / 2 = 10 mm. Merkez [50, 50, 47]
     const p1 = featPath.touchPoints[0].position;
-    expect(p1[0]).toBeCloseTo(60, 1); // 50 + 10
+    expect(p1[0]).toBeCloseTo(60, 1);
     expect(p1[1]).toBeCloseTo(50, 1);
 
     const hasTouchPhase = featPath.waypoints.some((w) => w.phase === 'TOUCH');
@@ -84,7 +83,6 @@ describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Nok
     const plan = MeasurementPathGenerator.generatePlan(sampleFeatures, mockBbox, {
       activeOperation: 'OP10',
     });
-    // Normal [0, 0, 1] (yukarı) -> Prob yaklaşması [0, 0, -1] -> A0° B0°
     expect(plan.featurePaths[0].ph10Angle.label).toBe('A0° B0°');
   });
 
@@ -103,7 +101,6 @@ describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Nok
       verticalAxis: 'Y',
       clearanceZMarginMm: 15.0,
     });
-    // Y_clearance = 8.63 + 15 = 23.63
     expect(plan.zClearance).toBeCloseTo(23.63, 2);
     expect(plan.allWaypoints[0].position.y).toBeCloseTo(23.63, 2);
     for (const wp of plan.allWaypoints) {
@@ -178,12 +175,14 @@ describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Nok
       {
         id: 31,
         balloon: '#31',
-        type: 'LINEAR',
-        type_label: 'Kalınlık',
-        nominal: 5.7,
-        cad_center: [0, 5.7, 0],
-        cad_normal: [0, 1, 0],
-        cad_feature_id: 'CAD_BBOX_Y',
+        type: 'DIAMETER',
+        type_label: 'Yan Delik',
+        nominal: 4.0,
+        cad_center: [20, 1.0, 0],
+        cad_normal: [1, 0, 0],
+        cad_instances: [
+          { center: [20, 1.0, 0], normal: [1, 0, 0], stem_blocked: true },
+        ],
         operation: 'OP10',
       },
     ];
@@ -198,6 +197,49 @@ describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Nok
       (wp) => Math.abs(wp.position.y - safeZ) < 0.1
     );
     expect(rotationWps.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('hiçbir waypoint koordinatında z < 0 veya y < 0 olamaz (granit tabla çarpışmasızlık)', () => {
+    const plan = MeasurementPathGenerator.generatePlan(sampleFeatures, mockBbox, {
+      verticalAxis: 'Y',
+      includeDatumSetup: true,
+    });
+    for (const wp of plan.allWaypoints) {
+      expect(wp.position.y).toBeGreaterThanOrEqual(0);
+      expect(wp.position.z).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('TOUCH adımında tipCenterPosition ile surfacePoint mesafesi probeTipRadius değerine eşittir', () => {
+    const tipRadius = 1.0;
+    const plan = MeasurementPathGenerator.generatePlan(sampleFeatures, mockBbox, {
+      probeTipRadiusMm: tipRadius,
+      includeDatumSetup: true,
+    });
+    const touchList = [
+      ...(plan.datumTouchPoints ?? []),
+      ...plan.featurePaths.flatMap((fp) => fp.touchPoints),
+    ];
+    expect(touchList.length).toBeGreaterThan(0);
+    for (const tp of touchList) {
+      if (tp.surfacePoint && tp.tipCenterPosition) {
+        const dist = Math.hypot(
+          tp.tipCenterPosition[0] - tp.surfacePoint[0],
+          tp.tipCenterPosition[1] - tp.surfacePoint[1],
+          tp.tipCenterPosition[2] - tp.surfacePoint[2]
+        );
+        expect(dist).toBeCloseTo(tipRadius, 2);
+      }
+    }
+  });
+
+  it('t=0 anında tüm ölçü boyutları UNMEASURED durumunda başlar', () => {
+    expect(GOBEK_ALL_12_DIMENSIONS.length).toBeGreaterThan(0);
+    for (const dim of GOBEK_ALL_12_DIMENSIONS) {
+      expect(dim.status).toBe('UNMEASURED');
+      expect(dim.measured).toBe('--');
+      expect(dim.deviation).toBe('--');
+    }
   });
 });
 

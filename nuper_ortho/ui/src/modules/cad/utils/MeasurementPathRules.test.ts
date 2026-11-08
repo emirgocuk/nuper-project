@@ -98,18 +98,20 @@ describe('Ölçüm kuralları: delik yolu, aşama sırası ve stylus', () => {
 
   it('prob kafa açısı (A0° B0° ↔ A0° B90°) değişirken parçadan uzak ve yüksek güvenli dönüş bölgesine (zClearance + 20) çıkar', () => {
     const topHole = hole(1, 23.6, 13.08, 3.0);
-    const thicknessFeat: PathFeatureInput = {
+    const sideFeat: PathFeatureInput = {
       id: 2,
       balloon: '#2',
-      type: 'LINEAR',
-      type_label: 'Kalınlık',
-      nominal: 5.7,
-      cad_center: [0, 5.7, 0],
-      cad_normal: [0, 1, 0],
-      cad_feature_id: 'CAD_BBOX_Y',
+      type: 'DIAMETER',
+      type_label: 'Yan Delik',
+      nominal: 4.0,
+      cad_center: [20, 1.0, 0],
+      cad_normal: [1, 0, 0],
+      cad_instances: [
+        { center: [20, 1.0, 0], normal: [1, 0, 0], stem_blocked: true },
+      ],
       operation: 'OP10',
     };
-    const plan = MeasurementPathGenerator.generatePlan([topHole, thicknessFeat], plateBbox, {
+    const plan = MeasurementPathGenerator.generatePlan([topHole, sideFeat], plateBbox, {
       verticalAxis: 'Y',
       clearanceZMarginMm: 15.0,
     });

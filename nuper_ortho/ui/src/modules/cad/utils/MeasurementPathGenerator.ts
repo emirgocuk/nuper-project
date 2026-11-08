@@ -33,6 +33,8 @@ export interface PathFeatureInput {
 export interface TouchPointRecord {
   position: [number, number, number];
   normal: [number, number, number];
+  surfacePoint?: [number, number, number];
+  tipCenterPosition?: [number, number, number];
   ph10Label?: string;
   label?: string;
   isDatum?: boolean;
@@ -57,6 +59,9 @@ export interface StylusRecommendation extends StylusChoice {
   featureId: number;
   balloon: string;
   holeDiameterMm: number;
+  recommendedModel?: string;
+  recommendedEwlMm?: number;
+  reason?: string;
 }
 
 export interface GeneratedMeasurementPlan {
@@ -79,6 +84,8 @@ export interface PathGeneratorOptions {
   retractDistanceMm?: number;
   verticalAxis?: 'Y' | 'Z';
   includeDatumSetup?: boolean;
+  probeTipRadiusMm?: number;
+  stylusEwlMm?: number;
   datumSurfacePoints?: Array<{
     balloon: 'DATUM_A' | 'DATUM_B' | 'DATUM_C';
     position: [number, number, number];
@@ -97,6 +104,8 @@ export class MeasurementPathGenerator {
     const isYAxis = options.verticalAxis === 'Y';
     const approachDist = options.approachDistanceMm ?? 8.0;
     const retractDist = options.retractDistanceMm ?? 5.0;
+    const probeTipRadius = options.probeTipRadiusMm ?? 1.0;
+    const stylusEwl = options.stylusEwlMm ?? 20.0;
 
     const yMinPart = bbox.min[1] ?? 0;
     const yMaxPart = bbox.max[1] ?? 50;
@@ -301,13 +310,16 @@ export class MeasurementPathGenerator {
       const datumWps: ExtendedWaypoint[] = [];
       for (let i = 0; i < ptsA.length; i++) {
         const [ax, ay, az] = ptsA[i];
+        const tipY = ay + probeTipRadius;
         datumWps.push(makeWp(new THREE.Vector3(ax, zClearance, az), 'TRAVERSE', 0, 'DATUM_A', [0, -1, 0], 'A0° B0°', 'SAFE_TRAVERSE', 150.0));
-        datumWps.push(makeWp(new THREE.Vector3(ax, ay + approachDist, az), 'TRAVERSE', 0, 'DATUM_A', [0, -1, 0], 'A0° B0°', 'APPROACH', 80.0));
-        datumWps.push(makeWp(new THREE.Vector3(ax, ay, az), 'TOUCH', 0, 'DATUM_A', [0, -1, 0], 'A0° B0°', 'TOUCH', 5.0));
-        datumWps.push(makeWp(new THREE.Vector3(ax, ay + retractDist, az), 'RETRACT', 0, 'DATUM_A', [0, -1, 0], 'A0° B0°', 'RETRACT', 50.0));
+        datumWps.push(makeWp(new THREE.Vector3(ax, tipY + approachDist, az), 'TRAVERSE', 0, 'DATUM_A', [0, -1, 0], 'A0° B0°', 'APPROACH', 80.0));
+        datumWps.push(makeWp(new THREE.Vector3(ax, tipY, az), 'TOUCH', 0, 'DATUM_A', [0, -1, 0], 'A0° B0°', 'TOUCH', 5.0));
+        datumWps.push(makeWp(new THREE.Vector3(ax, tipY + retractDist, az), 'RETRACT', 0, 'DATUM_A', [0, -1, 0], 'A0° B0°', 'RETRACT', 50.0));
         datumWps.push(makeWp(new THREE.Vector3(ax, zClearance, az), 'RETRACT', 0, 'DATUM_A', [0, -1, 0], 'A0° B0°', 'RETRACT_TO_SAFE', 150.0));
         datumTouchPoints.push({
           position: [ax, ay, az],
+          surfacePoint: [ax, ay, az],
+          tipCenterPosition: [ax, tipY, az],
           normal: [0, 1, 0],
           ph10Label: 'A0° B0°',
           label: `DATUM_A #${i + 1}`,
@@ -325,15 +337,18 @@ export class MeasurementPathGenerator {
             ];
       for (let i = 0; i < ptsB.length; i++) {
         const [bx, by, bz] = ptsB[i];
-        const standX = bx - approachDist;
-        const retX = bx - retractDist;
+        const tipX = bx - probeTipRadius;
+        const standX = tipX - approachDist;
+        const retX = tipX - retractDist;
         datumWps.push(makeWp(new THREE.Vector3(standX, zClearance, bz), 'TRAVERSE', 0, 'DATUM_B', [0, -1, 0], 'A0° B0°', 'SAFE_TRAVERSE', 150.0));
         datumWps.push(makeWp(new THREE.Vector3(standX, by, bz), 'TRAVERSE', 0, 'DATUM_B', [0, -1, 0], 'A0° B0°', 'APPROACH', 80.0));
-        datumWps.push(makeWp(new THREE.Vector3(bx, by, bz), 'TOUCH', 0, 'DATUM_B', [0, -1, 0], 'A0° B0°', 'TOUCH', 5.0));
+        datumWps.push(makeWp(new THREE.Vector3(tipX, by, bz), 'TOUCH', 0, 'DATUM_B', [0, -1, 0], 'A0° B0°', 'TOUCH', 5.0));
         datumWps.push(makeWp(new THREE.Vector3(retX, by, bz), 'RETRACT', 0, 'DATUM_B', [0, -1, 0], 'A0° B0°', 'RETRACT', 50.0));
         datumWps.push(makeWp(new THREE.Vector3(standX, zClearance, bz), 'RETRACT', 0, 'DATUM_B', [0, -1, 0], 'A0° B0°', 'RETRACT_TO_SAFE', 150.0));
         datumTouchPoints.push({
           position: [bx, by, bz],
+          surfacePoint: [bx, by, bz],
+          tipCenterPosition: [tipX, by, bz],
           normal: [-1, 0, 0],
           ph10Label: 'A0° B0°',
           label: `DATUM_B #${i + 1}`,
@@ -343,15 +358,18 @@ export class MeasurementPathGenerator {
 
       const [cxEdge, cyEdge, czEdge] =
         customC.length > 0 ? customC[0].position : [partCx, edgeY, minZ];
-      const standZ = czEdge - approachDist;
-      const retZ = czEdge - retractDist;
+      const tipZ = czEdge - probeTipRadius;
+      const standZ = tipZ - approachDist;
+      const retZ = tipZ - retractDist;
       datumWps.push(makeWp(new THREE.Vector3(cxEdge, zClearance, standZ), 'TRAVERSE', 0, 'DATUM_C', [0, -1, 0], 'A0° B0°', 'SAFE_TRAVERSE', 150.0));
       datumWps.push(makeWp(new THREE.Vector3(cxEdge, cyEdge, standZ), 'TRAVERSE', 0, 'DATUM_C', [0, -1, 0], 'A0° B0°', 'APPROACH', 80.0));
-      datumWps.push(makeWp(new THREE.Vector3(cxEdge, cyEdge, czEdge), 'TOUCH', 0, 'DATUM_C', [0, -1, 0], 'A0° B0°', 'TOUCH', 5.0));
+      datumWps.push(makeWp(new THREE.Vector3(cxEdge, cyEdge, tipZ), 'TOUCH', 0, 'DATUM_C', [0, -1, 0], 'A0° B0°', 'TOUCH', 5.0));
       datumWps.push(makeWp(new THREE.Vector3(cxEdge, cyEdge, retZ), 'RETRACT', 0, 'DATUM_C', [0, -1, 0], 'A0° B0°', 'RETRACT', 50.0));
       datumWps.push(makeWp(new THREE.Vector3(cxEdge, zClearance, standZ), 'RETRACT', 0, 'DATUM_C', [0, -1, 0], 'A0° B0°', 'RETRACT_TO_SAFE', 150.0));
       datumTouchPoints.push({
         position: [cxEdge, cyEdge, czEdge],
+        surfacePoint: [cxEdge, cyEdge, czEdge],
+        tipCenterPosition: [cxEdge, cyEdge, tipZ],
         normal: [0, 0, -1],
         ph10Label: 'A0° B0°',
         label: 'DATUM_C #1 (Sıfır Noktası)',
@@ -460,16 +478,19 @@ export class MeasurementPathGenerator {
           for (let idx = 0; idx < dirs.length; idx++) {
             const d = dirs[idx];
             const sDir: [number, number, number] = useHorizHead ? [-d.ux, 0, -d.uz] : [0, -1, 0];
-            const standPos = new THREE.Vector3(cx + d.ux * (radius + approachDist), cy, cz + d.uz * (radius + approachDist));
-            const touchPos = new THREE.Vector3(cx + d.ux * radius, cy, cz + d.uz * radius);
-            const retPos = new THREE.Vector3(cx + d.ux * (radius + retractDist), cy, cz + d.uz * (radius + retractDist));
+            const standPos = new THREE.Vector3(cx + d.ux * (radius + probeTipRadius + approachDist), cy, cz + d.uz * (radius + probeTipRadius + approachDist));
+            const touchPos = new THREE.Vector3(cx + d.ux * (radius + probeTipRadius), cy, cz + d.uz * (radius + probeTipRadius));
+            const retPos = new THREE.Vector3(cx + d.ux * (radius + probeTipRadius + retractDist), cy, cz + d.uz * (radius + probeTipRadius + retractDist));
+            const surfPos: [number, number, number] = [cx + d.ux * radius, cy, cz + d.uz * radius];
 
             featWaypoints.push(makeWp(standPos, 'TRAVERSE', feat.id, feat.balloon, sDir, effectiveAngleLabel, 'APPROACH', 80.0));
             featWaypoints.push(makeWp(touchPos.clone(), 'TOUCH', feat.id, feat.balloon, sDir, effectiveAngleLabel, 'TOUCH', 5.0));
             featWaypoints.push(makeWp(retPos, 'RETRACT', feat.id, feat.balloon, sDir, effectiveAngleLabel, 'RETRACT', 50.0));
 
             touchRecords.push({
-              position: [touchPos.x, touchPos.y, touchPos.z],
+              position: surfPos,
+              surfacePoint: surfPos,
+              tipCenterPosition: [touchPos.x, touchPos.y, touchPos.z],
               normal: [d.ux, 0, d.uz],
               ph10Label: effectiveAngleLabel,
             });
@@ -547,6 +568,19 @@ export class MeasurementPathGenerator {
               ? (inst.axial_min ?? yMinPart)
               : (inst.axial_min ?? zMinPart);
             const holeDepth = Math.max(1.0, holeTop - holeBottom);
+            if (holeDepth > stylusEwl - 2.0) {
+              stylusRecommendations.push({
+                ballDiameterMm: 3.0,
+                feasible: true,
+                recommendedModel: 'PH10M Ø3x50',
+                recommendedEwlMm: 50.0,
+                changedFromDefault: true,
+                reason: `Delik derinliği (${holeDepth.toFixed(1)} mm) mevcut EWL (${stylusEwl} mm) sınırını aşıyor.`,
+                featureId: feat.id,
+                balloon: feat.balloon,
+                holeDiameterMm: nom,
+              });
+            }
 
             const measOffset = Math.min(holeDepth * 0.5, Math.max(3.0, nom * 0.4));
             const measAltitude = holeTop - measOffset;
@@ -577,9 +611,14 @@ export class MeasurementPathGenerator {
               const cosT = Math.cos(theta);
               const sinT = Math.sin(theta);
 
+              const centerRadius = Math.max(0.1, radius - probeTipRadius);
+              const surfPos: [number, number, number] = isYAxis
+                ? [cx + radius * cosT, measAltitude, cz + radius * sinT]
+                : [cx + radius * cosT, cz + radius * sinT, measAltitude];
+
               const touchPos = isYAxis
-                ? new THREE.Vector3(cx + radius * cosT, measAltitude, cz + radius * sinT)
-                : new THREE.Vector3(cx + radius * cosT, cz + radius * sinT, measAltitude);
+                ? new THREE.Vector3(cx + centerRadius * cosT, measAltitude, cz + centerRadius * sinT)
+                : new THREE.Vector3(cx + centerRadius * cosT, cz + centerRadius * sinT, measAltitude);
 
               const normalVec: [number, number, number] = isYAxis
                 ? [-cosT, 0, -sinT]
@@ -589,9 +628,10 @@ export class MeasurementPathGenerator {
                 featWaypoints.push(makeWp(touchPos.clone(), 'TOUCH', feat.id, feat.balloon, effectiveAngleObj.direction, 'A0° B0°', 'TOUCH', 5.0));
                 featWaypoints.push(makeWp(pCenterDepth.clone(), 'RETRACT', feat.id, feat.balloon, effectiveAngleObj.direction, 'A0° B0°', 'RETRACT', 50.0));
               } else {
+                const appRadius = Math.max(0.05, centerRadius - dApp);
                 const appPos = isYAxis
-                  ? new THREE.Vector3(cx + (radius - dApp) * cosT, measAltitude, cz + (radius - dApp) * sinT)
-                  : new THREE.Vector3(cx + (radius - dApp) * cosT, cz + (radius - dApp) * sinT, measAltitude);
+                  ? new THREE.Vector3(cx + appRadius * cosT, measAltitude, cz + appRadius * sinT)
+                  : new THREE.Vector3(cx + appRadius * cosT, cz + appRadius * sinT, measAltitude);
 
                 featWaypoints.push(makeWp(appPos.clone(), 'TRAVERSE', feat.id, feat.balloon, effectiveAngleObj.direction, 'A0° B0°', 'APPROACH', 20.0));
                 featWaypoints.push(makeWp(touchPos.clone(), 'TOUCH', feat.id, feat.balloon, effectiveAngleObj.direction, 'A0° B0°', 'TOUCH', 5.0));
@@ -600,7 +640,9 @@ export class MeasurementPathGenerator {
               }
 
               touchRecords.push({
-                position: [touchPos.x, touchPos.y, touchPos.z],
+                position: surfPos,
+                surfacePoint: surfPos,
+                tipCenterPosition: [touchPos.x, touchPos.y, touchPos.z],
                 normal: normalVec,
                 ph10Label: 'A0° B0°',
               });
@@ -611,46 +653,32 @@ export class MeasurementPathGenerator {
             featWaypoints.push(makeWp(overheadPos.clone(), 'RETRACT', feat.id, feat.balloon, effectiveAngleObj.direction, 'A0° B0°', 'RETRACT_TO_SAFE', 150.0));
           }
         } else if (isYAxis && (cadId === 'CAD_BBOX_Y' || Math.abs((yMaxPart - yMinPart) - nom) <= 1.5)) {
-          effectiveAngleLabel = 'A0° B90°';
-          effectiveAngleObj = { aDeg: 0, bDeg: 90, direction: [-1, 0, 0], label: 'A0° B90°' };
+          effectiveAngleLabel = 'A0° B0°';
+          effectiveAngleObj = { aDeg: 0, bDeg: 0, direction: [0, -1, 0], label: 'A0° B0°' };
 
-          const topTouch = new THREE.Vector3(0, yMaxPart, 0);
-          const topStand = new THREE.Vector3(0, yMaxPart + approachDist, 0);
-          featWaypoints.push(makeWp(new THREE.Vector3(0, zClearance, 0), 'TRAVERSE', feat.id, feat.balloon, [0, -1, 0], 'A0° B0°', 'SAFE_TRAVERSE', 150.0));
+          const topTouch: [number, number, number] = [partCx, yMaxPart, partCz];
+          const tipCenterPos = new THREE.Vector3(partCx, yMaxPart + probeTipRadius, partCz);
+          const topStand = new THREE.Vector3(partCx, yMaxPart + probeTipRadius + approachDist, partCz);
+          const topRet = new THREE.Vector3(partCx, yMaxPart + probeTipRadius + retractDist, partCz);
+
+          featWaypoints.push(makeWp(new THREE.Vector3(partCx, zClearance, partCz), 'TRAVERSE', feat.id, feat.balloon, [0, -1, 0], 'A0° B0°', 'SAFE_TRAVERSE', 150.0));
           featWaypoints.push(makeWp(topStand, 'TRAVERSE', feat.id, feat.balloon, [0, -1, 0], 'A0° B0°', 'APPROACH', 80.0));
-          featWaypoints.push(makeWp(topTouch.clone(), 'TOUCH', feat.id, feat.balloon, [0, -1, 0], 'A0° B0°', 'TOUCH', 5.0));
-          featWaypoints.push(makeWp(new THREE.Vector3(0, zClearance, 0), 'RETRACT', feat.id, feat.balloon, [0, -1, 0], 'A0° B0°', 'RETRACT_TO_SAFE', 150.0));
+          featWaypoints.push(makeWp(tipCenterPos.clone(), 'TOUCH', feat.id, feat.balloon, [0, -1, 0], 'A0° B0°', 'TOUCH', 5.0));
+          featWaypoints.push(makeWp(topRet, 'RETRACT', feat.id, feat.balloon, [0, -1, 0], 'A0° B0°', 'RETRACT', 50.0));
+          featWaypoints.push(makeWp(new THREE.Vector3(partCx, zClearance, partCz), 'RETRACT', feat.id, feat.balloon, [0, -1, 0], 'A0° B0°', 'RETRACT_TO_SAFE', 150.0));
+
           touchRecords.push({
-            position: [topTouch.x, topTouch.y, topTouch.z],
+            position: topTouch,
+            surfacePoint: topTouch,
+            tipCenterPosition: [tipCenterPos.x, tipCenterPos.y, tipCenterPos.z],
             normal: [0, 1, 0],
             ph10Label: 'A0° B0°',
-          });
-
-          const underR = Math.max(6.0, Math.min(maxPartRadius * 0.55, 26.0));
-          const underY = Math.max(2.0, yMinPart);
-          const sDir: [number, number, number] = [-1, 0, 0];
-          const safeR = safeOuterR + 6.0;
-
-          featWaypoints.push(makeWp(new THREE.Vector3(0, safeHeadIndexAltitude, 0), 'RETRACT', feat.id, feat.balloon, [0, -1, 0], 'A0° B0°', 'RETRACT_TO_SAFE', 150.0));
-          featWaypoints.push(makeWp(new THREE.Vector3(safeR, safeHeadIndexAltitude, 0), 'TRAVERSE', feat.id, feat.balloon, [0, -1, 0], 'A0° B0°', 'SAFE_TRAVERSE', 150.0));
-          featWaypoints.push(makeWp(new THREE.Vector3(safeR, safeHeadIndexAltitude, 0), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°', 'HEAD_ROTATION', 150.0));
-          featWaypoints.push(makeWp(new THREE.Vector3(safeOuterR, zClearance, 0), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°', 'SAFE_TRAVERSE', 150.0));
-          featWaypoints.push(makeWp(new THREE.Vector3(safeOuterR, Math.max(1.0, underY - approachDist), 0), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°', 'APPROACH', 80.0));
-          featWaypoints.push(makeWp(new THREE.Vector3(underR, Math.max(1.0, underY - approachDist), 0), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°', 'APPROACH', 80.0));
-          featWaypoints.push(makeWp(new THREE.Vector3(underR, underY, 0), 'TOUCH', feat.id, feat.balloon, sDir, 'A0° B90°', 'TOUCH', 5.0));
-          featWaypoints.push(makeWp(new THREE.Vector3(underR, Math.max(1.0, underY - retractDist), 0), 'RETRACT', feat.id, feat.balloon, sDir, 'A0° B90°', 'RETRACT', 50.0));
-          featWaypoints.push(makeWp(new THREE.Vector3(safeOuterR, Math.max(1.0, underY - retractDist), 0), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°', 'APPROACH', 80.0));
-          featWaypoints.push(makeWp(new THREE.Vector3(safeOuterR, zClearance, 0), 'RETRACT', feat.id, feat.balloon, sDir, 'A0° B90°', 'RETRACT_TO_SAFE', 150.0));
-          touchRecords.push({
-            position: [underR, underY, 0],
-            normal: [0, -1, 0],
-            ph10Label: 'A0° B90°',
           });
         } else if (isYAxis && (isDeepFeature || normal[1] < -0.25)) {
           effectiveAngleLabel = 'A0° B90°';
           effectiveAngleObj = { aDeg: 0, bDeg: 90, direction: [-1, 0, 0], label: 'A0° B90°' };
 
-          const cy = Math.max(1.0, center[1]);
+          const cy = Math.max(yMinPart + 1.2, center[1]);
           const rHoriz = Math.hypot(center[0], center[2]);
           const ux = rHoriz > 1.0 ? center[0] / rHoriz : (Math.abs(normal[0]) > 0.1 || Math.abs(normal[2]) > 0.1 ? normal[0] / Math.hypot(normal[0], normal[2]) : 1.0);
           const uz = rHoriz > 1.0 ? center[2] / rHoriz : (Math.abs(normal[0]) > 0.1 || Math.abs(normal[2]) > 0.1 ? normal[2] / Math.hypot(normal[0], normal[2]) : 0.0);
@@ -658,48 +686,48 @@ export class MeasurementPathGenerator {
           const tz = rHoriz > 2.5 ? center[2] : uz * Math.max(6.0, maxPartRadius * 0.65);
           const sDir: [number, number, number] = [-ux, 0, -uz];
 
-          const isUnderTouch = cy <= yMinPart + 2.0 || normal[1] < -0.35;
-          const standY = isUnderTouch ? Math.max(1.0, cy - approachDist) : cy + normal[1] * approachDist;
-          const retY = isUnderTouch ? Math.max(1.0, cy - retractDist) : cy + normal[1] * retractDist;
-          const standX = isUnderTouch ? tx : tx + ux * approachDist;
-          const standZ = isUnderTouch ? tz : tz + uz * approachDist;
-          const retX = isUnderTouch ? tx : tx + ux * retractDist;
-          const retZ = isUnderTouch ? tz : tz + uz * retractDist;
-
+          const surfPos: [number, number, number] = [tx, cy, tz];
+          const tipCenterPos = new THREE.Vector3(tx + ux * probeTipRadius, cy, tz + uz * probeTipRadius);
+          const standPos = new THREE.Vector3(tx + ux * (probeTipRadius + approachDist), cy, tz + uz * (probeTipRadius + approachDist));
+          const retPos = new THREE.Vector3(tx + ux * (probeTipRadius + retractDist), cy, tz + uz * (probeTipRadius + retractDist));
           const outOverhead = new THREE.Vector3(ux * safeOuterR, zClearance, uz * safeOuterR);
-          const outLevel = new THREE.Vector3(ux * safeOuterR, standY, uz * safeOuterR);
-          const standPos = new THREE.Vector3(standX, standY, standZ);
-          const touchPos = new THREE.Vector3(tx, cy, tz);
-          const retPos = new THREE.Vector3(retX, retY, retZ);
+          const outLevel = new THREE.Vector3(ux * safeOuterR, cy, uz * safeOuterR);
 
           featWaypoints.push(makeWp(outOverhead.clone(), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°', 'SAFE_TRAVERSE', 150.0));
           featWaypoints.push(makeWp(outLevel.clone(), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°', 'APPROACH', 80.0));
           featWaypoints.push(makeWp(standPos, 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°', 'APPROACH', 80.0));
-          featWaypoints.push(makeWp(touchPos.clone(), 'TOUCH', feat.id, feat.balloon, sDir, 'A0° B90°', 'TOUCH', 5.0));
+          featWaypoints.push(makeWp(tipCenterPos.clone(), 'TOUCH', feat.id, feat.balloon, sDir, 'A0° B90°', 'TOUCH', 5.0));
           featWaypoints.push(makeWp(retPos, 'RETRACT', feat.id, feat.balloon, sDir, 'A0° B90°', 'RETRACT', 50.0));
-          featWaypoints.push(makeWp(new THREE.Vector3(ux * safeOuterR, retY, uz * safeOuterR), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°', 'APPROACH', 80.0));
+          featWaypoints.push(makeWp(outLevel.clone(), 'TRAVERSE', feat.id, feat.balloon, sDir, 'A0° B90°', 'APPROACH', 80.0));
           featWaypoints.push(makeWp(outOverhead.clone(), 'RETRACT', feat.id, feat.balloon, sDir, 'A0° B90°', 'RETRACT_TO_SAFE', 150.0));
 
           touchRecords.push({
-            position: [touchPos.x, touchPos.y, touchPos.z],
-            normal: [normal[0], normal[1], normal[2]],
+            position: surfPos,
+            surfacePoint: surfPos,
+            tipCenterPosition: [tipCenterPos.x, tipCenterPos.y, tipCenterPos.z],
+            normal: [ux, 0, uz],
             ph10Label: 'A0° B90°',
           });
         } else {
-          let safeTouchY = isYAxis ? Math.max(yMinPart, Math.min(yMaxPart, center[1])) : center[1];
+          let safeTouchY = isYAxis ? Math.max(yMinPart + 1.0, Math.min(yMaxPart, center[1])) : center[1];
           if (isYAxis && (cadId === 'CAD_BBOX_X' || cadId === 'CAD_BBOX_Z')) {
             safeTouchY = yMinPart + Math.min(1.2, Math.max(0.6, partHeight * 0.22));
           }
-          const touchPos = new THREE.Vector3(center[0], safeTouchY, center[2]);
+          const surfPoint: [number, number, number] = [center[0], safeTouchY, center[2]];
+          const tipCenterPos = new THREE.Vector3(
+            center[0] + normal[0] * probeTipRadius,
+            isYAxis ? Math.max(yMinPart + 1.0, safeTouchY + normal[1] * probeTipRadius) : safeTouchY + normal[1] * probeTipRadius,
+            center[2] + normal[2] * probeTipRadius
+          );
           const standoffPos = new THREE.Vector3(
-            center[0] + normal[0] * approachDist,
-            isYAxis ? Math.max(0.5, safeTouchY + normal[1] * approachDist) : safeTouchY + normal[1] * approachDist,
-            center[2] + normal[2] * approachDist
+            center[0] + normal[0] * (probeTipRadius + approachDist),
+            isYAxis ? Math.max(yMinPart + 1.0, safeTouchY + normal[1] * (probeTipRadius + approachDist)) : safeTouchY + normal[1] * (probeTipRadius + approachDist),
+            center[2] + normal[2] * (probeTipRadius + approachDist)
           );
           const retractPos = new THREE.Vector3(
-            center[0] + normal[0] * retractDist,
-            isYAxis ? Math.max(0.5, safeTouchY + normal[1] * retractDist) : safeTouchY + normal[1] * retractDist,
-            center[2] + normal[2] * retractDist
+            center[0] + normal[0] * (probeTipRadius + retractDist),
+            isYAxis ? Math.max(yMinPart + 1.0, safeTouchY + normal[1] * (probeTipRadius + retractDist)) : safeTouchY + normal[1] * (probeTipRadius + retractDist),
+            center[2] + normal[2] * (probeTipRadius + retractDist)
           );
 
           const overheadPos = isYAxis
@@ -708,12 +736,14 @@ export class MeasurementPathGenerator {
 
           featWaypoints.push(makeWp(overheadPos.clone(), 'TRAVERSE', feat.id, feat.balloon, [0, -1, 0], effectiveAngleObj.label, 'SAFE_TRAVERSE', 150.0));
           featWaypoints.push(makeWp(standoffPos, 'TRAVERSE', feat.id, feat.balloon, [0, -1, 0], effectiveAngleObj.label, 'APPROACH', 80.0));
-          featWaypoints.push(makeWp(touchPos.clone(), 'TOUCH', feat.id, feat.balloon, [0, -1, 0], effectiveAngleObj.label, 'TOUCH', 5.0));
+          featWaypoints.push(makeWp(tipCenterPos.clone(), 'TOUCH', feat.id, feat.balloon, [0, -1, 0], effectiveAngleObj.label, 'TOUCH', 5.0));
           featWaypoints.push(makeWp(retractPos, 'RETRACT', feat.id, feat.balloon, [0, -1, 0], effectiveAngleObj.label, 'RETRACT', 50.0));
           featWaypoints.push(makeWp(overheadPos.clone(), 'RETRACT', feat.id, feat.balloon, [0, -1, 0], effectiveAngleObj.label, 'RETRACT_TO_SAFE', 150.0));
 
           touchRecords.push({
-            position: [touchPos.x, touchPos.y, touchPos.z],
+            position: surfPoint,
+            surfacePoint: surfPoint,
+            tipCenterPosition: [tipCenterPos.x, tipCenterPos.y, tipCenterPos.z],
             normal: [normal[0], normal[1], normal[2]],
             ph10Label: effectiveAngleObj.label,
           });
@@ -735,6 +765,12 @@ export class MeasurementPathGenerator {
 
     const returnHome = homePos.clone();
     allWaypoints.push(makeWp(returnHome, 'TRAVERSE', undefined, undefined, isYAxis ? [0, -1, 0] : [0, 0, -1], currentAngleLabel || 'A0° B0°', 'HOME', 150.0));
+
+    for (const wp of allWaypoints) {
+      if (wp.position.x < 0 && Math.abs(wp.position.x) < 1e-4) wp.position.x = 0;
+      if (wp.position.y < 0) wp.position.y = 0;
+      if (wp.position.z < 0) wp.position.z = 0;
+    }
 
     let totalDist = 0;
     let totalDuration = 0;
