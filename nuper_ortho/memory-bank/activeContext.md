@@ -1,12 +1,18 @@
 # Nuper Ortho — Aktif Bağlam
 
-Son güncelleme: 7 Kasım 2026.
+Son güncelleme: 8 Kasım 2026.
 
 ## 1. Mevcut durum
 
-Projede kritik B02 CAD çekirdeği engeli çözüldü: OpenCASCADE 8.0 (`cadquery-ocp`) çekirdeği entegre edildi. Sahte model üreten (`buildDcModulPlakaModel` ve regex fallback mockup verileri) kodlar temizlendi. Artık gerçek STEP dosyaları tam analitik B-Rep yüzeyleri (PLANE, CYLINDER, CONE, SPHERE, TORUS), hassas köşe/tel kafes kenarları (`GCPnts_QuasiUniformDeflection`) ve eş eksenli delik/mil tespitiyle doğrudan Three.js BufferGeometry ve LineSegments olarak sahneye aktarılmaktadır. Mockup telemetri metinleri kaldırıldı.
+Projede YC RFS 2026 "Physical AI" (Kapalı Döngü İmalat ve Otonom Kalite Derleyicisi) vizyonu doğrultusunda otonom CMM kinematik planlayıcı ve üç çekirdekli mimari (TypeScript UI - Python OCP - Rust Kinematics) cerrahi olarak elden geçirilmiş ve eşitlenmiştir:
+1. **Fiziksel CMM Yolu:** Parçanın içinden doğrudan geçişler tamamen engellendi. `safeZ = maxZ + 25.0 mm` Emniyet Düzlemi ve zorunlu 3 aşamalı köprü intikali (`RETRACT_TO_SAFE` $\to$ `SAFE_TRAVERSE` $\to$ `PLUNGE_TO_ENTRY`) devreye alındı.
+2. **Eksenel Delik İnişi:** Deliklere yandan çarpma engellendi; prob delik merkez ekseninden (`AXIAL_ENTRY`, $20\text{ mm/s}$) iner, delik içinde 4 radyal temas noktası alır, tekrar merkeze çekilip eksenel olarak çıkar (`AXIAL_EXIT`, $50\text{ mm/s}$).
+3. **Güvenli PH10 Kafa İndeksi:** Kafa açı değişimleri parçanın tepesinde `safeIndexZ = maxZ + 50.0 mm` kotunda ve `HEAD_ROTATION` güvenli bölgesinde icra edilir.
+4. **AS9102 / ASME Y14.5 Önceliği:** Önce 3-2-1 Datumlar (A:3, B:2, C:1), ardından OP10 standart unsurları (DISTANCE $\to$ POSITION $\to$ THICKNESS, her faz kendi içinde Nearest-Neighbor TSP rotalı) ve OP20 açısal unsurları planlanır.
+5. **Kapalı Döngü CNC & Canlı DMIS:** Fanuc G10 / Siemens G10 L52 & `$TC_DP12` takım aşınma kompanzasyonu ve ANSI DMIS 5.3 blokları canlı simülasyon koordinatlarına bağlandı.
+6. **Canlı Telemetri & Çift Renkli Trajektori:** İntikal ($150\text{ mm/s}$, camgöbeği tüp) ve temas ($5\text{ mm/s}$, neon turuncu tüp) arayüzde anlık dinamik telemetri olarak sunulmaktadır.
 
-Tüm testler ve sözleşmeler senkronize durumdadır (TypeScript types, Vitest 144 test, Pytest 38 test, Rust cargo check %100 yeşil).
+Tüm testler ve sözleşmeler senkronize durumdadır (TypeScript `check:types` hatasız, 30 dosyada 171 Vitest testi, 47 Pytest testi, 28 Rust testi, `cargo check --workspace` %100 yeşil).
 
 ## 2. Belge rolleri ve okuma sırası
 

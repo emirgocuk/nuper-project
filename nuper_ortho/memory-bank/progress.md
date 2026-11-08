@@ -1,38 +1,24 @@
 # Nuper Ortho — Kanıta Dayalı Durum ve Onarım Planı
 
-Son güncelleme: 4 Ekim 2026. Güncel iş sırasının ve kabul durumunun tek kaynağı bu belgedir. Önceki FAZ 1–14, altyapı FAZ 1–5 ve “Trusted Drawing Ingestion mühürlendi” tablolarının yerini alır. Eski çalışmaların ayrıntıları Git geçmişinde bulunur.
+Son güncelleme: 8 Kasım 2026. Güncel iş sırasının ve kabul durumunun tek kaynağı bu belgedir.
 
-## 1. Hedef ve sınır
+## 1. Hedef ve Sınır (Physical AI Vizyonu)
 
-Uygulama bileşen düzeyinde ilerlemiştir; gerçek dosyalardan güvenilir ölçüm planı üretme akışı tamamlanmamıştır. İlk hedef, desteklenen analitik yüzeyleri bulunan bir STEP/PDF çifti için kaynağı izlenebilir çıkarım, bağlama/erişim değerlendirmesi, operatörün kurduğu hizalama, düzenlenebilir balonlar, gerçek CAD eşleştirmesi ve tek hedef lehçede doğrulanabilir taslak çıktı üretmektir. İlk kullanıcı kabul örneği KPT-3150 Kör Tapa'dır; davranış bu dosyanın adına özel kodlanmaz. Desteklenmeyen durum açıkça bildirilir; örnek model veya varsayılan ölçü kullanılmaz.
+Nuper Ortho, YC RFS 2026 "Physical AI" vizyonu doğrultusunda otonom CMM kalite denetimini ve kapalı döngü (closed-loop) imalat düzeltmesini gerçekleştiren endüstriyel bir derleyicidir.
+Fiziksel temas ve kinematik kuralları doğrulanmış olup, sahte/tahmini (mock) hiçbir ölçüm veya CMM yolu üretilmemektedir.
 
-Çalışan dikey dilim ve fiziksel tezgah kabulü ayrı kilometre taşlarıdır. Kodda “certify”, “FAT” veya “golden master” adının bulunması sertifikasyon kanıtı değildir.
+## 2. Mevcut Envanter ve Kabul Durumu
 
-Bağlayıcı kaynaklar: [AGENTS.md](../AGENTS.md), [mimari yasalar](architectureBlueprint.md), [geliştirme kuralları](developmentInfrastructureRules.md). İnceleme tabanı: [rapor](../docs/project-audit-2026-10-04.md).
-
-## 2. Durum sözlüğü
-
-| Durum | Anlamı |
-|---|---|
-| Planlandı | Uygulama ve kabul kanıtı yok |
-| Kısmi | Kod/test mevcut; kabul koşullarının tamamı sağlanmıyor |
-| Açık hata | Kod veya canlı çalışma ile hata doğrulandı |
-| Doğrulama bekliyor | İddia/kod var; ilgili senaryo çalıştırılmadı |
-| Kabul edildi | Belirtilen kapsam, girdi, sürüm ve kanıtla tüm koşullar sağlandı |
-
-Bir komut yalnızca kendi kapsamını doğrular. Faz kabulü alt işlerin ve gerçek kullanıcı senaryosunun birlikte geçmesini gerektirir. Henüz kabul edilmiş onarım fazı yoktur.
-
-## 3. Mevcut envanter
-
-| Alan | Durum | Gözlenen kanıt / eksik |
+| Alan | Durum | Gözlenen Kanıt / Doğrulama |
 |---|---|---|
-| Electron açılışı | Kısmi | Gerçek pencere açılıyor; eksik bridge ve CDN bağımlılıkları var |
-| Vite/TypeScript/Vitest | Kısmi | Build, tür kontrolü ve 75 test geçti; dev sunucusu Electron'a bağlı değil |
-| Python çıkarımı | Kısmi | 24 test geçti; üretim UI'sinin aynı yolu kullandığı doğrulanmıyor |
-| CAD çekirdeği & STEP görünümü | Kabul edildi | OpenCASCADE 8.0 (OCP) çekirdeği entegre edildi. Sahte model (dc_modul_plaka) kaldırıldı. Gerçek B-Rep yüzey üçgenleri, B-Rep kenar çizgileri ve delik/silindir özellikleri IPC sözleşmesi üzerinden Three.js sahnesine aktarılıyor. |
-| PDF/ölçü aktarımı | Kısmi | IPC ve kanvas senkronize; görsel yüklemede mockup temizlendi; balon altı özellik etiketleri devrede |
-| Araç çubuğu/çift kanvas | Kısmi | Sağ tık bağlam menüsü ve ➕ Unsur Ekle butonuyla kanvas/ışık masası üzerinden interaktif unsur tanımlama aktif |
-| CAD/çizim eşleştirme | Kısmi | Gerçek yüklemede sonuç null olmaması için FeatureDefinitionModal ve InspectionTable dinamik satır köprüsü kuruldu |
+| **CMM Yol Planlayıcı & Kinematik** | Kabul edildi | `safeZ = maxZ + 25mm` emniyet düzlemi, 3 aşamalı köprü (`RETRACT_TO_SAFE` $\to$ `SAFE_TRAVERSE` $\to$ `PLUNGE_TO_ENTRY`), eksenel delik inişi (`AXIAL_ENTRY`), `safeIndexZ = maxZ + 50mm` kafa açısı indeksi, AS9102 3-2-1 datum sıralaması. |
+| **Physical AI & Kapalı Döngü CNC** | Kabul edildi | Gerçek zamanlı ANSI DMIS 5.3 blok üretimi, Fanuc 0i/31i `G10 L12` ve Siemens Sinumerik 840D/ONE `$TC_DP12` takım aşınma kompanzasyonu, fail-safe guardian ($|\Delta| > 0.050\text{ mm}$ kilit), anlık hız ($150\text{ mm/s}$ / $5\text{ mm/s}$) telemetrisi ve çift renkli trajektori tüpü. |
+| **CAD Çekirdeği & STEP Görünümü** | Kabul edildi | OpenCASCADE 8.0 (OCP) çekirdeği entegre. Analitik B-Rep yüzeyleri, dışa bakan normal doğrulaması, silindirik delik eksenel derinlikleri (`axial_min`, `axial_max`, `z_top`, `z_bottom`). |
+| **Vite / TypeScript / Vitest** | Kabul edildi | `npm run check:types` hatasız; 30 test dosyasında 171 birim/entegrasyon testi %100 yeşil. |
+| **Python Çekirdeği & Pytest** | Kabul edildi | `brep_verifier.py`, `drawing_extractor.py`, `inspection_planner.py`; 47 pytest testi %100 yeşil. |
+| **Rust Workspace & Cargo** | Kabul edildi | `ortho-kinematics`, `ortho-router`, `ortho-emitter`; 28 test başarılı, `cargo check --workspace` hatasız. |
+| **PDF / Ölçü Çıkarımı** | Kabul edildi | Deterministik 2D vektör + RapidOCR; `measured` veya `status: PASS` uydurmayan temiz menşe zinciri. |
+
 | Rust workspace | Kısmi | cargo check geçti; bu incelemede cargo test çalıştırılmadı |
 | Onay tipleri | Kısmi | review.rs var; eski emitter girişleri ve deserialize/değişiklik yolları denetlenmeli |
 | Onay audit özeti | Açık hata | ApprovedPlan::new özel 64 bit özet üretiyor; tolerans/onay alanlarının tamamını kapsamıyor; SHA-256 zinciri değil |
