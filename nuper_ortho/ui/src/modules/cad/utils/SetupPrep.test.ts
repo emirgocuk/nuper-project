@@ -112,4 +112,31 @@ describe('5 Eksen Bağlama ve Geometri Hazırlık Modülü (SetupPrep)', () => {
     expect(recommendation.bestCandidate.axis).toBe('y');
     expect(recommendation.bestCandidate.requiresOp20).toBe(false);
   });
+
+  it('computeCollinearSafePoints dogrusal veya kucuk ucgen durumunda genis ucgen uretir', () => {
+    const collinear = SetupPrep.computeCollinearSafePoints(
+      [0, 10, 0],
+      [10, 10, 0],
+      [20, 10, 0],
+      100,
+      50,
+      [0, 1, 0]
+    );
+    expect(collinear.length).toBe(3);
+    const v1 = new THREE.Vector3(collinear[1][0] - collinear[0][0], collinear[1][1] - collinear[0][0], collinear[1][2] - collinear[0][2]);
+    const v2 = new THREE.Vector3(collinear[2][0] - collinear[0][0], collinear[2][1] - collinear[0][0], collinear[2][2] - collinear[0][2]);
+    const cross = new THREE.Vector3().crossVectors(v1, v2);
+    expect(cross.length()).toBeGreaterThan(1e-3);
+  });
+
+  it('verifyProperRightHandedMatrix sol el matrisi durumunda y eksenini duzeltir', () => {
+    const leftHanded = new THREE.Matrix4().set(
+      1, 0, 0, 0,
+      0, -1, 0, 0,
+      0, 0, -1, 0,
+      0, 0, 0, 1
+    );
+    const corrected = SetupPrep.verifyProperRightHandedMatrix(leftHanded);
+    expect(corrected.determinant()).toBeGreaterThan(0);
+  });
 });

@@ -51,6 +51,63 @@ export interface SetupPrepOptions {
 }
 
 export class SetupPrep {
+  public static computeCollinearSafePoints(
+    p1: [number, number, number],
+    p2: [number, number, number],
+    p3: [number, number, number],
+    width: number,
+    depth: number,
+    normal: [number, number, number] = [0, 1, 0]
+  ): [number, number, number][] {
+    const v1 = new THREE.Vector3(p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]);
+    const v2 = new THREE.Vector3(p3[0] - p1[0], p3[1] - p1[1], p3[2] - p1[2]);
+    const cross = new THREE.Vector3().crossVectors(v1, v2);
+    const area = 0.5 * cross.length();
+    const minRequiredArea = 0.25 * width * depth;
+
+    if (area >= minRequiredArea && cross.length() > 1e-4) {
+      return [p1, p2, p3];
+    }
+
+    const n = new THREE.Vector3(normal[0], normal[1], normal[2]).normalize();
+    const ref = Math.abs(n.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    const u = new THREE.Vector3().crossVectors(n, ref).normalize();
+    const v = new THREE.Vector3().crossVectors(n, u).normalize();
+
+    const spanU = Math.max(10.0, width * 0.4);
+    const spanV = Math.max(10.0, depth * 0.4);
+    const center = new THREE.Vector3(
+      (p1[0] + p2[0] + p3[0]) / 3,
+      (p1[1] + p2[1] + p3[1]) / 3,
+      (p1[2] + p2[2] + p3[2]) / 3
+    );
+
+    const safe1 = center.clone().addScaledVector(u, spanU);
+    const safe2 = center.clone().addScaledVector(u, -spanU * 0.5).addScaledVector(v, spanV * 0.866);
+    const safe3 = center.clone().addScaledVector(u, -spanU * 0.5).addScaledVector(v, -spanV * 0.866);
+
+    return [
+      [parseFloat(safe1.x.toFixed(3)), parseFloat(safe1.y.toFixed(3)), parseFloat(safe1.z.toFixed(3))],
+      [parseFloat(safe2.x.toFixed(3)), parseFloat(safe2.y.toFixed(3)), parseFloat(safe2.z.toFixed(3))],
+      [parseFloat(safe3.x.toFixed(3)), parseFloat(safe3.y.toFixed(3)), parseFloat(safe3.z.toFixed(3))],
+    ];
+  }
+
+  public static verifyProperRightHandedMatrix(matrix: THREE.Matrix4): THREE.Matrix4 {
+    const el = matrix.elements;
+    const x = new THREE.Vector3(el[0], el[1], el[2]);
+    const z = new THREE.Vector3(el[8], el[9], el[10]);
+
+    const det = matrix.determinant();
+    if (det < 0) {
+      const fixedY = new THREE.Vector3().crossVectors(z, x).normalize();
+      el[4] = fixedY.x;
+      el[5] = fixedY.y;
+      el[6] = fixedY.z;
+    }
+    return matrix;
+  }
+
   public static calculateRotationMatrix(axis: 'x' | 'y' | 'z', angleDeg: number): THREE.Matrix4 {
     const angleRad = THREE.MathUtils.degToRad(angleDeg);
     const matrix = new THREE.Matrix4();
