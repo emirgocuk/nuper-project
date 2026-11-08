@@ -224,6 +224,33 @@ impl AntiTamperAuthority {
             compliance_standard: "AS9100 Rev D (Clause 8.5.1/8.5.2) & NIST SP 800-53".to_string(),
         })
     }
+
+    pub fn generate_as9102_form3(
+        part_name: &str,
+        dimensions: &[(&str, f64, f64, f64, &str, &str)],
+    ) -> String {
+        let mut report = String::new();
+        report.push_str("================================================================================\n");
+        report.push_str("SAE AS9102 REV C — FIRST ARTICLE INSPECTION REPORT (FORM 3)\n");
+        report.push_str(&format!("PART: {} | SPEC: AS9102 REV C / ASME Y14.5-2018\n", part_name));
+        report.push_str("================================================================================\n");
+        report.push_str("| CHAR | BALLOON | NOMINAL | UPPER_TOL | LOWER_TOL | STATUS | NCR |\n");
+        report.push_str("|------|---------|---------|-----------|-----------|--------|-----|\n");
+        for (i, (balloon, nom, utol, ltol, status, ncr)) in dimensions.iter().enumerate() {
+            report.push_str(&format!(
+                "| {:4} | {:7} | {:7.3} | {:+9.3} | {:+9.3} | {:6} | {:5} |\n",
+                i + 1,
+                balloon,
+                nom,
+                utol,
+                ltol,
+                status,
+                ncr
+            ));
+        }
+        report.push_str("================================================================================\n");
+        report
+    }
 }
 
 #[cfg(test)]
@@ -295,5 +322,18 @@ mod tests {
         let raw = "FILNAM/'UNSIGNED_PART', 5.3\nENDFIL\n";
         let err = AntiTamperAuthority::verify_program_integrity(raw).expect_err("İmzasız kabul edildi!");
         assert_eq!(err, TamperViolation::UnsignedProgram);
+    }
+
+    #[test]
+    fn test_as9102_form3_generation() {
+        let dims = [
+            ("#1", 20.0, 0.021, 0.000, "PASS", "N/A"),
+            ("#2", 45.0, 0.100, -0.100, "FAIL", "NCR-01"),
+        ];
+        let report = AntiTamperAuthority::generate_as9102_form3("TEST_PLATE", &dims);
+        assert!(report.contains("SAE AS9102 REV C"));
+        assert!(report.contains("TEST_PLATE"));
+        assert!(report.contains("#1"));
+        assert!(report.contains("NCR-01"));
     }
 }

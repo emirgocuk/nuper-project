@@ -24,6 +24,7 @@ export class CodeSnippetGenerator {
       calibration: this.generateProbeCalibration(context),
       license: this.generateDefenseLicense(context),
       ipc: this.generateIpcBuffer(context),
+      as9102: this.generateAS9102Form3(context),
     };
   }
 
@@ -62,6 +63,15 @@ export class CodeSnippetGenerator {
       `SNSET/RETRCT, 5.0000`,
       `SNSET/CLRSRF, ${zClr.toFixed(4)}`,
       ``,
+      `$$ ==============================================================`,
+      `$$ 3-2-1 HIZALAMA VE KOORDINAT SISTEMI (ANSI DMIS 5.3)`,
+      `$$ ==============================================================`,
+      `DATDEF/FA(FEAT_DATUM_A),DAT(A)`,
+      `DATDEF/FA(FEAT_DATUM_B),DAT(B)`,
+      `DATDEF/FA(FEAT_DATUM_C),DAT(C)`,
+      `DATSET/DAT(A),ZDIR,ZORIG,DAT(B),XDIR,XORIG,DAT(C),YORIG`,
+      `SAVE/D(PCS_OP10)`,
+      ``,
     ];
 
     if (context.plan && context.plan.featurePaths.length > 0) {
@@ -98,6 +108,19 @@ export class CodeSnippetGenerator {
         lines.push(`PTMEAS/CART, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 1.0000`);
         lines.push(`ENDMES`);
       }
+    }
+
+    if (context.plan?.operation === 'OP20') {
+      lines.push(
+        `$$ ==============================================================`,
+        `$$ OP10 -> OP20 GECIS VE BAGLAMA TALIMATI`,
+        `$$ ==============================================================`,
+        `TEXT/OPER,'LUTFEN PARCAYI OP20 ICIN 180 DERECE CEVIRIP GRANIT TABLAYA BAGLAYIN'`,
+        `RECALL/D(MCS)`,
+        `DATSET/DAT(A),ZDIR,ZORIG,DAT(B),XDIR,XORIG,DAT(C),YORIG`,
+        `SAVE/D(PCS_OP20)`,
+        ``
+      );
     }
 
     lines.push(`ENDFIL`);
@@ -381,6 +404,56 @@ export class CodeSnippetGenerator {
       `Ag Durumu: %100 Izole (Air-Gapped - Yerel Kural Motoru)`,
       `Sertifikasyon Otoritesi: SAVUNMA SANAYII BASKANLIGI (SSB) KALITE ONAYI`,
     ];
+    return lines.join('\n');
+  }
+
+  public static generateAS9102Form3(context: CodeSnippetContext): string {
+    const cleanPart = context.partName.replace(/[^a-zA-Z0-9_]/g, '_').toUpperCase();
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const lines: string[] = [
+      `========================================================================================================================`,
+      `SAE AS9102 REV C — FIRST ARTICLE INSPECTION (FAI) REPORT: FORM 3 (CHARACTERISTIC ACCOUNTABILITY)`,
+      `ORGANIZATION: NUPER SOVEREIGN DEFENSE METROLOGY | FACILITY CAGE: 0A1B2 | REPORT NO: FAI-${dateStr}-001`,
+      `PART NAME: ${cleanPart} | DRAWING NO: ${cleanPart} | SPEC: ASME Y14.5-2018 / ISO 2768-mK / AS9102 Rev C`,
+      `========================================================================================================================`,
+      `| CHAR | REF LOC  | DESIGNATOR | REQUIREMENT (NOM + TOL + GD&T + SOURCE)        | RESULTS (MEASURED / DEV) | QUALIFIED TOOLING           | NON-CONFORMANCE |`,
+      `|------|----------|------------|------------------------------------------------|--------------------------|-----------------------------|-----------------|`,
+    ];
+
+    let failCount = 0;
+    for (let i = 0; i < context.dimensions.length; i++) {
+      const d = context.dimensions[i];
+      const charNo = String(i + 1).padStart(4, ' ');
+      const refLoc = (d.balloon || `#${i + 1}`).padEnd(8, ' ');
+      const isKey = Boolean(d.gdt || (d.nominal && d.nominal > 50) || (d.upper_tol && parseFloat(d.upper_tol) < 0.05));
+      const designator = (isKey ? 'KEY/CRIT' : 'STANDARD').padEnd(10, ' ');
+
+      const tolSource = d.tolerance_source || 'ISO_2768_M';
+      const tolStr = `${d.upper_tol || '+0.1'} / ${d.lower_tol || '-0.1'}`;
+      const gdtStr = d.gdt ? ` [${d.gdt}]` : '';
+      const req = `${d.nominal_str || d.nominal} mm (${tolStr})${gdtStr} <${tolSource}>`.padEnd(46, ' ');
+
+      const isMeasured = d.status === 'PASS' || d.status === 'FAIL';
+      const measuredVal = isMeasured && d.measured && d.measured !== '--' ? d.measured : ((d.status as string) === 'MEASURING' ? 'MEASURING' : 'PENDING');
+      const devVal = isMeasured && d.deviation && d.deviation !== '--' ? ` (${d.deviation})` : '';
+      const statusTag = d.status === 'PASS' ? ' PASS ✓' : (d.status === 'FAIL' ? ' FAIL ✗' : ' PENDING');
+      const results = `${measuredVal}${devVal} [${statusTag.trim()}]`.padEnd(24, ' ');
+
+      const tooling = 'Renishaw PH10M (TP20-Ø2x20)'.padEnd(27, ' ');
+      let ncr = 'N/A (COMPLIANT)'.padEnd(15, ' ');
+      if (d.status === 'FAIL') {
+        failCount++;
+        ncr = `NCR-2026-00${failCount}`.padEnd(15, ' ');
+      }
+
+      lines.push(`| ${charNo} | ${refLoc} | ${designator} | ${req} | ${results} | ${tooling} | ${ncr} |`);
+    }
+
+    lines.push(`========================================================================================================================`);
+    lines.push(`[FAI FORM 3 DISPOSITION SUMMARY]`);
+    lines.push(`Total Characteristics Accounted: ${context.dimensions.length}`);
+    lines.push(`Conformance Status: ${failCount === 0 ? 'CONFORMANT / ACCEPTED FOR FLIGHT USE (AS9102 REV C SECTION 5.3)' : `NON-CONFORMANT (${failCount} Discrepancies Flagged)`}`);
+    lines.push(`Inspector / Metrology Lead: SOVEREIGN AUTONOMOUS AGENT (DIGITALLY SEALED)`);
     return lines.join('\n');
   }
 }

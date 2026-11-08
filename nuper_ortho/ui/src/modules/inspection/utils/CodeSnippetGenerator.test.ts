@@ -56,6 +56,7 @@ describe('CodeSnippetGenerator (Pure Utility)', () => {
       'calibration',
       'license',
       'ipc',
+      'as9102',
     ];
 
     for (const key of expectedKeys) {
@@ -66,6 +67,10 @@ describe('CodeSnippetGenerator (Pure Utility)', () => {
 
     expect(snippets.dmis).toContain('10142739_DC_MODUL_PLAKA');
     expect(snippets.dmis).toContain('FILNAM');
+    expect(snippets.dmis).toContain('DATSET/DAT(A)');
+    expect(snippets.dmis).toContain('DATDEF/FA(FEAT_DATUM_A)');
+    expect(snippets.as9102).toContain('SAE AS9102 REV C');
+    expect(snippets.as9102).toContain('FORM 3');
     expect(snippets.calypso).toContain('ZEISS CALYPSO ASCII PRUFPLAN GENERATOR');
     expect(snippets.calypso).toContain('10142739_DC_MODUL_PLAKA');
     expect(snippets.wenzel).toContain('WENZEL WM | QUARTIS METROLOGY PROGRAM');
