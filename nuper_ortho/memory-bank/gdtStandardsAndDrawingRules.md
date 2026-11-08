@@ -161,3 +161,43 @@ Bu standartların kod tabanında hatasız uygulanabilmesi için:
 - Yakut küre yarıçapı ($R_{\text{tip}}$) telafisi doğrudan yüzey normali doğrultusunda eklenir.
 - Granite tabla $Y=0$ sınırlandırması yalnızca dikey eksen için uygulanır; $Z<0$ veya $X<0$ yatay koordinatlarının sıfıra ezilerek havada yapay düz çizgiler oluşturması engellenmiştir.
 - Trajektori görselleştirme boru yarıçapı $0.015\text{ mm}$ seviyesine inceltilerek şeffaf ve zarif (hairline) mühendislik çizgisi elde edilmiştir.
+
+---
+
+## 🛠️ 8. Endüstriyel Mükemmellik Standartları (Paket 4 / Havacılık Savunma Uyumu)
+
+### 8.1. ISO 2768-1 Genel Tolerans Tablosu Otomatik Atayıcısı
+Teknik resim antetinde tanımlı `ISO 2768-f`, `m`, `c`, `v` (veya `mK`, `fH`) sınıfına göre, yanında açık tolerans belirtilmemiş tüm doğrusal ölçülere standart tolerans aralık tablosu otomatik uygulanır:
+- $0.5 \text{–} 3\text{ mm} \implies \pm 0.1\text{ mm}$ (Orta / m sınıfı)
+- $> 3 \text{–} 6\text{ mm} \implies \pm 0.1\text{ mm}$
+- $> 6 \text{–} 30\text{ mm} \implies \pm 0.2\text{ mm}$
+- $> 30 \text{–} 120\text{ mm} \implies \pm 0.3\text{ mm}$
+- $> 120 \text{–} 400\text{ mm} \implies \pm 0.5\text{ mm}$
+- $> 400 \text{–} 1000\text{ mm} \implies \pm 0.8\text{ mm}$
+- Menşe etiketi `tolerance_source: 'ISO_2768_M'` olarak kaydedilir.
+
+### 8.2. Dişli Deliklerde Minör Çap ve Helisel Ofset Koruması
+- Metrik ve UNF dişlerde (M6x1, M8, M4 vb.) prob asla nominal dış anma çapına ($\varnothing 6.0\text{ mm}$) gönderilmez.
+- Hedef kontrol çapı minör/matkap çapı ($D_{\text{minor}} = D_{\text{major}} - 1.082532 \times P$) olarak hesaplanır; prob $r = D_{\text{minor}}/2$ silindirine temas eder.
+- Dört temas noktasına helisel faz ofseti ($\Delta z_i = (i / 4.0) \times P$) eklenerek probun diş sırtına bindirmesi ve yan yüzeylerde kilitlenmesi engellenir.
+
+### 8.3. Kör Delik ve Havşa Tabanı Çarpışma Koruması
+- STEP B-Rep modelinde tabanı kapalı olan (`is_blind: true`) kör deliklerde taban seviyesi `floor_z` çıkarılır.
+- Dalma kotu $Z_{\text{meas}} = \max(\text{floor\_z} + R_{\text{tip}} + 2.0\text{ mm}, \text{desiredZ})$ ile tabandan en az $2.0\text{ mm} + R_{\text{tip}}$ yukarıda tutulur.
+
+### 8.4. ANSI DMIS 5.3 Koordinat Sistemi (`DATSET` / `PCS`) ve OP20 Çevirme
+- Ölçüm programında Primer, Sekonder, Tersiyer datumların ardından ANSI DMIS 5.3 uyumlu `DATDEF`/`DATSET` ve `SAVE/D(PCS_OP10)` blokları üretilir.
+- OP20 kurulumunda operatöre `TEXT/OPER,'LUTFEN PARCAYI OP20 ICIN 180 DERECE CEVIRIP GRANIT TABLAYA BAGLAYIN'` ve `RECALL/D(MCS)` yönlendirmesi basılır.
+
+### 8.5. Trapezoidal Kinematik Profil ile Çevrim Süresi
+- $a_{\max} = 450\text{ mm/s}^2$ ivme limitiyle gerçekçi ivmelenme/yavaşlama süresi:
+  - $d \ge v^2/a \implies \Delta t = d/v + v/a$ (Trapezoidal)
+  - $d < v^2/a \implies \Delta t = 2\sqrt{d/a}$ (Üçgensel)
+- Her fiziksel `TOUCH` için $+0.25\text{ s}$ tetikleme/sönümleme, her PH10 kafa dönüşü için $+1.80\text{ s}$ mekanik indeksleme bekleme süresi eklenir.
+
+### 8.6. SAE AS9102 Rev C (FAI Form 3) Resmi Rapor Üreticisi
+- Resmi First Article Inspection standardına uygun 7 sütunlu Form 3 tablosu:
+  `Char No | Ref Location | Characteristic Designator | Requirement (Nom+Tol+GD&T+Source) | Results (Measured/Dev/Verdict) | Qualified Tooling | Non-Conformance No (NCR)`.
+
+### 8.7. STEP AP242 3D PMI Öncelikli Okuma
+- STEP dosyasında gömülü AP242 semantik PMI (`GEOMETRIC_TOLERANCE`, `DATUM`) mevcut olduğunda doğrudan okunur, `match_confidence: 100.0` ve `match_status: 'AP242_NATIVE_PMI'` etiketiyle 2D pafta verisine öncelikli olarak bağlanır.
