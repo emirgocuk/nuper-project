@@ -46,9 +46,15 @@ def extract_title_block_fields(text: str, filename: str) -> Dict[str, Any]:
     if rough_match:
         title_block["roughness"] = rough_match.group(1).strip()
 
-    tol_match = re.search(r"\b(ISO\s*2768(?:-[a-zA-Z]+)?|ASME\s*B1\.13M)\b", text, re.IGNORECASE)
+    tol_match = re.search(r"\b(ISO\s*2768(?:-|\s*)([fmcvFMCV])([a-zA-Z])?|ASME\s*B1\.13M)\b", text, re.IGNORECASE)
     if tol_match:
-        title_block["general_tolerance"] = tol_match.group(1).strip()
+        title_block["general_tolerance"] = tol_match.group(0).strip()
+        if tol_match.group(2):
+            title_block["iso_class"] = tol_match.group(2).lower()
+        else:
+            title_block["iso_class"] = "m"
+    else:
+        title_block["iso_class"] = "m"
 
     return title_block
 
