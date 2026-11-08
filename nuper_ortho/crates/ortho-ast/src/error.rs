@@ -38,6 +38,9 @@ pub enum AstError {
     #[error("Geçersiz tolerans kısıtı: {0}")]
     InvalidTolerance(String),
 
+    #[error("Tekil veya doğrusal (collinear) hizalama matrisi: {0}")]
+    SingularMatrix(String),
+
     #[error("Serileştirme / Deserileştirme hatası: {0}")]
     SerializationError(String),
 }

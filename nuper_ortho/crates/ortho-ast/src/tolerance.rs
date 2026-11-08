@@ -95,7 +95,37 @@ pub struct ToleranceConstraint {
     pub profile_disposition: Option<ProfileZoneDisposition>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct MmcBonusResult {
+    pub mmc_size: f64,
+    pub bonus_tolerance: f64,
+    pub total_tolerance: f64,
+}
+
 impl ToleranceConstraint {
+    pub fn compute_mmc_bonus(
+        nominal: f64,
+        upper_tol: f64,
+        lower_tol: f64,
+        actual_size: f64,
+        stated_pos_tol: f64,
+        is_internal: bool,
+    ) -> MmcBonusResult {
+        let (mmc_size, bonus) = if is_internal {
+            let mmc = nominal - lower_tol.abs();
+            let b = (actual_size - mmc).max(0.0);
+            (mmc, b)
+        } else {
+            let mmc = nominal + upper_tol.abs();
+            let b = (mmc - actual_size).max(0.0);
+            (mmc, b)
+        };
+        MmcBonusResult {
+            mmc_size,
+            bonus_tolerance: bonus,
+            total_tolerance: stated_pos_tol + bonus,
+        }
+    }
     /// Standart bir H7 dişi delik çap toleransı oluşturur (Chebyshev zorunlu)
     pub fn new_h7_hole(id: u32, feature_id: u32, nominal_diameter: f64, tolerance_band: f64) -> Self {
         Self {
@@ -164,5 +194,26 @@ impl ToleranceConstraint {
             is_composite: false,
             profile_disposition: Some(disposition),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_internal_hole_mmc_bonus() {
+        let res = ToleranceConstraint::compute_mmc_bonus(20.0, 0.021, 0.0, 20.015, 0.050, true);
+        assert!((res.mmc_size - 20.0).abs() < 1e-6);
+        assert!((res.bonus_tolerance - 0.015).abs() < 1e-6);
+        assert!((res.total_tolerance - 0.065).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_external_shaft_mmc_bonus() {
+        let res = ToleranceConstraint::compute_mmc_bonus(25.0, 0.0, -0.013, 24.990, 0.040, false);
+        assert!((res.mmc_size - 25.0).abs() < 1e-6);
+        assert!((res.bonus_tolerance - 0.010).abs() < 1e-6);
+        assert!((res.total_tolerance - 0.050).abs() < 1e-6);
     }
 }

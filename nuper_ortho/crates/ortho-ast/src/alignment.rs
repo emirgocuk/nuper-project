@@ -156,6 +156,43 @@ pub fn verify_6dof_jacobian_rank(points: &[DVec3], normals: &[DVec3]) -> usize {
     rank
 }
 
+pub fn compute_triangle_area(p1: DVec3, p2: DVec3, p3: DVec3) -> f64 {
+    0.5 * (p2 - p1).cross(p3 - p1).length()
+}
+
+pub fn compute_proper_321_rotation_matrix(
+    x_axis: DVec3,
+    mut y_axis: DVec3,
+    z_axis: DVec3,
+) -> Result<[[f64; 3]; 3], AstError> {
+    let x = x_axis.normalize();
+    let z = z_axis.normalize();
+    let det_check = x.dot(y_axis.cross(z));
+    if det_check.abs() < 1e-5 {
+        return Err(AstError::SingularMatrix(
+            "Eksenler dogrusal veya esduzlemli, tekil matris olustu".to_string(),
+        ));
+    }
+    if det_check < 0.0 {
+        y_axis = z.cross(x).normalize();
+    } else {
+        y_axis = y_axis.normalize();
+    }
+    let matrix = [
+        [x.x, y_axis.x, z.x],
+        [x.y, y_axis.y, z.y],
+        [x.z, y_axis.z, z.z],
+    ];
+    let final_det = x.dot(y_axis.cross(z));
+    if (final_det - 1.0).abs() > 1e-4 {
+        return Err(AstError::SingularMatrix(format!(
+            "Ozdes ortogonal matris sarti saglanamadi: det={:.6}",
+            final_det
+        )));
+    }
+    Ok(matrix)
+}
+
 /// Parça geometrisine göre en uygun hizalama şablonunu ve datum üçlüsünü önerir
 pub fn recommend_3_2_1_alignment(features: &[GeometricFeature]) -> Result<AlignmentRecommendation, AstError> {
     recommend_adaptive_alignment(features)
