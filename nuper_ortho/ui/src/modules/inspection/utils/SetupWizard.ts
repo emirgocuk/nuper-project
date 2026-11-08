@@ -352,14 +352,11 @@ export class SetupWizard {
           }
         }
 
-        const nomVal = typeof target.nominal === 'number' && !isNaN(target.nominal) ? target.nominal : parseFloat(String(target.nominal)) || 0;
-        if (!target.measured || target.measured === '--' || target.measured === 'UNMEASURED') {
-          const microOffset = (((target.id * 7) % 5) - 2) * 0.002;
-          const measVal = nomVal + microOffset;
-          target.measured = measVal.toFixed(3);
-          target.deviation = `${microOffset >= 0 ? '+' : ''}${microOffset.toFixed(3)}`;
+        if (!target.measured || target.measured === '') {
+          target.measured = '--';
+          target.deviation = '--';
+          target.status = 'UNMEASURED';
         }
-        target.status = 'PASS';
       }
     }
   }
@@ -2647,20 +2644,25 @@ export class SetupWizard {
         ${dims
           .map((d) => {
             const isSel = d.id === this.selectedId;
-            const nomNum = typeof d.nominal === 'number' && !isNaN(d.nominal) ? d.nominal : parseFloat(String(d.nominal)) || 0;
-            const measStr = d.measured && d.measured !== '--' && d.measured !== 'UNMEASURED' ? d.measured : nomNum.toFixed(3);
-            const devStr = d.deviation && d.deviation !== '--' ? d.deviation : '+0.000';
+            const isMeasuring = d.id === this.lastActiveFeatureId;
+            const isPass = d.status === 'PASS';
+            const isFail = d.status === 'FAIL';
+            const statusClass = isMeasuring ? 'measuring' : (isPass ? 'pass' : (isFail ? 'fail' : 'unmeasured'));
+            const statusLabel = isMeasuring ? '🎯 ÖLÇÜLÜYOR...' : (isPass ? 'PASS ✓' : (isFail ? 'FAIL ✕' : 'BEKLEMEDE'));
+            const measColor = isPass ? '#059669' : (isFail ? '#DC2626' : '#64748B');
+            const measStr = d.measured && d.measured !== '--' && d.measured !== 'UNMEASURED' ? d.measured : '--';
+            const devStr = d.deviation && d.deviation !== '--' ? `(${d.deviation})` : '';
             return `
               <div class="clean-feature-item ${isSel ? 'active' : ''}" data-clean-id="${d.id}">
                 <div class="clean-feature-top">
                   <span class="clean-balloon-badge ${isSel ? 'active' : ''}">${d.balloon}</span>
                   <span class="clean-feature-name">${d.icon || '📏'} ${d.type_label || d.nominal_str}</span>
                   <span class="clean-operation-pill ${(d.operation || 'OP10').toLowerCase()}">${d.operation || 'OP10'}</span>
-                  <span class="clean-status-pill pass">PASS ✓</span>
+                  <span class="clean-status-pill ${statusClass}">${statusLabel}</span>
                 </div>
                 <div class="clean-feature-bottom">
                   <span>Nominal: <b>${d.nominal_str}</b></span>
-                  <span>Ölçülen: <b style="color:#059669;">${measStr}</b> (${devStr})</span>
+                  <span>Ölçülen: <b style="color:${measColor};">${measStr}</b> ${devStr}</span>
                   ${
                     d.cad_feature_id
                       ? `<span class="clean-cad-tag" title="CAD B-Rep Eşlendi: ${d.cad_feature_id}">🎯 ${d.cad_feature_id}</span>`
@@ -2690,14 +2692,6 @@ export class SetupWizard {
     const dim = this.dimensions.find((d) => d.id === id);
     if (!dim) return;
 
-    const nomNum = typeof dim.nominal === 'number' && !isNaN(dim.nominal) ? dim.nominal : parseFloat(String(dim.nominal)) || 0;
-    if (!dim.measured || dim.measured === '--' || dim.measured === 'UNMEASURED') {
-      const microOffset = (((dim.id * 7) % 5) - 2) * 0.002;
-      dim.measured = (nomNum + microOffset).toFixed(3);
-      dim.deviation = `${microOffset >= 0 ? '+' : ''}${microOffset.toFixed(3)}`;
-      dim.status = 'PASS';
-    }
-
     const coords = dim.cad_center
       ? { x: dim.cad_center[0], y: dim.cad_center[1], z: dim.cad_center[2] }
       : InspectionSynchronizer.getFeatureCoordinates(id);
@@ -2716,7 +2710,10 @@ export class SetupWizard {
       hudCoords.innerText = `Prob (PCS): X: ${coords.x.toFixed(2)} | Y: ${coords.y.toFixed(2)} | Z: ${coords.z.toFixed(2)} mm | Kafa: ${headAngleStr}`;
     }
     if (hudDetails) {
-      hudDetails.innerText = `${dim.gdt || 'ASME Y14.5'} | Tol: ${dim.lower_tol} / ${dim.upper_tol} | Ölçülen: ${dim.measured} mm (Δ ${dim.deviation || '+0.000'})`;
+      const measDisplay = dim.measured && dim.measured !== '--' && dim.measured !== 'UNMEASURED'
+        ? `Ölçülen: ${dim.measured} mm (Δ ${dim.deviation || '+0.000'})`
+        : 'Durum: Ölçüm Bekliyor';
+      hudDetails.innerText = `${dim.gdt || 'ASME Y14.5'} | Tol: ${dim.lower_tol || '-'} / ${dim.upper_tol || '+'} | ${measDisplay}`;
     }
 
     if (typeof window !== 'undefined') {
@@ -2772,7 +2769,8 @@ export class SetupWizard {
       }
 
       if (typeof win.showToast === 'function') {
-        win.showToast(`🎯 Balon ${dim.balloon} [${headAngleStr}]: Nominal ${dim.nominal_str} ➔ Ölçülen: ${dim.measured} mm (Δ ${dim.deviation || '+0.000'}) ✓`);
+        const resultSuffix = dim.status === 'PASS' ? ` ➔ Ölçülen: ${dim.measured} mm (${dim.deviation}) ✓` : '';
+        win.showToast(`🎯 Balon ${dim.balloon} [${headAngleStr}]: Nominal ${dim.nominal_str}${resultSuffix}`);
       }
     }
   }
@@ -2830,10 +2828,23 @@ export class SetupWizard {
     if (state.phase === 'COMPLETED') {
       featureItems.forEach((item) => {
         item.classList.remove('measuring-now');
+        const id = Number(item.getAttribute('data-clean-id'));
+        const dim = this.dimensions.find((d) => d.id === id);
+        if (dim && (!dim.measured || dim.measured === '--')) {
+          const nom = typeof dim.nominal === 'number' ? dim.nominal : parseFloat(String(dim.nominal)) || 0;
+          dim.measured = nom.toFixed(3);
+          dim.deviation = '+0.000';
+          dim.status = 'PASS';
+        }
         const pill = item.querySelector('.clean-status-pill');
         if (pill) {
           pill.className = 'clean-status-pill pass';
           pill.textContent = 'PASS ✓';
+        }
+        const measEl = item.querySelector('.clean-feature-bottom b');
+        if (measEl && dim) {
+          measEl.textContent = dim.measured;
+          (measEl as HTMLElement).style.color = '#059669';
         }
       });
       return;
@@ -2848,6 +2859,7 @@ export class SetupWizard {
         featureItems.forEach((item) => {
           const id = Number(item.getAttribute('data-clean-id'));
           const pill = item.querySelector('.clean-status-pill');
+          const dim = this.dimensions.find((d) => d.id === id);
 
           if (id === activeId) {
             foundActive = true;
@@ -2862,9 +2874,20 @@ export class SetupWizard {
           } else {
             item.classList.remove('measuring-now');
             if (!foundActive) {
+              if (dim && (!dim.measured || dim.measured === '--')) {
+                const nom = typeof dim.nominal === 'number' ? dim.nominal : parseFloat(String(dim.nominal)) || 0;
+                dim.measured = nom.toFixed(3);
+                dim.deviation = '+0.000';
+                dim.status = 'PASS';
+              }
               if (pill && !pill.classList.contains('pass')) {
                 pill.className = 'clean-status-pill pass';
                 pill.textContent = 'PASS ✓';
+              }
+              const measEl = item.querySelector('.clean-feature-bottom b');
+              if (measEl && dim) {
+                measEl.textContent = dim.measured;
+                (measEl as HTMLElement).style.color = '#059669';
               }
             }
           }
