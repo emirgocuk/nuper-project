@@ -240,5 +240,67 @@ describe('MeasurementPathGenerator — Otomatik CMM Ölçüm Yolu ve Dokunma Nok
       expect(dim.deviation).toBe('--');
     }
   });
+
+  it('dişli deliklerde anma çapı yerine minör çap ve helisel ofset uygular', () => {
+    const threadFeat: PathFeatureInput = {
+      id: 99,
+      balloon: '#99',
+      type: 'THREAD',
+      type_label: 'M6x1 Diş',
+      nominal: 6.0,
+      pitch: 1.0,
+      cad_center: [0, 10, 0],
+      axial_min: 0,
+      axial_max: 20,
+    };
+    const plan = MeasurementPathGenerator.generatePlan([threadFeat], mockBbox, {
+      verticalAxis: 'Y',
+      probeTipRadiusMm: 1.0,
+    });
+    const fp = plan.featurePaths.find((p) => p.featureId === 99);
+    expect(fp).toBeDefined();
+    expect(fp!.touchPoints.length).toBe(4);
+    const tp0 = fp!.touchPoints[0];
+    const r0 = Math.hypot(tp0.position[0], tp0.position[2]);
+    expect(r0).toBeLessThan(3.0);
+    expect(r0).toBeCloseTo(2.459, 1);
+    const yVals = fp!.touchPoints.map((tp) => tp.position[1]);
+    expect(yVals[3]).toBeGreaterThan(yVals[0]);
+  });
+
+  it('kör deliklerde prob dalma kotu taban emniyet payına takılır', () => {
+    const blindHole: PathFeatureInput = {
+      id: 101,
+      balloon: '#101',
+      type: 'DIAMETER',
+      type_label: 'Kör Delik Ø10',
+      nominal: 10.0,
+      cad_center: [0, 15, 0],
+      axial_min: 10.0,
+      axial_max: 25.0,
+      is_blind: true,
+      floor_z: 10.0,
+    };
+    const tipR = 1.0;
+    const plan = MeasurementPathGenerator.generatePlan([blindHole], mockBbox, {
+      verticalAxis: 'Y',
+      probeTipRadiusMm: tipR,
+    });
+    const fp = plan.featurePaths.find((p) => p.featureId === 101);
+    expect(fp).toBeDefined();
+    const minSafe = 10.0 + tipR + 2.0;
+    for (const tp of fp!.touchPoints) {
+      expect(tp.position[1]).toBeGreaterThanOrEqual(minSafe);
+    }
+  });
+
+  it('trapezoidal profil ile çevrim süresi hesaplanır', () => {
+    const plan = MeasurementPathGenerator.generatePlan(sampleFeatures, mockBbox, {
+      verticalAxis: 'Y',
+      includeDatumSetup: true,
+    });
+    expect(plan.estimatedDurationSec).toBeGreaterThan(0);
+    expect(plan.totalDistanceMm).toBeGreaterThan(0);
+  });
 });
 

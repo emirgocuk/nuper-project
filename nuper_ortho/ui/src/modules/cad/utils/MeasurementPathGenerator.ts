@@ -35,6 +35,9 @@ export interface PathFeatureInput {
   faceB_normal?: [number, number, number];
   distance_type?: string;
   axis?: 'X' | 'Y' | 'Z';
+  is_blind?: boolean;
+  floor_z?: number;
+  pitch?: number;
 }
 
 export interface TouchPointRecord {
@@ -99,6 +102,49 @@ export interface PathGeneratorOptions {
     normal: [number, number, number];
     label: string;
   }>;
+}
+
+export function lookupMetricPitch(nominalDia: number): number {
+  const d = Math.round(nominalDia * 10) / 10;
+  const coarseMap: Record<number, number> = {
+    1.0: 0.25,
+    1.2: 0.25,
+    1.4: 0.3,
+    1.6: 0.35,
+    1.8: 0.35,
+    2.0: 0.4,
+    2.5: 0.45,
+    3.0: 0.5,
+    3.5: 0.6,
+    4.0: 0.7,
+    5.0: 0.8,
+    6.0: 1.0,
+    7.0: 1.0,
+    8.0: 1.25,
+    10.0: 1.5,
+    12.0: 1.75,
+    14.0: 2.0,
+    16.0: 2.0,
+    18.0: 2.5,
+    20.0: 2.5,
+    22.0: 2.5,
+    24.0: 3.0,
+  };
+  if (coarseMap[d]) return coarseMap[d];
+  if (nominalDia < 3.0) return 0.4;
+  if (nominalDia < 6.0) return 0.8;
+  if (nominalDia < 12.0) return 1.5;
+  return 2.0;
+}
+
+export function computeSegmentTrapezoidalDuration(dist: number, feedRate: number, accel = 450.0): number {
+  if (dist <= 1e-4) return 0;
+  const v = Math.max(1.0, feedRate);
+  const dAcc = (v * v) / accel;
+  if (dist >= dAcc) {
+    return dist / v + v / accel;
+  }
+  return 2.0 * Math.sqrt(dist / accel);
 }
 
 export class MeasurementPathGenerator {
@@ -392,13 +438,17 @@ export class MeasurementPathGenerator {
         ? [partCx, Math.max(0, bbox.max[1]), partCz]
         : [partCx, partCy, bbox.max[2]]);
       const baseNormal = feat.cad_normal ?? (isYAxis ? [0, 1, 0] : [0, 0, 1]);
-      const isDiameter = feat.type === 'DIAMETER' || /dia|çap|delik/i.test(feat.type_label ?? '');
+      const isDiameter =
+        feat.type === 'DIAMETER' ||
+        feat.type === 'THREAD' ||
+        /dia|çap|delik|diş|thread/i.test(feat.type_label ?? '');
       const nom = feat.nominal;
       const cadId = feat.cad_feature_id ?? '';
       const isInternalHole =
         cadId.startsWith('CAD_HOLE_') ||
         feat.feature_type === 'INTERNAL_CYLINDER' ||
-        /delik|hole|bore|m[0-9]/i.test(feat.type_label ?? '');
+        feat.type === 'THREAD' ||
+        /delik|hole|bore|m[0-9]|diş|thread/i.test(feat.type_label ?? '');
 
       const rawCountMatch = feat.type_label?.match(/([2-9]|1[0-9])x/i) || feat.nominal_str?.match(/([2-9]|1[0-9])x/i);
       const expectedCount = rawCountMatch ? parseInt(rawCountMatch[1], 10) : (feat.cad_instances?.length || 1);
@@ -596,7 +646,19 @@ export class MeasurementPathGenerator {
             featWaypoints.push(makeWp(entryOut.clone(), 'TRAVERSE', feat.id, subBalloon, sDir, 'A0° B90°', 'AXIAL_EXIT', 50.0));
             featWaypoints.push(makeWp(new THREE.Vector3(ux * safeOuterR, zClearance, uz * safeOuterR), 'RETRACT', feat.id, subBalloon, sDir, 'A0° B90°', 'RETRACT_TO_SAFE', 150.0));
           } else {
-            const radius = Math.min(nom / 2, 40.0);
+            const isThread =
+              feat.type === 'THREAD' ||
+              /diş|thread|\bm[0-9]|unf|unc/i.test(feat.type_label ?? '') ||
+              /diş|thread|\bm[0-9]/i.test(feat.balloon);
+            let effectiveNominal = nom;
+            let threadPitch = feat.pitch;
+            if (isThread) {
+              if (!threadPitch) {
+                threadPitch = lookupMetricPitch(nom);
+              }
+              effectiveNominal = Math.max(0.8, nom - 1.082532 * threadPitch);
+            }
+            const radius = Math.min(effectiveNominal / 2, 40.0);
             effectiveAngleLabel = 'A0° B0°';
             effectiveAngleObj = { aDeg: 0, bDeg: 0, direction: isYAxis ? [0, -1, 0] : [0, 0, -1], label: 'A0° B0°' };
 
@@ -621,8 +683,18 @@ export class MeasurementPathGenerator {
               });
             }
 
-            const measOffset = Math.min(holeDepth * 0.5, Math.max(3.0, nom * 0.4));
-            const measAltitude = holeTop - measOffset;
+            const isBlindHole = Boolean(
+              (inst as { is_blind?: boolean }).is_blind ||
+              feat.is_blind ||
+              (inst as { floor_z?: number }).floor_z !== undefined ||
+              feat.floor_z !== undefined
+            );
+            const floorZ = (inst as { floor_z?: number }).floor_z ?? feat.floor_z ?? holeBottom;
+            const minSafeAltitude = isBlindHole
+              ? floorZ + probeTipRadius + 2.0
+              : holeBottom + 0.2;
+            const measOffset = Math.min(holeDepth * 0.5, Math.max(3.0, effectiveNominal * 0.4));
+            const measAltitude = Math.max(minSafeAltitude, holeTop - measOffset);
 
             const cx = center[0];
             const cz = isYAxis ? center[2] : center[1];
@@ -649,15 +721,19 @@ export class MeasurementPathGenerator {
               const theta = (i * 2 * Math.PI) / pointCount;
               const cosT = Math.cos(theta);
               const sinT = Math.sin(theta);
+              const helicalDelta = isThread && threadPitch ? (i / pointCount) * threadPitch : 0;
+              const pointMeasAlt = isYAxis
+                ? Math.min(holeTop - 1.0, measAltitude + helicalDelta)
+                : Math.min(holeTop - 1.0, measAltitude + helicalDelta);
 
               const centerRadius = Math.max(0.1, radius - probeTipRadius);
               const surfPos: [number, number, number] = isYAxis
-                ? [cx + radius * cosT, measAltitude, cz + radius * sinT]
-                : [cx + radius * cosT, cz + radius * sinT, measAltitude];
+                ? [cx + radius * cosT, pointMeasAlt, cz + radius * sinT]
+                : [cx + radius * cosT, cz + radius * sinT, pointMeasAlt];
 
               const touchPos = isYAxis
-                ? new THREE.Vector3(cx + centerRadius * cosT, measAltitude, cz + centerRadius * sinT)
-                : new THREE.Vector3(cx + centerRadius * cosT, cz + centerRadius * sinT, measAltitude);
+                ? new THREE.Vector3(cx + centerRadius * cosT, pointMeasAlt, cz + centerRadius * sinT)
+                : new THREE.Vector3(cx + centerRadius * cosT, cz + centerRadius * sinT, pointMeasAlt);
 
               const normalVec: [number, number, number] = isYAxis
                 ? [-cosT, 0, -sinT]
@@ -669,8 +745,8 @@ export class MeasurementPathGenerator {
               } else {
                 const appRadius = Math.max(0.05, centerRadius - dApp);
                 const appPos = isYAxis
-                  ? new THREE.Vector3(cx + appRadius * cosT, measAltitude, cz + appRadius * sinT)
-                  : new THREE.Vector3(cx + appRadius * cosT, cz + appRadius * sinT, measAltitude);
+                  ? new THREE.Vector3(cx + appRadius * cosT, pointMeasAlt, cz + appRadius * sinT)
+                  : new THREE.Vector3(cx + appRadius * cosT, cz + appRadius * sinT, pointMeasAlt);
 
                 featWaypoints.push(makeWp(appPos.clone(), 'TRAVERSE', feat.id, subBalloon, effectiveAngleObj.direction, 'A0° B0°', 'APPROACH', 20.0));
                 featWaypoints.push(makeWp(touchPos.clone(), 'TOUCH', feat.id, subBalloon, effectiveAngleObj.direction, 'A0° B0°', 'TOUCH', 5.0));
@@ -755,6 +831,12 @@ export class MeasurementPathGenerator {
           for (let fIdx = 0; fIdx < facesToTouch.length; fIdx++) {
             const fc = facesToTouch[fIdx];
             const fn = fc.n;
+            if (isYAxis && activeOp === 'OP10' && fn[1] < -0.35) {
+              continue;
+            }
+            if (isYAxis && activeOp === 'OP20' && fn[1] > 0.35) {
+              continue;
+            }
             const touchY = isYAxis ? Math.max(yMinPart + 1.0, Math.min(yMaxPart, fc.c[1])) : fc.c[1];
             const surfPoint: [number, number, number] = [fc.c[0], touchY, fc.c[2]];
             const tAngleObj = isYAxis
@@ -868,8 +950,15 @@ export class MeasurementPathGenerator {
       const p2 = allWaypoints[i + 1].position;
       const dist = p1.distanceTo(p2);
       totalDist += dist;
-      const feed = allWaypoints[i + 1].feedRate ?? 150.0;
-      totalDuration += dist / Math.max(1.0, feed);
+      const wpNext = allWaypoints[i + 1];
+      const feed = wpNext.feedRate ?? 150.0;
+      totalDuration += computeSegmentTrapezoidalDuration(dist, feed, 450.0);
+      if (wpNext.phase === 'TOUCH') {
+        totalDuration += 0.25;
+      }
+      if (wpNext.subPhase === 'HEAD_ROTATION') {
+        totalDuration += 1.80;
+      }
     }
 
     return {
@@ -879,7 +968,7 @@ export class MeasurementPathGenerator {
       featurePaths,
       allWaypoints,
       totalDistanceMm: parseFloat(totalDist.toFixed(2)),
-      estimatedDurationSec: parseFloat((totalDuration + headRotations * 2.5).toFixed(1)),
+      estimatedDurationSec: parseFloat((totalDuration + headRotations * 0.7).toFixed(1)),
       probeHeadRotations: headRotations,
       stylusRecommendations,
       datumTouchPoints,
