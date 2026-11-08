@@ -12,7 +12,8 @@ Projede YC RFS 2026 "Physical AI" (Kapalı Döngü İmalat ve Otonom Kalite Derl
 5. **Kapalı Döngü CNC & Canlı DMIS:** Fanuc G10 / Siemens G10 L52 & `$TC_DP12` takım aşınma kompanzasyonu ve ANSI DMIS 5.3 blokları canlı simülasyon koordinatlarına bağlandı.
 6. **Canlı Telemetri & Çift Renkli Trajektori:** İntikal ($150\text{ mm/s}$, camgöbeği tüp) ve temas ($5\text{ mm/s}$, neon turuncu tüp) arayüzde anlık dinamik telemetri olarak sunulmaktadır.
 
-Tüm testler ve sözleşmeler senkronize durumdadır (TypeScript `check:types` hatasız, 30 dosyada 171 Vitest testi, 47 Pytest testi, 28 Rust testi, `cargo check --workspace` %100 yeşil).
+Tüm testler ve sözleşmeler senkronize durumdadır (TypeScript `check:types` hatasız, 30 dosyada 174 Vitest testi, 47 Pytest testi, `cargo check --workspace` %100 yeşil, `npm run build` hatasız).
+7 kritik mimari hata (Z>=0 Granit Tabla dönüşümü, Yakut Küre Telafisi, EWL stilus boyu denetimi, Canlı Ölçüm Durum Makinesi, Dinamik Teşhis & GUM/TUR, Electron Native IPC, Memory-Bank) çözülmüş ve kilitlenmiştir.
 
 ## 2. Belge rolleri ve okuma sırası
 

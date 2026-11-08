@@ -128,5 +128,34 @@ Detaylar için bakınız: [developmentInfrastructureRules.md](file:///d:/Project
   - **Siemens Sinumerik 840D / ONE:** `$TC_DP12[{tool}, 1] = $TC_DP12[{tool}, 1] + ({wear_delta})`.
 - **Fail-Safe Guardian (Takım Kırılma Emniyeti):** Ölçülen sapma $|\Delta| > 0.050\text{ mm}$ (veya belirlenen kritik eşik) ise kompanzasyon enjeksiyonu anında kilitlenir ve operatöre alarm verilir.
 
+---
+
+## 6. Otonom Kinematik, Prob Telafisi ve Metrolojik Teşhis Mimarisi
+
+### A. Yakut Küre Yarıçap Telafisi (Probe Tip Center Offset)
+- DMIS çıktısına (`PTMEAS/CART`) yazılan yüzey noktası $\vec{P}_{\text{surf}}$ ile 3D simülasyonda prob yakut küre merkezinin konumlandığı nokta $\vec{P}_{\text{center}}$ ayrıştırılmıştır:
+  $$\vec{P}_{\text{center}} = \vec{P}_{\text{surf}} + R_{\text{tip}} \cdot \hat{n}$$
+- Bu sayede yakut küre asla parça mesh modelinin içine dalmaz; yüzeye dıştan teğet dokunur.
+
+### B. Efektif Stilus Boyu (EWL) ve Gövde Çarpışma Denetimi
+- Unsur derinliği $L_{\text{depth}} > L_{\text{ewl}} - 2.0\text{ mm}$ durumunda sistem uzun prob (`PH10M Ø3x50`) konfigürasyonunu otomatik önerir ve operatörü uyarır.
+
+### C. Granit Tabla Çarpışmasızlık Koordinat Dönüşümü ($Z \ge 0, Y \ge 0$)
+- Ham B-Rep ve görsel mesh koordinatları rijit gövde ötelemesiyle granit tablası üzerine hizalanır. Hiçbir waypoint'te $Z < 0$ veya $Y < 0$ üretilemez; tezgah gövdesi veya fikstür altı dalışlar engellenir.
+
+### D. Canlı Simülasyon Durum Makinesi
+- Simülasyon başlangıcında ($t=0$) tüm özellikler `UNMEASURED` (`BEKLİYOR`, `Ölç: --- mm`) başlar.
+- Prob bir unsurun temas noktasına dokundukça `🎯 ÖLÇÜLÜYOR (curHits/totalHits)` sayacı canlı artar.
+- Son temas anında gerçek metroloji fitting algoritması çalıştırılarak ölçülen değer ve sapma hesaplanır; tolerans sınırlarına göre `PASS ✓` veya `FAIL ✕` durumuna geçer.
+
+### E. GUM ISO 15530-3 Belirsizlik & Standart Algoritma Dağılımı
+- Bileşik belirsizlik $u_c = 0.0012\text{ mm}$, genişletilmiş belirsizlik ($k=2$) $U_{95} = 0.0024\text{ mm}$.
+- Test Belirsizlik Oranı (TUR): Çift yönlüde $\text{TUR} = (T_{\text{max}} - T_{\text{min}}) / (2 \cdot U_{95})$, tek yönlüde $\text{TUR} = T / U_{95}$.
+- Standart fitting seçimi:
+  - İç delik/silindir (`HOLE`, `INTERNAL_CYLINDER`) & MMC $\to$ Maksimum İç Teğet Silindir (MIC).
+  - Dış silindir/mil (`BOSS`, `EXTERNAL_CYLINDER`) & MMC $\to$ Minimum Dış Çevrel Silindir (MCC).
+  - Düzlemsellik/profil (`FLATNESS`, `PROFILE`) $\to$ Minimum Bölge Chebyshev (MZPL).
+  - Doğrusal boyut/mesafe (`DISTANCE`, `LINEAR`) $\to$ Gauss En Küçük Kareler (LSQ).
+
 
 

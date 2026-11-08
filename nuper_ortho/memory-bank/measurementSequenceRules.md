@@ -169,3 +169,9 @@ Notlar:
 | Düzlem delik dışlama maskesi (`edgeMargin = 5.0mm`) | Uygulandı | `MeasurementPathGenerator.ts` |
 | Çift Renkli Trajektori (Traverse: Camgöbeği, Temas: Neon Turuncu) | Uygulandı | `SetupWizard.ts` |
 | Canlı DMIS 5.3 ve Kapalı Döngü Fanuc/Siemens G10 Derleyici | Uygulandı | `SetupWizard.ts`, `closed_loop.rs` |
+| Yakut Küre Yarıçap Telafisi (Tip Center Offset: P_center = P_surf + R_tip * n) | Uygulandı ve kilitlendi | `MeasurementPathGenerator.ts`, `MeasurementPathGenerator.test.ts` |
+| Efektif Stilus Boyu (EWL) ve Gövde Çarpışma Denetimi (Ø3x50 Önerisi) | Uygulandı ve kilitlendi | `MeasurementPathGenerator.ts`, `StylusSelector.ts` |
+| Z >= 0 Granit Tabla Çarpışmasızlık (Hiçbir waypoint'te Z < 0 / Y < 0 olamaz) | Uygulandı ve kilitlendi | `MeasurementPathGenerator.ts`, `MeasurementPathGenerator.test.ts` |
+| Canlı Ölçüm Durum Makinesi (UNMEASURED -> 🎯 ÖLÇÜLÜYOR (k/N) -> PASS/FAIL) | Uygulandı ve kilitlendi | `SetupWizard.ts`, `InspectionSynchronizer.ts` |
+| GUM ISO 15530-3 (uc: 0.0012, U95: 0.0024, TUR) & Standart Fitting (MIC/MCC/MZPL/LSQ) | Uygulandı ve kilitlendi | `SetupWizard.ts`, `InspectionSynchronizer.ts`, `index.html` |
+| Electron Native IPC Köprüsü (ortho:extract-drawing, ortho:parse-step, ortho:compile-dmis) | Uygulandı ve kilitlendi | `electron-main.js`, `IpcClient.ts` |
