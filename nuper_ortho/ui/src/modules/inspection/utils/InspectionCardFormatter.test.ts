@@ -60,4 +60,33 @@ describe('InspectionCardFormatter (Pure Utility)', () => {
     expect(listHtml).toContain('Ölçülecek Özellikler');
     expect(listHtml).toContain('Top: 1 Eleman');
   });
+
+  it('ASME Y14.5 MMC Bonus toleransını iç ve dış unsurlar için hesaplar', () => {
+    const internalRes = InspectionCardFormatter.computeMmcBonusTolerance(20.0, 0.0, 0.021, 20.015, 0.050, true);
+    expect(internalRes.mmcSize).toBe(20.0);
+    expect(internalRes.bonus).toBe(0.015);
+    expect(internalRes.totalTol).toBe(0.065);
+
+    const externalRes = InspectionCardFormatter.computeMmcBonusTolerance(25.0, -0.013, 0.0, 24.990, 0.040, false);
+    expect(externalRes.mmcSize).toBe(25.0);
+    expect(externalRes.bonus).toBe(0.01);
+    expect(externalRes.totalTol).toBe(0.05);
+
+    const bonusCard: FormattedInspectionCard = {
+      id: 9,
+      balloon: '#9',
+      page: 1,
+      featureTitle: 'H7 Delik',
+      nominalStr: 'Ø20 H7',
+      toleranceRange: '+0.021 / 0',
+      datumReference: '[A|B|C]',
+      status: 'PASS',
+      hasMmc: true,
+      bonusTol: 0.015,
+      totalTol: 0.065,
+    };
+    const html = InspectionCardFormatter.renderCardHtml(bonusCard);
+    expect(html).toContain('Bonus: +0.015 mm');
+    expect(html).toContain('Toplam: Ø0.065 mm');
+  });
 });

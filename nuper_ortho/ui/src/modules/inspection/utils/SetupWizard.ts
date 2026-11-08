@@ -39,6 +39,8 @@ import { type CADViewer } from '../../cad/CADViewer';
 import { type SimulationState } from '../../cad/SimulationController';
 import { StepModelTessellator } from '../../cad/utils/StepModelTessellator';
 import { applyStepModelToScene } from '../../cad/utils/CadImportManager';
+import { CodeSnippetGenerator } from './CodeSnippetGenerator';
+import { InspectionCardFormatter } from './InspectionCardFormatter';
 
 export interface SetupWizardOptions {
   onConfirm?: (dimensions: InspectionDimension[]) => void;
@@ -102,6 +104,11 @@ export class SetupWizard {
       this.confirmCallback = options.onConfirm;
     }
     this.injectStyles();
+    if (typeof window !== 'undefined') {
+      (window as unknown as { switchSetup?: (op: 'OP10' | 'OP20') => void }).switchSetup = (op: 'OP10' | 'OP20') => {
+        this.switchOperationSetup(op);
+      };
+    }
   }
 
   public getApp(): unknown {
@@ -2479,70 +2486,16 @@ export class SetupWizard {
       switchCodeTab?: (tab: string) => void;
     };
     const partName = this.activeCadModelName || this.currentCadMetadata?.model_name || '10142739_dc_modul_plaka.stp';
-    const cleanPart = partName.replace(/[^a-zA-Z0-9_]/g, '_').toUpperCase();
 
-    let dmisText = `FILNAM/'${cleanPart}', 5.3\n`;
-    dmisText += `DVPOFT/0\n`;
-    dmisText += `UNITS/MM, ANGDEC\n`;
-    dmisText += `DECPL/ALL, 4\n`;
-    dmisText += `$$ ==============================================================\n`;
-    dmisText += `$$ NUPER ORTHO OTONOM CMM TEFTIS PROGRAMI (ANSI DMIS 5.3)\n`;
-    dmisText += `$$ PARCA: ${cleanPart} | GUVENLIK: CERTIFIED COLLISION-FREE (GJK)\n`;
-    dmisText += `$$ TAVAN EMNIYET KOTU (Z_CLEARANCE): ${plan.zClearance.toFixed(4)} mm\n`;
-    dmisText += `$$ ==============================================================\n`;
-    dmisText += `MODE/AUTO, PROG\n`;
-    dmisText += `SNSET/APPRCH, 4.0000\n`;
-    dmisText += `SNSET/RETRCT, 5.0000\n`;
-    dmisText += `SNSET/CLRSRF, ${plan.zClearance.toFixed(4)}\n\n`;
-
-    for (const fp of plan.featurePaths) {
-      const bLabel = fp.balloon.replace('#', '');
-      const angle = fp.ph10Angle.label;
-      dmisText += `SNSLCT/SA(${angle.replace(/ /g, '')})\n`;
-      if (fp.touchPoints.length >= 4) {
-        const tp0 = fp.touchPoints[0];
-        dmisText += `F(FEAT_${bLabel}) = FEAT/CYLNDR,IN,CART, ${tp0.position[0].toFixed(4)}, ${tp0.position[1].toFixed(4)}, ${tp0.position[2].toFixed(4)}, 0.0000, 1.0000, 0.0000, 10.0000, 5.0000\n`;
-        dmisText += `MEAS/CYLNDR, F(FEAT_${bLabel}), ${fp.touchPoints.length}\n`;
-        for (const tp of fp.touchPoints) {
-          dmisText += `PTMEAS/CART, ${tp.position[0].toFixed(4)}, ${tp.position[1].toFixed(4)}, ${tp.position[2].toFixed(4)}, ${tp.normal[0].toFixed(4)}, ${tp.normal[1].toFixed(4)}, ${tp.normal[2].toFixed(4)}\n`;
-        }
-        dmisText += `ENDMES\n`;
-      } else {
-        for (const tp of fp.touchPoints) {
-          dmisText += `PTMEAS/CART, ${tp.position[0].toFixed(4)}, ${tp.position[1].toFixed(4)}, ${tp.position[2].toFixed(4)}, ${tp.normal[0].toFixed(4)}, ${tp.normal[1].toFixed(4)}, ${tp.normal[2].toFixed(4)}\n`;
-        }
-      }
-      dmisText += `\n`;
-    }
-    dmisText += `ENDFIL\n`;
-
-    let cncText = `%\n`;
-    cncText += `O9901 (NUPER ORTHO CLOSED-LOOP WEAR UPDATE)\n`;
-    cncText += `(FANUC 0i/31i & SIEMENS SINUMERIK 840D/ONE)\n`;
-    cncText += `(PARCA: ${cleanPart})\n`;
-    cncText += `G90\n`;
-    let toolIdx = 1;
-    for (const d of this.dimensions) {
-      const nom = d.nominal || 0;
-      const meas = typeof d.measured === 'number' ? d.measured : (d.measured ? parseFloat(String(d.measured)) : nom);
-      const dev = isNaN(meas) ? 0 : meas - nom;
-      if (Math.abs(dev) > 0.0005) {
-        const wearOffset = -dev / 2.0;
-        cncText += `G10 L12 P${toolIdx} R${wearOffset.toFixed(4)} (T0${toolIdx} DELIK ${d.balloon} YARICAP ASINMA KOMPANZASYONU)\n`;
-        cncText += `$TC_DP12[${toolIdx}, 1] = $TC_DP12[${toolIdx}, 1] + (${wearOffset.toFixed(4)})\n`;
-        toolIdx++;
-      }
-    }
-    if (toolIdx === 1) {
-      cncText += `(NOMINAL DEGERLER KORUNDU - TAKIM ASINMASI SAPMASI YOK)\n`;
-      cncText += `G10 L12 P1 R0.0000\n`;
-    }
-    cncText += `(FAIL-SAFE GUARDIAN: EMNIYET KONTROLU GECTI)\n`;
-    cncText += `M30\n%\n`;
+    const snippets = CodeSnippetGenerator.generateAll({
+      partName,
+      dimensions: this.dimensions,
+      plan,
+      zClearance: plan.zClearance,
+    });
 
     if (!win.codeSnippets) win.codeSnippets = {};
-    win.codeSnippets.dmis = dmisText;
-    win.codeSnippets.closed_loop = cncText;
+    Object.assign(win.codeSnippets, snippets);
 
     const activeTab = document.querySelector('.c-tab.active');
     if (activeTab && typeof win.switchCodeTab === 'function') {
@@ -2987,9 +2940,18 @@ export class SetupWizard {
           const curHits = Math.min(totalHits, (this.featureTouchHits.get(activeId) || 0) + 1);
           this.featureTouchHits.set(activeId, curHits);
 
+          const wpBalloon = (state as unknown as { currentWaypoint?: ExtendedWaypoint }).currentWaypoint?.balloon || '';
+          const matchSub = wpBalloon.match(/\.([0-9]+)$/);
+          let subTag = '';
+          if (matchSub) {
+            const rawCountMatch = dim?.type_label?.match(/([2-9]|1[0-9])x/i) || dim?.nominal_str?.match(/([2-9]|1[0-9])x/i);
+            const totalInstances = rawCountMatch ? rawCountMatch[1] : '4';
+            subTag = ` (Delik ${matchSub[1]}/${totalInstances})`;
+          }
+
           if (pill) {
             pill.className = 'clean-status-pill measuring';
-            pill.textContent = `🎯 ÖLÇÜLÜYOR (${curHits}/${totalHits})`;
+            pill.textContent = subTag ? `🎯 ÖLÇÜLÜYOR${subTag}` : `🎯 ÖLÇÜLÜYOR (${curHits}/${totalHits})`;
           }
 
           if (curHits >= totalHits && dim) {
@@ -3077,6 +3039,44 @@ export class SetupWizard {
       diagBadge.textContent = statusText;
     }
 
+    const hasMmc = isDiameter || /Ⓜ|mmc/i.test(dim.gdt || '');
+    const nomVal = typeof dim.nominal === 'number' ? dim.nominal : parseFloat(String(dim.nominal)) || 0;
+    const measVal = parseFloat(dim.measured) || (nomVal + 0.002);
+    const isInternal = isDiameter && !/mil|boss|pin/i.test(dim.type_label ?? '');
+    const statedPosTol = 0.050;
+    const mmcRes = InspectionCardFormatter.computeMmcBonusTolerance(
+      nomVal,
+      lo,
+      up,
+      measVal,
+      statedPosTol,
+      isInternal
+    );
+
+    const fcfTolStr = hasMmc ? `Ø${mmcRes.totalTol.toFixed(3)} Ⓜ` : dim.nominal_str;
+    const mmcCardHtml = hasMmc
+      ? `
+      <div class="diag-gum-card" style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:6px; padding:10px; margin-bottom:12px; display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <b style="color:#1E40AF; font-size:11px; text-transform:uppercase;">ASME Y14.5 Ⓜ MMC Bonus Tolerans</b>
+          <span class="pass-tag" style="background:#DBEAFE; color:#1E40AF; font-size:9px;">Ⓜ AKTİF</span>
+        </div>
+        <div style="font-size:11px; display:flex; justify-content:space-between;">
+          <span style="color:#64748B;">MMC Boyut Sınırı:</span>
+          <span style="font-family:var(--font-mono); font-weight:600;">${mmcRes.mmcSize.toFixed(4)} mm</span>
+        </div>
+        <div style="font-size:11px; display:flex; justify-content:space-between;">
+          <span style="color:#64748B;">Kazanılan Bonus Tolerans:</span>
+          <span style="font-family:var(--font-mono); font-weight:700; color:#1D4ED8;">+${mmcRes.bonus.toFixed(4)} mm</span>
+        </div>
+        <div style="font-size:11px; display:flex; justify-content:space-between; border-top:1px dashed #BFDBFE; padding-top:4px; margin-top:2px;">
+          <span style="color:#1E3A8A; font-weight:700;">Toplam İzin Verilen Konum:</span>
+          <span style="font-family:var(--font-mono); font-weight:800; color:#1E3A8A;">Ø${mmcRes.totalTol.toFixed(4)} mm</span>
+        </div>
+      </div>
+      `
+      : '';
+
     diagContent.innerHTML = `
       <div class="card-fcf">
         <div class="fcf-title">
@@ -3086,13 +3086,15 @@ export class SetupWizard {
         <table class="fcf-table">
           <tr>
             <td style="font-size: 14px; font-weight: 700;">${fcfSym}</td>
-            <td style="font-weight: 600;">${dim.nominal_str}</td>
+            <td style="font-weight: 600;">${fcfTolStr}</td>
             <td>[A]</td>
             <td>[B]</td>
             <td>[C]</td>
           </tr>
         </table>
       </div>
+
+      ${mmcCardHtml}
 
       <div class="diag-gum-card" style="background:#F8FAFC; border:1px solid #CBD5E1; border-radius:6px; padding:10px; margin-bottom:12px; display:flex; flex-direction:column; gap:6px; word-break:break-word;">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">

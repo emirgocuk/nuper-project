@@ -1,8 +1,3 @@
-/**
- * Nuper Ortho — Ölçülecek Özellikler (Inspection Items) Kart ve Liste Formatlayıcı
- * Pure utility functions: Datum çıkarma, tolerans aralığı biçimlendirme ve HTML kart üretimi.
- */
-
 export interface FormattedInspectionCard {
   id: number;
   balloon: string;
@@ -16,12 +11,36 @@ export interface FormattedInspectionCard {
   selected?: boolean;
   op?: string;
   op_reason?: string;
+  hasMmc?: boolean;
+  bonusTol?: number;
+  totalTol?: number;
 }
 
 export class InspectionCardFormatter {
-  /**
-   * GD&T veya datum listesinden standart [A], [A|B], [A|B|C] datum referansını çıkarır.
-   */
+  public static computeMmcBonusTolerance(
+    nominal: number,
+    lowerTol: number,
+    upperTol: number,
+    actualVal: number,
+    statedPosTol: number,
+    isInternal: boolean
+  ): { mmcSize: number; bonus: number; totalTol: number } {
+    let mmcSize = 0;
+    let bonus = 0;
+    if (isInternal) {
+      mmcSize = nominal - Math.abs(lowerTol);
+      bonus = Math.max(0, actualVal - mmcSize);
+    } else {
+      mmcSize = nominal + Math.abs(upperTol);
+      bonus = Math.max(0, mmcSize - actualVal);
+    }
+    return {
+      mmcSize: parseFloat(mmcSize.toFixed(4)),
+      bonus: parseFloat(bonus.toFixed(4)),
+      totalTol: parseFloat((statedPosTol + bonus).toFixed(4)),
+    };
+  }
+
   public static extractDatumReference(gdt?: string, fallbackDatums: string[] = ['A']): string {
     if (gdt) {
       const match = gdt.match(/\|\s*([A-Z])(?:\s*\|\s*([A-Z]))?(?:\s*\|\s*([A-Z]))?/);
@@ -38,9 +57,6 @@ export class InspectionCardFormatter {
     return '[A]';
   }
 
-  /**
-   * Alt ve üst tolerans değerlerinden okunaklı tolerans aralığı üretir (Örn: ±0.1, +0.2 / 0).
-   */
   public static formatToleranceRange(lower: string, upper: string, nominalStr?: string): string {
     if (nominalStr) {
       const parenMatch = nominalStr.match(/\(([^)]+)\)/);
@@ -69,9 +85,6 @@ export class InspectionCardFormatter {
     return `${upper} / ${lower}`;
   }
 
-  /**
-   * Unsur tipi ve nominal dizeyi kullanıcı dostu başlığa dönüştürür.
-   */
   public static formatFeatureTitle(typeLabel: string, nominalStr: string): string {
     const cleanLabel = typeLabel.replace(/\([^)]*\)/g, '').trim();
     if (nominalStr.toLowerCase().includes('profil')) {
@@ -89,9 +102,6 @@ export class InspectionCardFormatter {
     return `${cleanLabel} (${nominalStr})`;
   }
 
-  /**
-   * Tek bir kart için HTML dizesi üretir.
-   */
   public static renderCardHtml(card: FormattedInspectionCard): string {
     const activeClass = card.selected ? ' active' : '';
     const statusClass = ` status-${card.status.toLowerCase()}`;
@@ -124,14 +134,16 @@ export class InspectionCardFormatter {
               <span class="detail-value tol-highlight">${card.toleranceRange}</span>
             </div>
           </div>
+          ${
+            card.hasMmc && card.bonusTol !== undefined && card.bonusTol > 0
+              ? `<div class="card-bonus-row" style="font-size: 10px; color: #1D4ED8; margin-top: 4px; font-weight: 700; background: #EFF6FF; padding: 2px 6px; border-radius: 3px; border: 1px solid #BFDBFE;">Ⓜ Bonus: +${card.bonusTol.toFixed(3)} mm | Toplam: Ø${card.totalTol?.toFixed(3)} mm</div>`
+              : ''
+          }
         </div>
       </div>
     `.trim();
   }
 
-  /**
-   * Ölçülecek Özellikler (Top: X Eleman) dikey liste kapsayıcısı HTML'i üretir.
-   */
   public static renderListContainerHtml(cards: FormattedInspectionCard[]): string {
     const cardsHtml = cards.map((c) => this.renderCardHtml(c)).join('\n');
     return `
