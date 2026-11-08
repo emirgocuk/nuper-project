@@ -129,3 +129,35 @@ Bu standartların kod tabanında hatasız uygulanabilmesi için:
    - `[CF]` (Continuous Feature) tespit edildiğinde tek bir delik/yüzey yerine ilişkili $N$ adet yüzeyin ortak fit edilmesi planlanmalıdır.
 3. **Sıfır Uydurma İlkesi (Y1 / Y2):**
    - Kutu içindeki temel ölçü için tolerans alanı boş bırakılmalı, tolerans yalnızca FCF çerçevesine (örn. `⌖ Ø0.2 A B C`) bağlanmalıdır. Çıplak sayıya asla varsayılan `±0.2` atanmamalıdır.
+
+---
+
+## 7. Deterministik Topolojik Eşleştirme ve Çift Yüzey Kaliper Kinematiği
+
+### 7.1. B-Rep Topolojik Mesafe Grafı
+1. **Paralel Düzlem Çiftleri:** $|\vec{n}_i \cdot \vec{n}_j| \ge 0.998$ şartını sağlayan tüm düzlemler taranır ve dik mesafe $d_{ij} = |(\vec{C}_i - \vec{C}_j) \cdot \vec{n}_i|$ hesaplanır.
+2. **Geometrik Tip Sınıflandırması:**
+   - `STEP_HEIGHT`: Normaller aynı yöne bakıyor ($\vec{n}_i \cdot \vec{n}_j > 0.95$).
+   - `INTERNAL_SLOT`: Normaller birbirine doğru içe bakıyor ($\vec{n}_i \cdot (\vec{C}_j - \vec{C}_i) > 0$).
+   - `EXTERNAL_WIDTH`: Normaller dışa doğru bakıyor.
+   - `AXIS_DISTANCE`: Paralel silindir eksenleri arası mesafe.
+3. **Tekillik ve Veri Zenginliği:** Key bazlı kataloglama ile aynı nominal mesafeye sahip farklı bölgelerdeki unsurlar elenmez; `faceA_center`, `faceB_center`, `faceA_normal`, `faceB_normal` değerleriyle tam fiziksel koordinatlarına bağlanır. $d < 0.5\text{ mm}$ olan parazit pah/gürültü mesafeleri filtrelenir.
+
+### 7.2. Çok Kriterli Güven Skoru (Confidence Scoring - 100 Puan)
+- **Nominal Boyut Uyumu (40 Puan):** $|\Delta| \le 0.02\text{ mm} \to 40$, $\le 0.05\text{ mm} \to 35$, $\le 0.15\text{ mm} \to 25$, $\le 0.50\text{ mm} \to 15$, $\le 0.85\text{ mm} \to 5$.
+- **Geometrik Unsur Tipi Uyumu (20 Puan):** Çap $\leftrightarrow$ Silindir, Doğrusal $\leftrightarrow$ Düzlem Çifti/BBox, Radyus $\leftrightarrow$ Kavis/Dış Silindir (Radyusun delikle eşleşmesi kesinlikle engellenir).
+- **Unsur Adedi / Kalıp Deseni (15 Puan):** Çizimdeki desen sayısı ile CAD gruplaması uyumu.
+- **2D Görünüş / Eksen İzdüşümü (15 Puan):** Vektörel çizim açısı ve görünüş adası ile 3D yüzey normali uyumu.
+- **Datum Uyumu (10 Puan):** İlişkili datum referans yüzeyi doğrulaması.
+- **Durum Skalası:**
+  - $\ge 85$: `VERIFIED_EXACT`
+  - $70 - 84$: `VERIFIED_TOPOLOGY`
+  - $45 - 69$: `NEEDS_REVIEW`
+  - $< 45$: `UNMATCHED`
+  - Operatör Doğrulaması: `ENGINEER_LOCKED` (%100)
+
+### 7.3. Fiziksel Çift Yüzey Kaliper Teması & Kinematik İyileştirme
+- Doğrusal boyutlar için tek bir havada asılı nokta yerine, mesafe sınırını oluşturan `Face A` ve `Face B` yüzeylerinin ağırlık merkezlerine ayrı ayrı temas edilir.
+- Yakut küre yarıçapı ($R_{\text{tip}}$) telafisi doğrudan yüzey normali doğrultusunda eklenir.
+- Granite tabla $Y=0$ sınırlandırması yalnızca dikey eksen için uygulanır; $Z<0$ veya $X<0$ yatay koordinatlarının sıfıra ezilerek havada yapay düz çizgiler oluşturması engellenmiştir.
+- Trajektori görselleştirme boru yarıçapı $0.015\text{ mm}$ seviyesine inceltilerek şeffaf ve zarif (hairline) mühendislik çizgisi elde edilmiştir.

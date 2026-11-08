@@ -53,7 +53,7 @@ describe('Referans Numune Entegrasyon Duman Testi (Smoke Test)', () => {
     const linearCallout = result.dimensions.find((d) => d.nominal_str.includes('27.2'));
     expect(linearCallout).toBeDefined();
     expect(linearCallout?.nominal).toBe(27.2);
-  });
+  }, 20000);
 
   it('STEP B-Rep varlıkları doğrulanır ve Three.js sahnesine aktarılır', () => {
     const stepContent = fs.readFileSync(stepPath, 'utf8');

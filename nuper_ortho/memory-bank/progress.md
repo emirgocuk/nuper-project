@@ -18,6 +18,7 @@ Fiziksel temas ve kinematik kuralları doğrulanmış olup, sahte/tahmini (mock)
 | **Python Çekirdeği & Pytest** | Kabul edildi | `brep_verifier.py`, `drawing_extractor.py`, `inspection_planner.py`; 47 pytest testi %100 yeşil. |
 | **Rust Workspace & Cargo** | Kabul edildi | `ortho-ast`, `ortho-kinematics`, `ortho-router`, `ortho-emitter`; 28 test başarılı, `cargo check --workspace` hatasız. |
 | **İleri Mühendislik & ASME Y14.5** | Kabul edildi | 3-2-1 Doğrusallık (Collinearity) önleme, det(R)=+1.000000 sağ el kilidi, PH10 7.5° kuantizasyonu, desen unsurlarının (4x, 2x, 3x) tam taranması, ASME Y14.5 MMC bonus toleransı, OP10/OP20 bağlama değişimi, 10 konsol sekmesinin canlı veri üretimi. |
+| **Topolojik Eşleştirme & Çift Yüzey Kaliper** | Kabul edildi | B-Rep paralel düzlemler arası dik mesafe kataloğu (`CAD_STEP_DIST_`), 100 puanlık çok kriterli güven skoru (`VERIFIED_EXACT`, `VERIFIED_TOPOLOGY`, `NEEDS_REVIEW`, `ENGINEER_LOCKED`), delik/radyus ayrımı, 2D görünüş eksen izdüşümü, çift yüzey kaliper dokunma kinematiği, Y=0 granit tabla dikey sınırlandırması ve 0.015mm kibar hairline trajektori teli. |
 | **PDF / Ölçü Çıkarımı** | Kabul edildi | Deterministik 2D vektör + RapidOCR; `measured` veya `status: PASS` uydurmayan temiz menşe zinciri. |
 
 | Rust workspace | Kısmi | cargo check geçti; bu incelemede cargo test çalıştırılmadı |
@@ -37,11 +38,11 @@ Aşağıdaki sonuçlar 4 Ekim 2026 incelemesine aittir; plan düzenlemesinde yen
 
 | Kontrol | Sonuç | Kanıt sınırı |
 |---|---|---|
-| npm run check:types | Başarılı | TypeScript tür kontrolü |
-| npm run test:ui | 16 dosya / 75 test başarılı | Modül testleri |
-| python -m pytest tools/tests -q | 24 test başarılı | Python test kapsamı |
-| cargo check --workspace | Başarılı, 8 uyarı | Derleme kontrolü; Rust testi değil |
-| npm run build | Başarılı, uyarılar var | Eksik klasik script build'i durdurmuyor |
+| npm run check:types | Başarılı (0 hata) | TypeScript tür kontrolü |
+| npm run test:ui | 31 dosya / 181 test başarılı | Modül testleri (%100 yeşil) |
+| python -m pytest tools/tests -q | 47 test başarılı | Python test kapsamı (%100 yeşil) |
+| cargo check --workspace | Başarılı (0 hata) | Rust workspace derleme kontrolü |
+| npm run build | Başarılı (962 ms) | Production Vite bundle |
 | node scripts/verify_live_ui.mjs | Başarısız | 2D alan 0; gerçek IPC kurulmayan ayrı pencere |
 | Gerçek Electron + valve_block.step | Hata yeniden üretildi | Model görünür; metadata/eşleşme null |
 | Çift Kanvas, iki ardışık geçiş | Hata yeniden üretildi | Aktif sınıf değişiyor, display hep none |

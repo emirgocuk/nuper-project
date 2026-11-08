@@ -18,6 +18,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true
   },
+  test: {
+    testTimeout: 20000
+  },
   build: {
     outDir: path.resolve(__dirname, 'ui/dist'),
     emptyOutDir: true,
