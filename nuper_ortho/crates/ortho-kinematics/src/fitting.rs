@@ -54,12 +54,33 @@ pub struct CylinderFitResult {
     pub axis: DVec3,
     /// Hesaplanmış yarıçap R (mm)
     pub radius: f64,
-    /// Hesaplanmış anma çapı D = 2 * R (mm)
     pub diameter: f64,
-    /// Dairesellik / Silindiriklik sapması (Peak-to-Valley) (mm)
     pub roundness: f64,
-    /// RMS radyal uyum hatası (mm)
     pub rms_error: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OutlierPoint {
+    pub index: usize,
+    pub point: DVec3,
+    pub residual: f64,
+    pub tag: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlaneFitWithOutlierResult {
+    pub fit: PlaneFitResult,
+    pub outliers: Vec<OutlierPoint>,
+    pub clean_point_count: usize,
+    pub suspected_burr_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CylinderFitWithOutlierResult {
+    pub fit: CylinderFitResult,
+    pub outliers: Vec<OutlierPoint>,
+    pub clean_point_count: usize,
+    pub suspected_burr_count: usize,
 }
 
 /// PTB / NIST formatındaki `.dat` koordinat dosyalarını ayrıştırır
@@ -243,6 +264,66 @@ pub fn fit_least_squares_plane(points: &[DVec3]) -> Result<PlaneFitResult, Fitti
     })
 }
 
+pub fn fit_plane_with_outlier_rejection(
+    points: &[DVec3],
+) -> Result<PlaneFitWithOutlierResult, FittingError> {
+    let initial_fit = fit_least_squares_plane(points)?;
+    if points.len() <= 3 {
+        return Ok(PlaneFitWithOutlierResult {
+            fit: initial_fit,
+            outliers: Vec::new(),
+            clean_point_count: points.len(),
+            suspected_burr_count: 0,
+        });
+    }
+
+    let n = initial_fit.normal;
+    let residuals: Vec<f64> = points
+        .iter()
+        .map(|p| (*p - initial_fit.centroid).dot(n))
+        .collect();
+
+    let mean_res: f64 = residuals.iter().sum::<f64>() / residuals.len() as f64;
+    let variance: f64 = residuals
+        .iter()
+        .map(|r| (r - mean_res).powi(2))
+        .sum::<f64>()
+        / residuals.len() as f64;
+    let std_dev = variance.sqrt();
+
+    let mut clean_points = Vec::with_capacity(points.len());
+    let mut outliers = Vec::new();
+
+    for (idx, (p, &r)) in points.iter().zip(residuals.iter()).enumerate() {
+        let dev = (r - mean_res).abs();
+        if dev > 2.5 * std_dev && r.abs() > 0.015 {
+            outliers.push(OutlierPoint {
+                index: idx,
+                point: *p,
+                residual: r,
+                tag: "SUSPECTED_BURR_OUTLIER".to_string(),
+            });
+        } else {
+            clean_points.push(*p);
+        }
+    }
+
+    let suspected_burr_count = outliers.len();
+
+    let final_fit = if !outliers.is_empty() && clean_points.len() >= 3 {
+        fit_least_squares_plane(&clean_points)?
+    } else {
+        initial_fit
+    };
+
+    Ok(PlaneFitWithOutlierResult {
+        fit: final_fit,
+        clean_point_count: clean_points.len(),
+        suspected_burr_count,
+        outliers,
+    })
+}
+
 /// 2 Boyutlu Düzlemde Sayısal Olarak Kararlı Merkezlenmiş (Centered) Çember Fitting
 fn fit_circle_2d(pts_2d: &[(f64, f64)]) -> Result<(f64, f64, f64, f64, f64), FittingError> {
     let n = pts_2d.len();
@@ -423,6 +504,75 @@ pub fn fit_least_squares_cylinder(
         diameter: radius * 2.0,
         roundness,
         rms_error,
+    })
+}
+
+pub fn fit_cylinder_with_outlier_rejection(
+    points: &[DVec3],
+    initial_axis_hint: Option<DVec3>,
+) -> Result<CylinderFitWithOutlierResult, FittingError> {
+    let initial_fit = fit_least_squares_cylinder(points, initial_axis_hint)?;
+    if points.len() <= 5 {
+        return Ok(CylinderFitWithOutlierResult {
+            fit: initial_fit,
+            outliers: Vec::new(),
+            clean_point_count: points.len(),
+            suspected_burr_count: 0,
+        });
+    }
+
+    let axis = initial_fit.axis;
+    let center = initial_fit.center;
+    let radius = initial_fit.radius;
+
+    let residuals: Vec<f64> = points
+        .iter()
+        .map(|p| {
+            let diff = *p - center;
+            let proj = diff.dot(axis) * axis;
+            let perp = diff - proj;
+            perp.length() - radius
+        })
+        .collect();
+
+    let mean_res: f64 = residuals.iter().sum::<f64>() / residuals.len() as f64;
+    let variance: f64 = residuals
+        .iter()
+        .map(|r| (r - mean_res).powi(2))
+        .sum::<f64>()
+        / residuals.len() as f64;
+    let std_dev = variance.sqrt();
+
+    let mut clean_points = Vec::with_capacity(points.len());
+    let mut outliers = Vec::new();
+
+    for (idx, (p, &r)) in points.iter().zip(residuals.iter()).enumerate() {
+        let dev = (r - mean_res).abs();
+        if dev > 2.5 * std_dev && r.abs() > 0.015 {
+            outliers.push(OutlierPoint {
+                index: idx,
+                point: *p,
+                residual: r,
+                tag: "SUSPECTED_BURR_OUTLIER".to_string(),
+            });
+        } else {
+            clean_points.push(*p);
+        }
+    }
+
+    let suspected_burr_count = outliers.len();
+
+    let final_fit = if !outliers.is_empty() && clean_points.len() >= 5 {
+        fit_least_squares_cylinder(&clean_points, Some(axis))?
+    } else {
+        initial_fit
+    };
+
+    Ok(CylinderFitWithOutlierResult {
+        fit: final_fit,
+        clean_point_count: clean_points.len(),
+        suspected_burr_count,
+        outliers,
     })
 }
 
@@ -962,6 +1112,26 @@ mod tests {
         assert!(eval.frtzf_in_tolerance);
         assert!(eval.is_in_tolerance);
         assert_relative_eq!(eval.frtzf_max_deviation_diameter, 0.0, epsilon = 1e-4);
+    }
+
+    #[test]
+    fn test_outlier_rejection_burr_filtering() {
+        let mut points = vec![
+            DVec3::new(0.0, 0.0, 0.001),
+            DVec3::new(10.0, 0.0, -0.001),
+            DVec3::new(10.0, 10.0, 0.002),
+            DVec3::new(0.0, 10.0, -0.002),
+            DVec3::new(5.0, 5.0, 0.000),
+            DVec3::new(2.0, 8.0, 0.001),
+            DVec3::new(8.0, 2.0, -0.001),
+            DVec3::new(5.0, 2.0, 0.250),
+        ];
+
+        let res = fit_plane_with_outlier_rejection(&points).expect("Fitting failed");
+        assert_eq!(res.suspected_burr_count, 1);
+        assert_eq!(res.clean_point_count, 7);
+        assert_eq!(res.outliers[0].tag, "SUSPECTED_BURR_OUTLIER");
+        assert_eq!(res.outliers[0].index, 7);
     }
 }
 

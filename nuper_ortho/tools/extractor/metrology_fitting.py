@@ -243,3 +243,63 @@ def evaluate_gdt_feature(
         return fit
 
     return {"success": False, "error": f"Desteklenmeyen unsur türü: {expected_type}"}
+
+
+def fit_with_outlier_rejection(
+    points: np.ndarray,
+    feature_type: str = "PLANE"
+) -> Dict[str, Any]:
+    pts = np.asarray(points, dtype=np.float64)
+    if len(pts) < 4:
+        return fit_plane_least_squares(pts) if feature_type.upper() == "PLANE" else fit_cylinder_least_squares(pts)
+
+    if feature_type.upper() == "PLANE":
+        base_fit = fit_plane_least_squares(pts)
+        if not base_fit.get("success"):
+            return base_fit
+        normal = np.array(base_fit["normal"], dtype=np.float64)
+        centroid = np.array(base_fit["centroid"], dtype=np.float64)
+        residuals = np.dot(pts - centroid, normal)
+    else:
+        base_fit = fit_cylinder_least_squares(pts)
+        if not base_fit.get("success"):
+            return base_fit
+        center = np.array(base_fit["center"], dtype=np.float64)
+        axis = np.array(base_fit["axis"], dtype=np.float64)
+        radius = base_fit["radius"]
+        diffs = pts - center
+        proj = np.outer(np.dot(diffs, axis), axis)
+        perp = diffs - proj
+        r_actual = np.linalg.norm(perp, axis=1)
+        residuals = r_actual - radius
+
+    mean_res = float(np.mean(residuals))
+    std_res = float(np.std(residuals))
+
+    clean_indices = []
+    outliers = []
+
+    for i, r in enumerate(residuals):
+        dev = abs(r - mean_res)
+        if dev > 2.5 * std_res and abs(r) > 0.015:
+            outliers.append({
+                "index": i,
+                "point": [round(float(v), 6) for v in pts[i]],
+                "residual": round(float(r), 6),
+                "tag": "SUSPECTED_BURR_OUTLIER"
+            })
+        else:
+            clean_indices.append(i)
+
+    if outliers and len(clean_indices) >= (3 if feature_type.upper() == "PLANE" else 5):
+        clean_pts = pts[clean_indices]
+        refined_fit = fit_plane_least_squares(clean_pts) if feature_type.upper() == "PLANE" else fit_cylinder_least_squares(clean_pts)
+        refined_fit["outliers"] = outliers
+        refined_fit["suspected_burr_count"] = len(outliers)
+        refined_fit["clean_point_count"] = len(clean_pts)
+        return refined_fit
+
+    base_fit["outliers"] = []
+    base_fit["suspected_burr_count"] = 0
+    base_fit["clean_point_count"] = len(pts)
+    return base_fit

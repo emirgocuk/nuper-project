@@ -100,5 +100,25 @@ def test_evaluate_gdt_feature():
     )
 
     assert eval_res["success"] is True
-    # Diameter is ~10.02, size deviation ~+0.02
     assert abs(eval_res["size_deviation"] - 0.02) < 1e-3
+
+
+def test_fit_with_outlier_rejection():
+    from tools.extractor.metrology_fitting import fit_with_outlier_rejection
+    pts = np.array([
+        [0.0, 0.0, 0.001],
+        [10.0, 0.0, -0.001],
+        [10.0, 10.0, 0.002],
+        [0.0, 10.0, -0.002],
+        [5.0, 5.0, 0.000],
+        [2.0, 8.0, 0.001],
+        [8.0, 2.0, -0.001],
+        [5.0, 2.0, 0.250],
+    ])
+    res = fit_with_outlier_rejection(pts, "PLANE")
+    assert res["success"] is True
+    assert res["suspected_burr_count"] == 1
+    assert res["clean_point_count"] == 7
+    assert res["outliers"][0]["tag"] == "SUSPECTED_BURR_OUTLIER"
+    assert res["outliers"][0]["index"] == 7
+
