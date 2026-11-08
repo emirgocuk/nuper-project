@@ -64,6 +64,10 @@ function resolveIpcRenderer(): ElectronIpcRenderer | null {
     return null;
   }
 
+  if (target.electronIpc) {
+    return target.electronIpc as ElectronIpcRenderer;
+  }
+
   if (target.ipcRenderer) {
     return target.ipcRenderer as ElectronIpcRenderer;
   }

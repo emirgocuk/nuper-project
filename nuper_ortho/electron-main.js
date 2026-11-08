@@ -453,6 +453,63 @@ print(json.dumps(res))
       return [];
     }
   });
+
+  ipcMain.handle('ortho:extract-drawing', async (event, targetPath, stepPath) => {
+    try {
+      const { execFile } = require('child_process');
+      const pyBin = await resolvePythonPath();
+      const scriptPath = path.join(__dirname, 'tools', 'drawing_extractor.py');
+      const args = [scriptPath, targetPath];
+      if (stepPath) args.push(stepPath);
+      return new Promise((resolve) => {
+        execFile(pyBin, args, { maxBuffer: 15 * 1024 * 1024 }, (err, stdout, stderr) => {
+          if (err) {
+            resolve({ success: false, error: err?.message || stderr || 'Extract error' });
+          } else {
+            try {
+              resolve(JSON.parse(stdout));
+            } catch (e) {
+              resolve({ success: false, error: 'JSON error: ' + e.message });
+            }
+          }
+        });
+      });
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('ortho:parse-step', async (event, stepPath) => {
+    return parseStepMetadata(stepPath);
+  });
+
+  ipcMain.handle('ortho:compile-dmis', async (event, planPayload) => {
+    try {
+      const { execFile } = require('child_process');
+      const pyBin = await resolvePythonPath();
+      const scriptPath = path.join(__dirname, 'tools', 'inspection_planner.py');
+      const inputJson = typeof planPayload === 'string' ? planPayload : JSON.stringify(planPayload);
+      return new Promise((resolve) => {
+        const child = execFile(pyBin, [scriptPath, '--stdin'], { maxBuffer: 15 * 1024 * 1024 }, (err, stdout, stderr) => {
+          if (!err && stdout) {
+            try {
+              resolve(JSON.parse(stdout));
+            } catch {
+              resolve({ success: true, dmis: stdout });
+            }
+          } else {
+            resolve({ success: false, error: err?.message || stderr });
+          }
+        });
+        if (child.stdin) {
+          child.stdin.write(inputJson);
+          child.stdin.end();
+        }
+      });
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
 }
 
 app.whenReady().then(createWindow);
