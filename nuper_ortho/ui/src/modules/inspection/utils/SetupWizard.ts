@@ -1,7 +1,6 @@
 import {
   type InspectionDimension,
   GOBEK_ALL_12_DIMENSIONS,
-  InspectionSynchronizer,
 } from './InspectionSynchronizer';
 import {
   type BalloonItem,
@@ -19,6 +18,9 @@ import {
   screenDeltaToStage,
   applyLabelOffset,
   escapeHtmlText,
+  computeDrawingFingerprint,
+  saveBalloonSessionState,
+  loadBalloonSessionState,
   type LabelOffset,
 } from './BalloonEditing';
 import {
@@ -748,6 +750,16 @@ export class SetupWizard {
     }
     this.renderDrawingAuditModal();
     this.syncBalloonsToCanvas();
+    this.persistBalloonSession();
+  }
+
+  private persistBalloonSession(): void {
+    const fp = computeDrawingFingerprint(this.activeCadModelName || 'drawing', this.dimensions.length);
+    saveBalloonSessionState({
+      fingerprint: fp,
+      timestamp: Date.now(),
+      dimensions: this.dimensions,
+    });
   }
 
   public setExtractedData(
@@ -844,6 +856,12 @@ export class SetupWizard {
           bbox: d.bbox,
         };
       });
+
+      const fp = computeDrawingFingerprint(this.activeCadModelName || data.filename || 'drawing', this.dimensions.length);
+      const savedState = loadBalloonSessionState(fp);
+      if (savedState && Array.isArray(savedState.dimensions) && savedState.dimensions.length > 0) {
+        this.dimensions = savedState.dimensions as InspectionDimension[];
+      }
 
       this.balloons = this.dimensions.map((d) => ({
         id: d.id,
@@ -1933,6 +1951,7 @@ export class SetupWizard {
     this.isAddingInline = false;
     this.renderDrawingAuditModal();
     this.syncBalloonsToCanvas();
+    this.persistBalloonSession();
   }
 
   private updateBalloonMeta(dim: InspectionDimension): void {
@@ -2079,6 +2098,7 @@ export class SetupWizard {
     }
     this.renderDrawingAuditModal();
     this.syncBalloonsToCanvas();
+    this.persistBalloonSession();
   }
 
   private applyStageTransform(): void {
@@ -2202,10 +2222,20 @@ export class SetupWizard {
       : (tessBbox || { min: [0, 20, 0] as [number, number, number], max: [120, 80, 45] as [number, number, number] });
 
     const cadFeatList = this.currentCadMetadata?.features || [];
+    const fallbackCenter = {
+      x: (bbox.min[0] + bbox.max[0]) / 2,
+      y: bbox.max[1],
+      z: (bbox.min[2] + bbox.max[2]) / 2,
+    };
     const pathFeatures: PathFeatureInput[] = activeDims.map((d) => {
-      const coords = d.cad_center
+      const rawCoords = d.cad_center
         ? { x: d.cad_center[0], y: d.cad_center[1], z: d.cad_center[2] }
-        : InspectionSynchronizer.getFeatureCoordinates(d.id);
+        : fallbackCenter;
+      const coords = {
+        x: Math.max(bbox.min[0], Math.min(bbox.max[0], rawCoords.x)),
+        y: Math.max(bbox.min[1], Math.min(bbox.max[1], rawCoords.y)),
+        z: Math.max(bbox.min[2], Math.min(bbox.max[2], rawCoords.z)),
+      };
       const matchedCadFeat = d.cad_feature_id ? cadFeatList.find((cf) => cf.id === d.cad_feature_id) : undefined;
       const dExt = d as InspectionDimension & {
         axial_min?: number;
@@ -2377,7 +2407,7 @@ export class SetupWizard {
   private renderSceneTrajectoryAndTouches(
     waypoints: ExtendedWaypoint[],
     touches: Array<{ position: [number, number, number]; label?: string; isDatum?: boolean }>,
-    tubeRadius = 0.015
+    _tubeRadius = 0.015
   ): void {
     if (typeof window === 'undefined') return;
     const win = window as unknown as {
@@ -2432,43 +2462,46 @@ export class SetupWizard {
       pathGroup.name = 'NuperMeasurementTrajectoryGroup';
 
       if (tPoints.length >= 2) {
-        const lineGeo = new T.BufferGeometry().setFromPoints(tPoints);
-        const lineMat = new T.LineBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.55 });
-        pathGroup.add(new T.Line(lineGeo, lineMat));
-
-        const upAxis = new T.Vector3(0, 1, 0);
-        const matTraverse = new T.MeshBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.60 });
-        const matTouch = new T.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.85 });
-        const matMeas = new T.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.70 });
-        const matDatum = new T.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.85 });
+        const rapidPoints: THREE.Vector3[] = [];
+        const touchPointsList: THREE.Vector3[] = [];
+        const measPoints: THREE.Vector3[] = [];
 
         for (let i = 0; i < tPoints.length - 1; i++) {
           const pA = tPoints[i];
           const pB = tPoints[i + 1];
-          const diff = new T.Vector3().subVectors(pB, pA);
-          const segLen = diff.length();
-          if (segLen < 0.05) continue;
+          const nextWp = waypoints[i + 1];
+          const nextPhase = nextWp?.phase;
+          const isDatum = Boolean(nextWp?.balloon?.startsWith('DATUM_'));
 
-          const isDatumSeg = Boolean(waypoints[i + 1]?.balloon?.startsWith('DATUM_'));
-          const nextPhase = waypoints[i + 1]?.phase;
-          const cylMat = isDatumSeg
-            ? matDatum
-            : nextPhase === 'TOUCH'
-            ? matTouch
-            : nextPhase === 'TRAVERSE'
-            ? matTraverse
-            : matMeas;
+          if (isDatum || nextPhase === 'TOUCH') {
+            touchPointsList.push(pA, pB);
+          } else if (nextPhase === 'TRAVERSE' || nextWp?.subPhase === 'SAFE_TRAVERSE' || nextWp?.subPhase === 'HEAD_ROTATION') {
+            rapidPoints.push(pA, pB);
+          } else {
+            measPoints.push(pA, pB);
+          }
+        }
 
-          const cylGeo = new T.CylinderGeometry(tubeRadius, tubeRadius, segLen, 6);
-          const cylMesh = new T.Mesh(cylGeo, cylMat);
-          const mid = new T.Vector3().addVectors(pA, pB).multiplyScalar(0.5);
-          cylMesh.position.copy(mid);
-          cylMesh.quaternion.setFromUnitVectors(upAxis, diff.normalize());
-          pathGroup.add(cylMesh);
+        if (rapidPoints.length > 0) {
+          const rapidGeo = new T.BufferGeometry().setFromPoints(rapidPoints);
+          const rapidMat = new T.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.45 });
+          pathGroup.add(new T.LineSegments(rapidGeo, rapidMat));
+        }
+
+        if (touchPointsList.length > 0) {
+          const touchGeo = new T.BufferGeometry().setFromPoints(touchPointsList);
+          const touchMat = new T.LineBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.85 });
+          pathGroup.add(new T.LineSegments(touchGeo, touchMat));
+        }
+
+        if (measPoints.length > 0) {
+          const measGeo = new T.BufferGeometry().setFromPoints(measPoints);
+          const measMat = new T.LineBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.70 });
+          pathGroup.add(new T.LineSegments(measGeo, measMat));
         }
       }
 
-      const dotGeo = new T.SphereGeometry(Math.max(0.12, tubeRadius * 2.2), 12, 12);
+      const dotGeo = new T.SphereGeometry(0.35, 12, 12);
       const dotMatMeas = new T.MeshBasicMaterial({ color: 0x10b981 });
       const dotMatDatum = new T.MeshBasicMaterial({ color: 0xf59e0b });
       for (const tp of touches) {
@@ -2597,10 +2630,20 @@ export class SetupWizard {
       : { min: [0, 35, 0] as [number, number, number], max: [120, 95, 45] as [number, number, number] };
 
     const cadFeatList = this.currentCadMetadata?.features || [];
+    const fallbackCenter = {
+      x: (bbox.min[0] + bbox.max[0]) / 2,
+      y: bbox.max[1],
+      z: (bbox.min[2] + bbox.max[2]) / 2,
+    };
     const pathFeatures: PathFeatureInput[] = dims.map((d) => {
-      const coords = d.cad_center
+      const rawCoords = d.cad_center
         ? { x: d.cad_center[0], y: d.cad_center[1], z: d.cad_center[2] }
-        : InspectionSynchronizer.getFeatureCoordinates(d.id);
+        : fallbackCenter;
+      const coords = {
+        x: Math.max(bbox.min[0], Math.min(bbox.max[0], rawCoords.x)),
+        y: Math.max(bbox.min[1], Math.min(bbox.max[1], rawCoords.y)),
+        z: Math.max(bbox.min[2], Math.min(bbox.max[2], rawCoords.z)),
+      };
       const matchedCadFeat = d.cad_feature_id ? cadFeatList.find((cf) => cf.id === d.cad_feature_id) : undefined;
       return {
         id: d.id,
@@ -2810,9 +2853,13 @@ export class SetupWizard {
     const dim = this.dimensions.find((d) => d.id === id);
     if (!dim) return;
 
+    const bbox = this.currentCadMetadata?.bbox;
+    const fallbackCoords = bbox
+      ? { x: (bbox.min[0] + bbox.max[0]) / 2, y: bbox.max[1], z: (bbox.min[2] + bbox.max[2]) / 2 }
+      : { x: 0, y: 25, z: 0 };
     const coords = dim.cad_center
       ? { x: dim.cad_center[0], y: dim.cad_center[1], z: dim.cad_center[2] }
-      : InspectionSynchronizer.getFeatureCoordinates(id);
+      : fallbackCoords;
     const hudName = document.getElementById('hud-feature-name');
     const hudCoords = document.getElementById('hud-feature-coords');
     const hudDetails = document.getElementById('hud-feature-details');

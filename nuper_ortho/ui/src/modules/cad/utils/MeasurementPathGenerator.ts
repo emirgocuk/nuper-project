@@ -209,6 +209,7 @@ export class MeasurementPathGenerator {
     const allWaypoints: ExtendedWaypoint[] = [];
     const datumTouchPoints: TouchPointRecord[] = [];
 
+    const yMinFloor = isYAxis ? yMinPart + 0.5 : 0;
     const makeWp = (
       position: THREE.Vector3,
       phase: ProbePhase,
@@ -218,16 +219,22 @@ export class MeasurementPathGenerator {
       ph10Label = 'A0° B0°',
       subPhase?: string,
       feedRate = 150.0
-    ): ExtendedWaypoint => ({
-      position,
-      phase,
-      featureId,
-      balloon,
-      stylusDir,
-      ph10Label,
-      subPhase,
-      feedRate,
-    });
+    ): ExtendedWaypoint => {
+      const safePos = position.clone();
+      if (isYAxis && activeOp === 'OP10' && safePos.y < yMinFloor) {
+        safePos.y = yMinFloor;
+      }
+      return {
+        position: safePos,
+        phase,
+        featureId,
+        balloon,
+        stylusDir,
+        ph10Label,
+        subPhase,
+        feedRate,
+      };
+    };
 
     const homePos = isYAxis
       ? new THREE.Vector3(0, zClearance, 0)
@@ -272,10 +279,14 @@ export class MeasurementPathGenerator {
             : new THREE.Vector3(prev.position.x, prev.position.y, retractY);
           dest.push(makeWp(exitPos, 'RETRACT', next.featureId, next.balloon, prevDir, prevLabel, 'RETRACT_TO_SAFE', 150.0));
 
+          if (isHeadAngleChange) {
+            dest.push(makeWp(exitPos.clone(), 'TRAVERSE', next.featureId, next.balloon, nextDir, nextLabel, 'HEAD_ROTATION', 150.0));
+          }
+
           const rotationPos = isYAxis
             ? new THREE.Vector3(next.position.x, retractY, next.position.z)
             : new THREE.Vector3(next.position.x, next.position.y, retractY);
-          dest.push(makeWp(rotationPos, 'TRAVERSE', next.featureId, next.balloon, nextDir, nextLabel, isHeadAngleChange ? 'HEAD_ROTATION' : 'SAFE_TRAVERSE', 150.0));
+          dest.push(makeWp(rotationPos, 'TRAVERSE', next.featureId, next.balloon, nextDir, nextLabel, 'SAFE_TRAVERSE', 150.0));
 
           const plungeTarget = next.position.clone();
           const safeTraverseTarget = isYAxis
@@ -509,6 +520,20 @@ export class MeasurementPathGenerator {
             { ...base, center: [base.center[0], cy, 0] },
             { ...base, center: [base.center[0], cy, halfZ] },
           ];
+        }
+      }
+
+      for (const inst of instances) {
+        if (inst.center[0] < bbox.min[0] - 1.0 || inst.center[0] > bbox.max[0] + 1.0) {
+          inst.center[0] = Math.max(bbox.min[0], Math.min(bbox.max[0], inst.center[0]));
+        }
+        if (isYAxis) {
+          if (inst.center[1] < yMinFloor || inst.center[1] > bbox.max[1] + 1.0) {
+            inst.center[1] = Math.max(yMinFloor, Math.min(bbox.max[1], inst.center[1]));
+          }
+          if (inst.center[2] < bbox.min[2] - 1.0 || inst.center[2] > bbox.max[2] + 1.0) {
+            inst.center[2] = Math.max(bbox.min[2], Math.min(bbox.max[2], inst.center[2]));
+          }
         }
       }
 
@@ -808,11 +833,11 @@ export class MeasurementPathGenerator {
             normal: [0, 1, 0],
             ph10Label: 'A0° B0°',
           });
-        } else if (isYAxis && (isDeepFeature || normal[1] < -0.25)) {
+        } else if (isYAxis && isDeepFeature && normal[1] >= -0.25) {
           effectiveAngleLabel = 'A0° B90°';
           effectiveAngleObj = { aDeg: 0, bDeg: 90, direction: [-1, 0, 0], label: 'A0° B90°' };
 
-          const cy = Math.max(yMinPart + 1.2, center[1]);
+          const cy = Math.max(yMinFloor + 1.2, center[1]);
           const rHoriz = Math.hypot(center[0], center[2]);
           const ux = rHoriz > 1.0 ? center[0] / rHoriz : (Math.abs(normal[0]) > 0.1 || Math.abs(normal[2]) > 0.1 ? normal[0] / Math.hypot(normal[0], normal[2]) : 1.0);
           const uz = rHoriz > 1.0 ? center[2] / rHoriz : (Math.abs(normal[0]) > 0.1 || Math.abs(normal[2]) > 0.1 ? normal[2] / Math.hypot(normal[0], normal[2]) : 0.0);
@@ -906,12 +931,18 @@ export class MeasurementPathGenerator {
             });
           }
         } else {
-          let safeTouchY = isYAxis ? Math.max(yMinPart + 1.0, Math.min(yMaxPart, center[1])) : center[1];
+          let safeTouchY = isYAxis ? Math.max(yMinFloor + 0.5, Math.min(yMaxPart, center[1])) : center[1];
           if (isYAxis && (cadId === 'CAD_BBOX_X' || cadId === 'CAD_BBOX_Z')) {
-            safeTouchY = yMinPart + Math.min(1.2, Math.max(0.6, partHeight * 0.22));
+            safeTouchY = yMinFloor + Math.min(1.2, Math.max(0.6, partHeight * 0.22));
           }
           let touchX = center[0];
           let touchZ = center[2];
+          if (touchX < bbox.min[0] - 1.0 || touchX > bbox.max[0] + 1.0) {
+            touchX = Math.max(bbox.min[0], Math.min(bbox.max[0], touchX));
+          }
+          if (touchZ < bbox.min[2] - 1.0 || touchZ > bbox.max[2] + 1.0) {
+            touchZ = Math.max(bbox.min[2], Math.min(bbox.max[2], touchZ));
+          }
           for (const cb of clampBoxes) {
             if (SetupPrep.isPointInsideClampBox([touchX, safeTouchY, touchZ], cb, 5.0)) {
               if (touchX < 0) touchX = cb.max[0] + 6.0;
