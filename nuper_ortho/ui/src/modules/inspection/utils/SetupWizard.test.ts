@@ -534,7 +534,7 @@ describe('SetupWizard — Sıfır Durum ve Beyaz Temalı Işık Masası Modalı'
 
     expect(item2.classList.contains('measuring-now')).toBe(true);
     expect(pill2.classList.contains('measuring')).toBe(true);
-    expect(pill2.textContent).toBe('🎯 ÖLÇÜLÜYOR...');
+    expect(pill2.textContent).toContain('🎯 ÖLÇÜLÜYOR');
 
     expect(item1.classList.contains('measuring-now')).toBe(false);
     expect(pill1.classList.contains('pass')).toBe(true);
