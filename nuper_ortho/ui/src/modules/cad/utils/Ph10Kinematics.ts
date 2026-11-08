@@ -13,6 +13,43 @@ export interface AngleMatchResult {
 export class Ph10Kinematics {
   private static cachedLut: PH10Angle[] | null = null;
 
+  public static quantizeAngle(rawA: number, rawB: number): { aDeg: number; bDeg: number; label: string } {
+    const quantizedA = Math.min(105.0, Math.max(0.0, Math.round(rawA / 7.5) * 7.5));
+    let rawModB = ((Math.round(rawB / 7.5) * 7.5 + 180) % 360) - 180;
+    if (rawModB < -180) rawModB += 360;
+    if (rawModB > 180) rawModB -= 360;
+    const quantizedB = rawModB;
+    return {
+      aDeg: quantizedA,
+      bDeg: quantizedB,
+      label: `A${quantizedA}° B${quantizedB}°`,
+    };
+  }
+
+  public static verifySweepClearance(
+    headCenter: [number, number, number],
+    bbox: { min: [number, number, number]; max: [number, number, number] },
+    headLengthMm = 60.0,
+    stylusLengthMm = 50.0,
+    verticalAxis: 'Y' | 'Z' = 'Y'
+  ): boolean {
+    const sweepRadius = headLengthMm + stylusLengthMm;
+    const clearanceMargin = sweepRadius + 10.0;
+    const topAltitude = verticalAxis === 'Y' ? bbox.max[1] : bbox.max[2];
+    const headAltitude = verticalAxis === 'Y' ? headCenter[1] : headCenter[2];
+
+    if (headAltitude >= topAltitude + clearanceMargin) {
+      return true;
+    }
+
+    const cx = Math.max(bbox.min[0], Math.min(bbox.max[0], headCenter[0]));
+    const cy = Math.max(bbox.min[1], Math.min(bbox.max[1], headCenter[1]));
+    const cz = Math.max(bbox.min[2], Math.min(bbox.max[2], headCenter[2]));
+    const dist = Math.hypot(headCenter[0] - cx, headCenter[1] - cy, headCenter[2] - cz);
+
+    return dist >= clearanceMargin;
+  }
+
   public static computeDirection(aDeg: number, bDeg: number): [number, number, number] {
     const aRad = (aDeg * Math.PI) / 180.0;
     const bRad = (bDeg * Math.PI) / 180.0;

@@ -61,5 +61,27 @@ describe('Ph10Kinematics — Renishaw PH10 A/B Motorize Açı ve Yönelim Motoru
     expect(clusters.get('A0° B0°')?.items.length).toBe(2);
     expect(clusters.get('A90° B90°')?.items.length).toBe(1);
   });
+
+  it('quantizeAngle 7.5 derecelik mekanik disli adimlarina yuvarlar', () => {
+    const q1 = Ph10Kinematics.quantizeAngle(3.8, 14.8);
+    expect(q1.aDeg).toBe(7.5);
+    expect(q1.bDeg).toBe(15.0);
+
+    const q2 = Ph10Kinematics.quantizeAngle(110.0, -190.0);
+    expect(q2.aDeg).toBe(105.0);
+    expect(q2.bDeg).toBe(172.5);
+  });
+
+  it('verifySweepClearance tavan yuksekliginde ve guvenli mesafede dogrulanir', () => {
+    const bbox = {
+      min: [0, 0, 0] as [number, number, number],
+      max: [100, 50, 100] as [number, number, number],
+    };
+    const isSafeHigh = Ph10Kinematics.verifySweepClearance([50, 200, 50], bbox, 60, 50, 'Y');
+    expect(isSafeHigh).toBe(true);
+
+    const isCollisionClose = Ph10Kinematics.verifySweepClearance([50, 60, 50], bbox, 60, 50, 'Y');
+    expect(isCollisionClose).toBe(false);
+  });
 });
 

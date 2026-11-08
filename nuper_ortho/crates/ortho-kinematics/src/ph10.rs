@@ -35,6 +35,32 @@ impl PH10Angle {
             direction_vector,
         }
     }
+
+    pub fn quantize(raw_a: f64, raw_b: f64) -> Self {
+        let quantized_a = (raw_a / 7.5).round() * 7.5;
+        let clamped_a = quantized_a.clamp(0.0, 105.0);
+        let quantized_b = ((raw_b / 7.5).round() * 7.5 + 180.0).rem_euclid(360.0) - 180.0;
+        Self::new(clamped_a, quantized_b)
+    }
+
+    pub fn verify_sweep_clearance(
+        head_center: DVec3,
+        bbox_min: DVec3,
+        bbox_max: DVec3,
+        head_len_mm: f64,
+        stylus_len_mm: f64,
+    ) -> bool {
+        let sweep_radius = head_len_mm + stylus_len_mm;
+        let safe_altitude = bbox_max.z + sweep_radius + 10.0;
+        if head_center.z >= safe_altitude {
+            return true;
+        }
+        let closest_x = head_center.x.clamp(bbox_min.x, bbox_max.x);
+        let closest_y = head_center.y.clamp(bbox_min.y, bbox_max.y);
+        let closest_z = head_center.z.clamp(bbox_min.z, bbox_max.z);
+        let dist = head_center.distance(DVec3::new(closest_x, closest_y, closest_z));
+        dist >= sweep_radius + 10.0
+    }
 }
 
 /// Açı seçim ve optimizasyon sonucu
