@@ -288,6 +288,77 @@ export class StepModelTessellator {
       solidGeo.computeVertexNormals();
     }
     solidGeo.setIndex(new T.BufferAttribute(indices, 1));
+
+    const vertCount = positions.length / 3;
+    const faceIdArray = new Float32Array(vertCount);
+    const surfaceTypeArray = new Float32Array(vertCount);
+
+    const surfaceTypeToNum = (st: string): number => {
+      const u = (st || '').toUpperCase();
+      if (u === 'PLANE') return 1;
+      if (u === 'CYLINDER') return 2;
+      if (u === 'CONE') return 3;
+      if (u === 'SPHERE') return 4;
+      if (u === 'TORUS') return 5;
+      return 6;
+    };
+
+    const bRepFaces: Array<{
+      id: string;
+      numericId: number;
+      surfaceType: string;
+      surfaceTypeNum: number;
+      triangleStart: number;
+      triangleCount: number;
+      area?: number;
+    }> = [];
+
+    const metaFaces = meshData.faces || [];
+    if (metaFaces.length > 0) {
+      for (let fIdx = 0; fIdx < metaFaces.length; fIdx++) {
+        const mf = metaFaces[fIdx];
+        const numId = fIdx + 1;
+        const stNum = surfaceTypeToNum(mf.surface_type || 'PLANE');
+        bRepFaces.push({
+          id: mf.id || `FACE_${numId}`,
+          numericId: numId,
+          surfaceType: mf.surface_type || 'PLANE',
+          surfaceTypeNum: stNum,
+          triangleStart: mf.triangle_start,
+          triangleCount: mf.triangle_count,
+          area: mf.area,
+        });
+
+        const triStart = mf.triangle_start;
+        const triEnd = triStart + mf.triangle_count;
+        for (let t = triStart; t < triEnd; t++) {
+          const idxA = indices[t * 3];
+          const idxB = indices[t * 3 + 1];
+          const idxC = indices[t * 3 + 2];
+          if (idxA !== undefined && idxA < vertCount) {
+            faceIdArray[idxA] = numId;
+            surfaceTypeArray[idxA] = stNum;
+          }
+          if (idxB !== undefined && idxB < vertCount) {
+            faceIdArray[idxB] = numId;
+            surfaceTypeArray[idxB] = stNum;
+          }
+          if (idxC !== undefined && idxC < vertCount) {
+            faceIdArray[idxC] = numId;
+            surfaceTypeArray[idxC] = stNum;
+          }
+        }
+      }
+    } else {
+      for (let i = 0; i < vertCount; i++) {
+        faceIdArray[i] = 1;
+        surfaceTypeArray[i] = 1;
+      }
+    }
+
+    solidGeo.setAttribute('faceId', new T.BufferAttribute(faceIdArray, 1));
+    solidGeo.setAttribute('surfaceType', new T.BufferAttribute(surfaceTypeArray, 1));
+    solidGeo.userData.bRepFaces = bRepFaces;
     solidGeo.computeBoundingBox();
 
     const rawBox = solidGeo.boundingBox;
@@ -1498,6 +1569,17 @@ export class StepModelTessellator {
       solidGeo = new T.BufferGeometry();
       solidGeo.setAttribute('position', new T.Float32BufferAttribute(triPositions, 3));
       solidGeo.setAttribute('normal', new T.Float32BufferAttribute(triNormals, 3));
+
+      const vCount = triPositions.length / 3;
+      const fIdArr = new Float32Array(vCount);
+      const sTypeArr = new Float32Array(vCount);
+      for (let i = 0; i < vCount; i++) {
+        fIdArr[i] = Math.floor(i / 3) + 1;
+        sTypeArr[i] = 1;
+      }
+      solidGeo.setAttribute('faceId', new T.Float32BufferAttribute(fIdArr, 1));
+      solidGeo.setAttribute('surfaceType', new T.Float32BufferAttribute(sTypeArr, 1));
+
       const solidMesh = new T.Mesh(solidGeo, metalMat);
       solidMesh.name = 'step_brep_solid';
       group.add(solidMesh);
@@ -1508,6 +1590,17 @@ export class StepModelTessellator {
     } else {
       solidGeo = new T.BoxGeometry(finalSizeX, finalSizeY, finalSizeZ);
       solidGeo.translate(0, standoffHeight + finalSizeY / 2, 0);
+
+      const vCount = solidGeo.getAttribute('position').count;
+      const fIdArr = new Float32Array(vCount);
+      const sTypeArr = new Float32Array(vCount);
+      for (let i = 0; i < vCount; i++) {
+        fIdArr[i] = Math.floor(i / 4) + 1;
+        sTypeArr[i] = 1;
+      }
+      solidGeo.setAttribute('faceId', new T.Float32BufferAttribute(fIdArr, 1));
+      solidGeo.setAttribute('surfaceType', new T.Float32BufferAttribute(sTypeArr, 1));
+
       const boxMesh = new T.Mesh(solidGeo, metalMat);
       boxMesh.name = 'step_bbox_solid';
       group.add(boxMesh);

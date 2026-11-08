@@ -4,6 +4,7 @@ import { SimulationController } from './SimulationController';
 import { SetupPrep, type BoundingBoxEnvelope, type SetupPrepOptions } from './utils/SetupPrep';
 import { type GeneratedMeasurementPlan } from './utils/MeasurementPathGenerator';
 import type { CadMetadata } from '../../types/generated/cad_metadata';
+import { extractFaceDetailsFromHit, type SelectedFaceDetails } from './utils/StylusSelector';
 
 export interface CADViewerOptions {
   antialias?: boolean;
@@ -28,6 +29,7 @@ export class CADViewer {
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
   private pointer: THREE.Vector2 = new THREE.Vector2();
   private featureSelectedListeners: Array<(featureId: string, feature: NonNullable<CadMetadata['features']>[0]) => void> = [];
+  private faceSelectedListeners: Array<(details: SelectedFaceDetails) => void> = [];
   private canvasClickHandler: ((e: MouseEvent) => void) | null = null;
 
   constructor(options: CADViewerOptions = {}) {
@@ -111,6 +113,13 @@ export class CADViewer {
     };
   }
 
+  public onFaceSelected(cb: (details: SelectedFaceDetails) => void): () => void {
+    this.faceSelectedListeners.push(cb);
+    return () => {
+      this.faceSelectedListeners = this.faceSelectedListeners.filter((listener) => listener !== cb);
+    };
+  }
+
   private handleCanvasClick(e: MouseEvent): void {
     if (!this.renderer) return;
     const rect = this.renderer.domElement.getBoundingClientRect();
@@ -121,6 +130,17 @@ export class CADViewer {
     const intersects = this.raycaster.intersectObjects(this.modelGroup.children, true);
     if (intersects.length > 0) {
       const hit = intersects[0];
+      const hitMesh = hit.object as THREE.Mesh;
+      const faceDetails = extractFaceDetailsFromHit(hit, hitMesh, this.cadMetadata?.features);
+
+      if (faceDetails) {
+        const hitNormal = hit.face ? hit.face.normal : new THREE.Vector3(0, 1, 0);
+        this.highlightFaceById(faceDetails.faceId, hit.point, hitNormal);
+        for (const cb of this.faceSelectedListeners) {
+          cb(faceDetails);
+        }
+      }
+
       const hitPoint = hit.point;
       const features = this.cadMetadata?.features || [];
       if (features.length > 0) {
@@ -139,7 +159,9 @@ export class CADViewer {
         }
 
         if (closestFeat) {
-          this.highlightFeature(closestFeat.id);
+          if (!faceDetails) {
+            this.highlightFeature(closestFeat.id);
+          }
           for (const cb of this.featureSelectedListeners) {
             cb(closestFeat.id, closestFeat);
           }
@@ -289,6 +311,79 @@ export class CADViewer {
 
   public getModelGroup(): THREE.Group {
     return this.modelGroup;
+  }
+
+  public highlightFaceById(faceId: number, hitPoint?: THREE.Vector3, hitNormal?: THREE.Vector3): void {
+    if (this.isDestroyed || !this.currentGeometry) return;
+
+    SceneCleaner.disposeNode(this.highlightGroup);
+
+    const geo = this.currentGeometry;
+    const faceIdAttr = geo.getAttribute('faceId');
+    const posAttr = geo.getAttribute('position');
+    const indexAttr = geo.getIndex();
+
+    if (faceIdAttr && posAttr) {
+      const matchingPositions: number[] = [];
+      const triCount = indexAttr ? indexAttr.count / 3 : posAttr.count / 3;
+
+      for (let t = 0; t < triCount; t++) {
+        const iA = indexAttr ? indexAttr.getX(t * 3) : t * 3;
+        const iB = indexAttr ? indexAttr.getX(t * 3 + 1) : t * 3 + 1;
+        const iC = indexAttr ? indexAttr.getX(t * 3 + 2) : t * 3 + 2;
+
+        if (faceIdAttr.getX(iA) === faceId || faceIdAttr.getX(iB) === faceId || faceIdAttr.getX(iC) === faceId) {
+          matchingPositions.push(
+            posAttr.getX(iA), posAttr.getY(iA), posAttr.getZ(iA),
+            posAttr.getX(iB), posAttr.getY(iB), posAttr.getZ(iB),
+            posAttr.getX(iC), posAttr.getY(iC), posAttr.getZ(iC)
+          );
+        }
+      }
+
+      if (matchingPositions.length > 0) {
+        const overlayGeo = new THREE.BufferGeometry();
+        overlayGeo.setAttribute('position', new THREE.Float32BufferAttribute(matchingPositions, 3));
+        overlayGeo.computeVertexNormals();
+
+        const overlayMat = new THREE.MeshBasicMaterial({
+          color: 0x06b6d4,
+          transparent: true,
+          opacity: 0.45,
+          side: THREE.DoubleSide,
+          depthTest: true,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -1,
+        });
+
+        const overlayMesh = new THREE.Mesh(overlayGeo, overlayMat);
+        this.highlightGroup.add(overlayMesh);
+
+        const wireMat = new THREE.MeshBasicMaterial({
+          color: 0x38bdf8,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.7,
+        });
+        const wireMesh = new THREE.Mesh(overlayGeo, wireMat);
+        this.highlightGroup.add(wireMesh);
+      }
+    }
+
+    if (hitPoint && hitNormal) {
+      const normalNorm = hitNormal.clone().normalize();
+      const arrow = new THREE.ArrowHelper(normalNorm, hitPoint, 15, 0xf59e0b, 4, 2);
+      this.highlightGroup.add(arrow);
+
+      const markerGeo = new THREE.SphereGeometry(1.2, 12, 12);
+      const markerMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+      const marker = new THREE.Mesh(markerGeo, markerMat);
+      marker.position.copy(hitPoint);
+      this.highlightGroup.add(marker);
+    }
+
+    this.render();
   }
 
   public highlightFeature(featureKey?: string): void {

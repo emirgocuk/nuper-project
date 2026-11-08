@@ -4,7 +4,6 @@ import type { CadMetadata } from '../../../types/generated/cad_metadata';
 
 describe('StepModelTessellator', () => {
   it('buildFromMetadata OpenCASCADE B-Rep mesh ve özelliklerinden Three.js modeli üretir', () => {
-    // 3 vertices (triangle), 1 normal, 1 triangle index, 1 edge line (2 points)
     const positions = new Float32Array([0, 0, 0, 10, 0, 0, 0, 10, 0]);
     const normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
     const indices = new Uint32Array([0, 1, 2]);
@@ -146,5 +145,41 @@ describe('StepModelTessellator', () => {
     const feat = res.cadFeatures?.find((f) => f.id === 'CAD_STEP_DIST_16.00_1');
     expect(feat).toBeDefined();
     expect(feat?.normal?.[0]).toBeLessThan(0);
+  });
+
+  it('generates faceId and surfaceType vertex attributes for raycasting and selection', () => {
+    const positions = new Float32Array([0, 0, 0, 10, 0, 0, 0, 10, 0]);
+    const normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+    const indices = new Uint32Array([0, 1, 2]);
+
+    const meta: CadMetadata = {
+      model_name: 'test_face_id.stp',
+      file_format: 'step',
+      vertex_count: 3,
+      triangle_count: 1,
+      kernel: 'OpenCASCADE 8.0 (OCP)',
+      bbox: { min: [0, 0, 0], max: [10, 10, 5], size: [10, 10, 5] },
+      features: [],
+      mesh: {
+        positions_b64: Buffer.from(positions.buffer).toString('base64'),
+        normals_b64: Buffer.from(normals.buffer).toString('base64'),
+        indices_b64: Buffer.from(indices.buffer).toString('base64'),
+        edges_b64: '',
+        linear_deflection: 0.05,
+        faces: [{ id: 'FACE_10', surface_type: 'CYLINDER', triangle_start: 0, triangle_count: 1, area: 42.5 }],
+      },
+    };
+
+    const res = StepModelTessellator.buildFromMetadata(meta, 'test_face_id.stp');
+    expect(res.geometry).toBeDefined();
+    const faceIdAttr = res.geometry?.getAttribute('faceId');
+    const surfaceTypeAttr = res.geometry?.getAttribute('surfaceType');
+
+    expect(faceIdAttr).toBeDefined();
+    expect(faceIdAttr?.getX(0)).toBe(1);
+    expect(surfaceTypeAttr).toBeDefined();
+    expect(surfaceTypeAttr?.getX(0)).toBe(2);
+    expect(res.geometry?.userData.bRepFaces?.length).toBe(1);
+    expect(res.geometry?.userData.bRepFaces[0].surfaceType).toBe('CYLINDER');
   });
 });
