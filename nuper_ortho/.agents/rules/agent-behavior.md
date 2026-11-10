@@ -23,3 +23,8 @@ Bu kurallar, repodaki tüm yapay zeka ajanlarının çalışma prensiplerini bel
 ## 3. BAĞLAM VE TOKEN KORUMA (CONTEXT-MODE STANDARDI)
 - **Ham Çıktı Yığmama:** Devasa terminal logları, ham CMM ölçüm dosyaları (`.dmi`, `.txt`), yüzlerce satırlık derleme ve test raporları doğrudan bağlama (context) yığılmaz.
 - **Hedefli Okuma:** Dosyalar `grep_search` veya belirli satır aralıkları (`view_file` ile slice) kullanılarak hedefe yönelik taranır.
+
+---
+
+## 4. GITHUB BECERİ VE STANDART KAYIT PROTOKOLÜ (GITHUB-FOUNDED-SKILLS)
+- **Doğrudan Kayıt Kuralı:** Kullanıcı bir GitHub bağlantısı verip "bunu ekle", "bunu da kaydet" dediğinde, bu bağlantı doğrudan `memory-bank/github-founded-skills.md` dosyasına amaç, felsefe ve Nuper Ortho entegrasyon bağlamıyla kaydedilir.

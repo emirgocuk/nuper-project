@@ -34,8 +34,12 @@ Tüm AI ajanları (Antigravity, Cursor, Claude, Copilot vb.) bu depoda kod yazar
 ## 7. BAĞLAM VE TOKEN KORUMA (CONTEXT-MODE STANDARDI)
 - Devasa terminal çıktıları, ham CMM ölçüm dosyaları (`.dmi`, `.txt`) ve yüzlerce satırlık loglar doğrudan bağlama dökülemez; filtrelenerek ve dilimlenerek okunur.
 
+## 8. GITHUB BECERİ VE STANDART KAYIT KURALI (GITHUB-FOUNDED-SKILLS)
+- Kullanıcı herhangi bir GitHub bağlantısı paylaşarak "bunu ekle", "bunu da kaydet" veya benzeri bir talepte bulunduğunda, bu bağlantı ve repo analizi doğrudan `memory-bank/github-founded-skills.md` dosyasına yeni bir madde olarak kaydedilir.
+
 ---
 Detaylı mimari plan, değişmez yasalar ve standartlar için:
 - Ajan Davranış ve İletişim Protokolü: [.agents/rules/agent-behavior.md](file:///.agents/rules/agent-behavior.md)
 - Mimari Plan ve Değişmez Yasalar (Zorunlu): [memory-bank/architectureBlueprint.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/architectureBlueprint.md)
 - Geliştirme Altyapı Kuralları: [memory-bank/developmentInfrastructureRules.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/developmentInfrastructureRules.md)
+- GitHub Kaynaklı Beceriler ve Standartlar: [memory-bank/github-founded-skills.md](file:///d:/Projects/nuper-project/nuper_ortho/memory-bank/github-founded-skills.md)
