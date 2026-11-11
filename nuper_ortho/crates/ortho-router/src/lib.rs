@@ -2,6 +2,7 @@
 //! 
 //! Katman 4: Emniyet kutusu, pabuç yasaklı alanları ve GJK/EPA çarpışmasız hareket planlayıcısı.
 
+pub mod autonomous_loop;
 pub mod clearance;
 pub mod collision;
 pub mod hal;
@@ -15,6 +16,9 @@ pub mod tsp;
 use glam::DVec3;
 use serde::{Deserialize, Serialize};
 
+pub use autonomous_loop::{
+    AutonomousLoopConfig, AutonomousLoopResult, AutonomousQualityOrchestrator, LoopIterationRecord,
+};
 pub use clearance::{ClearanceBox, KeepOutZone};
 pub use collision::{
     ccd_check_trajectory, compute_penetration_mtv, generate_3point_detour, generate_lift_and_hop,
