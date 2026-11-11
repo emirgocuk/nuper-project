@@ -33,7 +33,7 @@ fn test_phase5_sandboxed_ai_shop_safety_and_hybrid_metrology_pipeline() {
     // 1. ADIM 5.1: YEREL SANDBOXED AI & DETERMINİSTİK GARDİYAN DENETİMİ
     // =========================================================================
     let drf = DatumReferenceFrame::new_3_2_1("PCS_BASE", 1, 2, 3);
-    let mut plan = InspectionPlan::new("AERO_HYDRAULIC_BODY", "manifold.step", drf);
+    let mut plan = InspectionPlan::new("AERO_HYDRAULIC_BODY", "manifold.step", drf.clone());
 
     let main_bore = GeometricFeature::new_internal_cylinder(
         10,
@@ -196,7 +196,7 @@ fn test_phase5_sandboxed_ai_shop_safety_and_hybrid_metrology_pipeline() {
         standoff_distance_mm: 90.0,
         point_density_pts_per_mm: 30.0,
     };
-    let test_surface = ParametricFace::sample_plane_z50();
+    let test_surface = ParametricFace::new_plane(1, DVec3::new(50.0, 50.0, 50.0), DVec3::Z, 100.0, 100.0);
 
     let scan_stripes = LaserScanPlanner::plan_stripes_for_surface(&test_surface, &laser_sensor, 0.20)
         .expect("Lazer tarama şeritleri üretilmeli");
