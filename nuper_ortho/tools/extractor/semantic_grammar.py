@@ -5,21 +5,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
-    """
-    1. Mühendislik Grameri ve Sözdizimi Düzeltme:
-    Çizgilerle kesiştiği için bozulabilen metinleri standart kalıplarla yapılandırır:
-    - '4x O2.5' -> Type: HOLE, Count: 4, Nominal: 2.5, Unit: mm
-    - '12 +- 0.5' -> Type: LINEAR, Nominal: 12.0, UpperTol: +0.5, LowerTol: -0.5
-    - '2X R2.5' -> Type: RADIUS, Count: 2, Nominal: 2.5
-    - '20 H7' -> Type: HOLE/DIAMETER, Nominal: 20.0, Fit: H7
-    """
     cleaned = raw_text.strip()
-    # Farklı font çap sembolleri (\xa2, \xd8, \xf8, @, O, o)
     cleaned = re.sub(r"[\u00d8\u00f8\u2300\u2349\xa2@]", "Ø", cleaned)
     cleaned = re.sub(r"\b[Oo]([0-9]+(?:\.[0-9]+)?)\b", r"Ø\1", cleaned)
     cleaned = cleaned.replace("+-", "±").replace("+/-", "±")
 
-    # 1. Diş Grubu (Örn: 4X M3, 2x M4)
     thread_match = re.search(r"(\d+)\s*[xX]\s*M([0-9]+(?:\.[0-9]+)?)", cleaned, re.IGNORECASE)
     if thread_match:
         qty = int(thread_match.group(1))
@@ -37,7 +27,6 @@ def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
             "op_reason": "Dikey Z-probu ile üstten tek bağlamada ölçülebilir dişli delik.",
         }
 
-    # 2. Delik Grubu (Örn: 4x Ø2.5, 2X DIA 10)
     hole_group_match = re.search(r"(\d+)\s*[xX]\s*(?:Ø|DIA)\s*([0-9]+(?:\.[0-9]+)?)", cleaned, re.IGNORECASE)
     if hole_group_match:
         qty = int(hole_group_match.group(1))
@@ -55,7 +44,6 @@ def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
             "op_reason": "Dikey Z-probu ile üstten tek bağlamada ölçülebilir.",
         }
 
-    # 2. Çap / Delik (Ø20 H7, Ø35 +0.0/-0.2, Ø17, Ø2.5)
     dia_match = re.search(r"(?:Ø|DIA)\s*([0-9]+(?:\.[0-9]+)?)(?:\s*([A-Za-z]\d+))?", cleaned)
     if dia_match:
         nom = float(dia_match.group(1))
@@ -76,7 +64,6 @@ def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
             "op_reason": "Dikey mil/delik geometrisi.",
         }
 
-    # 3. Yarıçap / Radyüs (R2.5, 2x R6.3, R6.3(x2))
     rad_match = re.search(r"(?:(\d+)\s*[xX]\s*)?R\s*([0-9]+(?:\.[0-9]+)?)(?:\s*\(x(\d+)\))?", cleaned, re.IGNORECASE)
     if rad_match:
         q1 = int(rad_match.group(1)) if rad_match.group(1) else None
@@ -96,7 +83,6 @@ def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
             "op_reason": "Parça dış/iç kavis yüzeyi.",
         }
 
-    # 4. Tekrarlanan Doğrusal Ölçü (Örn: 2X 1.4±0.1, 2X 37.6±0.1, 2X 6.42)
     rep_lin_match = re.search(r"(\d+)\s*[xX]\s*([0-9]+(?:\.[0-9]+)?)(?:\s*(?:±|\+-)\s*([0-9]+(?:\.[0-9]+)?))?", cleaned)
     if rep_lin_match:
         qty = int(rep_lin_match.group(1))
@@ -115,7 +101,6 @@ def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
             "op_reason": "Ana sınır kutusu veya kademe boyutu.",
         }
 
-    # 5. Doğrusal Ölçü ve Tolerans (Örn: 12 +- 0.5, 12 ± 0.5, 35 +0.0/-0.2)
     lin_tol_match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*(?:±|\+-)\s*([0-9]+(?:\.[0-9]+)?)", cleaned)
     if lin_tol_match:
         nom = float(lin_tol_match.group(1))
@@ -133,7 +118,6 @@ def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
             "op_reason": "Parça üst yüzey derinliği / mesafesi.",
         }
 
-    # Asimetrik tolerans (Örn: 35 +0.0/-0.2)
     asym_match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*([+-][0-9\.]+)\s*/\s*([+-][0-9\.]+)", cleaned)
     if asym_match:
         nom = float(asym_match.group(1))
@@ -152,7 +136,6 @@ def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
             "op_reason": "Hassas işlenmiş basamak / referans kademesi.",
         }
 
-    # 5. Yalın Sayısal Boyut
     num_match = re.search(r"([0-9]+(?:\.[0-9]+)?)", cleaned)
     if num_match:
         nom = float(num_match.group(1))
@@ -184,13 +167,150 @@ def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
     }
 
 
+def parse_fcf_cells(
+    fcf_box: Dict[str, Any],
+    text_spans: List[Dict[str, Any]],
+    vertical_dividers: Optional[List[float]] = None,
+) -> Dict[str, Any]:
+    bbox = fcf_box.get("bbox", [0.0, 0.0, 0.0, 0.0])
+    x0, y0, x1, y1 = bbox
+
+    divs = sorted([d for d in (vertical_dividers or []) if x0 < d < x1])
+    divs_clean: List[float] = []
+    for d in divs:
+        if not divs_clean or abs(d - divs_clean[-1]) > 3.0:
+            divs_clean.append(d)
+
+    boundary_x = [x0] + divs_clean + [x1]
+    cell_intervals = []
+    for idx in range(len(boundary_x) - 1):
+        cell_intervals.append((boundary_x[idx], boundary_x[idx + 1]))
+
+    spans_inside = []
+    for s in text_spans:
+        sb = s.get("bbox", [0.0, 0.0, 0.0, 0.0])
+        scx = (sb[0] + sb[2]) / 2.0
+        scy = (sb[1] + sb[3]) / 2.0
+        if x0 - 2.0 <= scx <= x1 + 2.0 and y0 - 3.0 <= scy <= y1 + 3.0:
+            spans_inside.append((scx, s))
+
+    spans_inside.sort(key=lambda pair: pair[0])
+
+    cells_data: List[Dict[str, Any]] = []
+    for cell_idx, (cx0, cx1) in enumerate(cell_intervals):
+        cell_spans = []
+        for scx, s in spans_inside:
+            if cx0 <= scx < cx1 or (cell_idx == len(cell_intervals) - 1 and cx0 <= scx <= cx1 + 2.0):
+                cell_spans.append(s.get("text", "").strip())
+        content = " ".join([t for t in cell_spans if t]).strip()
+        cells_data.append({
+            "cell_index": cell_idx,
+            "boundary": [round(cx0, 1), round(cx1, 1)],
+            "content": content,
+        })
+
+    char_map = {
+        "⌖": "POSITION",
+        "⌒": "PROFILE",
+        "⊥": "PERPENDICULARITY",
+        "▱": "FLATNESS",
+        "∥": "PARALLELISM",
+        "◎": "CONCENTRICITY",
+        "∠": "ANGULARITY",
+        "↗": "CIRCULAR_RUNOUT",
+        "⌰": "TOTAL_RUNOUT",
+        "⌯": "SYMMETRY",
+        "-": "STRAIGHTNESS",
+        "○": "CIRCULARITY",
+        "⌭": "CYLINDRICITY",
+    }
+
+    characteristic = "UNKNOWN"
+    symbol = ""
+    tol_val = 0.0
+    is_dia = False
+    mod = None
+    primary_datum = None
+    secondary_datum = None
+    tertiary_datum = None
+
+    if cells_data:
+        c0_text = cells_data[0]["content"]
+        for sym_char, char_name in char_map.items():
+            if sym_char in c0_text:
+                characteristic = char_name
+                symbol = sym_char
+                break
+        if not symbol:
+            c0_upper = c0_text.upper()
+            if "POS" in c0_upper or "CONC" in c0_upper:
+                characteristic = "POSITION"
+                symbol = "⌖"
+            elif "PROF" in c0_upper:
+                characteristic = "PROFILE"
+                symbol = "⌒"
+            elif "PERP" in c0_upper:
+                characteristic = "PERPENDICULARITY"
+                symbol = "⊥"
+            elif "FLAT" in c0_upper:
+                characteristic = "FLATNESS"
+                symbol = "▱"
+            elif "PARA" in c0_upper:
+                characteristic = "PARALLELISM"
+                symbol = "∥"
+
+    if len(cells_data) > 1:
+        c1_text = cells_data[1]["content"]
+        if "Ø" in c1_text or "DIA" in c1_text.upper():
+            is_dia = True
+        if "Ⓜ" in c1_text or re.search(r"\bM\b", c1_text):
+            mod = "MMC"
+        elif "Ⓛ" in c1_text or re.search(r"\bL\b", c1_text):
+            mod = "LMC"
+        elif "Ⓟ" in c1_text or re.search(r"\bP\b", c1_text):
+            mod = "PROJECTED"
+
+        val_m = re.search(r"([0-9]+(?:\.[0-9]+)?)", c1_text)
+        if val_m:
+            tol_val = float(val_m.group(1))
+
+    datum_cells = cells_data[2:]
+    datums_extracted = []
+    for d_cell in datum_cells:
+        raw_d = d_cell["content"].strip()
+        d_clean = re.sub(r"[ⓂⓁⓅ]", "", raw_d).strip()
+        dm = re.search(r"([A-Z](?:-[A-Z])?)", d_clean)
+        if dm:
+            datums_extracted.append(dm.group(1))
+
+    if len(datums_extracted) >= 1:
+        primary_datum = datums_extracted[0]
+    if len(datums_extracted) >= 2:
+        secondary_datum = datums_extracted[1]
+    if len(datums_extracted) >= 3:
+        tertiary_datum = datums_extracted[2]
+
+    all_contents = [c["content"] for c in cells_data if c["content"]]
+    raw_fcf = " | ".join(all_contents)
+    if not raw_fcf.startswith("|"):
+        raw_fcf = f"| {raw_fcf} |"
+
+    return {
+        "characteristic": characteristic,
+        "symbol": symbol,
+        "tolerance_value": tol_val,
+        "is_diameter_zone": is_dia,
+        "material_condition": mod,
+        "primary_datum": primary_datum,
+        "secondary_datum": secondary_datum,
+        "tertiary_datum": tertiary_datum,
+        "raw_fcf": raw_fcf,
+        "cells": cells_data,
+        "bbox": bbox,
+    }
+
+
 def build_321_alignment(datums: List[str]) -> Dict[str, Any]:
-    """
-    2. Ölçüm Stratejisi ve Datum Sıralaması (3-2-1 Alignment):
-    Datum A: Taban Yüzeyi (Düzlem -> 3 nokta / Primer)
-    Datum B: Merkez Delik Ekseni / Yan Kenar (Silindir/Doğru -> 2 nokta / Sekonder)
-    Datum C: Yan Kanal Yüzeyi / Stop (Düzlem/Nokta -> 1 nokta / Tersiyer)
-    """
     alignment_scheme = {
         "strategy": "3-2-1 Alignment",
         "primary": None,
@@ -225,14 +345,8 @@ def build_321_alignment(datums: List[str]) -> Dict[str, Any]:
 
 
 def classify_operation_setup(feature: Dict[str, Any], normal_z: float = 1.0) -> Tuple[str, str]:
-    """
-    3. Operasyon Ayrımı (OP10 / OP20):
-    - OP10: Parça tablaya düz bağlıyken dikey Z- probuyla ölçülebilen yüzey ve dikey delikler.
-    - OP20: Parçayı çevirerek veya açılı kafayla (PH10 A/B açıları, yan delikler) ölçülmesi gereken unsurlar.
-    """
     f_type = feature.get("type", "")
 
-    # Yan veya açılı yüzey
     if abs(normal_z) < 0.3:
         return "OP20", "PH10 A90 / B açılı prob kafası veya parça çevirme gerektirir."
 
@@ -243,10 +357,6 @@ def classify_operation_setup(feature: Dict[str, Any], normal_z: float = 1.0) -> 
 
 
 def try_local_llm_semantic_parse(text_snippet: str) -> Optional[Dict[str, Any]]:
-    """
-    Ollama yerel dil modeli (Qwen2.5-Coder-3B veya Llama-3.2-3B) aktif ise semantik düzeltme çağrısı yapar.
-    Model kapalıysa veya yanıt gecikirse anında None döner ve deterministik motor devreye girer.
-    """
     url = "http://localhost:11434/api/generate"
     prompt = (
         f"You are a CMM metrology parser. Parse this callout into JSON with keys: "

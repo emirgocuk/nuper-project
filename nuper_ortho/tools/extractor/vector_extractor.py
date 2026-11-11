@@ -4,9 +4,14 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
-    from extractor.spatial import recognize_vector_gdt_symbols
+    from extractor.spatial import recognize_vector_gdt_symbols, get_point_coords
 except ImportError:
-    from .spatial import recognize_vector_gdt_symbols
+    from .spatial import recognize_vector_gdt_symbols, get_point_coords
+
+try:
+    from extractor.semantic_grammar import parse_fcf_cells
+except ImportError:
+    from .semantic_grammar import parse_fcf_cells
 
 
 def get_title_block_mask(page_width: float, page_height: float) -> List[Tuple[float, float, float, float]]:
@@ -259,20 +264,45 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
     fcf_annotations = []
     for fbox in fcf_boxes:
         fb = fbox["bbox"]
-        inside_texts = []
-        for s in spans_pool:
-            sb = s["bbox"]
-            cx = (sb[0] + sb[2]) / 2.0
-            cy = (sb[1] + sb[3]) / 2.0
-            if fb[0] <= cx <= fb[2] and fb[1] <= cy <= fb[3]:
-                inside_texts.append(s["text"])
+        dividers = []
+        for d in drawings:
+            for it in d.get("items", []):
+                cmd = it[0] if isinstance(it, (list, tuple)) and len(it) > 0 else ""
+                if cmd == "l" and len(it) >= 3:
+                    p1 = get_point_coords(it[1])
+                    p2 = get_point_coords(it[2])
+                    if abs(p1[0] - p2[0]) <= 2.0:
+                        lx = (p1[0] + p2[0]) / 2.0
+                        ly_min = min(p1[1], p2[1])
+                        ly_max = max(p1[1], p2[1])
+                        if fb[0] < lx < fb[2] and ly_max >= fb[1] and ly_min <= fb[3]:
+                            dividers.append(lx)
 
-        if inside_texts:
-            fcf_annotations.append({
-                "bbox": fb,
-                "symbols": inside_texts,
-                "raw_fcf": " | ".join(inside_texts),
-            })
+        fcf_res = parse_fcf_cells(fbox, spans_pool, vertical_dividers=dividers)
+        if fcf_res.get("characteristic") != "UNKNOWN" or any(c.get("content") for c in fcf_res.get("cells", [])):
+            fcf_annotations.append(fcf_res)
+        else:
+            inside_texts = []
+            for s in spans_pool:
+                sb = s["bbox"]
+                cx = (sb[0] + sb[2]) / 2.0
+                cy = (sb[1] + sb[3]) / 2.0
+                if fb[0] <= cx <= fb[2] and fb[1] <= cy <= fb[3]:
+                    inside_texts.append(s["text"])
+            if inside_texts:
+                fcf_annotations.append({
+                    "characteristic": "UNKNOWN",
+                    "symbol": "",
+                    "tolerance_value": 0.0,
+                    "is_diameter_zone": False,
+                    "material_condition": None,
+                    "primary_datum": None,
+                    "secondary_datum": None,
+                    "tertiary_datum": None,
+                    "raw_fcf": " | ".join(inside_texts),
+                    "cells": [],
+                    "bbox": fb,
+                })
 
     return {
         "page": page_num,
