@@ -24,7 +24,10 @@ pub use compound::{
     detect_compound_holes, BoreSegment, CompoundHoleFeature, ConcentricityEvaluation,
     CounterborePocket, CountersinkChamfer, StepPlaneFace,
 };
-pub use composite_gdandt::{CompositeTolerance, SingleToleranceZone};
+pub use composite_gdandt::{
+    compute_bonus_tolerance, BonusToleranceResult, CompositeTolerance, GdAndTEvaluation,
+    GdAndTEvaluator, SingleToleranceZone,
+};
 pub use datum::{DatumFeature, DatumLabel, DatumPrecedence, DatumReferenceFrame};
 pub use error::AstError;
 pub use feature::{FeatureType, GeometricFeature};
