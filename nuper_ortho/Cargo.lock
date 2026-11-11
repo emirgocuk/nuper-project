@@ -480,6 +480,7 @@ dependencies = [
  "approx",
  "glam",
  "ortho-ast",
+ "ortho-emitter",
  "ortho-kinematics",
  "parry3d",
  "serde",
