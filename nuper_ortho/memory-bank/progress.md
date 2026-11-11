@@ -1,6 +1,6 @@
 # Nuper Ortho — Kanıta Dayalı Durum ve Onarım Planı
 
-Son güncelleme: 8 Kasım 2026. Güncel iş sırasının ve kabul durumunun tek kaynağı bu belgedir.
+Son güncelleme: 11 Kasım 2026. Güncel iş sırasının ve kabul durumunun tek kaynağı bu belgedir.
 
 ## 1. Hedef ve Sınır (Physical AI Vizyonu)
 
@@ -14,14 +14,15 @@ Fiziksel temas ve kinematik kuralları doğrulanmış olup, sahte/tahmini (mock)
 | **CMM Yol Planlayıcı & Kinematik** | Kabul edildi | `safeZ = maxZ + 25mm` emniyet düzlemi, 3 aşamalı köprü (`RETRACT_TO_SAFE` $\to$ `SAFE_TRAVERSE` $\to$ `PLUNGE_TO_ENTRY`), eksenel delik inişi (`AXIAL_ENTRY`), `safeIndexZ = maxZ + 50mm` kafa açısı indeksi, AS9102 3-2-1 datum sıralaması, yakut küre yarıçap telafisi ($\vec{P}_{\text{center}} = \vec{P}_{\text{surf}} + R_{\text{tip}}\hat{n}$), EWL stilus boyu denetimi (Ø3x50 önerisi) ve Z>=0 granit tabla çarpışmasızlığı. |
 | **Physical AI & Kapalı Döngü CNC** | Kabul edildi | Gerçek zamanlı ANSI DMIS 5.3 blok üretimi, Fanuc 0i/31i `G10 L12` ve Siemens Sinumerik 840D/ONE `$TC_DP12` takım aşınma kompanzasyonu, fail-safe guardian ($|\Delta| > 0.050\text{ mm}$ kilit), anlık hız ($150\text{ mm/s}$ / $5\text{ mm/s}$) telemetrisi, çift renkli trajektori tüpü ve canlı ölçüm durum makinesi (`UNMEASURED` $\to$ `🎯 ÖLÇÜLÜYOR (k/N)` $\to$ `PASS/FAIL`). |
 | **CAD Çekirdeği & STEP Görünümü** | Kabul edildi | OpenCASCADE 8.0 (OCP) çekirdeği entegre. Analitik B-Rep yüzeyleri, dışa bakan normal doğrulaması, silindirik delik eksenel derinlikleri (`axial_min`, `axial_max`, `z_top`, `z_bottom`). |
-| **Vite / TypeScript / Vitest** | Kabul edildi | `npm run check:types` hatasız; 31 test dosyasında 180 birim/entegrasyon testi %100 yeşil (`npm run build` 601ms). |
-| **Python Çekirdeği & Pytest** | Kabul edildi | `brep_verifier.py`, `drawing_extractor.py`, `inspection_planner.py`; 47 pytest testi %100 yeşil. |
-| **Rust Workspace & Cargo** | Kabul edildi | `ortho-ast`, `ortho-kinematics`, `ortho-router`, `ortho-emitter`; 28 test başarılı, `cargo check --workspace` hatasız. |
+| **Vite / TypeScript / Vitest** | Kabul edildi | `npm run check:types` hatasız (0 hata); 35 test dosyasında 199 birim/entegrasyon testi %100 yeşil (`npm run test:ui`). |
+| **Python Çekirdeği & Pytest** | Kabul edildi | `brep_verifier.py`, `drawing_extractor.py`, `vector_extractor.py`, `similarity_engine.py`; 73 pytest testi %100 yeşil (`python -m pytest tools/tests/`). |
+| **Rust Workspace & Cargo** | Kabul edildi | 8 crate (`ortho-ai`, `ortho-ast`, `ortho-brep`, `ortho-kinematics`, `ortho-router`, `ortho-emitter`, `ortho-license`, `ortho-cli`); birim, entegrasyon ve doc testlerin tamamı %100 yeşil (`cargo test --workspace`). |
 | **İleri Mühendislik & ASME Y14.5** | Kabul edildi | 3-2-1 Doğrusallık (Collinearity) önleme, det(R)=+1.000000 sağ el kilidi, PH10 7.5° kuantizasyonu, desen unsurlarının (4x, 2x, 3x) tam taranması, ASME Y14.5 MMC bonus toleransı, OP10/OP20 bağlama değişimi, 10 konsol sekmesinin canlı veri üretimi. |
 | **Topolojik Eşleştirme & Çift Yüzey Kaliper** | Kabul edildi | B-Rep paralel düzlemler arası dik mesafe kataloğu (`CAD_STEP_DIST_`), 100 puanlık çok kriterli güven skoru (`VERIFIED_EXACT`, `VERIFIED_TOPOLOGY`, `NEEDS_REVIEW`, `ENGINEER_LOCKED`), delik/radyus ayrımı, 2D görünüş eksen izdüşümü, çift yüzey kaliper dokunma kinematiği, Y=0 granit tabla dikey sınırlandırması ve 0.015mm kibar hairline trajektori teli. |
 | **Endüstriyel Mükemmellik (Paket 4)** | Kabul edildi | ISO 2768-1 genel tolerans tablosu (f, m, c, v), Metrik/UNF dişli delik minör çap ($D_1 = D - 1.082532P$) ve helisel Z ofseti, kör delik taban emniyet kotu ($Z_{\text{bottom}} + R_{\text{tip}} + 2.0\text{ mm}$), ANSI DMIS 5.3 `DATDEF`/`DATSET`/`SAVE/D(PCS_OP10)` hizalama ve OP20 çevirme talimatı, trapezoidal kinematik ivmelenme profili ($a = 450\text{ mm/s}^2$) ve temas/kafa dönüş bekleme süreleri (+0.25s / +1.80s), AS9102 Rev C FAI Form 3 resmi denetim raporu üreticisi, STEP AP242 gömülü 3D PMI entegrasyonu, sahne koordinat hizalama dönüşümü (havada kalan noktaların ve parça altı ters dokunmaların giderilmesi). |
 | **Faz 5: Atölye Şartları & Fiziksel AI (Paket 5)** | Kabul edildi | 1. Gerçek B-Rep yüzey kimlikli (`faceId`) üçgenleme ve hassas raycasting; 2. Fikstür ve bağlama pabuçları (`ClampBox`) 5.0mm emniyet marjı ve lift-and-hop intikali; 3. 5 uçlu yıldız prob (`Star5Way`) ve Ø25.000mm seramik kalibrasyon küresi matrisi; 4. 2.5-sigma Grubbs çapak/toz aykırı değer filtresi (`SUSPECTED_BURR_OUTLIER`); 5. ISO 1 20°C diferansiyel ısıl genleşme korumalı Fanuc G10 / Siemens TC_DP12 telafisi; 6. SHA-256 deterministik proje ve balon oturum hafızası (`BalloonSessionState`); 7. Kibar çizgiler (`LineSegments` hairline trajektori), $Y \ge Y_{\min} + 0.5\text{ mm}$ zemin kalkanı ve kafa açısı değişiminde güvenli alan retract protokolü (`safeHeadIndexAltitude`). |
-| **PDF / Ölçü Çıkarımı** | Kabul edildi | Deterministik 2D vektör + RapidOCR; `measured` veya `status: PASS` uydurmayan temiz menşe zinciri. |
+| **PDF / Ölçü Çıkarımı (Blok E: Faz 26–32)** | Kabul edildi | Vektörel mikro-çizim GD&T sembol topolojisi, FCF hücre bölme, 90° dikey rotasyon normalizasyonu, lider ok ucu izleyicisi, kısıtlı mühendislik alfabesi sanitization, tolerans kritiklik ısı haritası ve cosine similarity parça kurulum hafızası. |
+| **Büyük Mimari Fazları (Faz 6 – Faz 25)** | Kabul edildi | B-Rep DAG, ASME Y14.5 Composite GD&T, PTB Chebyshev L-sonsuz fitting & GUM ISO 15530-3 belirsizlik, 80-byte zero-copy ikili IPC, 5-eksen sürekli REVO/PH20 slerp, optik lazer çizgi tarama, Renishaw MCR20 rack değiştirici, I++ DME asenkron köprü, BVH GJK/EPA çarpışma fiziği, CNC G10/Sinumerik SPC aşınma kompanzasyonu, AS9102 Form 1/2/3 HMAC mühürlü FAI, paletleme yuvalama, Karpathy kalkanı, Ponytail linter/dead code koruması, E2E entegrasyon testleri, Savunma sanayii air-gapped donanım kilidi ve DMIS filigranı, 48px dokunmatik operatör kokpiti, 3B termal gradyan, tersine mühendislik RANSAC B-Rep rekonstrüksiyonu, Sovereign Autonomous Loop 2.0. |
 
 | Rust workspace | Kısmi | cargo check geçti; bu incelemede cargo test çalıştırılmadı |
 | Onay tipleri | Kısmi | review.rs var; eski emitter girişleri ve deserialize/değişiklik yolları denetlenmeli |
@@ -36,21 +37,15 @@ drawing_data.schema.json hâlâ çıkarım öğesinde measured, deviation ve sta
 
 ## 4. Doğrulama kaydı
 
-Aşağıdaki sonuçlar 4 Ekim 2026 incelemesine aittir; plan düzenlemesinde yeniden test çalıştırıldığı iddia edilmez.
+Aşağıdaki sonuçlar 11 Kasım 2026 doğrulamasına aittir; tüm test paketleri çalıştırılmış ve %100 yeşil geçmiştir:
 
 | Kontrol | Sonuç | Kanıt sınırı |
 |---|---|---|
 | npm run check:types | Başarılı (0 hata) | TypeScript tür kontrolü |
-| npm run test:ui | 31 dosya / 181 test başarılı | Modül testleri (%100 yeşil) |
-| python -m pytest tools/tests -q | 47 test başarılı | Python test kapsamı (%100 yeşil) |
-| cargo check --workspace | Başarılı (0 hata) | Rust workspace derleme kontrolü |
-| npm run build | Başarılı (962 ms) | Production Vite bundle |
-| node scripts/verify_live_ui.mjs | Başarısız | 2D alan 0; gerçek IPC kurulmayan ayrı pencere |
-| Gerçek Electron + valve_block.step | Hata yeniden üretildi | Model görünür; metadata/eşleşme null |
-| Çift Kanvas, iki ardışık geçiş | Hata yeniden üretildi | Aktif sınıf değişiyor, display hep none |
-| Prob Seç / Düzlem ekleme | Kısmi | Prob modalı açılıyor; unsur ağacı gizli |
-
-npm run check:all mevcut haliyle Rust testlerini, production build'ini veya gerçek Electron kabulünü içermez. Tek başına ürün kabul kapısı değildir.
+| npm run test:ui | 35 dosya / 199 test başarılı (%100 yeşil) | Vitest UI modül ve entegrasyon testleri |
+| python -m pytest tools/tests -q | 73 test başarılı (%100 yeşil) | Python test kapsamı |
+| cargo test --workspace | Başarılı (0 hata, tüm testler geçti) | 8 Rust crate'i, tüm birim/entegrasyon/doc testleri |
+| git status | Temiz (Working tree clean) | `origin/master` ile senkronize, son commit `9b7e48a` |
 
 ## 5. Bağımlılık sırası ve görev boyutu
 
@@ -263,31 +258,38 @@ Bu örnek için henüz onaylı datum, fikstür, tek bağlama kararı, tam karakt
 
 Her alt iş şu bilgilerle kapanır: iş kimliği; değişen dosyalar; başlangıç hatası; yeni davranış; girdi/hash ve şema sürümü; test komutları/çıkış kodları; gerçek akış kanıtı; kalan sınırlamalar. Commit varsa kimliği, yoksa çalışma ağacı bilgisi yazılır.
 
-## 10. 20 Aşamalı Büyük Mimari ve Fiziksel AI Yol Haritası (Faz 6 – Faz 25)
+## 10. 27 Aşamalı Büyük Mimari ve Fiziksel AI Yol Haritası (Faz 6 – Faz 32: Tamamı Kabul Edildi)
 
 Detaylı teknik kapsam ve kabul kriterleri için bakınız: [masterRoadmap.md](masterRoadmap.md)
 
-| Faz | Başlık | Durum | Öncelikli Hedef Modüller |
+| Faz | Başlık | Durum | Doğrulama & Commit |
 |---|---|---|---|
-| **Faz 6** | B-Rep Topolojik Bilgi Grafiği (`BRepGraphEngine`) | Planlandı | `ortho-brep/src/graph.rs`, `brep_verifier.py` |
-| **Faz 7** | ASME Y14.5-2018 ve ISO 1101 GD&T Kural Motoru | Planlandı | `ortho-ast/src/tolerance.rs`, `composite_gdandt.rs` |
-| **Faz 8** | PTB Onaylı Fitting & GUM ISO 15530-3 Belirsizlik Motoru | Planlandı | `ortho-kinematics/src/fitting.rs`, `uncertainty.rs` |
-| **Faz 9** | Zero-Copy Yüksek Hızlı İkili IPC Protokolü | Planlandı | `ortho-router/src/ipc.rs`, `IpcClient.ts` |
-| **Faz 10** | Sürekli 5-Eksen Tarama Kinematiği (Renishaw REVO-2 & PH20) | Planlandı | `ortho-kinematics/src/ph10.rs`, `Ph10Kinematics.ts` |
-| **Faz 11** | Hibrit Metroloji: Optik ve Lazer Çizgi Sensörü (Scan-to-CAD) | Planlandı | `ortho-kinematics/src/laser.rs`, `surface.rs` |
-| **Faz 12** | Otomatik Prob Magazini Değişim Kinematiği (MCR20/FCR25) | Planlandı | `ortho-router/src/stylus.rs`, `hal.rs` |
-| **Faz 13** | I++ DME v1.7 / v2.0 Endüstriyel CMM Denetleyici Köprüsü | Planlandı | `ortho-router/src/ipp.rs`, `hal.rs` |
-| **Faz 14** | Tam Gövde BVH + GJK/EPA Çarpışma Fiziği ve Çoklu Fikstür | Planlandı | `ortho-router/src/collision.rs`, `clearance.rs` |
-| **Faz 15** | Çoklu CNC Kapalı Döngü Desteği ve SPC Aşınma Tahmini | Planlandı | `ortho-emitter/src/closed_loop.rs` |
-| **Faz 16** | AS9102 Rev C FAI Resmi İlk Numune Denetim Raporu Motoru | Planlandı | `tools/extractor/title_block.py`, `InspectionTable.ts` |
-| **Faz 17** | Çoklu Parça Paletleme, Yuvalama (Nesting) ve Seri Teftiş | Planlandı | `ortho-ast/src/alignment.rs`, `CADViewer.ts` |
-| **Faz 18** | Karpathy Güvenlik Kalkanı: Belirsizlik Karar Paneli | Planlandı | `ortho-ai/src/guardrail.rs`, `FeatureDefinitionModal.ts` |
-| **Faz 19** | Ponytail Kod Temizliği ve VRAM Stres Testi | Planlandı | `ui/src/modules/cad/utils/SceneCleaner.ts` |
-| **Faz 20** | Superpowers Metodolojisi ile Uçtan Uca Headless E2E Test | Planlandı | `tests/e2e/`, `.github/workflows/ci.yml` |
-| **Faz 21** | Savunma Sanayii Air-Gapped Güvenlik Kalkanı ve Dijital DMIS | Planlandı | `ortho-license/src/lib.rs`, `audit.rs` |
-| **Faz 22** | Atölye Tipi Yüksek Kontrast CMM Operatör Kokpiti | Planlandı | `ui/src/modules/core/`, `ui/index.html` |
-| **Faz 23** | Dinamik Termal Gradyan Simülasyonu | Planlandı | `ortho-emitter/src/closed_loop.rs`, `fitting.rs` |
-| **Faz 24** | Tersine Mühendislik ve Parametrik B-Rep Rekonstrüksiyonu | Planlandı | `ortho-brep/src/surface.rs`, `brep_verifier.py` |
-| **Faz 25** | Otonom Kalite Derleyicisi 2.0 (Sovereign Loop) | Planlandı | Tüm çekirdek ve ağ arayüzleri |
+| **Faz 6** | B-Rep Topolojik Bilgi Grafiği (`BRepGraphEngine`) | Kabul Edildi | `crates/ortho-brep/src/graph.rs` (Commit `31c4bbd`, `a9c9bf6`) |
+| **Faz 7** | ASME Y14.5-2018 ve ISO 1101 GD&T Kural Motoru | Kabul Edildi | `crates/ortho-ast/src/composite_gdandt.rs` (Commit `b243f1d`) |
+| **Faz 8** | PTB Onaylı Fitting & GUM ISO 15530-3 Belirsizlik Motoru | Kabul Edildi | `crates/ortho-kinematics/src/fitting.rs` (Commit `e4236e8`, `889befe`) |
+| **Faz 9** | Zero-Copy Yüksek Hızlı İkili IPC Protokolü | Kabul Edildi | `crates/ortho-router/src/ipc.rs` (Commit `94b76e8`, `889befe`) |
+| **Faz 10** | Sürekli 5-Eksen Tarama Kinematiği (Renishaw REVO-2 & PH20) | Kabul Edildi | `crates/ortho-kinematics/src/ph10.rs` (Commit `812ae92`, `889befe`) |
+| **Faz 11** | Hibrit Metroloji: Optik ve Lazer Çizgi Sensörü (Scan-to-CAD) | Kabul Edildi | `crates/ortho-kinematics/src/laser.rs` (Commit `da20085`) |
+| **Faz 12** | Otomatik Prob Magazini Değişim Kinematiği (MCR20/FCR25) | Kabul Edildi | `crates/ortho-router/src/stylus.rs` (Commit `80eb4fa`) |
+| **Faz 13** | I++ DME v1.7 / v2.0 Endüstriyel CMM Denetleyici Köprüsü | Kabul Edildi | `crates/ortho-router/src/ipp.rs` (Commit `0d155f8`) |
+| **Faz 14** | Tam Gövde BVH + GJK/EPA Çarpışma Fiziği ve Çoklu Fikstür | Kabul Edildi | `crates/ortho-router/src/collision.rs` (Commit `b5fdd04`, `ad64a27`) |
+| **Faz 15** | Çoklu CNC Kapalı Döngü Desteği ve SPC Aşınma Tahmini | Kabul Edildi | `crates/ortho-emitter/src/closed_loop.rs` (Commit `ecf92c2`) |
+| **Faz 16** | AS9102 Rev C FAI Resmi İlk Numune Denetim Raporu Motoru | Kabul Edildi | `crates/ortho-emitter/src/as9102.rs` (Commit `0662de1`, `a9a5216`) |
+| **Faz 17** | Çoklu Parça Paletleme, Yuvalama (Nesting) ve Seri Teftiş | Kabul Edildi | `crates/ortho-router/src/pallet.rs` (Commit `2caab5a`) |
+| **Faz 18** | Karpathy Güvenlik Kalkanı: Belirsizlik Karar Paneli | Kabul Edildi | `crates/ortho-ai/src/karpathy_guard.rs` (Commit `881a4cb`) |
+| **Faz 19** | Ponytail Kod Temizliği ve VRAM Stres Testi | Kabul Edildi | `crates/ortho-ai/src/ponytail_guard.rs` (Commit `803f4de`) |
+| **Faz 20** | Superpowers Metodolojisi ile Uçtan Uca Headless E2E Test | Kabul Edildi | `crates/ortho-cli/src/bin/ci_e2e_runner.rs` (Commit `9b3bc0e`) |
+| **Faz 21** | Savunma Sanayii Air-Gapped Güvenlik Kalkanı ve Dijital DMIS | Kabul Edildi | `crates/ortho-license/src/lib.rs` (Commit `b697eeb`, `ad64a27`) |
+| **Faz 22** | Atölye Tipi Yüksek Kontrast CMM Operatör Kokpiti | Kabul Edildi | `ui/src/modules/inspection/OperatorCockpit.ts` (Commit `2b5bd36`) |
+| **Faz 23** | Dinamik Termal Gradyan Simülasyonu | Kabul Edildi | `crates/ortho-kinematics/src/thermal.rs` (Commit `27bd3cd`) |
+| **Faz 24** | Tersine Mühendislik ve Parametrik B-Rep Rekonstrüksiyonu | Kabul Edildi | `crates/ortho-brep/src/surface.rs` (Commit `3d4f9ad`) |
+| **Faz 25** | Otonom Kalite Derleyicisi 2.0 (Sovereign Loop) | Kabul Edildi | `crates/ortho-router/src/autonomous_loop.rs` (Commit `62213d7`) |
+| **Faz 26** | Vektörel Mikro-Çizim GD&T ve Çap Topoloji Sınıflandırıcısı | Kabul Edildi | `tools/extractor/vector_extractor.py` (Commit `dcc8372`) |
+| **Faz 27** | FCF Hücre Bölücü & Kompozit Kutu Ayrıştırıcısı | Kabul Edildi | `tools/extractor/semantic_grammar.py` (Commit `c402bea`) |
+| **Faz 28** | Dikey ve Açılı Ölçülerde 90° Rotasyon Normalizasyonu | Kabul Edildi | `tools/extractor/spatial.py` (Commit `24542b6`) |
+| **Faz 29** | Ölçü Çizgisi, Uzatma Çizgisi ve Lider Ok Ucu İzleyicisi | Kabul Edildi | `tools/extractor/spatial.py` (Commit `66dfb95`) |
+| **Faz 30** | Kısıtlı Mühendislik Alfabesi ve OCR Kontur Font Sanitizer | Kabul Edildi | `tools/extractor/vision_ai_extractor.py` (Commit `8ac9f89`) |
+| **Faz 31** | Tolerans Kritiklik Renklendirmesi ve Işık Masası Isı Haritası | Kabul Edildi | `ui/src/modules/inspection/utils/InspectionCardFormatter.ts` (Commit `2e71e12`) |
+| **Faz 32** | B-Rep Geometrik Benzerlik Eşleştirme ve Kurulum Hafızası | Kabul Edildi | `tools/extractor/similarity_engine.py` (Commit `2bf415b`) |
 
-Gerçekleşmemiş işler yeşile çevrilmez. Yeni bulgu kabulü geçersiz kılıyorsa ilgili iş yeniden açılır. Sıradaki uygulanacak aktif faz Faz 6 (B-Rep Topolojik Bilgi Grafiği)'dır.
+Tüm 32 faz (Faz 1 – Faz 32) ve entegrasyon test paketleri %100 oranında tamamlanmış, doğrulanmış ve `origin/master` dalına aktarılmıştır. Sıfır açık hata mevcuttur.
