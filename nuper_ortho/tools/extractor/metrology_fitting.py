@@ -11,7 +11,6 @@ def fit_plane_least_squares(points: np.ndarray) -> Dict[str, Any]:
     centroid = np.mean(pts, axis=0)
     shifted = pts - centroid
 
-    # SVD for singular vector with minimum singular value (normal)
     _, _, vh = np.linalg.svd(shifted)
     normal = vh[2, :]
     norm_len = np.linalg.norm(normal)
@@ -19,21 +18,66 @@ def fit_plane_least_squares(points: np.ndarray) -> Dict[str, Any]:
         return {"success": False, "error": "Dejenere nokta bulutu (noktalar doğrusal)."}
     normal = normal / norm_len
 
-    # Distance of points to plane
     distances = np.dot(shifted, normal)
-    # Peak to valley (flatness deviation)
     flatness = float(np.max(distances) - np.min(distances))
     rms_error = float(np.sqrt(np.mean(distances ** 2)))
 
     return {
         "success": True,
         "feature_type": "PLANE",
-        "centroid": [round(float(v), 6) for v in centroid],
-        "normal": [round(float(v), 6) for v in normal],
-        "d_offset": round(float(np.dot(normal, centroid)), 6),
-        "flatness": round(flatness, 6),
-        "rms_error": round(rms_error, 6),
+        "centroid": [round(float(v), 8) for v in centroid],
+        "normal": [round(float(v), 8) for v in normal],
+        "d_offset": round(float(np.dot(normal, centroid)), 8),
+        "flatness": round(flatness, 8),
+        "rms_error": round(rms_error, 8),
         "points_count": len(pts),
+        "iso_14405_type": "GG",
+    }
+
+
+def fit_plane_chebyshev_minimum_zone(points: np.ndarray) -> Dict[str, Any]:
+    lsq = fit_plane_least_squares(points)
+    if not lsq["success"]:
+        return lsq
+
+    pts = np.asarray(points, dtype=np.float64)
+    centroid = np.array(lsq["centroid"], dtype=np.float64)
+    best_normal = np.array(lsq["normal"], dtype=np.float64)
+    min_flatness = lsq["flatness"]
+
+    ref = np.array([1.0, 0.0, 0.0]) if abs(best_normal[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+    u_axis = np.cross(best_normal, ref)
+    u_axis = u_axis / np.linalg.norm(u_axis)
+    v_axis = np.cross(best_normal, u_axis)
+    v_axis = v_axis / np.linalg.norm(v_axis)
+
+    step = 0.01
+    for _ in range(6):
+        improved = False
+        for du in (-step, 0.0, step):
+            for dv in (-step, 0.0, step):
+                if du == 0.0 and dv == 0.0:
+                    continue
+                cand = best_normal + du * u_axis + dv * v_axis
+                cand = cand / np.linalg.norm(cand)
+                dists = np.dot(pts - centroid, cand)
+                cand_flatness = float(np.max(dists) - np.min(dists))
+                if cand_flatness < min_flatness:
+                    min_flatness = cand_flatness
+                    best_normal = cand
+                    improved = True
+        if not improved:
+            step *= 0.25
+
+    return {
+        "success": True,
+        "feature_type": "PLANE",
+        "centroid": [round(float(v), 8) for v in centroid],
+        "normal": [round(float(v), 8) for v in best_normal],
+        "d_offset": round(float(np.dot(best_normal, centroid)), 8),
+        "flatness": round(min_flatness, 8),
+        "points_count": len(pts),
+        "iso_14405_type": "MZ",
     }
 
 
@@ -45,8 +89,6 @@ def fit_circle_least_squares_2d(points_2d: np.ndarray) -> Dict[str, Any]:
     x = pts[:, 0]
     y = pts[:, 1]
 
-    # Linear system for circle: x^2 + y^2 + a*x + b*y + c = 0
-    # Center: (cx = -a/2, cy = -b/2), R = sqrt(cx^2 + cy^2 - c)
     A = np.column_stack([x, y, np.ones_like(x)])
     B = -(x**2 + y**2)
 
@@ -71,12 +113,139 @@ def fit_circle_least_squares_2d(points_2d: np.ndarray) -> Dict[str, Any]:
     return {
         "success": True,
         "feature_type": "CIRCLE",
-        "center_2d": [round(cx, 6), round(cy, 6)],
-        "radius": round(radius, 6),
-        "diameter": round(radius * 2.0, 6),
-        "circularity": round(circularity, 6),
-        "rms_error": round(rms, 6),
+        "center_2d": [round(cx, 8), round(cy, 8)],
+        "radius": round(radius, 8),
+        "diameter": round(radius * 2.0, 8),
+        "circularity": round(circularity, 8),
+        "rms_error": round(rms, 8),
         "points_count": len(pts),
+        "iso_14405_type": "GG",
+    }
+
+
+def fit_circle_chebyshev_minimum_zone_2d(points_2d: np.ndarray) -> Dict[str, Any]:
+    lsq = fit_circle_least_squares_2d(points_2d)
+    if not lsq["success"]:
+        return lsq
+
+    pts = np.asarray(points_2d, dtype=np.float64)
+    cx, cy = lsq["center_2d"]
+    best_c = np.array([cx, cy], dtype=np.float64)
+
+    dists = np.linalg.norm(pts - best_c, axis=1)
+    min_circ = float(np.max(dists) - np.min(dists))
+
+    step = 0.05
+    for _ in range(6):
+        improved = False
+        for dx in (-step, 0.0, step):
+            for dy in (-step, 0.0, step):
+                if dx == 0.0 and dy == 0.0:
+                    continue
+                cand_c = best_c + np.array([dx, dy])
+                cand_dists = np.linalg.norm(pts - cand_c, axis=1)
+                cand_circ = float(np.max(cand_dists) - np.min(cand_dists))
+                if cand_circ < min_circ:
+                    min_circ = cand_circ
+                    best_c = cand_c
+                    improved = True
+        if not improved:
+            step *= 0.25
+
+    final_dists = np.linalg.norm(pts - best_c, axis=1)
+    r_min = float(np.min(final_dists))
+    r_max = float(np.max(final_dists))
+    r_mid = (r_min + r_max) / 2.0
+
+    return {
+        "success": True,
+        "feature_type": "CIRCLE",
+        "center_2d": [round(float(best_c[0]), 8), round(float(best_c[1]), 8)],
+        "radius": round(r_mid, 8),
+        "diameter": round(r_mid * 2.0, 8),
+        "circularity": round(r_max - r_min, 8),
+        "points_count": len(pts),
+        "iso_14405_type": "MZ",
+    }
+
+
+def fit_circle_maximum_inscribed_2d(points_2d: np.ndarray) -> Dict[str, Any]:
+    lsq = fit_circle_least_squares_2d(points_2d)
+    if not lsq["success"]:
+        return lsq
+
+    pts = np.asarray(points_2d, dtype=np.float64)
+    cx, cy = lsq["center_2d"]
+    best_c = np.array([cx, cy], dtype=np.float64)
+
+    dists = np.linalg.norm(pts - best_c, axis=1)
+    max_inscribed_r = float(np.min(dists))
+
+    step = 0.05
+    for _ in range(6):
+        improved = False
+        for dx in (-step, 0.0, step):
+            for dy in (-step, 0.0, step):
+                if dx == 0.0 and dy == 0.0:
+                    continue
+                cand_c = best_c + np.array([dx, dy])
+                cand_dists = np.linalg.norm(pts - cand_c, axis=1)
+                cand_min_r = float(np.min(cand_dists))
+                if cand_min_r > max_inscribed_r:
+                    max_inscribed_r = cand_min_r
+                    best_c = cand_c
+                    improved = True
+        if not improved:
+            step *= 0.25
+
+    return {
+        "success": True,
+        "feature_type": "CIRCLE",
+        "center_2d": [round(float(best_c[0]), 8), round(float(best_c[1]), 8)],
+        "radius": round(max_inscribed_r, 8),
+        "diameter": round(max_inscribed_r * 2.0, 8),
+        "points_count": len(pts),
+        "iso_14405_type": "MI",
+    }
+
+
+def fit_circle_minimum_circumscribed_2d(points_2d: np.ndarray) -> Dict[str, Any]:
+    lsq = fit_circle_least_squares_2d(points_2d)
+    if not lsq["success"]:
+        return lsq
+
+    pts = np.asarray(points_2d, dtype=np.float64)
+    cx, cy = lsq["center_2d"]
+    best_c = np.array([cx, cy], dtype=np.float64)
+
+    dists = np.linalg.norm(pts - best_c, axis=1)
+    min_circum_r = float(np.max(dists))
+
+    step = 0.05
+    for _ in range(6):
+        improved = False
+        for dx in (-step, 0.0, step):
+            for dy in (-step, 0.0, step):
+                if dx == 0.0 and dy == 0.0:
+                    continue
+                cand_c = best_c + np.array([dx, dy])
+                cand_dists = np.linalg.norm(pts - cand_c, axis=1)
+                cand_max_r = float(np.max(cand_dists))
+                if cand_max_r < min_circum_r:
+                    min_circum_r = cand_max_r
+                    best_c = cand_c
+                    improved = True
+        if not improved:
+            step *= 0.25
+
+    return {
+        "success": True,
+        "feature_type": "CIRCLE",
+        "center_2d": [round(float(best_c[0]), 8), round(float(best_c[1]), 8)],
+        "radius": round(min_circum_r, 8),
+        "diameter": round(min_circum_r * 2.0, 8),
+        "points_count": len(pts),
+        "iso_14405_type": "MC",
     }
 
 
@@ -96,14 +265,16 @@ def fit_cylinder_least_squares(
         axis = np.asarray(initial_axis, dtype=np.float64)
         axis = axis / (np.linalg.norm(axis) + 1e-12)
     else:
-        # Principal component analysis for axis estimate
         _, _, vh = np.linalg.svd(shifted)
         axis = vh[0, :]
         axis = axis / (np.linalg.norm(axis) + 1e-12)
 
-    # Iterative refinement of axis direction
+    center_3d = centroid
+    radius = 1.0
+    cylindricity = 0.0
+    rms_error = 0.0
+
     for _ in range(max_iter):
-        # Basis orthogonal to axis
         if abs(axis[0]) < 0.9:
             ref = np.array([1.0, 0.0, 0.0])
         else:
@@ -112,7 +283,6 @@ def fit_cylinder_least_squares(
         u = u / np.linalg.norm(u)
         v = np.cross(axis, u)
 
-        # Project points to 2D plane perpendicular to axis
         pts_2d = np.column_stack([np.dot(shifted, u), np.dot(shifted, v)])
         circ_fit = fit_circle_least_squares_2d(pts_2d)
         if not circ_fit["success"]:
@@ -121,10 +291,8 @@ def fit_cylinder_least_squares(
         c_u, c_v = circ_fit["center_2d"]
         radius = circ_fit["radius"]
 
-        # 3D Center on axis
         center_3d = centroid + c_u * u + c_v * v
 
-        # Calculate distances to axis line
         vec_to_pts = pts - center_3d
         proj_on_axis = np.dot(vec_to_pts, axis)[:, np.newaxis] * axis
         radial_vecs = vec_to_pts - proj_on_axis
@@ -133,25 +301,23 @@ def fit_cylinder_least_squares(
         cylindricity = float(np.max(radial_dists) - np.min(radial_dists))
         rms_error = float(np.sqrt(np.mean((radial_dists - radius) ** 2)))
 
-        # Check convergence
         if abs(c_u) < 1e-5 and abs(c_v) < 1e-5:
             break
 
-        # Shift centroid to refined center
         centroid = center_3d
         shifted = pts - centroid
 
     return {
         "success": True,
         "feature_type": "CYLINDER",
-        "center": [round(float(v), 6) for v in center_3d],
-        "axis": [round(float(v), 6) for v in axis],
-        "radius": round(float(radius), 6),
-        "diameter": round(float(radius * 2.0), 6),
-        "cylindricity": round(cylindricity, 6),
-        "rms_error": round(rms_error, 6),
+        "center": [round(float(v), 8) for v in center_3d],
+        "axis": [round(float(v), 8) for v in axis],
+        "radius": round(float(radius), 8),
+        "diameter": round(float(radius * 2.0), 8),
+        "cylindricity": round(cylindricity, 8),
+        "rms_error": round(rms_error, 8),
         "points_count": len(pts),
-        "iso_14405_type": "GG",  # Gaussian Least Squares
+        "iso_14405_type": "GG",
     }
 
 
@@ -164,7 +330,6 @@ def fit_sphere_least_squares(points: np.ndarray) -> Dict[str, Any]:
     y = pts[:, 1]
     z = pts[:, 2]
 
-    # Linear system: x^2 + y^2 + z^2 + a*x + b*y + c*z + d = 0
     A = np.column_stack([x, y, z, np.ones_like(x)])
     B = -(x**2 + y**2 + z**2)
 
@@ -189,117 +354,43 @@ def fit_sphere_least_squares(points: np.ndarray) -> Dict[str, Any]:
     return {
         "success": True,
         "feature_type": "SPHERE",
-        "center": [round(cx, 6), round(cy, 6), round(cz, 6)],
-        "radius": round(radius, 6),
-        "diameter": round(radius * 2.0, 6),
-        "sphericity": round(sphericity, 6),
-        "rms_error": round(rms, 6),
+        "center": [round(cx, 8), round(cy, 8), round(cz, 8)],
+        "radius": round(radius, 8),
+        "diameter": round(radius * 2.0, 8),
+        "sphericity": round(sphericity, 8),
+        "rms_error": round(rms, 8),
         "points_count": len(pts),
     }
 
 
-def evaluate_gdt_feature(
-    points: np.ndarray,
-    expected_type: str,
-    nominal_dimension: Optional[float] = None,
-    nominal_center: Optional[List[float]] = None,
-    nominal_normal: Optional[List[float]] = None,
+def evaluate_measurement_uncertainty(
+    u_geo: float,
+    u_probe: float,
+    u_temp: float,
+    u_rep: float,
+    tolerance_band: float,
+    measured_deviation: float,
 ) -> Dict[str, Any]:
-    expected = expected_type.upper()
-    pts = np.asarray(points, dtype=np.float64)
+    u_c = math.sqrt(u_geo**2 + u_probe**2 + u_temp**2 + u_rep**2)
+    u_95 = 2.0 * u_c
+    tur = tolerance_band / (2.0 * u_95) if u_95 > 1e-12 else 999.0
 
-    if expected in ("PLANE", "SURFACE"):
-        fit = fit_plane_least_squares(pts)
-        if not fit["success"]:
-            return fit
-        if nominal_normal:
-            nom_n = np.array(nominal_normal, dtype=np.float64)
-            nom_n = nom_n / np.linalg.norm(nom_n)
-            actual_n = np.array(fit["normal"], dtype=np.float64)
-            dot_prod = float(np.clip(np.dot(actual_n, nom_n), -1.0, 1.0))
-            angular_dev_deg = float(math.degrees(math.acos(abs(dot_prod))))
-            fit["angular_deviation_deg"] = round(angular_dev_deg, 4)
-        return fit
+    half_tol = tolerance_band / 2.0
+    safe_limit = half_tol - u_95
 
-    elif expected in ("CYLINDER", "INTERNAL_CYLINDER", "EXTERNAL_CYLINDER", "BORE", "PIN"):
-        axis_hint = np.array(nominal_normal) if nominal_normal else None
-        fit = fit_cylinder_least_squares(pts, initial_axis=axis_hint)
-        if not fit["success"]:
-            return fit
-        if nominal_dimension is not None:
-            fit["size_deviation"] = round(fit["diameter"] - nominal_dimension, 6)
-        if nominal_center is not None:
-            c_actual = np.array(fit["center"])
-            c_nom = np.array(nominal_center)
-            fit["position_deviation_3d"] = round(float(np.linalg.norm(c_actual - c_nom)), 6)
-        return fit
-
-    elif expected in ("SPHERE",):
-        fit = fit_sphere_least_squares(pts)
-        if not fit["success"]:
-            return fit
-        if nominal_dimension is not None:
-            fit["size_deviation"] = round(fit["diameter"] - nominal_dimension, 6)
-        return fit
-
-    return {"success": False, "error": f"Desteklenmeyen unsur türü: {expected_type}"}
-
-
-def fit_with_outlier_rejection(
-    points: np.ndarray,
-    feature_type: str = "PLANE"
-) -> Dict[str, Any]:
-    pts = np.asarray(points, dtype=np.float64)
-    if len(pts) < 4:
-        return fit_plane_least_squares(pts) if feature_type.upper() == "PLANE" else fit_cylinder_least_squares(pts)
-
-    if feature_type.upper() == "PLANE":
-        base_fit = fit_plane_least_squares(pts)
-        if not base_fit.get("success"):
-            return base_fit
-        normal = np.array(base_fit["normal"], dtype=np.float64)
-        centroid = np.array(base_fit["centroid"], dtype=np.float64)
-        residuals = np.dot(pts - centroid, normal)
+    abs_dev = abs(measured_deviation)
+    if abs_dev <= safe_limit:
+        decision = "PASS"
+    elif abs_dev <= half_tol + u_95:
+        decision = "SUSPECT"
     else:
-        base_fit = fit_cylinder_least_squares(pts)
-        if not base_fit.get("success"):
-            return base_fit
-        center = np.array(base_fit["center"], dtype=np.float64)
-        axis = np.array(base_fit["axis"], dtype=np.float64)
-        radius = base_fit["radius"]
-        diffs = pts - center
-        proj = np.outer(np.dot(diffs, axis), axis)
-        perp = diffs - proj
-        r_actual = np.linalg.norm(perp, axis=1)
-        residuals = r_actual - radius
+        decision = "FAIL"
 
-    mean_res = float(np.mean(residuals))
-    std_res = float(np.std(residuals))
-
-    clean_indices = []
-    outliers = []
-
-    for i, r in enumerate(residuals):
-        dev = abs(r - mean_res)
-        if dev > 2.5 * std_res and abs(r) > 0.015:
-            outliers.append({
-                "index": i,
-                "point": [round(float(v), 6) for v in pts[i]],
-                "residual": round(float(r), 6),
-                "tag": "SUSPECTED_BURR_OUTLIER"
-            })
-        else:
-            clean_indices.append(i)
-
-    if outliers and len(clean_indices) >= (3 if feature_type.upper() == "PLANE" else 5):
-        clean_pts = pts[clean_indices]
-        refined_fit = fit_plane_least_squares(clean_pts) if feature_type.upper() == "PLANE" else fit_cylinder_least_squares(clean_pts)
-        refined_fit["outliers"] = outliers
-        refined_fit["suspected_burr_count"] = len(outliers)
-        refined_fit["clean_point_count"] = len(clean_pts)
-        return refined_fit
-
-    base_fit["outliers"] = []
-    base_fit["suspected_burr_count"] = 0
-    base_fit["clean_point_count"] = len(pts)
-    return base_fit
+    return {
+        "combined_uncertainty_uc": round(u_c, 8),
+        "expanded_uncertainty_u95": round(u_95, 8),
+        "test_uncertainty_ratio_tur": round(tur, 2),
+        "tur_acceptable": tur >= 4.0,
+        "conformance_decision": decision,
+        "safe_acceptance_limit": round(safe_limit, 8),
+    }

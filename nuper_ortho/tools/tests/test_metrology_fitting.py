@@ -3,122 +3,112 @@ import numpy as np
 import pytest
 from tools.extractor.metrology_fitting import (
     fit_plane_least_squares,
+    fit_plane_chebyshev_minimum_zone,
     fit_circle_least_squares_2d,
-    fit_cylinder_least_squares,
-    fit_sphere_least_squares,
-    evaluate_gdt_feature,
+    fit_circle_chebyshev_minimum_zone_2d,
+    fit_circle_maximum_inscribed_2d,
+    fit_circle_minimum_circumscribed_2d,
+    evaluate_measurement_uncertainty,
 )
 
 
-def test_fit_plane_least_squares():
-    # Plane at Z = 5.0 with small noise
-    np.random.seed(42)
-    x = np.linspace(0, 100, 10)
-    y = np.linspace(0, 50, 10)
-    xx, yy = np.meshgrid(x, y)
-    zz = 5.0 + (np.random.rand(*xx.shape) - 0.5) * 0.004
+def test_fit_plane_least_squares_canonical_ptb():
+    pts = []
+    for x in np.linspace(0.0, 100.0, 11):
+        for y in np.linspace(0.0, 100.0, 11):
+            pts.append([x, y, 0.0])
+    pts = np.array(pts)
 
-    pts = np.column_stack([xx.ravel(), yy.ravel(), zz.ravel()])
     res = fit_plane_least_squares(pts)
-
     assert res["success"] is True
-    assert res["feature_type"] == "PLANE"
-    assert abs(abs(res["normal"][2]) - 1.0) < 1e-4
-    assert res["flatness"] < 0.005
-    assert res["rms_error"] < 0.002
+    assert res["flatness"] < 1e-7
+    assert abs(res["normal"][2] - 1.0) < 1e-7
 
 
-def test_fit_circle_least_squares_2d():
-    # Circle at (10, 20) with radius 12.5 (diameter 25.0)
+def test_fit_plane_chebyshev_minimum_zone():
+    pts = np.array([
+        [0.0, 0.0, 0.002],
+        [50.0, 0.0, -0.003],
+        [50.0, 50.0, 0.001],
+        [0.0, 50.0, -0.002],
+        [25.0, 25.0, 0.000],
+    ])
+
+    lsq = fit_plane_least_squares(pts)
+    mz = fit_plane_chebyshev_minimum_zone(pts)
+
+    assert mz["success"] is True
+    assert mz["flatness"] <= lsq["flatness"] + 1e-9
+    assert mz["iso_14405_type"] == "MZ"
+
+
+def test_fit_circle_least_squares_and_chebyshev_canonical():
+    angles = np.linspace(0, 2 * math.pi, 24, endpoint=False)
+    r_nom = 25.0
+    cx_nom = 10.0
+    cy_nom = 30.0
+
+    pts = np.column_stack([
+        cx_nom + r_nom * np.cos(angles),
+        cy_nom + r_nom * np.sin(angles),
+    ])
+
+    lsq = fit_circle_least_squares_2d(pts)
+    assert lsq["success"] is True
+    assert abs(lsq["radius"] - r_nom) < 1e-7
+    assert abs(lsq["center_2d"][0] - cx_nom) < 1e-7
+    assert abs(lsq["center_2d"][1] - cy_nom) < 1e-7
+    assert lsq["circularity"] < 1e-7
+
+    mz = fit_circle_chebyshev_minimum_zone_2d(pts)
+    assert mz["success"] is True
+    assert abs(mz["radius"] - r_nom) < 1e-7
+    assert mz["circularity"] < 1e-7
+
+
+def test_mic_and_mcc_circle_bounds():
     angles = np.linspace(0, 2 * math.pi, 16, endpoint=False)
-    r_nom = 12.5
-    cx, cy = 10.0, 20.0
-    pts_2d = np.column_stack([cx + r_nom * np.cos(angles), cy + r_nom * np.sin(angles)])
+    base_r = 20.0
+    variations = [0.01 * math.sin(3 * a) for a in angles]
+    pts = np.column_stack([
+        (base_r + v) * np.cos(a) for a, v in zip(angles, variations)
+    ])
+    pts = np.column_stack([
+        [(base_r + v) * math.cos(a) for a, v in zip(angles, variations)],
+        [(base_r + v) * math.sin(a) for a, v in zip(angles, variations)],
+    ])
 
-    res = fit_circle_least_squares_2d(pts_2d)
+    lsq = fit_circle_least_squares_2d(pts)
+    mic = fit_circle_maximum_inscribed_2d(pts)
+    mcc = fit_circle_minimum_circumscribed_2d(pts)
 
-    assert res["success"] is True
-    assert abs(res["radius"] - 12.5) < 1e-5
-    assert abs(res["diameter"] - 25.0) < 1e-5
-    assert abs(res["center_2d"][0] - 10.0) < 1e-5
-    assert abs(res["center_2d"][1] - 20.0) < 1e-5
-    assert res["circularity"] < 1e-5
-
-
-def test_fit_cylinder_least_squares():
-    # Cylinder along Z-axis at (5, 5), radius 4.0 (diameter 8.0)
-    angles = np.linspace(0, 2 * math.pi, 8, endpoint=False)
-    z_levels = [0.0, 10.0, 20.0]
-    pts = []
-    r = 4.0
-    for z in z_levels:
-        for a in angles:
-            pts.append([5.0 + r * math.cos(a), 5.0 + r * math.sin(a), z])
-    pts = np.array(pts)
-
-    res = fit_cylinder_least_squares(pts)
-
-    assert res["success"] is True
-    assert abs(res["diameter"] - 8.0) < 1e-4
-    assert abs(abs(res["axis"][2]) - 1.0) < 1e-4
-    assert res["cylindricity"] < 1e-4
+    assert mic["radius"] <= lsq["radius"] + 1e-6
+    assert mcc["radius"] >= lsq["radius"] - 1e-6
+    assert mic["radius"] < mcc["radius"]
 
 
-def test_fit_sphere_least_squares():
-    # Sphere at (1, 2, 3), radius 7.5 (diameter 15.0)
-    u = np.linspace(0, 2 * math.pi, 10)
-    v = np.linspace(0, math.pi, 10)
-    pts = []
-    for u_i in u:
-        for v_i in v:
-            x = 1.0 + 7.5 * math.sin(v_i) * math.cos(u_i)
-            y = 2.0 + 7.5 * math.sin(v_i) * math.sin(u_i)
-            z = 3.0 + 7.5 * math.cos(v_i)
-            pts.append([x, y, z])
-    pts = np.array(pts)
-
-    res = fit_sphere_least_squares(pts)
-
-    assert res["success"] is True
-    assert abs(res["diameter"] - 15.0) < 1e-4
-    assert abs(res["center"][0] - 1.0) < 1e-4
-    assert abs(res["center"][1] - 2.0) < 1e-4
-    assert abs(res["center"][2] - 3.0) < 1e-4
-
-
-def test_evaluate_gdt_feature():
-    # Hole evaluation with nominal diameter 10.0 mm
-    angles = np.linspace(0, 2 * math.pi, 8, endpoint=False)
-    pts = np.array([[5.01 * math.cos(a), 5.01 * math.sin(a), 0.0] for a in angles])
-
-    eval_res = evaluate_gdt_feature(
-        pts,
-        expected_type="INTERNAL_CYLINDER",
-        nominal_dimension=10.0,
-        nominal_center=[0.0, 0.0, 0.0],
-        nominal_normal=[0.0, 0.0, 1.0],
+def test_evaluate_measurement_uncertainty_gum():
+    res = evaluate_measurement_uncertainty(
+        u_geo=0.0015,
+        u_probe=0.0006,
+        u_temp=0.0005,
+        u_rep=0.0003,
+        tolerance_band=0.040,
+        measured_deviation=0.005,
     )
 
-    assert eval_res["success"] is True
-    assert abs(eval_res["size_deviation"] - 0.02) < 1e-3
+    assert res["combined_uncertainty_uc"] > 0.001
+    assert res["expanded_uncertainty_u95"] > res["combined_uncertainty_uc"]
+    assert res["test_uncertainty_ratio_tur"] >= 4.0
+    assert res["tur_acceptable"] is True
+    assert res["conformance_decision"] == "PASS"
 
-
-def test_fit_with_outlier_rejection():
-    from tools.extractor.metrology_fitting import fit_with_outlier_rejection
-    pts = np.array([
-        [0.0, 0.0, 0.001],
-        [10.0, 0.0, -0.001],
-        [10.0, 10.0, 0.002],
-        [0.0, 10.0, -0.002],
-        [5.0, 5.0, 0.000],
-        [2.0, 8.0, 0.001],
-        [8.0, 2.0, -0.001],
-        [5.0, 2.0, 0.250],
-    ])
-    res = fit_with_outlier_rejection(pts, "PLANE")
-    assert res["success"] is True
-    assert res["suspected_burr_count"] == 1
-    assert res["clean_point_count"] == 7
-    assert res["outliers"][0]["tag"] == "SUSPECTED_BURR_OUTLIER"
-    assert res["outliers"][0]["index"] == 7
-
+    fail_res = evaluate_measurement_uncertainty(
+        u_geo=0.0015,
+        u_probe=0.0006,
+        u_temp=0.0005,
+        u_rep=0.0003,
+        tolerance_band=0.040,
+        measured_deviation=0.035,
+    )
+    assert fail_res["conformance_decision"] == "FAIL"

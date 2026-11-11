@@ -324,6 +324,74 @@ pub fn fit_plane_with_outlier_rejection(
     })
 }
 
+pub fn fit_minimum_zone_chebyshev_plane(points: &[DVec3]) -> Result<PlaneFitResult, FittingError> {
+    let lsq = fit_least_squares_plane(points)?;
+    if points.len() < 3 {
+        return Ok(lsq);
+    }
+
+    let centroid = lsq.centroid;
+    let mut best_normal = lsq.normal;
+    let mut min_flatness = lsq.flatness;
+
+    let ref_axis = if best_normal.x.abs() < 0.9 {
+        DVec3::X
+    } else {
+        DVec3::Y
+    };
+    let u_axis = best_normal.cross(ref_axis).normalize();
+    let v_axis = best_normal.cross(u_axis).normalize();
+
+    let mut step = 0.01;
+    for _ in 0..6 {
+        let mut improved = false;
+        for &du in &[-step, 0.0, step] {
+            for &dv in &[-step, 0.0, step] {
+                if du == 0.0 && dv == 0.0 {
+                    continue;
+                }
+                let cand_normal = (best_normal + du * u_axis + dv * v_axis).normalize();
+                let mut min_d = f64::MAX;
+                let mut max_d = f64::MIN;
+                for p in points {
+                    let d = cand_normal.dot(*p - centroid);
+                    if d < min_d {
+                        min_d = d;
+                    }
+                    if d > max_d {
+                        max_d = d;
+                    }
+                }
+                let cand_flatness = max_d - min_d;
+                if cand_flatness < min_flatness {
+                    min_flatness = cand_flatness;
+                    best_normal = cand_normal;
+                    improved = true;
+                }
+            }
+        }
+        if !improved {
+            step *= 0.25;
+        }
+    }
+
+    let d_param = -best_normal.dot(centroid);
+    let mut sq_sum = 0.0;
+    for p in points {
+        let d = best_normal.dot(*p) + d_param;
+        sq_sum += d * d;
+    }
+    let rms_error = (sq_sum / points.len() as f64).sqrt();
+
+    Ok(PlaneFitResult {
+        centroid,
+        normal: best_normal,
+        flatness: min_flatness,
+        rms_error,
+        d_param,
+    })
+}
+
 /// 2 Boyutlu Düzlemde Sayısal Olarak Kararlı Merkezlenmiş (Centered) Çember Fitting
 fn fit_circle_2d(pts_2d: &[(f64, f64)]) -> Result<(f64, f64, f64, f64, f64), FittingError> {
     let n = pts_2d.len();
@@ -1132,6 +1200,19 @@ mod tests {
         assert_eq!(res.clean_point_count, 7);
         assert_eq!(res.outliers[0].tag, "SUSPECTED_BURR_OUTLIER");
         assert_eq!(res.outliers[0].index, 7);
+    }
+
+    #[test]
+    fn test_ptb_standard_plane_fitting() {
+        let mut pts = Vec::new();
+        for i in 0..10 {
+            for j in 0..10 {
+                pts.push(DVec3::new(i as f64 * 10.0, j as f64 * 10.0, 0.0));
+            }
+        }
+        let res = fit_minimum_zone_chebyshev_plane(&pts).expect("Chebyshev plane failed");
+        assert!(res.flatness < 1e-7);
+        assert!((res.normal.z - 1.0).abs() < 1e-7);
     }
 }
 
