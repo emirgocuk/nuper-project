@@ -196,3 +196,117 @@ export function selectOptimalStylusConfiguration(
     effectiveDia: 1.9996,
   };
 }
+
+export interface ProbeRackPort {
+  portId: number;
+  stylusId: string;
+  dockPos: [number, number, number];
+  approachVec: [number, number, number];
+  isOccupied: boolean;
+}
+
+export interface ProbeChangeWaypoint {
+  stepIndex: number;
+  name: string;
+  target: [number, number, number];
+  speedMms: number;
+  action: string;
+}
+
+export function planMcr20ProbeChange(
+  currentPos: [number, number, number],
+  currentPort: ProbeRackPort,
+  targetPort: ProbeRackPort,
+  safeAltitudeZ: number
+): ProbeChangeWaypoint[] {
+  const normAppCurr = Math.hypot(...currentPort.approachVec) || 1.0;
+  const acx = currentPort.approachVec[0] / normAppCurr;
+  const acy = currentPort.approachVec[1] / normAppCurr;
+  const acz = currentPort.approachVec[2] / normAppCurr;
+
+  const currPreDock: [number, number, number] = [
+    currentPort.dockPos[0] - acx * 50.0,
+    currentPort.dockPos[1] - acy * 50.0,
+    currentPort.dockPos[2] - acz * 50.0,
+  ];
+  const currElevated: [number, number, number] = [
+    currentPort.dockPos[0],
+    currentPort.dockPos[1],
+    currentPort.dockPos[2] + 15.0,
+  ];
+
+  const normAppTgt = Math.hypot(...targetPort.approachVec) || 1.0;
+  const atx = targetPort.approachVec[0] / normAppTgt;
+  const aty = targetPort.approachVec[1] / normAppTgt;
+  const atz = targetPort.approachVec[2] / normAppTgt;
+
+  const tgtPreDock: [number, number, number] = [
+    targetPort.dockPos[0] - atx * 50.0,
+    targetPort.dockPos[1] - aty * 50.0,
+    targetPort.dockPos[2] - atz * 50.0,
+  ];
+  const tgtElevated: [number, number, number] = [
+    targetPort.dockPos[0],
+    targetPort.dockPos[1],
+    targetPort.dockPos[2] + 15.0,
+  ];
+
+  return [
+    {
+      stepIndex: 1,
+      name: 'RetractToSafeAltitude',
+      target: [currentPos[0], currentPos[1], safeAltitudeZ],
+      speedMms: 150.0,
+      action: 'Traverse',
+    },
+    {
+      stepIndex: 2,
+      name: 'MoveAboveOldPortApproach',
+      target: [currPreDock[0], currPreDock[1], safeAltitudeZ],
+      speedMms: 150.0,
+      action: 'Traverse',
+    },
+    {
+      stepIndex: 3,
+      name: 'DescendToApproachHeight',
+      target: currPreDock,
+      speedMms: 50.0,
+      action: 'Descent',
+    },
+    {
+      stepIndex: 4,
+      name: 'EnterPortReleaseLock',
+      target: [...currentPort.dockPos],
+      speedMms: 20.0,
+      action: 'DockRelease',
+    },
+    {
+      stepIndex: 5,
+      name: 'AscendLeavingModule',
+      target: currElevated,
+      speedMms: 20.0,
+      action: 'ModuleRelease',
+    },
+    {
+      stepIndex: 6,
+      name: 'MoveAboveNewPort',
+      target: [tgtElevated[0], tgtElevated[1], safeAltitudeZ],
+      speedMms: 150.0,
+      action: 'Traverse',
+    },
+    {
+      stepIndex: 7,
+      name: 'DescendAndEngageLock',
+      target: [...targetPort.dockPos],
+      speedMms: 20.0,
+      action: 'DockEngage',
+    },
+    {
+      stepIndex: 8,
+      name: 'ExitPortToSafeAltitude',
+      target: [tgtPreDock[0], tgtPreDock[1], safeAltitudeZ],
+      speedMms: 50.0,
+      action: 'Retract',
+    },
+  ];
+}

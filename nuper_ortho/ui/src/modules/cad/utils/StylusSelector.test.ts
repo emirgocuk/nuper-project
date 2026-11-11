@@ -4,6 +4,8 @@ import {
   selectStylusForHole,
   extractFaceDetailsFromHit,
   selectOptimalStylusConfiguration,
+  planMcr20ProbeChange,
+  type ProbeRackPort,
 } from './StylusSelector';
 
 describe('StylusSelector', () => {
@@ -64,5 +66,31 @@ describe('StylusSelector', () => {
     const starYNeg = selectOptimalStylusConfiguration(true, [0, -1, 0]);
     expect(starYNeg.stylusType).toBe('STAR_5WAY_30MM');
     expect(starYNeg.tipIndex).toBe(5);
+  });
+
+  it('planMcr20ProbeChange 8 adımlı güvenli prob değişim rotasını üretir (Faz 12)', () => {
+    const port1: ProbeRackPort = {
+      portId: 1,
+      stylusId: 'STYLUS_DIA2',
+      dockPos: [50, -100, 40],
+      approachVec: [0, 1, 0],
+      isOccupied: true,
+    };
+    const port2: ProbeRackPort = {
+      portId: 2,
+      stylusId: 'STYLUS_DIA4',
+      dockPos: [100, -100, 40],
+      approachVec: [0, 1, 0],
+      isOccupied: false,
+    };
+
+    const waypoints = planMcr20ProbeChange([200, 150, 60], port1, port2, 150);
+    expect(waypoints.length).toBe(8);
+    expect(waypoints[0].target[2]).toBe(150);
+    expect(waypoints[3].speedMms).toBe(20);
+    expect(waypoints[3].target).toEqual([50, -100, 40]);
+    expect(waypoints[6].speedMms).toBe(20);
+    expect(waypoints[6].target).toEqual([100, -100, 40]);
+    expect(waypoints[7].target[2]).toBe(150);
   });
 });

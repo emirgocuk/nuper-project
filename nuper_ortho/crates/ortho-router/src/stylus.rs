@@ -1,8 +1,3 @@
-//! # ortho-router::stylus
-//! 
-//! Prob gövdesi, yakut bilye ve TP20 şaft geometrisi modellemesi.
-//! Şaft sürtünmesi (shank rub) ve prob gövdesi çarpışmalarını fiziksel sınırlarla denetler.
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -23,30 +18,23 @@ pub enum StylusError {
     },
 }
 
-/// Standart CMM Prob Montaj Geometrisi (Renishaw TP20 / TP200 / SP25)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StylusAssembly {
-    /// Yakut bilye yarıçapı R_ball (mm) (Standart: Ø2mm -> 1.0mm, Ø4mm -> 2.0mm)
     pub ball_radius: f64,
-    /// Şaft gövdesi yarıçapı R_stem (mm) (Standart paslanmaz çelik/tungsten karbür: 0.75 - 1.0 mm)
     pub stem_radius: f64,
-    /// Şaft serbest boyu L_stem (mm) (Standart: 20.0, 30.0, 50.0 mm)
     pub stem_length: f64,
-    /// TP20 modül gövde yarıçapı R_module (mm) (Renishaw TP20 standart: Ø13.2mm -> 6.6 mm)
     pub module_radius: f64,
-    /// TP20 modül gövde boyu L_module (mm)
     pub module_length: f64,
 }
 
 impl Default for StylusAssembly {
-    /// Varsayılan endüstriyel prob konfigürasyonu: Ø2x20mm prob + TP20 modül
     fn default() -> Self {
         Self {
-            ball_radius: 1.0,      // Ø2.0 mm Yakut
-            stem_radius: 0.75,     // Ø1.5 mm Şaft
-            stem_length: 20.0,     // 20 mm boy
-            module_radius: 6.6,    // Ø13.2 mm TP20 gövde
-            module_length: 30.0,   // 30 mm gövde boyu
+            ball_radius: 1.0,
+            stem_radius: 0.75,
+            stem_length: 20.0,
+            module_radius: 6.6,
+            module_length: 30.0,
         }
     }
 }
@@ -68,18 +56,14 @@ impl StylusAssembly {
         }
     }
 
-    /// Maksimum güvenli ölçüm derinliği (Bilyenin ekvator hattından şaft bağlantısına kadar)
     pub fn max_safe_depth(&self) -> f64 {
         self.stem_length - (self.ball_radius - self.stem_radius)
     }
 
-    /// Bir deliğe probun güvenle dalıp dalamayacağını ve şaft sürtünmesi olup olmadığını doğrular
     pub fn validate_bore_clearance(&self, hole_diameter: f64, hole_depth: f64) -> Result<(), StylusError> {
         let hole_radius = hole_diameter / 2.0;
-
-        // 1. Şaft sürtünmesi (min 1.0 mm radyal güvenlik payı)
         let radial_clearance = hole_radius - self.stem_radius;
-        let min_required_clearance = 0.5; // Minimum 0.5 mm boşluk
+        let min_required_clearance = 0.5;
         if radial_clearance < min_required_clearance {
             return Err(StylusError::ShankRubbing {
                 clearance: radial_clearance,
@@ -87,7 +71,6 @@ impl StylusAssembly {
             });
         }
 
-        // 2. TP20 gövde dalışı kontrolü: Delik boyu şafttan derinse ve delik TP20'den darsa çarpışma!
         if hole_depth > self.stem_length {
             let module_margin = 1.0;
             if hole_radius < (self.module_radius + module_margin) {
@@ -103,7 +86,6 @@ impl StylusAssembly {
         Ok(())
     }
 
-    /// Bir geometrik unsurun bu prob donanımıyla erişilebilir olup olmadığını analiz eder (Unreachable Feature Flag)
     pub fn check_feature_reachability(
         &self,
         feature_id: u32,
@@ -133,7 +115,6 @@ impl StylusAssembly {
     }
 }
 
-/// Ulaşılamayan Unsur Teşhis Raporu (Unreachable Feature Flag - Doc 08 Section 6)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReachabilityReport {
     pub feature_id: u32,
@@ -197,6 +178,107 @@ pub fn select_optimal_stylus_configuration(
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProbeRackPort {
+    pub port_id: usize,
+    pub stylus_id: String,
+    pub dock_pos: glam::DVec3,
+    pub approach_vec: glam::DVec3,
+    pub is_occupied: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProbeChangeWaypoint {
+    pub step_index: usize,
+    pub name: String,
+    pub target: glam::DVec3,
+    pub speed_mms: f64,
+    pub action: String,
+}
+
+pub fn plan_mcr20_probe_change(
+    current_pos: glam::DVec3,
+    current_port: &ProbeRackPort,
+    target_port: &ProbeRackPort,
+    safe_altitude_z: f64,
+) -> Vec<ProbeChangeWaypoint> {
+    let mut waypoints = Vec::with_capacity(8);
+
+    let app_vec_curr = current_port.approach_vec.normalize();
+    let curr_pre_dock = current_port.dock_pos - app_vec_curr * 50.0;
+    let curr_elevated = current_port.dock_pos + glam::DVec3::new(0.0, 0.0, 15.0);
+
+    let app_vec_tgt = target_port.approach_vec.normalize();
+    let tgt_pre_dock = target_port.dock_pos - app_vec_tgt * 50.0;
+    let tgt_elevated = target_port.dock_pos + glam::DVec3::new(0.0, 0.0, 15.0);
+
+    waypoints.push(ProbeChangeWaypoint {
+        step_index: 1,
+        name: "RetractToSafeAltitude".to_string(),
+        target: glam::DVec3::new(current_pos.x, current_pos.y, safe_altitude_z),
+        speed_mms: 150.0,
+        action: "Traverse".to_string(),
+    });
+
+    waypoints.push(ProbeChangeWaypoint {
+        step_index: 2,
+        name: "MoveAboveOldPortApproach".to_string(),
+        target: glam::DVec3::new(curr_pre_dock.x, curr_pre_dock.y, safe_altitude_z),
+        speed_mms: 150.0,
+        action: "Traverse".to_string(),
+    });
+
+    waypoints.push(ProbeChangeWaypoint {
+        step_index: 3,
+        name: "DescendToApproachHeight".to_string(),
+        target: curr_pre_dock,
+        speed_mms: 50.0,
+        action: "Descent".to_string(),
+    });
+
+    waypoints.push(ProbeChangeWaypoint {
+        step_index: 4,
+        name: "EnterPortReleaseLock".to_string(),
+        target: current_port.dock_pos,
+        speed_mms: 20.0,
+        action: "DockRelease".to_string(),
+    });
+
+    waypoints.push(ProbeChangeWaypoint {
+        step_index: 5,
+        name: "AscendLeavingModule".to_string(),
+        target: curr_elevated,
+        speed_mms: 20.0,
+        action: "ModuleRelease".to_string(),
+    });
+
+    waypoints.push(ProbeChangeWaypoint {
+        step_index: 6,
+        name: "MoveAboveNewPort".to_string(),
+        target: glam::DVec3::new(tgt_elevated.x, tgt_elevated.y, safe_altitude_z),
+        speed_mms: 150.0,
+        action: "Traverse".to_string(),
+    });
+
+    waypoints.push(ProbeChangeWaypoint {
+        step_index: 7,
+        name: "DescendAndEngageLock".to_string(),
+        target: target_port.dock_pos,
+        speed_mms: 20.0,
+        action: "DockEngage".to_string(),
+    });
+
+    waypoints.push(ProbeChangeWaypoint {
+        step_index: 8,
+        name: "ExitPortToSafeAltitude".to_string(),
+        target: glam::DVec3::new(tgt_pre_dock.x, tgt_pre_dock.y, safe_altitude_z),
+        speed_mms: 50.0,
+        action: "Retract".to_string(),
+    });
+
+    waypoints
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,5 +325,36 @@ mod tests {
         assert_eq!(cfg_collision_x.active_tip_index, 2);
         assert_eq!(cfg_collision_x.ph10_label, "A0.0° B0.0°");
         assert!(matches!(cfg_collision_x.stylus_type, StylusType::Star5Way { .. }));
+    }
+
+    #[test]
+    fn test_mcr20_probe_change_planning() {
+        let port1 = ProbeRackPort {
+            port_id: 1,
+            stylus_id: "STYLUS_DIA2_L20".to_string(),
+            dock_pos: glam::DVec3::new(50.0, -100.0, 40.0),
+            approach_vec: glam::DVec3::new(0.0, 1.0, 0.0),
+            is_occupied: true,
+        };
+        let port2 = ProbeRackPort {
+            port_id: 2,
+            stylus_id: "STYLUS_DIA4_L50".to_string(),
+            dock_pos: glam::DVec3::new(100.0, -100.0, 40.0),
+            approach_vec: glam::DVec3::new(0.0, 1.0, 0.0),
+            is_occupied: false,
+        };
+
+        let waypoints = plan_mcr20_probe_change(
+            glam::DVec3::new(200.0, 150.0, 60.0),
+            &port1,
+            &port2,
+            150.0,
+        );
+
+        assert_eq!(waypoints.len(), 8);
+        assert_eq!(waypoints[0].target.z, 150.0);
+        assert_eq!(waypoints[3].speed_mms, 20.0);
+        assert_eq!(waypoints[6].speed_mms, 20.0);
+        assert_eq!(waypoints[6].target, port2.dock_pos);
     }
 }
