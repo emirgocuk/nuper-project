@@ -88,6 +88,16 @@ impl GeometricFeature {
         Ok(feature)
     }
 
+    pub fn new_planar_face(
+        id: u32,
+        name: impl Into<String>,
+        centroid: DVec3,
+        normal_vector: DVec3,
+        area_mm2: f64,
+    ) -> Result<Self, AstError> {
+        Self::new_plane(id, name, centroid, normal_vector, area_mm2, 10.0)
+    }
+
     /// Yeni bir serbest formlu yüzey (NURBS / B-Spline) oluşturur
     pub fn new_freeform_surface(
         id: u32,

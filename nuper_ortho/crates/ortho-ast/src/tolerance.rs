@@ -126,7 +126,29 @@ impl ToleranceConstraint {
             total_tolerance: stated_pos_tol + bonus,
         }
     }
-    /// Standart bir H7 dişi delik çap toleransı oluşturur (Chebyshev zorunlu)
+    pub fn new(
+        id: u32,
+        feature_id: u32,
+        tolerance_type: ToleranceType,
+        nominal_value: f64,
+        upper_tolerance: f64,
+        lower_tolerance: f64,
+    ) -> Self {
+        Self {
+            id,
+            feature_id,
+            tolerance_type,
+            nominal_value,
+            upper_tolerance,
+            lower_tolerance,
+            datum_precedence: Vec::new(),
+            material_modifier: MaterialModifier::RFS,
+            recommended_fitting: FittingAlgorithm::GaussLeastSquares,
+            is_composite: false,
+            profile_disposition: None,
+        }
+    }
+
     pub fn new_h7_hole(id: u32, feature_id: u32, nominal_diameter: f64, tolerance_band: f64) -> Self {
         Self {
             id,

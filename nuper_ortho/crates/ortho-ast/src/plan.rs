@@ -63,9 +63,12 @@ impl InspectionPlan {
         }
     }
 
-    /// Yeni bir geometrik unsur ekler
     pub fn add_feature(&mut self, feature: GeometricFeature) {
         self.features.push(feature);
+    }
+
+    pub fn add_tolerance(&mut self, tolerance: ToleranceConstraint) {
+        self.tolerances.push(tolerance);
     }
 
     /// AST ağacının tüm tutarlılık kurallarını doğrular
