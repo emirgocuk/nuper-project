@@ -918,31 +918,56 @@ export class DrawingCanvas {
       const isSelected = String(b.id) === this.selectedBalloonId;
       const isConfirmed = !!b.confirmed;
 
+      let critStroke = isSelected ? '#38bdf8' : isConfirmed ? '#059669' : '#0284c7';
+      let critFill = isSelected ? '#0284c7' : isConfirmed ? '#10b981' : '#ffffff';
+
+      const tolStr = typeof b.tolerance === 'string' ? b.tolerance : '';
+      if (tolStr) {
+        const pmMatch = tolStr.match(/[±\+]\s*([0-9\.]+)/);
+        const slashMatch = tolStr.match(/([+-]?[0-9\.]+)\s*\/\s*([+-]?[0-9\.]+)/);
+        let span = 0.2;
+        if (slashMatch) {
+          span = Math.abs(parseFloat(slashMatch[1]) - parseFloat(slashMatch[2]));
+        } else if (pmMatch) {
+          span = parseFloat(pmMatch[1]) * 2;
+        }
+        if (span < 0.02 || (b.feature_label && (b.feature_label.includes('Ⓜ') || b.feature_label.includes('⌖') || b.feature_label.includes('⌒')))) {
+          critStroke = '#EF4444';
+          if (!isSelected && !isConfirmed) {
+            critFill = '#FEF2F2';
+          }
+        } else if (span <= 0.05) {
+          critStroke = '#F59E0B';
+          if (!isSelected && !isConfirmed) {
+            critFill = '#FFFBEB';
+          }
+        }
+      }
+
       if (isSelected) {
         ctx.beginPath();
         ctx.arc(balloonPt.x, balloonPt.y, 22 * this.zoom, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(14, 165, 233, 0.22)';
+        ctx.fillStyle = critStroke === '#EF4444' ? 'rgba(239, 68, 68, 0.22)' : 'rgba(14, 165, 233, 0.22)';
         ctx.fill();
         ctx.lineWidth = 2 * this.zoom;
-        ctx.strokeStyle = '#38bdf8';
+        ctx.strokeStyle = critStroke;
         ctx.stroke();
       }
 
       ctx.beginPath();
       ctx.arc(balloonPt.x, balloonPt.y, 14 * this.zoom, 0, Math.PI * 2);
-      ctx.fillStyle = isSelected ? '#0284c7' : isConfirmed ? '#10b981' : '#ffffff';
+      ctx.fillStyle = critFill;
       ctx.fill();
-      ctx.lineWidth = isSelected ? 3.5 : 1.5;
-      ctx.strokeStyle = isSelected ? '#38bdf8' : isConfirmed ? '#059669' : '#0284c7';
+      ctx.lineWidth = isSelected ? 3.5 : 2.0;
+      ctx.strokeStyle = critStroke;
       ctx.stroke();
 
-      ctx.fillStyle = isSelected || isConfirmed ? '#ffffff' : '#0f172a';
+      ctx.fillStyle = isSelected || isConfirmed ? '#ffffff' : critStroke === '#EF4444' ? '#B91C1C' : critStroke === '#F59E0B' ? '#B45309' : '#0f172a';
       ctx.font = `bold ${Math.max(10, 11 * this.zoom)}px Inter, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(String(b.id), balloonPt.x, balloonPt.y);
 
-      // Feature characteristic badge under balloon circle
       const labelText = b.feature_label || (b.nominal !== undefined && b.nominal !== null ? `${b.nominal}` : '');
       if (labelText) {
         const badgeY = balloonPt.y + 22 * this.zoom;

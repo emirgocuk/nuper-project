@@ -89,4 +89,21 @@ describe('InspectionCardFormatter (Pure Utility)', () => {
     expect(html).toContain('Bonus: +0.015 mm');
     expect(html).toContain('Toplam: Ø0.065 mm');
   });
+
+  it('Tolerans aralığına göre kritiklik seviyesini (Standart/Hassas/Kritik) doğru hesaplar', () => {
+    const standard = InspectionCardFormatter.computeToleranceCriticality('+0.1', '-0.1');
+    expect(standard.level).toBe('STANDARD');
+    expect(standard.color).toBe('#10B981');
+
+    const tight = InspectionCardFormatter.computeToleranceCriticality('+0.025', '0.0');
+    expect(tight.level).toBe('TIGHT');
+    expect(tight.color).toBe('#F59E0B');
+
+    const critical = InspectionCardFormatter.computeToleranceCriticality('+0.005', '-0.005');
+    expect(critical.level).toBe('CRITICAL');
+    expect(critical.color).toBe('#EF4444');
+
+    const mmcCritical = InspectionCardFormatter.computeToleranceCriticality('+0.1', '-0.1', 20.0, '| ⌖ | Ø0.1 Ⓜ | A |');
+    expect(mmcCritical.level).toBe('CRITICAL');
+  });
 });

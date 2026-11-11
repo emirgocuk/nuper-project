@@ -1,3 +1,13 @@
+export type CriticalityLevel = 'STANDARD' | 'TIGHT' | 'CRITICAL';
+
+export interface CriticalityInfo {
+  level: CriticalityLevel;
+  badge: string;
+  color: string;
+  cssClass: string;
+  spanMm: number;
+}
+
 export interface FormattedInspectionCard {
   id: number;
   balloon: string;
@@ -14,9 +24,63 @@ export interface FormattedInspectionCard {
   hasMmc?: boolean;
   bonusTol?: number;
   totalTol?: number;
+  criticality?: CriticalityInfo;
 }
 
 export class InspectionCardFormatter {
+  public static computeToleranceCriticality(
+    upperTol: string,
+    lowerTol: string,
+    _nominal?: number,
+    gdt?: string
+  ): CriticalityInfo {
+    const isMmc = !!(gdt && (gdt.includes('Ⓜ') || gdt.includes('(M)') || gdt.includes('|M|')));
+    const isProfileOrPos = !!(gdt && (gdt.includes('⌖') || gdt.includes('⌒') || gdt.includes('PROFILE') || gdt.includes('POSITION')));
+
+    let span = 0.2;
+    const upNum = parseFloat(upperTol);
+    const lowNum = parseFloat(lowerTol);
+
+    if (!isNaN(upNum) && !isNaN(lowNum)) {
+      span = Math.abs(upNum - lowNum);
+    } else if (!isNaN(upNum)) {
+      span = Math.abs(upNum) * 2;
+    } else if (upperTol && upperTol.includes('±')) {
+      const pmMatch = upperTol.match(/[0-9.]+/);
+      if (pmMatch) {
+        span = parseFloat(pmMatch[0]) * 2;
+      }
+    }
+
+    if (span < 0.02 || isMmc || isProfileOrPos) {
+      return {
+        level: 'CRITICAL',
+        badge: 'KRİTİK (KC)',
+        color: '#EF4444',
+        cssClass: 'criticality-critical',
+        spanMm: parseFloat(span.toFixed(4)),
+      };
+    }
+
+    if (span <= 0.05) {
+      return {
+        level: 'TIGHT',
+        badge: 'HASSAS',
+        color: '#F59E0B',
+        cssClass: 'criticality-tight',
+        spanMm: parseFloat(span.toFixed(4)),
+      };
+    }
+
+    return {
+      level: 'STANDARD',
+      badge: 'STANDART',
+      color: '#10B981',
+      cssClass: 'criticality-standard',
+      spanMm: parseFloat(span.toFixed(4)),
+    };
+  }
+
   public static computeMmcBonusTolerance(
     nominal: number,
     lowerTol: number,
@@ -110,6 +174,9 @@ export class InspectionCardFormatter {
       ? `<span class="card-op-badge ${card.op.toLowerCase()}" title="${card.op_reason || card.op}">${card.op}</span>`
       : '';
 
+    const crit = card.criticality || InspectionCardFormatter.computeToleranceCriticality(card.toleranceRange, '', undefined, card.nominalStr);
+    const critBadge = `<span class="card-crit-badge ${crit.cssClass}" style="color:${crit.color}; font-weight:700; font-size:9.5px; border:1px solid ${crit.color}; padding:1px 5px; border-radius:3px; background:rgba(255,255,255,0.06);">${crit.badge}</span>`;
+
     return `
       <div class="inspection-card${activeClass}${statusClass}" data-id="${card.id}" data-page="${card.page}">
         <div class="card-left-badge">
@@ -121,6 +188,7 @@ export class InspectionCardFormatter {
             <span class="card-title">${card.featureTitle}</span>
             <div class="card-header-badges">
               ${opBadge}
+              ${critBadge}
               <span class="card-datum-badge">${card.datumReference}</span>
             </div>
           </div>
