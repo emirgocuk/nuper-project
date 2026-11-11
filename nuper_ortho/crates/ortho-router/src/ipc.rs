@@ -221,6 +221,88 @@ impl BinaryMeshPacket {
     }
 }
 
+pub const TELEMETRY_MAGIC: u32 = 0x4E555052;
+pub const STATUS_MOVING: u32 = 0x01;
+pub const STATUS_IN_CONTACT: u32 = 0x02;
+pub const STATUS_TRIGGERED: u32 = 0x04;
+pub const STATUS_ESTOP: u32 = 0x08;
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BinaryTelemetryPacket {
+    pub magic: u32,
+    pub status_flags: u32,
+    pub timestamp_ns: u64,
+    pub probe_pos: [f64; 3],
+    pub probe_normal: [f64; 3],
+    pub head_a: f64,
+    pub head_b: f64,
+}
+
+impl BinaryTelemetryPacket {
+    pub fn new(
+        timestamp_ns: u64,
+        probe_pos: [f64; 3],
+        probe_normal: [f64; 3],
+        head_a: f64,
+        head_b: f64,
+        status_flags: u32,
+    ) -> Self {
+        Self {
+            magic: TELEMETRY_MAGIC,
+            status_flags,
+            timestamp_ns,
+            probe_pos,
+            probe_normal,
+            head_a,
+            head_b,
+        }
+    }
+
+    pub fn to_bytes(&self) -> [u8; 80] {
+        let mut buf = [0u8; 80];
+        buf[0..4].copy_from_slice(&self.magic.to_le_bytes());
+        buf[4..8].copy_from_slice(&self.status_flags.to_le_bytes());
+        buf[8..16].copy_from_slice(&self.timestamp_ns.to_le_bytes());
+        buf[16..24].copy_from_slice(&self.probe_pos[0].to_le_bytes());
+        buf[24..32].copy_from_slice(&self.probe_pos[1].to_le_bytes());
+        buf[32..40].copy_from_slice(&self.probe_pos[2].to_le_bytes());
+        buf[40..48].copy_from_slice(&self.probe_normal[0].to_le_bytes());
+        buf[48..56].copy_from_slice(&self.probe_normal[1].to_le_bytes());
+        buf[56..64].copy_from_slice(&self.probe_normal[2].to_le_bytes());
+        buf[64..72].copy_from_slice(&self.head_a.to_le_bytes());
+        buf[72..80].copy_from_slice(&self.head_b.to_le_bytes());
+        buf
+    }
+
+    pub fn from_bytes(bytes: &[u8; 80]) -> Result<Self, &'static str> {
+        let magic = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
+        if magic != TELEMETRY_MAGIC {
+            return Err("Invalid telemetry magic prefix");
+        }
+        let status_flags = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
+        let timestamp_ns = u64::from_le_bytes(bytes[8..16].try_into().unwrap());
+        let p_x = f64::from_le_bytes(bytes[16..24].try_into().unwrap());
+        let p_y = f64::from_le_bytes(bytes[24..32].try_into().unwrap());
+        let p_z = f64::from_le_bytes(bytes[32..40].try_into().unwrap());
+        let n_x = f64::from_le_bytes(bytes[40..48].try_into().unwrap());
+        let n_y = f64::from_le_bytes(bytes[48..56].try_into().unwrap());
+        let n_z = f64::from_le_bytes(bytes[56..64].try_into().unwrap());
+        let head_a = f64::from_le_bytes(bytes[64..72].try_into().unwrap());
+        let head_b = f64::from_le_bytes(bytes[72..80].try_into().unwrap());
+
+        Ok(Self {
+            magic,
+            status_flags,
+            timestamp_ns,
+            probe_pos: [p_x, p_y, p_z],
+            probe_normal: [n_x, n_y, n_z],
+            head_a,
+            head_b,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273,6 +355,36 @@ mod tests {
         assert_eq!(v_bytes.len(), 108 * 4); // 432 bytes
         let n_bytes = box_mesh.to_normal_bytes();
         assert_eq!(n_bytes.len(), 108 * 4);
+    }
+
+    #[test]
+    fn test_binary_telemetry_packet_layout_and_roundtrip() {
+        assert_eq!(std::mem::size_of::<BinaryTelemetryPacket>(), 80);
+
+        let packet = BinaryTelemetryPacket::new(
+            1_700_000_000_123_456,
+            [120.5, 45.2, -10.8],
+            [0.0, 0.0, 1.0],
+            45.0,
+            90.0,
+            STATUS_MOVING | STATUS_IN_CONTACT,
+        );
+
+        let bytes = packet.to_bytes();
+        assert_eq!(bytes.len(), 80);
+
+        let decoded = BinaryTelemetryPacket::from_bytes(&bytes).expect("Decode failed");
+        assert_eq!(decoded.magic, TELEMETRY_MAGIC);
+        assert_eq!(decoded.timestamp_ns, 1_700_000_000_123_456);
+        assert_eq!(decoded.probe_pos, [120.5, 45.2, -10.8]);
+        assert_eq!(decoded.probe_normal, [0.0, 0.0, 1.0]);
+        assert_eq!(decoded.head_a, 45.0);
+        assert_eq!(decoded.head_b, 90.0);
+        assert_eq!(decoded.status_flags, STATUS_MOVING | STATUS_IN_CONTACT);
+
+        let mut bad_bytes = bytes;
+        bad_bytes[0] = 0x00;
+        assert!(BinaryTelemetryPacket::from_bytes(&bad_bytes).is_err());
     }
 }
 
