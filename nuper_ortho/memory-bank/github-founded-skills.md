@@ -68,3 +68,17 @@
   3. *Yan Etki / Yan Hasar Önleme (No Collateral Damage):* İlgisiz modülleri, testleri veya çalışan kodları değiştirme.
   4. *Açık Başarı Kriteri (Clear Success Criteria):* Doğrulama döngüsü olmadan işi bitti sayma.
 * **Nuper Ortho ile İlişkisi:** Nuper Ortho'nun **Sıfır Uydurma İlkesi (No-Fabrication Invariant)**, atomik modül sınırlaması (tek görevde maks 3 dosya) ve her adımda tip/test doğrulama kapılarının felsefi temelidir.
+
+---
+
+### 6. Karlsruhe Institute of Technology (KIT / CIRP 2022) & EDI AG Reference Project
+* **URL:** https://edi-ag.ai/reference-projects/technical-drawing-analysis-ai-parameter-extraction-similarity-matching-automated-quotation-planning
+* **Geliştirici / Kurum:** Karlsruhe Institute of Technology (KIT - wbk Institute of Production Science) & EDI GmbH (Karlsruhe, Almanya)
+* **Temel Felsefe ve Amaç:** Endüstriyel 2D teknik resimlerin bilgisayarlı görüsü ve parametre çıkarımında standart OCR'ın yetersiz kaldığı kontur (stroked) fontlar, çizgi-metin kesişimleri (captcha etkisi) ve döndürülmüş toleransları; "Bölge Tespiti $\to$ Negatif Arka Plan Filtresi $\to$ 90° Rotasyon Düzeltme $\to$ Kısıtlı Mühendislik Alfabesi $\to$ FCF Hücre Bölme $\to$ Parça Benzerlik Eşleştirme" hattıyla deterministik ve hatasız işleyen mimaridir.
+* **Öne Çıkan Mühendislik Prensipleri:**
+  1. *İzole Kırpma ve 90° Normalizasyonu:* Dikey ölçüler ve asimetrik toleranslar ($+0.2/0$) yerel koordinata ($x_{\text{local}} = -y, y_{\text{local}} = x$) döndürülerek yatay uzayda sıfır eksen hatasıyla okunur.
+  2. *Kısıtlı Mühendislik Alfabesi ($\Sigma$):* OCR sözlüğü sadece teknik resim karakterleriyle ($\Sigma = \{0\text{--}9, ., ,, +, -, \varnothing, F, G, H, K, M, R, x\}$) sınırlandırılarak harf-sayı karışıklığı ($O/0, l/1, S/5$) önlenir.
+  3. *FCF Hücre Bölme (Cell Splitting):* Geometrik tolerans kutuları dikey bölücü çizgilerden kesilerek Sembol (`Cell_0`), Değer/MMC (`Cell_1`) ve Datum (`Cell_2..N`) olarak ayrıştırılır.
+  4. *Tolerans Kritiklik Renklendirmesi (Yellow/Red Heatmap):* Tolerans aralığına göre standart (mavi/yeşil), hassas (sarı) ve kritik dar toleranslar (kırmızı) renklendirilerek operatöre görsel risk haritası sunulur.
+  5. *Topolojik Parça Benzerliği (Part Similarity Matching):* Parçanın öznitelik vektörü ile geçmiş işler taranarak benzer parçaların fikstür bağlama ve prob stratejileri tek tıkla yeniden kullanılır.
+* **Nuper Ortho ile İlişkisi:** Nuper Ortho'nun `tools/extractor/` PDF vektör çıkarım hattının (Faz 26 – Faz 30), Işık Masası risk göstergelerinin (Faz 31) ve geometrik benzerlik hafızasının (Faz 32) kurumsal temelidir.

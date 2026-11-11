@@ -1,12 +1,12 @@
-# Nuper Ortho — Büyük Mimari ve Fiziksel AI Uygulama Şartnamesi (Faz 6 – Faz 25)
+# Nuper Ortho — Büyük Mimari ve Fiziksel AI Uygulama Şartnamesi (Faz 6 – Faz 32)
 
 > **Amaç ve Vizyon:** YC RFS 2026 "Physical AI" vizyonu doğrultusunda, Nuper Ortho'yu CAD/B-Rep geometrisi, 2D teknik resimler, CMM kinematik yolu, metrolojik kalite denetimi ve kapalı döngü (closed-loop) CNC takım aşınma düzeltmesini otonom olarak icra eden **Dünyanın İlk Egemen Otonom Kalite Derleyicisi (Sovereign Autonomous Quality Compiler)** seviyesine taşımaktır.
 
 ---
 
-## 1. Metodolojik Temeller (GitHub Kaynaklı Beceriler Sentezi)
+## 1. Metodolojik Temeller (GitHub ve Endüstriyel Referanslar Sentezi)
 
-Bu yol haritasındaki tüm fazlar, [memory-bank/github-founded-skills.md](github-founded-skills.md) belgesindeki 5 temel açık kaynak metodolojisinin kurumsal senteziyle yürütülür:
+Bu yol haritasındaki tüm fazlar, [memory-bank/github-founded-skills.md](github-founded-skills.md) belgesindeki 6 temel açık kaynak ve kurumsal araştırma metodolojisinin senteziyle yürütülür:
 
 1. **`obra/superpowers` (Disiplinli Agentic SDLC & TDD):**
    - Her faz; Tasarım $\to$ İzole Geliştirme $\to$ Planlama $\to$ TDD (Önce Başarısız Test) $\to$ Kod İnceleme $\to$ Doğrulama adımlarıyla tamamlanır. Kod yazılmadan önce doğrulama testi hazırdır.
@@ -18,6 +18,8 @@ Bu yol haritasındaki tüm fazlar, [memory-bank/github-founded-skills.md](github
    - "En iyi kod hiç yazılmamış koddur." Erken soyutlamalar, gereksiz wrapper'lar ve kullanılmayan farazi özellikler yasaktır.
 5. **`multica-ai/andrej-karpathy-skills` (LLM Hata Kalkanı):**
    - Sessiz varsayım yasaktır; belirsiz ölçülerde mühendis kararı istenir; hiçbir kod değişikliği çalışan diğer modüllere yan hasar (collateral damage) veremez.
+6. **`KIT (CIRP 2022) & EDI AG Reference Project` (Endüstriyel Doküman Zekası & Benzerlik Hafızası):**
+   - Vektörel mikro sembol topolojisi, dikey ölçülerde 90° rotasyon düzeltmesi, kısıtlı mühendislik alfabesi ($\Sigma$), FCF hücre bölme, tolerans risk ısı haritası ve geçmiş iş benzerlik hafızası ile deterministik ve sıfır VRAM tüketimli çıkarım.
 
 ---
 
@@ -29,6 +31,7 @@ Bu yol haritasındaki tüm fazlar, [memory-bank/github-founded-skills.md](github
 | **Blok B** | **Faz 9 – Faz 14** | Kinematik, Prob Donanımı ve Makine Sürücüleri | Zero-Copy Binary IPC, 5-Eksen REVO/PH20, Lazer Çizgi, MCR20 Rack, I++ DME, BVH GJK/EPA |
 | **Blok C** | **Faz 15 – Faz 20** | Kapalı Döngü İmalat, Raporlama ve Kalite Güvencesi | Çoklu CNC G10/$TC_DP12, AS9102 Rev C FAI, Paletleme, Karpathy Kalkanı, E2E Test |
 | **Blok D** | **Faz 21 – Faz 25** | Fiziksel AI ve Egemen Otonom Derleyici | FIPS/Air-Gap Lisans, Dokunmatik UI, Termal Gradyan, Scan-to-STEP, Sovereign Loop 2.0 |
+| **Blok E** | **Faz 26 – Faz 32** | Endüstriyel Doküman Zekası ve Parça Benzerlik Hafızası | Vektörel GD&T Topolojisi, FCF Hücre Bölme, 90° Rotasyon, Kısıtlı Alfabe, Risk Isı Haritası, Kurulum Hafızası |
 
 ---
 
@@ -428,3 +431,165 @@ Bu yol haritasındaki tüm fazlar, [memory-bank/github-founded-skills.md](github
   - Tüm çekirdek kütüphaneler ve otonom orkestrasyon servisi.
 * **Kabul Kriteri ve Doğrulama:**
   - 5 parçalık kapalı döngü simülasyonunda süreç yeterliliği $C_{pk} = 0.95$'ten $C_{pk} = 1.78$'e otonom olarak yükseltilir.
+
+---
+
+## 7. Blok E: Endüstriyel Doküman Zekası, Vektörel GD&T Topolojisi ve Parça Benzerlik Hafızası (Faz 26 – Faz 32)
+
+### FAZ 26: Vektörel Mikro-Çizim GD&T ve Çap Topoloji Sınıflandırıcısı (`VectorSymbolClassifier`)
+* **Problem ve Kök Neden:** CAD yazılımları (CATIA, NX, SolidWorks, AutoCAD) PDF çıktısı üretirken `Ø`, `⌖`, `⊥`, `▱`, `⌒`, `Ⓜ` gibi mühendislik sembollerini çoğu zaman Unicode karakter olarak değil, küçük vektörel çizgi ve eğri grupları (`page.get_drawings()`) olarak çizer. Bu nedenle `get_text()` bu sembolleri göremez veya yanlış ASCII karakteri olarak okur.
+* **Matematiksel ve Algoritmik Altyapı (`tools/extractor/vector_extractor.py` & `spatial.py`):**
+  - `page.get_drawings()` içindeki $1.5\text{ pt} \le \text{width} \le 18.0\text{ pt}$ ve $1.5\text{ pt} \le \text{height} \le 18.0\text{ pt}$ boyutlarındaki mikro çizim kümeleri uzamsal yakınlıkla ($\text{distance} \le 2.0\text{ pt}$) gruplanır.
+  - Mikro kümenin içindeki geometrik ilkeller analiz edilerek sembol deterministik olarak sınıflandırılır:
+    - 1 Daire + 1 Çapraz Çizgi ($45^\circ - 75^\circ$) $\longrightarrow$ `'Ø'` (Çap)
+    - 1 Daire + 1 Yatay + 1 Dikey Çizgi (Merkezden geçen artı) $\longrightarrow$ `'⌖'` (Konum / True Position)
+    - 2 Eşmerkezli Daire $\longrightarrow$ `'◎'` (Eşmerkezlilik / Concentricity)
+    - 1 Yatay Taban Çizgisi + 1 Dikey Orta Çizgi $\longrightarrow$ `'⊥'` (Diklik / Perpendicularity)
+    - 2 Paralel Eğik veya Yatay Çizgi $\longrightarrow$ `'∥'` (Paralellik / Parallelism)
+    - 4 Kenarlı Kapalı Paralelkenar / Kare $\longrightarrow$ `'▱'` (Düzlemsellik / Flatness)
+    - 1 Kapalı Yarım Daire + Taban Çizgisi veya Üst Açık Yay $\longrightarrow$ `'⌒'` (Profil)
+    - 1 Daire içinde `'M'` metni veya 4 kırıklı M poligonu $\longrightarrow$ `'Ⓜ'` (MMC Modifier)
+  - Tespit edilen vektörel semboller kendi `bbox` koordinatlarıyla metin havuzuna sanal span olarak enjekte edilir; sayının solundaki `'Ø'` sembolü `"Ø21"` olarak tam birleştirilir.
+* **Etkilenen Dosyalar:**
+  - `tools/extractor/vector_extractor.py`
+  - `tools/extractor/spatial.py`
+* **Kabul Kriteri ve Doğrulama:**
+  - Vektörel olarak çizilmiş tüm `Ø` ve `⌖` sembolleri Unicode metin olmasa bile `recognize_vector_gdt_symbols` tarafından sıfır OCR ile %100 tanınır.
+
+---
+
+### FAZ 27: FCF (Feature Control Frame) Hücre Bölücü ve Kompozit Kutu Ayrıştırıcısı (`parse_fcf_cells`)
+* **Problem ve Kök Neden:** Geometrik tolerans kutuları (`| ⌖ | Ø0.1 Ⓜ | A | B | C |`) tek bir metin dizisi olarak okunduğunda sembol, tolerans değeri ve datum harfleri birbirine karışır.
+* **Matematiksel ve Algoritmik Altyapı:**
+  - `page.get_drawings()` içinde $12\text{ pt} \le \text{height} \le 28\text{ pt}$ ve $\text{width} \ge 35\text{ pt}$ olan yatay dikdörtgen çerçeveler tespit edilir.
+  - Bu dikdörtgenin içini kesen dikey bölücü çizgilerin (`x_dividers`) $X$ koordinatlarına göre kutu soldan sağa sıralı hücrelere (`Cell_0`, `Cell_1`, `Cell_2`, ...) bölünür:
+    - `Cell_0`: Geometrik karakteristik sembolü (`⌖`, `⌒`, `⊥`, `▱` vb.).
+    - `Cell_1`: Çap işareti (`Ø`), sayısal tolerans değeri ve malzeme şartı modifiyeri (`Ⓜ`, `Ⓛ`, `Ⓟ`).
+    - `Cell_2..N`: Birincil, ikincil ve üçüncül Datum referans harfleri (`A`, `B`, `C`, `A-B`).
+  - Çıkarılan FCF yapısı doğrudan en yakın ölçü bloğuna veya lider çizgisinin işaret ettiği unsura bağlanır.
+* **Etkilenen Dosyalar:**
+  - `tools/extractor/vector_extractor.py`
+  - `tools/extractor/semantic_grammar.py`
+  - `crates/ortho-ast/src/composite_gdandt.rs`
+* **Kabul Kriteri ve Doğrulama:**
+  - `| ⌒ | 0.5 | A | B |` tolerans kutusu hücre bölücü çizgilerden ayrılarak hatasız semantik AST nesnesine dönüştürülür.
+
+---
+
+### FAZ 28: Dikey ve Açılı Ölçüler İçin 90° Rotasyon Normalizasyonu (`normalize_span_to_local_frame`)
+* **Problem ve Kök Neden:** Dikey ölçülerde ($90^\circ$ veya $270^\circ$) ana nominal ölçü ile yanındaki üst/alt toleransların (`+0.2 / 0`) $X$ ve $Y$ eksenleri yer değiştirdiği için standart yatay kümeleme dikey ölçülerde toleransları kaçırır.
+* **Matematiksel ve Algoritmik Altyapı:**
+  - Bir span'ın yönelim açısı $\theta \in [75^\circ, 105^\circ]$ veya $\theta \in [255^\circ, 285^\circ]$ ise, o span ve $25\text{ pt}$ yarıçapındaki komşuları için yerel koordinat dönüşümü uygulanır:
+    $$x_{\text{local}} = -y_{\text{page}}, \quad y_{\text{local}} = x_{\text{page}}$$
+  - Dikey yazılmış tüm ölçüler yerel uzayda tamamen yatay ($0^\circ$) hale gelir; nominal + üst tolerans (`y_local` üstte) + alt tolerans (`y_local` altta) eşleştirmesi yatay ölçülerle özdeş kesinlikte çalışır.
+* **Etkilenen Dosyalar:**
+  - `tools/extractor/vector_extractor.py`
+  - `tools/extractor/parse/dimension.py`
+* **Kabul Kriteri ve Doğrulama:**
+  - $90^\circ$ dikey döndürülmüş asimetrik toleranslı bir ölçünün (`35 +0.0/-0.2`) nominal ve limit toleransları yerel çerçeve dönüşümüyle hatasız ayrıştırılır.
+
+---
+
+### FAZ 29: Ölçü Çizgisi, Uzatma Çizgisi ve Lider Ok Ucu İzleyicisi (`trace_dimension_attachments`)
+* **Problem ve Kök Neden:** Bir ölçü metninin (`36.5 ±0.1` veya `12 ±0.5`) çizim üzerindeki hangi iki kenar veya delik ekseni arasını ölçtüğü yalnızca metin kutusuna (`bbox`) bakılarak anlaşılamaz; ölçü çizgisinin uçlarındaki okların değdiği koordinatların bulunması gerekir.
+* **Matematiksel ve Algoritmik Altyapı:**
+  - Vektörel Ölçü Çizgisi ve Ok Ucu Takibi:
+    1. Her ölçü metninin merkezinden geçen veya paralel uzanan ölçü çizgisi (`dimension_line`) tespit edilir.
+    2. Bu çizginin iki uç noktası (`p_start`, `p_end`) ve bu uçlardan dik ($\approx 90^\circ$) olarak parçaya doğru uzanan iki bağlama/uzatma çizgisi (`extension_lines`) tespit edilir.
+    3. Lider çizgisine bağlı ölçülerde (örn. `4x Ø3.5`), kırık çizgi takip edilerek ok ucunun parçaya değdiği `(tip_x, tip_y)` koordinatı çıkarılır.
+  - Piksel-Milimetre Ölçek Tutarlılık Testi (`Scale Consistency Filter`):
+    - Görünüşteki bilinen en büyük ölçüden (örn. $395.5\text{ mm}$) ölçek katsayısı ($S = \text{Nominal} / \Delta L_{\text{pt}}$) hesaplanır.
+    - Ölçü çizgisinin uzunluğu ile nominal değerin ölçeği uyuşmayan sahte sayılar kesin olarak elenir.
+* **Etkilenen Dosyalar:**
+  - `tools/extractor/spatial.py`
+  - `tools/extractor/brep_verifier.py`
+* **Kabul Kriteri ve Doğrulama:**
+  - Ölçü ok uçlarının değdiği koordinatlar 3D STEP'teki ilgili yüzey/delik çiftine kilitlenir; ölçü dışı sahte sayılar elenir.
+
+---
+
+### FAZ 30: Kısıtlı Mühendislik Alfabesi ve Kontur Font İyileştiricisi (`sanitize_engineering_ocr_tokens`)
+* **Problem ve Kök Neden:** Metin akışı bozuk veya kontur (stroked) fontlu PDF'lerde karakter bazlı bozulmalar (`Ø` yerine `0` veya `O`, `1` yerine `I` veya `l`, `5` yerine `S`) ve sayıların ortasından geçen tarama/kesit çizgileri oluşur.
+* **Matematiksel ve Algoritmik Altyapı:**
+  - Kısıtlı Mühendislik Alfabesi ($\Sigma = \{0\text{--}9, ., ,, +, -, \varnothing, F, G, H, K, M, R, x\}$):
+    - Sayı dizisi başındaki `'O'`, `'0/'`, `'Ø'` $\longrightarrow$ `'Ø'`
+    - Rakamlar arasındaki `'l'`, `'I'`, `'|'` $\longrightarrow$ `'1'`
+    - Rakamlar arasındaki `'S'` $\longrightarrow$ `'5'`, `'B'` $\longrightarrow$ `'8'`, `'Z'` $\longrightarrow$ `'2'`
+    - `'+-'`, `'+/-'` $\longrightarrow$ `'±'`
+  - Kontur Fontlu Bölgeler İçin İzole Kutu + Çizgi Silme (`clean_crop_for_recognition`):
+    - $90^\circ$ dikey kutular yataya çevrilir; kutuyu boydan boya kesen uzun arka plan/tarama çizgileri morfolojik veya vektörel uzunluk filtresiyle silinir.
+* **Etkilenen Dosyalar:**
+  - `tools/extractor/vision_ai_extractor.py`
+  - `tools/extractor/parse/dimension.py`
+* **Kabul Kriteri ve Doğrulama:**
+  - Kontur fontlu ve kesit çizgili test paftasında harf-sayı karışıklığı sıfıra indirilir.
+
+---
+
+### FAZ 31: Tolerans Kritiklik Renklendirmesi ve Işık Masası Isı Haritası (Criticality Heatmap)
+* **Problem ve Kök Neden (EDI AG İlkesi):** Teknik resim açıldığında tüm balonların aynı renkte olması kalite mühendisinin ve CMM operatörünün kritik dar toleransları, tezgâh duruş risklerini ve AS9102 Key Characteristic unsurlarını gözden kaçırmasına neden olur.
+* **Matematiksel ve Algoritmik Altyapı:**
+  - Üç Kademeli Kritiklik Sınıflandırması:
+    - *Standart Tolerans ($T > \pm 0.100\text{ mm}$ veya ISO 2768-m):* Yeşil / Mavi Balon (Standart hızda rutin denetim).
+    - *Hassas Tolerans ($0.020\text{ mm} \le T \le 0.050\text{ mm}$ veya H7/g6):* Sarı Vurgulu Balon (Yavaş yaklaşma, dikkatli denetim).
+    - *Kritik / Dar Tolerans ($T < 0.020\text{ mm}$, MMC $\textcircled{\small M}$, Profil/Konum):* Parlayan Kırmızı Alarm Balonu (AS9102 Key Characteristic, $2\text{ mm/s}$ prob hızı ve çoklu dokunuş stratejisi otomatik tetiklenir).
+  - Işık Masasında (`#modal-drawing-audit`) görsel risk ısı haritası ve tek tıkla kırmızı toleransları filtreleme yeteneği.
+* **Etkilenen Dosyalar:**
+  - `ui/src/modules/inspection/utils/InspectionCardFormatter.ts`
+  - `ui/src/modules/drawing/DrawingCanvas.ts`
+  - `ui/src/modules/drawing/utils/LightTableControls.ts`
+* **Kabul Kriteri ve Doğrulama:**
+  - 38 balonlu teknik resimde dar toleranslı unsurlar kırmızı, orta toleranslılar sarı, standartlar yeşil/mavi olarak anında renklendirilir.
+
+---
+
+### FAZ 32: B-Rep Geometrik Benzerlik Eşleştirme ve Kurulum Hafızası (`PartSimilarityEngine`)
+* **Problem ve Kök Neden (EDI AG İlkesi):** Atölyede üretilen yeni parçaların çoğu (%70-80) daha önce üretilmiş ve CMM stratejisi onaylanmış parçaların boyutsal varyantlarıdır. Her yeni parça için sıfırdan fikstür ve prob stratejisi belirlemek ciddi zaman kaybıdır.
+* **Matematiksel ve Algoritmik Altyapı:**
+  - Topolojik Öznitelik Vektörü (`FeatureEmbeddingVector`):
+    $$\vec{v} = [\text{BBox}_X, \text{BBox}_Y, \text{BBox}_Z, \text{HoleCount}, \text{CylinderRatio}, \text{MinTolerance}, \text{SurfaceArea}]$$
+  - SQLite Veritabanında Geçmiş Onaylı Projelerin Taranması (Cosine Similarity):
+    $$\text{Sim}(\vec{u}, \vec{v}) = \frac{\vec{u} \cdot \vec{v}}{\|\vec{u}\| \|\vec{v}\|}$$
+  - Akıllı Operatör Öneri Kartı:
+    - Eğer $\text{Sim} \ge \%90$ ise:
+      *"💡 Bu parça daha önce onaylanan [Parça No] parçasına geometrik olarak %94 benziyor. Önceki OP10/OP20 bağlama stratejisini, fikstür pabuçlarını ve PH10 prob açılarını otomatik uygulamak ister misiniz?"*
+    - Onaylandığında saniyeler içinde tüm kurulum kopyalanır ve B-Rep yüzey kimliklerine yeniden eşlenir.
+* **Etkilenen Dosyalar:**
+  - `crates/ortho-ast/src/lib.rs`
+  - `crates/ortho-router/src/hal.rs`
+  - `tools/extractor/similarity_engine.py`
+  - `ui/src/modules/cad/CADViewer.ts`
+* **Kabul Kriteri ve Doğrulama:**
+  - Geometrisi %95 uyuşan yeni varyant parçada önceki teftiş stratejisi tek tıkla yüklenir ve %100 çarpışmasız simüle edilir.
+
+---
+
+## 8. Fazlar Arası Bağımlılık ve İnşa Sırası
+
+```
+[FAZ 26: Vektör GD&T] ──► [FAZ 27: FCF Hücre] ──► [FAZ 28: 90° Normalizasyon] ──► [FAZ 29: Ok Takibi] ──► [FAZ 30: Kısıtlı Alfabe]
+                                                                                                                   │
+                                                                                                                   ▼
+[FAZ 6: B-Rep DAG] ───► [FAZ 7: ASME GD&T] ───► [FAZ 8: PTB Fitting/GUM] ──────────────────────────► [FAZ 31: Risk Isı Haritası]
+         │                                                                                                         │
+         ▼                                                                                                         ▼
+[FAZ 9: Zero-Copy IPC] ─► [FAZ 10: 5-Eksen] ─► [FAZ 11: Lazer] ─► [FAZ 12: MCR20] ─► [FAZ 13: I++] ─► [FAZ 14: BVH]
+                                                                                                        │
+                                                                                                        ▼
+[FAZ 15: CNC G10/SPC] ◄─ [FAZ 16: AS9102] ◄─ [FAZ 17: Paletleme] ◄─ [FAZ 18: Karpathy] ◄─ [FAZ 19: Ponytail] ◄─┘
+         │
+         ▼
+[FAZ 20: E2E Test] ─► [FAZ 21: Lisans/İmza] ─► [FAZ 22: Dokunmatik] ─► [FAZ 23: Isıl] ─► [FAZ 24: STEP] ─► [FAZ 25: Sovereign Loop]
+                                                                                                                   │
+                                                                                                                   ▼
+                                                                                                          [FAZ 32: Parça Hafızası]
+```
+
+---
+
+## 9. Sıradaki Somut Eylem
+
+Uygulama şartnamesi Blok E (Faz 26 – Faz 32) ile birlikte eksiksiz kilitlenmiştir.
+İlk inşa adımı olarak:
+1. **Faz 26: Vektörel Mikro-Çizim GD&T ve Çap Topoloji Sınıflandırıcısı (`VectorSymbolClassifier`)** için `tools/extractor/vector_extractor.py` içine `recognize_vector_gdt_symbols` fonksiyonunun yazılması ve `tools/tests/test_vector_extractor.py` testinin eklenmesi.
+2. Veya temel B-Rep motoru için **Faz 6: B-Rep Topolojik Bilgi Grafiği (`BRepGraphEngine`)** adımından `crates/ortho-brep/src/graph.rs` ile başlanması.
