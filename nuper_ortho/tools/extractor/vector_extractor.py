@@ -3,16 +3,15 @@ import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
+try:
+    from extractor.spatial import recognize_vector_gdt_symbols
+except ImportError:
+    from .spatial import recognize_vector_gdt_symbols
+
 
 def get_title_block_mask(page_width: float, page_height: float) -> List[Tuple[float, float, float, float]]:
-    """
-    Standart teknik resim antet ve revizyon maskeleri.
-    Bu bölgelerdeki metinler ve notlar ölçü havuzuna karışmaması için elenir.
-    """
     return [
-        # Sağ alt antet ve genel toleranslar bölgesi (~%52 en, ~%24 boy)
         (page_width * 0.46, page_height * 0.76, page_width, page_height),
-        # Sağ üst revizyon tablosu bölgesi (~%32 en, ~%20 boy)
         (page_width * 0.68, 0.0, page_width, page_height * 0.20),
     ]
 
@@ -28,9 +27,6 @@ def is_inside_mask(bbox: Tuple[float, float, float, float], masks: List[Tuple[fl
 
 
 def is_drawing_border_margin(bbox: Tuple[float, float, float, float], page_width: float, page_height: float, margin: float = 45.0, text: str = "") -> bool:
-    """
-    Teknik resim pafta kenarındaki harf/rakam koordinat gridlerini (A,B,C.. 1,2,3..) eler.
-    """
     x0, y0, x1, y1 = bbox
     cx = (x0 + x1) / 2.0
     cy = (y0 + y1) / 2.0
@@ -45,10 +41,6 @@ def is_drawing_border_margin(bbox: Tuple[float, float, float, float], page_width
 
 
 def extract_fcf_boxes(page: Any) -> List[Dict[str, Any]]:
-    """
-    Feature Control Frame (FCF) kutularını ve hücrelerini (page.get_drawings) çıkarır.
-    Kapalı dikdörtgen ve bölücü dikey çizgileri yakalar.
-    """
     fcf_boxes = []
     try:
         drawings = page.get_drawings()
@@ -70,11 +62,6 @@ def extract_fcf_boxes(page: Any) -> List[Dict[str, Any]]:
 
 
 def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[str, Any]:
-    """
-    Katman 1: Deterministik Vektör & Bölge Ayrıştırma (Sıfır VRAM, Saf CPU).
-    PyMuPDF sayfasından font boyutu, baseline, rotasyon açısı ve uzamsal ilişkilerle
-    ölçüleri ve FCF kutularını ayrıştırır.
-    """
     rect = page.rect
     page_w = rect.width
     page_h = rect.height
@@ -83,6 +70,25 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
 
     page_dict = page.get_text("dict")
     spans_pool = []
+
+    try:
+        drawings = page.get_drawings()
+    except Exception:
+        drawings = []
+    vector_symbols = recognize_vector_gdt_symbols(drawings, rect)
+
+    for sym in vector_symbols:
+        sb = sym["bbox"]
+        spans_pool.append({
+            "text": sym["symbol"],
+            "font": "VectorGeometry",
+            "size": round(max(sb[3] - sb[1], 10.0), 2),
+            "origin": (sb[0], sb[3]),
+            "bbox": sb,
+            "rotation": 0.0,
+            "flags": 0,
+            "is_vector_symbol": True,
+        })
 
     for block in page_dict.get("blocks", []):
         if block.get("type") != 0:
@@ -105,7 +111,6 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
                 if not txt:
                     continue
                 bbox = span.get("bbox", (0, 0, 0, 0))
-                # Antet, revizyon ve pafta kenar gridi kontrolü
                 if is_inside_mask(bbox, masks):
                     continue
                 if is_drawing_border_margin(bbox, page_w, page_h, text=txt):
@@ -135,7 +140,6 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
                     "flags": span.get("flags", 0),
                 })
 
-    # 1. Karakter ve Font Analizi & Küçük Fontlu Tolerans Eşleme (Örn: 35 +0.0/-0.2)
     grouped_dimensions = []
     used_spans = set()
 
@@ -144,16 +148,13 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             continue
         txt = s["text"]
 
-        # Sıcaklık, standart numarası, sertlik vb. teknik not değerlerini ele
         if re.search(r"[°\^]C|OC\b|ASTM|MIL-STD|SAE\b|HRC|HB\b|DIN\b|EN\b\s*\d+|ISO\b\s*\d+", txt, re.I):
             continue
 
-        # Sayısal veya sembolik ölçü kalıbı (Ø, R, M veya yalın ölçü)
         nom_match = re.search(r"(?:[Ø\u00d8@]|R|M)?\s*([0-9]+(?:\.[0-9]+)?)", txt)
         if not nom_match:
             continue
 
-        # Kenar harf/sayı veya parça no tek haneli grid filtresi
         if re.match(r"^[A-Z]$", txt) or (re.match(r"^[0-9]$", txt) and s["size"] < 11.0):
             continue
 
@@ -166,7 +167,19 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
         main_size = s["size"]
         main_bbox = s["bbox"]
 
-        # Çevredeki daha küçük fontlu tolerans span'lerini ara (~%50-%85 font boyutu, sağ bitişiğinde)
+        sym_prefix = ""
+        for j, other in enumerate(spans_pool):
+            if i == j or j in used_spans:
+                continue
+            if other.get("is_vector_symbol"):
+                ob = other["bbox"]
+                dx = main_bbox[0] - ob[2]
+                dy = abs(((main_bbox[1] + main_bbox[3]) / 2.0) - ((ob[1] + ob[3]) / 2.0))
+                if -2.0 <= dx <= 8.0 and dy <= 6.0:
+                    sym_prefix = other["text"]
+                    used_spans.add(j)
+                    break
+
         tol_candidates = []
         for j, other in enumerate(spans_pool):
             if i == j or j in used_spans:
@@ -181,7 +194,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
 
         upper_tol = ""
         lower_tol = ""
-        combined_str = txt
+        combined_str = f"{sym_prefix}{txt}" if sym_prefix and not txt.startswith(sym_prefix) else txt
 
         if len(tol_candidates) >= 2:
             c1 = tol_candidates[0][1]
@@ -192,7 +205,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             lower_cand = c2 if c1["bbox"][1] < c2["bbox"][1] else c1
             upper_tol = upper_cand["text"]
             lower_tol = lower_cand["text"]
-            combined_str = f"{txt} {upper_tol}/{lower_tol}"
+            combined_str = f"{combined_str} {upper_tol}/{lower_tol}"
         elif len(tol_candidates) == 1:
             used_spans.add(tol_candidates[0][0])
             c = tol_candidates[0][1]
@@ -205,7 +218,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
                 upper_tol = t_txt.strip()
             elif "-" in t_txt:
                 lower_tol = t_txt.strip()
-            combined_str = f"{txt} {t_txt}"
+            combined_str = f"{combined_str} {t_txt}"
 
         used_spans.add(i)
         rot_val = abs(float(s.get("rotation", 0.0))) % 180.0
@@ -243,7 +256,6 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             "inferred_axis": dim_axis,
         })
 
-    # 2. FCF Kutuları ile sembol ve datum kesişimi (box.contains(point))
     fcf_annotations = []
     for fbox in fcf_boxes:
         fb = fbox["bbox"]
