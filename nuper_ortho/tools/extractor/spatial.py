@@ -203,6 +203,26 @@ def classify_vector_symbol_cluster(cluster: List[Dict[str, Any]]) -> Optional[Di
     }
 
 
+def normalize_span_to_local_frame(
+    bbox: List[float],
+    rotation_deg: float,
+) -> List[float]:
+    deg = rotation_deg % 360.0
+    x0, y0, x1, y1 = bbox
+    corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    rad = math.radians(-deg)
+    cos_a = math.cos(rad)
+    sin_a = math.sin(rad)
+    tx = []
+    ty = []
+    for x, y in corners:
+        lx = x * cos_a - y * sin_a
+        ly = x * sin_a + y * cos_a
+        tx.append(lx)
+        ty.append(ly)
+    return [round(min(tx), 2), round(min(ty), 2), round(max(tx), 2), round(max(ty), 2)]
+
+
 def recognize_vector_gdt_symbols(
     drawings: List[Dict[str, Any]],
     page_rect: Any = None,

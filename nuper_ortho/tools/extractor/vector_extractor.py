@@ -4,9 +4,9 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
-    from extractor.spatial import recognize_vector_gdt_symbols, get_point_coords
+    from extractor.spatial import recognize_vector_gdt_symbols, get_point_coords, normalize_span_to_local_frame
 except ImportError:
-    from .spatial import recognize_vector_gdt_symbols, get_point_coords
+    from .spatial import recognize_vector_gdt_symbols, get_point_coords, normalize_span_to_local_frame
 
 try:
     from extractor.semantic_grammar import parse_fcf_cells
@@ -185,35 +185,46 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
                     used_spans.add(j)
                     break
 
+        span_rot = s.get("rotation", 0.0)
+        loc_main = normalize_span_to_local_frame(main_bbox, span_rot)
+
         tol_candidates = []
         for j, other in enumerate(spans_pool):
             if i == j or j in used_spans:
                 continue
-            dx = other["bbox"][0] - main_bbox[2]
-            dy = abs(other["bbox"][1] - main_bbox[1])
+            loc_other = normalize_span_to_local_frame(other["bbox"], span_rot)
+            dx = loc_other[0] - loc_main[2]
+            dy = abs(loc_other[1] - loc_main[1])
             is_smaller = other["size"] <= main_size * 0.85
             if -6.0 <= dx <= 28.0 and dy <= 22.0 and is_smaller:
                 other_text = other["text"]
                 if re.search(r"[+-]?[0-9\.]+|[0-9\.]+", other_text):
-                    tol_candidates.append((j, other))
+                    tol_candidates.append((j, other, loc_other))
 
         upper_tol = ""
         lower_tol = ""
         combined_str = f"{sym_prefix}{txt}" if sym_prefix and not txt.startswith(sym_prefix) else txt
 
         if len(tol_candidates) >= 2:
-            c1 = tol_candidates[0][1]
-            c2 = tol_candidates[1][1]
-            used_spans.add(tol_candidates[0][0])
-            used_spans.add(tol_candidates[1][0])
-            upper_cand = c1 if c1["bbox"][1] < c2["bbox"][1] else c2
-            lower_cand = c2 if c1["bbox"][1] < c2["bbox"][1] else c1
+            c1_idx, c1, loc_c1 = tol_candidates[0]
+            c2_idx, c2, loc_c2 = tol_candidates[1]
+            used_spans.add(c1_idx)
+            used_spans.add(c2_idx)
+            t1 = c1["text"]
+            t2 = c2["text"]
+            if "+" in t1 and ("-" in t2 or t2 in ("0", "-0")):
+                upper_cand, lower_cand = c1, c2
+            elif "+" in t2 and ("-" in t1 or t1 in ("0", "-0")):
+                upper_cand, lower_cand = c2, c1
+            else:
+                upper_cand = c1 if loc_c1[1] > loc_c2[1] else c2
+                lower_cand = c2 if loc_c1[1] > loc_c2[1] else c1
             upper_tol = upper_cand["text"]
             lower_tol = lower_cand["text"]
             combined_str = f"{combined_str} {upper_tol}/{lower_tol}"
         elif len(tol_candidates) == 1:
-            used_spans.add(tol_candidates[0][0])
-            c = tol_candidates[0][1]
+            c_idx, c, _ = tol_candidates[0]
+            used_spans.add(c_idx)
             t_txt = c["text"]
             if "±" in t_txt:
                 val = t_txt.replace("±", "").strip()
