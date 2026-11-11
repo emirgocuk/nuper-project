@@ -64,19 +64,11 @@ Rust testleri, fiziksel CMM ve üretici yazılımında çıktı kabulü bu incel
 
 ## 6. Şimdiki odak
 
-11 Ekim 2026 planlama eki: [Işık masası detay planı](lightTableCapabilityPlan.md) §12–14, kalıcı arayüz düzenini ve otomatik çıkarımdan bağımsız manuel çalışma yolunu tanımlar. Sonraki arayüz odağı kaynak bölgesi → manuel karakteristik kartı → taslak → inceleme akışıdır; R0/R1 önkoşulları ve progress.md iş sırası geçerlidir. Bu ek yalnız tasarımdır; UI veya sözleşme uygulanmadı, uygulama testi çalıştırılmadı.
+11 Kasım 2026 itibarıyla Faz 1'den Faz 5'e kadar olan temel fiziksel kinematik, B-Rep yüzey kimliği, bağlama pabuçları emniyeti, yıldız prob, çapak ayıklama ve ISO 1 20°C ısıl genleşme kompanzasyonu başarıyla tamamlanmış ve %100 test doğrulamasıyla kilitlenmiştir.
 
-Ürün akışı kullanıcının CMM programlama sırasına göre tanımlandı: çizim/genel notlar → gerçek datumlar veya açık operatör referansları → bağlama/erişim → düzlem/daire/kenar/kurgu çizgisiyle hizalama → tam karakteristik ve düzenlenebilir balon kontrolü → ölçüm stratejisi/onay → program. X yönü için uygun kenar veya operatörün seçtiği iki daire merkezinden çizgi desteklenecek; belirli geometriye zorlanmayacak. Bu davranışlar henüz uygulamada yoktur.
+Kullanıcı talebi doğrultusunda [masterRoadmap.md](masterRoadmap.md) altında 20 Aşamalı Büyük Mimari Yol Haritası (Faz 6 – Faz 25) planlanmıştır. Bu yol haritası; B-Rep Topolojik Bilgi Grafiği, ASME Y14.5 / ISO 1101 tam kapsamı, PTB onaylı fitting, I++ DME CMM kontrolcü köprüsü, AS9102 Rev C raporlama ve Physical AI kapalı döngü otonomisini hedefler.
 
-İlk kabul adayı KPT-3150 Kör Tapa'nın iki sayfalı PDF'i ve yerel STEP dosyasıdır. PDF'in metin katmanından içerik çıkarılamadı; OCR gerekir. Görsel incelemede açık A/B/C datum etiketi saptanmadı; pafta harfleri/not numaraları datum sayılmayacak. Antet/genel not, diş tablosu ve kaplama sonrası ölçüm şartı plan kapsamındadır. Tek bağlama sonucu prob/fikstür/erişim doğrulaması olmadan verilmeyecek. Kaynak hash'leri ve gözlem sınırları progress.md §7'de bulunur.
-
-Balon düzenleme ve PDF üzerinde sağ tıkla yeni balon tanımlama temel işlevdir. Kaynak bölgesi ile taşınabilir balon etiketi ayrılır; zoom/pan/sayfa dönüşümünde ankraj korunur; kaydet/yeniden aç ve undo/redo desteklenir. Tam ölçü kapsamı, yalnız OCR satır sayısıyla değil operatörün doğruladığı sayfa envanteriyle kabul edilir. Ayrıntılar progress.md §6'daki O1–O7 ve B1–B6 koşullarıdır.
-
-Aktif öncelik **R0 — sonuç uyduran yolların kaldırılması**. Uygulama onarımı henüz başlamadı.
-
-İlk atomik aday R0.1: DrawingPdfParser.ts içindeki nominalden ölçüm türetme ve dosya adına göre sabit veri üretme davranışını kaldırmak; davranışı bağımsız regresyonla korumak. Değişecek dosyalar görev başında seçilir; en fazla üç bağımsız modül dosyası sınırı korunur.
-
-Sonraki sıra: R1 sözleşmeler → R2 başlatma/IPC → R3 CAD/PDF akışı → R4 ortak arayüz durumu → R5 eşleştirme → R6 onay/rota/emitter → R7 kabul → R8 saha. Ayrıntılar yalnızca [progress.md](progress.md) içinde yönetilir.
+Aktif öncelik: Kullanıcı geri bildirimleri ve önceliklendirmesi doğrultusunda **Faz 6: B-Rep Topolojik Bilgi Grafiği (`BRepGraphEngine`)** uygulamasının başlatılmasıdır.
 
 ## 7. Kapsam ilkeleri
 

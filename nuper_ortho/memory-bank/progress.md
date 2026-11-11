@@ -263,4 +263,31 @@ Bu örnek için henüz onaylı datum, fikstür, tek bağlama kararı, tam karakt
 
 Her alt iş şu bilgilerle kapanır: iş kimliği; değişen dosyalar; başlangıç hatası; yeni davranış; girdi/hash ve şema sürümü; test komutları/çıkış kodları; gerçek akış kanıtı; kalan sınırlamalar. Commit varsa kimliği, yoksa çalışma ağacı bilgisi yazılır.
 
-Gerçekleşmemiş işler yeşile çevrilmez. Yeni bulgu kabulü geçersiz kılıyorsa ilgili iş yeniden açılır. Şu anda ilk uygulanacak görev R0.1'dir.
+## 10. 20 Aşamalı Büyük Mimari ve Fiziksel AI Yol Haritası (Faz 6 – Faz 25)
+
+Detaylı teknik kapsam ve kabul kriterleri için bakınız: [masterRoadmap.md](masterRoadmap.md)
+
+| Faz | Başlık | Durum | Öncelikli Hedef Modüller |
+|---|---|---|---|
+| **Faz 6** | B-Rep Topolojik Bilgi Grafiği (`BRepGraphEngine`) | Planlandı | `ortho-brep/src/graph.rs`, `brep_verifier.py` |
+| **Faz 7** | ASME Y14.5-2018 ve ISO 1101 GD&T Kural Motoru | Planlandı | `ortho-ast/src/tolerance.rs`, `composite_gdandt.rs` |
+| **Faz 8** | PTB Onaylı Fitting & GUM ISO 15530-3 Belirsizlik Motoru | Planlandı | `ortho-kinematics/src/fitting.rs`, `uncertainty.rs` |
+| **Faz 9** | Zero-Copy Yüksek Hızlı İkili IPC Protokolü | Planlandı | `ortho-router/src/ipc.rs`, `IpcClient.ts` |
+| **Faz 10** | Sürekli 5-Eksen Tarama Kinematiği (Renishaw REVO-2 & PH20) | Planlandı | `ortho-kinematics/src/ph10.rs`, `Ph10Kinematics.ts` |
+| **Faz 11** | Hibrit Metroloji: Optik ve Lazer Çizgi Sensörü (Scan-to-CAD) | Planlandı | `ortho-kinematics/src/laser.rs`, `surface.rs` |
+| **Faz 12** | Otomatik Prob Magazini Değişim Kinematiği (MCR20/FCR25) | Planlandı | `ortho-router/src/stylus.rs`, `hal.rs` |
+| **Faz 13** | I++ DME v1.7 / v2.0 Endüstriyel CMM Denetleyici Köprüsü | Planlandı | `ortho-router/src/ipp.rs`, `hal.rs` |
+| **Faz 14** | Tam Gövde BVH + GJK/EPA Çarpışma Fiziği ve Çoklu Fikstür | Planlandı | `ortho-router/src/collision.rs`, `clearance.rs` |
+| **Faz 15** | Çoklu CNC Kapalı Döngü Desteği ve SPC Aşınma Tahmini | Planlandı | `ortho-emitter/src/closed_loop.rs` |
+| **Faz 16** | AS9102 Rev C FAI Resmi İlk Numune Denetim Raporu Motoru | Planlandı | `tools/extractor/title_block.py`, `InspectionTable.ts` |
+| **Faz 17** | Çoklu Parça Paletleme, Yuvalama (Nesting) ve Seri Teftiş | Planlandı | `ortho-ast/src/alignment.rs`, `CADViewer.ts` |
+| **Faz 18** | Karpathy Güvenlik Kalkanı: Belirsizlik Karar Paneli | Planlandı | `ortho-ai/src/guardrail.rs`, `FeatureDefinitionModal.ts` |
+| **Faz 19** | Ponytail Kod Temizliği ve VRAM Stres Testi | Planlandı | `ui/src/modules/cad/utils/SceneCleaner.ts` |
+| **Faz 20** | Superpowers Metodolojisi ile Uçtan Uca Headless E2E Test | Planlandı | `tests/e2e/`, `.github/workflows/ci.yml` |
+| **Faz 21** | Savunma Sanayii Air-Gapped Güvenlik Kalkanı ve Dijital DMIS | Planlandı | `ortho-license/src/lib.rs`, `audit.rs` |
+| **Faz 22** | Atölye Tipi Yüksek Kontrast CMM Operatör Kokpiti | Planlandı | `ui/src/modules/core/`, `ui/index.html` |
+| **Faz 23** | Dinamik Termal Gradyan Simülasyonu | Planlandı | `ortho-emitter/src/closed_loop.rs`, `fitting.rs` |
+| **Faz 24** | Tersine Mühendislik ve Parametrik B-Rep Rekonstrüksiyonu | Planlandı | `ortho-brep/src/surface.rs`, `brep_verifier.py` |
+| **Faz 25** | Otonom Kalite Derleyicisi 2.0 (Sovereign Loop) | Planlandı | Tüm çekirdek ve ağ arayüzleri |
+
+Gerçekleşmemiş işler yeşile çevrilmez. Yeni bulgu kabulü geçersiz kılıyorsa ilgili iş yeniden açılır. Sıradaki uygulanacak aktif faz Faz 6 (B-Rep Topolojik Bilgi Grafiği)'dır.

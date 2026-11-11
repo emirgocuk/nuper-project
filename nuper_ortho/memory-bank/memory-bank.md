@@ -59,6 +59,7 @@ Create additional files/folders within memory-bank/ when they help organize:
 - `gdtStandardsAndDrawingRules.md`: Havacılık ve savunma teknik resim standartları (ASME Y14.5-2018, MBD/Y14.41, FCF, DRF, ISO 2768, tolerans hiyerarşisi).
 - `developmentInfrastructureRules.md`: Geliştirme altyapısı kurulum planı, darboğaz önleme kuralları, modüler UI mimarisi, IPC şema sözleşmeleri ve test standartları.
 - `github-founded-skills.md`: GitHub ve açık kaynak ekosisteminden keşfedilen ve projeye rehberlik eden agentic beceri, kural ve felsefe repolarının (superpowers, graphify, caveman, ponytail, karpathy-skills) kayıt defteri. Kullanıcı yeni bir GitHub repo bağlantısı verip "bunu ekle" dediğinde otomatik olarak bu dosyaya işlenir.
+- `masterRoadmap.md`: Nuper Ortho 20 Aşamalı Büyük Mimari ve Fiziksel AI Yol Haritası (Faz 6 – Faz 25). B-Rep topolojik grafiği, ASME Y14.5 kural motoru, PTB fitting, 5 eksen REVO-2 tarama, I++ DME, AS9102 Rev C ve kapalı döngü CNC otonomi planı.
 
 
 ## Documentation Updates
