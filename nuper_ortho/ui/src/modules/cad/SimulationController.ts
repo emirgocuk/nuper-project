@@ -21,6 +21,8 @@ export interface SimulationState {
   isPlaying: boolean;
   activeFeatureId?: number;
   activeBalloon?: string;
+  totalDurationSec?: number;
+  elapsedSec?: number;
 }
 
 export const SUPPORTED_SPEEDS = [0.5, 1.0, 2.0, 5.0] as const;
@@ -33,6 +35,7 @@ export class SimulationController {
   private waypoints: Waypoint[] = [];
   private currentWaypointIndex = 0;
   private currentPhase: ProbePhase = 'IDLE';
+  private totalDurationSec = 34.0;
 
   private baseTraverseSpeed = 150.0;
   private baseTouchSpeed = 5.0;
@@ -45,6 +48,24 @@ export class SimulationController {
 
   constructor(initialSpeed = 1.0) {
     this.setSpeedMultiplier(initialSpeed);
+  }
+
+  public setTotalDuration(sec: number): void {
+    if (sec > 0 && isFinite(sec)) {
+      this.totalDurationSec = sec;
+      this.notifyListeners();
+    }
+  }
+
+  public getTotalDuration(): number {
+    return this.totalDurationSec;
+  }
+
+  public static formatTime(seconds: number): string {
+    const s = Math.max(0, Math.floor(seconds));
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins < 10 ? '0' + mins : mins}:${secs < 10 ? '0' + secs : secs}`;
   }
 
   public getAvailableSpeeds(): readonly number[] {
@@ -191,8 +212,9 @@ export class SimulationController {
         }
         const timeDisplay = document.getElementById('time-display');
         if (timeDisplay) {
-          const sec = Math.floor(state.progress * 34);
-          timeDisplay.innerText = `00:${sec < 10 ? '0' + sec : sec} / 00:34`;
+          const totalSec = controller ? controller.getTotalDuration() : (state.totalDurationSec ?? 34);
+          const curSec = Math.floor(state.progress * totalSec);
+          timeDisplay.innerText = `${SimulationController.formatTime(curSec)} / ${SimulationController.formatTime(totalSec)}`;
         }
         const hudCoords = document.getElementById('hud-feature-coords');
         if (hudCoords) {
@@ -434,6 +456,8 @@ export class SimulationController {
       isPlaying: this.isPlaying,
       activeFeatureId: currentWp?.featureId,
       activeBalloon: currentWp?.balloon,
+      totalDurationSec: this.totalDurationSec,
+      elapsedSec: progress * this.totalDurationSec,
     };
   }
 

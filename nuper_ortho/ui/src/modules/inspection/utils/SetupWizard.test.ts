@@ -430,7 +430,7 @@ describe('SetupWizard — Sıfır Durum ve Beyaz Temalı Işık Masası Modalı'
     expect(cleanPanel?.innerHTML).toContain('395.5');
 
     const timeDisplay = mockDoc.getElementById('time-display');
-    expect(timeDisplay?.innerText).toBe('00:00 / 00:34');
+    expect(timeDisplay?.innerText).toBe('00:00 / 01:14');
   });
 
   it('Kullanıcı sağ tık veya buton ile yeni unsur tanımlayabilir ve balon altında gerçek özellik gösterilir', () => {

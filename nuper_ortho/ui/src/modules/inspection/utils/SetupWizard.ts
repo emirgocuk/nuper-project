@@ -39,7 +39,7 @@ import {
 } from '../../cad/utils/MeasurementPathGenerator';
 import { SetupPrep, type SetupRecommendation } from '../../cad/utils/SetupPrep';
 import { type CADViewer } from '../../cad/CADViewer';
-import { type SimulationState } from '../../cad/SimulationController';
+import { SimulationController, type SimulationState } from '../../cad/SimulationController';
 import { StepModelTessellator } from '../../cad/utils/StepModelTessellator';
 import { applyStepModelToScene } from '../../cad/utils/CadImportManager';
 import { CodeSnippetGenerator } from './CodeSnippetGenerator';
@@ -285,11 +285,6 @@ export class SetupWizard {
     };
     this.matchResult = matchCadWithDrawing(this.currentCadMetadata, drawingPayload);
     const cadFeats = this.currentCadMetadata.features || [];
-    const bbox = this.currentCadMetadata.bbox || { min: [-25, 20, -25], max: [25, 70, 25], size: [50, 50, 50] };
-    const maxR = Math.max(Math.abs(bbox.min[0]), Math.abs(bbox.max[0]), Math.abs(bbox.min[2]), Math.abs(bbox.max[2]), 15);
-    const yMin = bbox.min[1] ?? 20;
-    const yMax = bbox.max[1] ?? 70;
-    const sizeY = Math.max(1.0, yMax - yMin);
 
     for (const matchedDim of this.matchResult.dimensions) {
       const target = this.dimensions.find((d) => d.id === matchedDim.id);
@@ -350,18 +345,7 @@ export class SetupWizard {
         }
 
         if (!target.cad_center) {
-          const validFeats = cadFeats.filter((f) => f.center && f.normal);
-          if (validFeats.length > 0) {
-            const fallbackFeat = validFeats[Math.abs(target.id) % validFeats.length];
-            target.cad_feature_id = fallbackFeat.id;
-            target.cad_center = [fallbackFeat.center![0], fallbackFeat.center![1], fallbackFeat.center![2]];
-            target.cad_normal = [fallbackFeat.normal![0], fallbackFeat.normal![1], fallbackFeat.normal![2]];
-          } else {
-            const stepH = Math.min(sizeY - 0.5, Math.max(0.5, sizeY * 0.25));
-            const safeY = parseFloat((yMin + stepH).toFixed(2));
-            target.cad_center = [parseFloat((maxR * 0.82).toFixed(2)), safeY, 0];
-            target.cad_normal = [1, 0, 0];
-          }
+          target.match_confidence = 'UNMATCHED';
         }
 
         if (!target.measured || target.measured === '') {
@@ -2172,7 +2156,7 @@ export class SetupWizard {
       eval?: (code: string) => unknown;
       dispatchEvent?: (e: Event) => boolean;
       generateDynamicProbeTrajectory?: () => void;
-      nuperApp?: { getCADViewer: () => { getSimulationController: () => { setWaypoints: (w: unknown[]) => void; bindProbeObject: (o: unknown, v: unknown) => void; reset: () => void; onUpdate: (fn: (state: SimulationState) => void) => () => void } } };
+      nuperApp?: { getCADViewer: () => { getSimulationController: () => { setWaypoints: (w: unknown[]) => void; setTotalDuration?: (s: number) => void; bindProbeObject: (o: unknown, v: unknown) => void; reset: () => void; onUpdate: (fn: (state: SimulationState) => void) => () => void } } };
     } | undefined;
 
     let tessBbox: { min: [number, number, number]; max: [number, number, number] } | null = null;
@@ -2217,9 +2201,11 @@ export class SetupWizard {
       hudDetails.textContent = `Katı model ${supportCount} adet çift taraflı bantlı destek (H=20.0 mm) üzerine bağlandı ve ${activeDims.length} ölçüye göre takım yolu üretildi.`;
     }
 
-    const bbox = (this.currentCadMetadata?.bbox?.min && this.currentCadMetadata?.bbox?.max)
-      ? { min: this.currentCadMetadata.bbox.min, max: this.currentCadMetadata.bbox.max }
-      : (tessBbox || { min: [0, 20, 0] as [number, number, number], max: [120, 80, 45] as [number, number, number] });
+    const bbox = (tessBbox?.min && tessBbox?.max)
+      ? tessBbox
+      : ((this.currentCadMetadata?.bbox?.min && this.currentCadMetadata?.bbox?.max)
+        ? { min: this.currentCadMetadata.bbox.min, max: this.currentCadMetadata.bbox.max }
+        : { min: [-30, 20, -20] as [number, number, number], max: [30, 26, 20] as [number, number, number] });
 
     const cadFeatList = this.currentCadMetadata?.features || [];
     const fallbackCenter = {
@@ -2228,14 +2214,9 @@ export class SetupWizard {
       z: (bbox.min[2] + bbox.max[2]) / 2,
     };
     const pathFeatures: PathFeatureInput[] = activeDims.map((d) => {
-      const rawCoords = d.cad_center
+      const coords = d.cad_center
         ? { x: d.cad_center[0], y: d.cad_center[1], z: d.cad_center[2] }
         : fallbackCenter;
-      const coords = {
-        x: Math.max(bbox.min[0], Math.min(bbox.max[0], rawCoords.x)),
-        y: Math.max(bbox.min[1], Math.min(bbox.max[1], rawCoords.y)),
-        z: Math.max(bbox.min[2], Math.min(bbox.max[2], rawCoords.z)),
-      };
       const matchedCadFeat = d.cad_feature_id ? cadFeatList.find((cf) => cf.id === d.cad_feature_id) : undefined;
       const dExt = d as InspectionDimension & {
         axial_min?: number;
@@ -2298,6 +2279,9 @@ export class SetupWizard {
       const simCtrl = cadViewer?.getSimulationController();
       if (simCtrl) {
         simCtrl.setWaypoints(plan.allWaypoints);
+        if (plan.estimatedDurationSec > 0) {
+          simCtrl.setTotalDuration(plan.estimatedDurationSec);
+        }
         simCtrl.setSpeedMultiplier(1.0);
         if (this.simUnregister) {
           this.simUnregister();
@@ -2310,7 +2294,8 @@ export class SetupWizard {
 
     const timeDisplay = document.getElementById('time-display');
     if (timeDisplay) {
-      timeDisplay.innerText = '00:00 / 00:34';
+      const totalSec = plan.estimatedDurationSec > 0 ? plan.estimatedDurationSec : 34;
+      timeDisplay.innerText = `00:00 / ${SimulationController.formatTime(totalSec)}`;
     }
 
     if (winRef) {
@@ -2350,6 +2335,9 @@ export class SetupWizard {
         try {
           const simCtrl = win.nuperApp.getCADViewer().getSimulationController();
           simCtrl.setWaypoints(plan.allWaypoints);
+          if (plan.estimatedDurationSec > 0 && typeof simCtrl.setTotalDuration === 'function') {
+            simCtrl.setTotalDuration(plan.estimatedDurationSec);
+          }
           if (win.probeGroup) {
             simCtrl.bindProbeObject(win.probeGroup, new THREE.Vector3(0, 20, 0));
           }
@@ -2681,6 +2669,9 @@ export class SetupWizard {
       const simCtrl = cadViewer?.getSimulationController();
       if (simCtrl) {
         simCtrl.setWaypoints(plan.allWaypoints);
+        if (plan.estimatedDurationSec > 0) {
+          simCtrl.setTotalDuration(plan.estimatedDurationSec);
+        }
         simCtrl.setSpeedMultiplier(1.0);
         if (this.simUnregister) {
           this.simUnregister();
@@ -2956,10 +2947,9 @@ export class SetupWizard {
 
     const timeDisplay = document.getElementById('time-display');
     if (timeDisplay) {
-      const totalSec = 34;
+      const totalSec = state.totalDurationSec ?? (this.lastGeneratedPlan?.estimatedDurationSec || 34);
       const curSec = Math.floor(state.progress * totalSec);
-      const curStr = curSec < 10 ? `0${curSec}` : `${curSec}`;
-      timeDisplay.innerText = `00:${curStr} / 00:${totalSec}`;
+      timeDisplay.innerText = `${SimulationController.formatTime(curSec)} / ${SimulationController.formatTime(totalSec)}`;
     }
 
     if (typeof window !== 'undefined') {
