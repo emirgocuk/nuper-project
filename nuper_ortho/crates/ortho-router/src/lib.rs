@@ -16,7 +16,8 @@ use serde::{Deserialize, Serialize};
 
 pub use clearance::{ClearanceBox, KeepOutZone};
 pub use collision::{
-    generate_lift_and_hop, resolve_collision_free_path, test_swept_capsule_obstacle,
+    ccd_check_trajectory, compute_penetration_mtv, generate_3point_detour, generate_lift_and_hop,
+    resolve_collision_free_path, test_swept_capsule_obstacle, BvhAabb, BvhNode, BvhTree,
     CollisionError, CollisionReport,
 };
 pub use hal::{

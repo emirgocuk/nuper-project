@@ -12,6 +12,12 @@ export interface ClampBox {
   max: [number, number, number];
 }
 
+export interface KeepOutZoneDto {
+  name: string;
+  min: [number, number, number];
+  max: [number, number, number];
+}
+
 export interface CadBboxInput {
   size: [number, number, number];
   min?: [number, number, number];
@@ -384,5 +390,13 @@ export class SetupPrep {
     if (!checkAxis(p1[2], dz, minZ, maxZ)) return false;
 
     return tMin <= tMax && tMax >= 0.0 && tMin <= 1.0;
+  }
+
+  public static buildKeepOutZonesFromClamps(clamps: ClampBox[]): KeepOutZoneDto[] {
+    return clamps.map((c) => ({
+      name: c.id,
+      min: c.min,
+      max: c.max,
+    }));
   }
 }
