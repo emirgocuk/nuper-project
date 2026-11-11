@@ -203,6 +203,130 @@ def classify_vector_symbol_cluster(cluster: List[Dict[str, Any]]) -> Optional[Di
     }
 
 
+def trace_dimension_attachments(
+    dim_bbox: List[float],
+    drawings: List[Dict[str, Any]],
+    nominal_val: Optional[float] = None,
+    page_scale: Optional[float] = None,
+) -> Dict[str, Any]:
+    x0, y0, x1, y1 = dim_bbox
+    cx = (x0 + x1) / 2.0
+    cy = (y0 + y1) / 2.0
+    bw = x1 - x0
+    bh = y1 - y0
+
+    all_lines: List[Tuple[Tuple[float, float], Tuple[float, float]]] = []
+    for d in drawings:
+        for it in d.get("items", []):
+            cmd = it[0] if isinstance(it, (list, tuple)) and len(it) > 0 else ""
+            if cmd == "l" and len(it) >= 3:
+                p1 = get_point_coords(it[1])
+                p2 = get_point_coords(it[2])
+                all_lines.append((p1, p2))
+
+    best_dim_line = None
+    min_dist = float("inf")
+    dim_is_horiz = bw >= bh
+
+    for p1, p2 in all_lines:
+        dx = p2[0] - p1[0]
+        dy = p2[1] - p1[1]
+        line_len = (dx**2 + dy**2)**0.5
+        if line_len < 10.0:
+            continue
+        angle = math.degrees(math.atan2(abs(dy), abs(dx)))
+        line_cx = (p1[0] + p2[0]) / 2.0
+        line_cy = (p1[1] + p2[1]) / 2.0
+
+        if dim_is_horiz and angle <= 20.0:
+            dist = abs(line_cy - cy)
+            if dist <= 35.0 and abs(line_cx - cx) <= line_len * 0.6:
+                if dist < min_dist:
+                    min_dist = dist
+                    best_dim_line = (p1, p2, line_len, "HORIZONTAL")
+        elif not dim_is_horiz and angle >= 70.0:
+            dist = abs(line_cx - cx)
+            if dist <= 35.0 and abs(line_cy - cy) <= line_len * 0.6:
+                if dist < min_dist:
+                    min_dist = dist
+                    best_dim_line = (p1, p2, line_len, "VERTICAL")
+
+    p_start = None
+    p_end = None
+    line_length = 0.0
+    attachments = []
+
+    if best_dim_line:
+        p1, p2, line_length, orientation = best_dim_line
+        if p1[0] < p2[0] or (p1[0] == p2[0] and p1[1] < p2[1]):
+            p_start = [round(p1[0], 2), round(p1[1], 2)]
+            p_end = [round(p2[0], 2), round(p2[1], 2)]
+        else:
+            p_start = [round(p2[0], 2), round(p2[1], 2)]
+            p_end = [round(p1[0], 2), round(p1[1], 2)]
+
+        for p_target in (p_start, p_end):
+            matched_for_target = False
+            for lp1, lp2 in all_lines:
+                for candidate_pt, other_pt in ((lp1, lp2), (lp2, lp1)):
+                    dist_to_end = ((candidate_pt[0] - p_target[0])**2 + (candidate_pt[1] - p_target[1])**2)**0.5
+                    if dist_to_end <= 4.0:
+                        ldx = other_pt[0] - candidate_pt[0]
+                        ldy = other_pt[1] - candidate_pt[1]
+                        l_len = (ldx**2 + ldy**2)**0.5
+                        if l_len >= 8.0:
+                            l_angle = math.degrees(math.atan2(abs(ldy), abs(ldx)))
+                            if orientation == "HORIZONTAL" and l_angle >= 65.0:
+                                attachments.append([round(other_pt[0], 2), round(other_pt[1], 2)])
+                                matched_for_target = True
+                                break
+                            elif orientation == "VERTICAL" and l_angle <= 25.0:
+                                attachments.append([round(other_pt[0], 2), round(other_pt[1], 2)])
+                                matched_for_target = True
+                                break
+                if matched_for_target:
+                    break
+
+    leader_tip = None
+    if not best_dim_line or line_length < 15.0:
+        leader_segments = []
+        for lp1, lp2 in all_lines:
+            d1 = min(((lp1[0] - cx)**2 + (lp1[1] - cy)**2)**0.5, ((lp2[0] - cx)**2 + (lp2[1] - cy)**2)**0.5)
+            if d1 <= max(bw, bh) * 1.5 + 25.0:
+                leader_segments.append((lp1, lp2))
+
+        if leader_segments:
+            furthest_pt = None
+            max_d = float("-inf")
+            for lp1, lp2 in leader_segments:
+                for pt in (lp1, lp2):
+                    d_from_center = ((pt[0] - cx)**2 + (pt[1] - cy)**2)**0.5
+                    if d_from_center > max_d:
+                        max_d = d_from_center
+                        furthest_pt = pt
+            if furthest_pt and max_d >= 15.0:
+                leader_tip = [round(furthest_pt[0], 2), round(furthest_pt[1], 2)]
+
+    scale_consistent = True
+    ratio = None
+    if best_dim_line and nominal_val is not None and page_scale is not None and nominal_val > 0.0:
+        computed_dist = line_length * page_scale
+        ratio = computed_dist / nominal_val
+        if ratio < 0.65 or ratio > 1.45:
+            scale_consistent = False
+
+    return {
+        "has_dimension_line": best_dim_line is not None,
+        "dimension_line_length_pt": round(line_length, 2),
+        "p_start": p_start,
+        "p_end": p_end,
+        "attachment_points": attachments,
+        "leader_tip": leader_tip,
+        "scale_consistent": scale_consistent,
+        "computed_scale_ratio": round(ratio, 3) if ratio is not None else None,
+    }
+
+
 def normalize_span_to_local_frame(
     bbox: List[float],
     rotation_deg: float,

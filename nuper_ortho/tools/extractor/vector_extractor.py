@@ -4,9 +4,19 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
-    from extractor.spatial import recognize_vector_gdt_symbols, get_point_coords, normalize_span_to_local_frame
+    from extractor.spatial import (
+        recognize_vector_gdt_symbols,
+        get_point_coords,
+        normalize_span_to_local_frame,
+        trace_dimension_attachments,
+    )
 except ImportError:
-    from .spatial import recognize_vector_gdt_symbols, get_point_coords, normalize_span_to_local_frame
+    from .spatial import (
+        recognize_vector_gdt_symbols,
+        get_point_coords,
+        normalize_span_to_local_frame,
+        trace_dimension_attachments,
+    )
 
 try:
     from extractor.semantic_grammar import parse_fcf_cells
@@ -258,6 +268,8 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             dim_view = "VIEW_SIDE_YZ"
             dim_axis = "Z" if dim_orientation == "HORIZONTAL" else "Y"
 
+        attachment_info = trace_dimension_attachments(main_bbox, drawings, nominal_val=base_nom)
+
         grouped_dimensions.append({
             "raw_text": combined_str,
             "nominal": base_nom,
@@ -270,6 +282,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             "orientation": dim_orientation,
             "view_cluster": dim_view,
             "inferred_axis": dim_axis,
+            "attachments": attachment_info,
         })
 
     fcf_annotations = []
