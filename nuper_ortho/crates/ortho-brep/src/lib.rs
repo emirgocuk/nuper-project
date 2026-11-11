@@ -28,7 +28,9 @@ pub use multi_body::{MultiBodyFilter, SolidBody};
 pub use pmi::{PmiError, StepPmiReader};
 pub use step_parser::StepParser;
 pub use surface::{
-    ClassifierState, ParametricFace, SurfaceCurvature, SurfaceGeometry, SurfaceSamplingCandidate,
+    ransac_fit_cylinder, ransac_fit_plane, reconstruct_parametric_cylinder,
+    reconstruct_parametric_plane, ClassifierState, ParametricFace, SurfaceCurvature,
+    SurfaceGeometry, SurfaceSamplingCandidate,
 };
 pub use tier::{HardwareProfile, InferenceTier, Tier1RuleBasedParser};
 

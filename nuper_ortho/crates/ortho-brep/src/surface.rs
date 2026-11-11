@@ -777,6 +777,197 @@ impl ParametricFace {
     }
 }
 
+pub fn ransac_fit_plane(
+    points: &[DVec3],
+    distance_threshold: f64,
+    max_iterations: usize,
+) -> Option<(DVec3, DVec3, Vec<usize>)> {
+    let n = points.len();
+    if n < 3 {
+        return None;
+    }
+
+    let mut best_inliers = Vec::new();
+    let mut best_plane = (DVec3::ZERO, DVec3::Z);
+
+    for it in 0..max_iterations {
+        let idx1 = (it * 7 + 1) % n;
+        let idx2 = (it * 13 + 3) % n;
+        let idx3 = (it * 31 + 5) % n;
+
+        if idx1 == idx2 || idx2 == idx3 || idx1 == idx3 {
+            continue;
+        }
+
+        let p1 = points[idx1];
+        let p2 = points[idx2];
+        let p3 = points[idx3];
+
+        let normal = (p2 - p1).cross(p3 - p1);
+        if normal.length_squared() < 1e-10 {
+            continue;
+        }
+        let normal = normal.normalize();
+
+        let mut current_inliers = Vec::new();
+        for (i, p) in points.iter().enumerate() {
+            let dist = ((p - p1).dot(normal)).abs();
+            if dist <= distance_threshold {
+                current_inliers.push(i);
+            }
+        }
+
+        if current_inliers.len() > best_inliers.len() {
+            best_inliers = current_inliers;
+            best_plane = (p1, normal);
+        }
+    }
+
+    if best_inliers.len() < 3 {
+        return None;
+    }
+
+    let inliers_sum: DVec3 = best_inliers.iter().map(|&i| points[i]).sum();
+    let centroid = inliers_sum / (best_inliers.len() as f64);
+
+    Some((centroid, best_plane.1, best_inliers))
+}
+
+pub fn ransac_fit_cylinder(
+    points: &[DVec3],
+    distance_threshold: f64,
+    max_iterations: usize,
+) -> Option<(DVec3, DVec3, f64, Vec<usize>)> {
+    let n = points.len();
+    if n < 5 {
+        return None;
+    }
+
+    let candidate_axes = [
+        DVec3::X,
+        DVec3::Y,
+        DVec3::Z,
+        DVec3::new(1.0, 1.0, 0.0).normalize(),
+        DVec3::new(0.0, 1.0, 1.0).normalize(),
+    ];
+
+    let mut best_inliers = Vec::new();
+    let mut best_result = (DVec3::ZERO, DVec3::Z, 0.0);
+
+    for axis in candidate_axes {
+        for it in 0..max_iterations {
+            let idx1 = (it * 11 + 2) % n;
+            let idx2 = (it * 23 + 7) % n;
+            let idx3 = (it * 37 + 13) % n;
+            if idx1 == idx2 || idx2 == idx3 || idx1 == idx3 {
+                continue;
+            }
+
+            let p1 = points[idx1];
+            let p2 = points[idx2];
+            let p3 = points[idx3];
+
+            let a = p1 - p1.dot(axis) * axis;
+            let b = p2 - p2.dot(axis) * axis;
+            let c = p3 - p3.dot(axis) * axis;
+
+            let v1 = b - a;
+            let v2 = c - a;
+            let cross_v = v1.cross(v2);
+            let cross_sq = cross_v.length_squared();
+
+            if cross_sq < 1e-8 {
+                continue;
+            }
+
+            let v1_sq = v1.length_squared();
+            let v2_sq = v2.length_squared();
+            let num = (v1_sq * v2 - v2_sq * v1).cross(cross_v);
+            let center_est = a + num / (2.0 * cross_sq);
+            let r_est = a.distance(center_est);
+
+            if r_est < 0.5 || r_est > 1000.0 {
+                continue;
+            }
+
+            let mut inliers = Vec::new();
+            for (i, p) in points.iter().enumerate() {
+                let proj = p - p.dot(axis) * axis;
+                let d = (proj.distance(center_est) - r_est).abs();
+                if d <= distance_threshold {
+                    inliers.push(i);
+                }
+            }
+
+            if inliers.len() > best_inliers.len() {
+                best_inliers = inliers;
+                best_result = (center_est, axis, r_est);
+            }
+        }
+    }
+
+    if best_inliers.len() < 5 {
+        return None;
+    }
+
+    Some((best_result.0, best_result.1, best_result.2, best_inliers))
+}
+
+pub fn reconstruct_parametric_plane(
+    surface_id: u32,
+    inliers: &[DVec3],
+    normal: DVec3,
+) -> ParametricFace {
+    let centroid = inliers.iter().sum::<DVec3>() / (inliers.len().max(1) as f64);
+    let u_dir = if normal.cross(DVec3::Z).length_squared() > 1e-4 {
+        normal.cross(DVec3::Z).normalize()
+    } else {
+        normal.cross(DVec3::X).normalize()
+    };
+    let v_dir = normal.cross(u_dir).normalize();
+
+    let mut u_min = f64::MAX;
+    let mut u_max = f64::MIN;
+    let mut v_min = f64::MAX;
+    let mut v_max = f64::MIN;
+
+    for p in inliers {
+        let diff = *p - centroid;
+        let u = diff.dot(u_dir);
+        let v = diff.dot(v_dir);
+        u_min = u_min.min(u);
+        u_max = u_max.max(u);
+        v_min = v_min.min(v);
+        v_max = v_max.max(v);
+    }
+
+    let u_len = (u_max - u_min).max(10.0);
+    let v_len = (v_max - v_min).max(10.0);
+
+    ParametricFace::new_plane(surface_id, centroid, normal, u_len, v_len)
+}
+
+pub fn reconstruct_parametric_cylinder(
+    surface_id: u32,
+    inliers: &[DVec3],
+    origin: DVec3,
+    axis: DVec3,
+    radius: f64,
+    is_internal: bool,
+) -> ParametricFace {
+    let mut h_min = f64::MAX;
+    let mut h_max = f64::MIN;
+
+    for p in inliers {
+        let h = (*p - origin).dot(axis);
+        h_min = h_min.min(h);
+        h_max = h_max.max(h);
+    }
+
+    let height = (h_max - h_min).max(10.0);
+    ParametricFace::new_cylinder(surface_id, origin, axis, radius, height, is_internal)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -907,5 +1098,55 @@ mod tests {
             );
             assert!(pt.curvature.is_some());
         }
+    }
+
+    #[test]
+    fn test_ransac_fit_plane_and_reconstruction() {
+        let mut points = Vec::new();
+        for i in 0..10 {
+            for j in 0..10 {
+                let noise = ((i + j) % 3) as f64 * 0.01;
+                points.push(DVec3::new(i as f64 * 10.0, j as f64 * 10.0, 50.0 + noise));
+            }
+        }
+        points.push(DVec3::new(20.0, 20.0, 100.0));
+        points.push(DVec3::new(30.0, 30.0, -20.0));
+
+        let res = ransac_fit_plane(&points, 0.05, 50);
+        assert!(res.is_some());
+        let (centroid, normal, inliers) = res.unwrap();
+        assert!(inliers.len() >= 95);
+        assert!((normal.z.abs() - 1.0).abs() < 1e-3);
+        assert!((centroid.z - 50.0).abs() < 0.1);
+
+        let reconstructed = reconstruct_parametric_plane(1, &points[..100], normal);
+        assert_eq!(reconstructed.surface_id, 1);
+        let normal_eval = reconstructed.evaluate_normal(0.0, 0.0);
+        assert!((normal_eval.z.abs() - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_ransac_fit_cylinder_and_reconstruction() {
+        let mut points = Vec::new();
+        let radius = 25.0;
+        for h in 0..8 {
+            let z = h as f64 * 10.0;
+            for a in 0..12 {
+                let theta = (a as f64) * std::f64::consts::PI / 6.0;
+                let x = radius * theta.cos();
+                let y = radius * theta.sin();
+                points.push(DVec3::new(x, y, z));
+            }
+        }
+
+        let res = ransac_fit_cylinder(&points, 0.1, 80);
+        assert!(res.is_some());
+        let (origin, axis, r_est, inliers) = res.unwrap();
+        assert!(inliers.len() >= 80);
+        assert!((r_est - radius).abs() < 1.0);
+        assert!((axis.z.abs() - 1.0).abs() < 1e-3);
+
+        let reconstructed = reconstruct_parametric_cylinder(2, &points, origin, axis, r_est, true);
+        assert_eq!(reconstructed.surface_id, 2);
     }
 }

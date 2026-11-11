@@ -1219,6 +1219,24 @@ def extract_cad_metadata(step_path: str) -> Dict[str, Any]:
     return fallback_dict
 
 
+def verify_reconstructed_surface(feature: Dict[str, Any]) -> bool:
+    if not isinstance(feature, dict):
+        return False
+    ft = feature.get("feature_type")
+    if ft not in ("PLANE", "CYLINDER", "CONE", "SPHERE", "TORUS"):
+        return False
+    center = feature.get("center")
+    if not isinstance(center, (list, tuple)) or len(center) != 3:
+        return False
+    normal = feature.get("normal")
+    if not isinstance(normal, (list, tuple)) or len(normal) != 3:
+        return False
+    length = math.sqrt(normal[0] ** 2 + normal[1] ** 2 + normal[2] ** 2)
+    if length < 1e-6:
+        return False
+    return True
+
+
 if __name__ == "__main__":
     import json
     if len(sys.argv) > 1:
