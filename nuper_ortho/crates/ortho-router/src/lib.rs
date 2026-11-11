@@ -7,6 +7,7 @@ pub mod collision;
 pub mod hal;
 pub mod ipc;
 pub mod ipp;
+pub mod pallet;
 pub mod stylus;
 pub mod traversal;
 pub mod tsp;
@@ -26,6 +27,10 @@ pub use hal::{
 pub use ipc::{BinaryMeshPacket, BinaryTrajectoryPacket};
 pub use ipp::{
     trajectory_to_ipp_stream, IppClient, IppCmmSimulator, IppCommand, IppError, IppProtocol, IppResponse,
+};
+pub use pallet::{
+    optimize_cross_nest_pallet_inspection, partition_trajectory_by_orientation, PalletError,
+    PalletGrid, PalletSlot,
 };
 pub use stylus::{ReachabilityReport, StylusAssembly, StylusError};
 pub use traversal::{SafeTraversalSequence, ZFirstTraversal};
