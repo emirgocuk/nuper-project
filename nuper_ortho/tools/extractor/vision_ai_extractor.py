@@ -34,6 +34,42 @@ JSON format:
 Return only pure JSON. No markdown fences. No commentary."""
 
 
+def sanitize_engineering_ocr_tokens(token: str) -> str:
+    if not token:
+        return ""
+    t = token.strip()
+    t = re.sub(r"^\s*0/([0-9])", r"Ø\1", t)
+    t = re.sub(r"^\s*[OQ]([0-9])", r"Ø\1", t)
+    t = re.sub(r"(\s+)[OQ]([0-9])", r"\1Ø\2", t)
+
+    t = t.replace("+-", "±").replace("+/-", "±").replace(r"+\-", "±")
+
+    def replace_substitutions(m):
+        full = m.group(0)
+        full = re.sub(r"(?<=[0-9\.])[lI|](?=[0-9\.])", "1", full)
+        full = re.sub(r"(?<=[0-9\.])[S](?=[0-9\.])", "5", full)
+        full = re.sub(r"(?<=[0-9\.])[B](?=[0-9\.])", "8", full)
+        full = re.sub(r"(?<=[0-9\.])[Z](?=[0-9\.])", "2", full)
+        full = re.sub(r"(?<=[0-9])[lI|]$", "1", full)
+        full = re.sub(r"(?<=[0-9])[S]$", "5", full)
+        full = re.sub(r"(?<=[0-9])[B]$", "8", full)
+        full = re.sub(r"(?<=[0-9])[Z]$", "2", full)
+        full = re.sub(r"^[lI|](?=[0-9])", "1", full)
+        full = re.sub(r"^[S](?=[0-9])", "5", full)
+        full = re.sub(r"^[B](?=[0-9])", "8", full)
+        full = re.sub(r"^[Z](?=[0-9])", "2", full)
+        return full
+
+    t = re.sub(r"\b[0-9A-Za-z\.\-\+|]+\b", replace_substitutions, t)
+    t = re.sub(r"(?<=[xX])[lI|](?=\.)", "1", t)
+    t = re.sub(r"(?<=[xX])[lI|](?=[A-Za-z0-9])", "1", t)
+    t = re.sub(r"\.Z\b", ".2", t)
+    t = re.sub(r"\.S\b", ".5", t)
+    t = re.sub(r"\.B\b", ".8", t)
+    t = re.sub(r"\.l\b", ".1", t)
+    return t
+
+
 def render_pdf_page_to_base64(pdf_path: str, page_num: int = 1, dpi: int = 150) -> Optional[Tuple[str, int, int]]:
     try:
         import pymupdf

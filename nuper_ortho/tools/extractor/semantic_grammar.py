@@ -3,9 +3,14 @@ import re
 import urllib.request
 from typing import Any, Dict, List, Optional, Tuple
 
+try:
+    from extractor.vision_ai_extractor import sanitize_engineering_ocr_tokens
+except ImportError:
+    from .vision_ai_extractor import sanitize_engineering_ocr_tokens
+
 
 def normalize_engineering_callout(raw_text: str) -> Dict[str, Any]:
-    cleaned = raw_text.strip()
+    cleaned = sanitize_engineering_ocr_tokens(raw_text)
     cleaned = re.sub(r"[\u00d8\u00f8\u2300\u2349\xa2@]", "Ø", cleaned)
     cleaned = re.sub(r"\b[Oo]([0-9]+(?:\.[0-9]+)?)\b", r"Ø\1", cleaned)
     cleaned = cleaned.replace("+-", "±").replace("+/-", "±")
