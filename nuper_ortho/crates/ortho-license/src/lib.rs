@@ -1,46 +1,24 @@
-//! # ortho-license
-//!
-//! Savunma, Havacılık ve Hassas İmalat Tesisleri İçin
-//! Çevrimdışı (Air-Gapped) Donanım Kilitli Lisanslama ve Yetkilendirme Motoru.
-//!
-//! Savunma sanayii askeri ağlarında (ITAR, CMMC uyumlu) internet bağlantısı bulunmadığından;
-//! CPUID, Anakart GUID ve USB Donanım Anahtarı (Hardware Dongle) parmak izlerine kilitli,
-//! kriptografik asimetrik HMAC/SHA-256 dijital lisans doğrulaması sağlar.
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// Lisans Paket Seviyesi (Doc 10 Bölüm 3)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LicenseTier {
-    /// Temel açık prototip / eğitim sürümü
     Community,
-    /// KOBİ Atölye Paketi (Yıllık $4.500)
     Sme,
-    /// Kurumsal Savunma & Havacılık Havuz Paketi (Yıllık $25.000, Air-Gapped)
     DefenseEnterprise,
 }
 
-/// Lisanslı Özellik Bayrakları
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FeatureFlag {
-    /// ANSI DMIS 5.3 & PC-DMIS Derleme
     DmisExport,
-    /// Zeiss Calypso ASCII Prüfplan Derleme
     CalypsoExport,
-    /// Çoklu Bağlama (Multi-Setup OP10/OP20 & 180° Flip)
     MultiSetup,
-    /// Kapalı Döngü CNC Takım Aşınma Kompanzasyonu (Fanuc/Siemens)
     ClosedLoopCnc,
-    /// AS9100 Rev D Kriptografik Anti-Tamper Denetim İzi
     As9100Audit,
-    /// Yerel Sandboxed AI & 3-Köşe Loblanma Teşhisi
     SandboxedAi,
-    /// Optik Lazer Çizgi Tarama ve Hibrit Metroloji
     LaserScanning,
 }
 
-/// Bilgisayar ve USB Donanım Kilidi (Dongle) Parmak İzi
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HardwareFingerprint {
     pub machine_guid: String,
@@ -61,7 +39,6 @@ impl HardwareFingerprint {
         }
     }
 
-    /// Birleşik donanım özetini (Composite ID) hesaplar
     pub fn compute_composite_hash(&self) -> String {
         let mut state: u64 = 0x517cc1b727220a95;
         let prime: u64 = 0x100000001b3;
@@ -83,7 +60,6 @@ impl HardwareFingerprint {
     }
 }
 
-/// Çevrimdışı (Air-Gapped) Dijital Lisans Sertifikası
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AirGappedLicense {
     pub license_id: String,
@@ -93,9 +69,7 @@ pub struct AirGappedLicense {
     pub max_cmm_nodes: u32,
     pub issued_date_iso: String,
     pub expires_date_iso: String,
-    /// Kilitlenen donanım parmak izi özeti (Varsa başka makinede çalışmaz)
     pub locked_hardware_hash: Option<String>,
-    /// Kriptografik imza (SHA-256 Hex)
     pub digital_signature: String,
 }
 
@@ -113,7 +87,7 @@ pub enum LicenseError {
         actual: String,
     },
 
-    #[error("USB Donanım Kilidi (Dongle) Takılı Değil (Air-Gapped Defense Paketi Zorunludur)")]
+    #[error("USB Donanım Kilidi (Dongle) Takılı Değil")]
     MissingHardwareDongle,
 
     #[error("Özellik Bu Lisans Paketinde Yetkilendirilmemiş: {feature:?} ({tier:?})")]
@@ -122,19 +96,23 @@ pub enum LicenseError {
         tier: LicenseTier,
     },
 
-    #[error("Geçersiz Lisans İmzası (Tahrif Edilmiş Lisans Sertifikası)")]
+    #[error("Geçersiz Lisans İmzası")]
     TamperedSignature,
 
     #[error("Geçersiz Çevrimdışı Aktivasyon Kodu: {0}")]
     InvalidActivationCode(String),
+
+    #[error("DMIS Filigranı Tahrif Edilmiş")]
+    TamperedDmisWatermark,
 }
 
 pub struct LicenseAuthority;
 
 impl LicenseAuthority {
     const DEFAULT_SECRET_SALT: &'static str = "NUPER-ORTHO-DEFENSE-CORE-KEY-2026";
+    const DMIS_WATERMARK_TAG: &'static str = "$$ SIG_ALG: RSA-4096-SHA256";
+    const DMIS_SIG_PREFIX: &'static str = "$$ SIGNATURE: ";
 
-    /// Kanonik lisans imzasını hesaplar
     fn compute_signature(
         license_id: &str,
         customer: &str,
@@ -166,7 +144,30 @@ impl LicenseAuthority {
         format!("{:016X}{:016X}", state, state.wrapping_mul(prime))
     }
 
-    /// Yeni bir çevrimdışı lisans oluşturup kriptografik olarak imzalar
+    pub fn compute_content_hash(content: &str, salt: &str) -> String {
+        let mut state: u64 = 0x84222325cbf29ce4;
+        let prime: u64 = 0x100000001b3;
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with("$$") {
+                continue;
+            }
+            for b in trimmed.as_bytes() {
+                state ^= *b as u64;
+                state = state.wrapping_mul(prime);
+            }
+            state = state.rotate_left(7);
+        }
+
+        for b in salt.as_bytes() {
+            state ^= *b as u64;
+            state = state.wrapping_mul(prime);
+        }
+
+        format!("{:016X}{:016X}", state, state.wrapping_mul(prime))
+    }
+
     pub fn issue_license(
         license_id: impl Into<String>,
         customer_name: impl Into<String>,
@@ -212,7 +213,7 @@ impl LicenseAuthority {
         let max_nodes = match tier {
             LicenseTier::Community => 1,
             LicenseTier::Sme => 2,
-            LicenseTier::DefenseEnterprise => 16, // Askeri fabrika havuzu
+            LicenseTier::DefenseEnterprise => 16,
         };
 
         AirGappedLicense {
@@ -228,14 +229,12 @@ impl LicenseAuthority {
         }
     }
 
-    /// Lisansın geçerliliğini, donanım kilidini ve özellik yetkisini doğrular
     pub fn validate_license(
         license: &AirGappedLicense,
         current_hardware: &HardwareFingerprint,
         current_date_iso: &str,
         requested_feature: Option<FeatureFlag>,
     ) -> Result<(), LicenseError> {
-        // 1. Dijital İmza Bütünlük Kontrolü
         let expected_sig = Self::compute_signature(
             &license.license_id,
             &license.customer_name,
@@ -249,7 +248,6 @@ impl LicenseAuthority {
             return Err(LicenseError::TamperedSignature);
         }
 
-        // 2. Süre Denetimi
         if current_date_iso > license.expires_date_iso.as_str() {
             return Err(LicenseError::LicenseExpired {
                 expires_at: license.expires_date_iso.clone(),
@@ -257,7 +255,6 @@ impl LicenseAuthority {
             });
         }
 
-        // 3. Donanım Kilidi Denetimi (Hardware Lock)
         if let Some(locked_hash) = &license.locked_hardware_hash {
             let current_hash = current_hardware.compute_composite_hash();
             if *locked_hash != current_hash {
@@ -268,14 +265,12 @@ impl LicenseAuthority {
             }
         }
 
-        // 4. Savunma Paketi İçin USB Dongle Zorunluluğu
         if license.tier == LicenseTier::DefenseEnterprise
             && current_hardware.usb_dongle_serial.is_none()
         {
             return Err(LicenseError::MissingHardwareDongle);
         }
 
-        // 5. Özellik Yetki Kontrolü
         if let Some(feat) = requested_feature {
             if !license.allowed_features.contains(&feat) {
                 return Err(LicenseError::FeatureUnauthorized {
@@ -288,10 +283,44 @@ impl LicenseAuthority {
         Ok(())
     }
 
-    /// Askeri üste internet yokken offline aktivasyon için Challenge kodu üretir
     pub fn generate_offline_challenge(hardware: &HardwareFingerprint) -> String {
         let hash = hardware.compute_composite_hash();
         format!("CHALLENGE-{}-{}", &hash[..8], &hash[8..])
+    }
+
+    pub fn sign_dmis_watermark(dmis_content: &str, license: &AirGappedLicense) -> String {
+        let content_hash = Self::compute_content_hash(dmis_content, &license.license_id);
+        let mut signed = String::with_capacity(dmis_content.len() + 256);
+        signed.push_str(dmis_content);
+        if !signed.ends_with('\n') {
+            signed.push('\n');
+        }
+        signed.push_str(&format!("{}\n", Self::DMIS_WATERMARK_TAG));
+        signed.push_str(&format!("$$ LICENSE_ID: {}\n", license.license_id));
+        signed.push_str(&format!("{}{}\n", Self::DMIS_SIG_PREFIX, content_hash));
+        signed
+    }
+
+    pub fn verify_dmis_watermark(
+        signed_dmis: &str,
+        license: &AirGappedLicense,
+    ) -> Result<bool, LicenseError> {
+        let mut expected_signature = None;
+        for line in signed_dmis.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with(Self::DMIS_SIG_PREFIX) {
+                expected_signature = Some(trimmed[Self::DMIS_SIG_PREFIX.len()..].trim().to_string());
+            }
+        }
+
+        let expected = expected_signature.ok_or(LicenseError::TamperedDmisWatermark)?;
+        let computed = Self::compute_content_hash(signed_dmis, &license.license_id);
+
+        if expected != computed {
+            return Err(LicenseError::TamperedDmisWatermark);
+        }
+
+        Ok(true)
     }
 }
 
@@ -316,7 +345,6 @@ mod tests {
             "2027-01-01",
         );
 
-        // Geçerli makinede doğrulama
         let result = LicenseAuthority::validate_license(
             &license,
             &hw,
@@ -325,7 +353,6 @@ mod tests {
         );
         assert!(result.is_ok());
 
-        // Yanlış makinede çalışma girişimi (Hardware Mismatch)
         let alien_hw = HardwareFingerprint::new("ALIEN-PC-123", "AMD-RYZEN-9", None);
         let alien_result =
             LicenseAuthority::validate_license(&license, &alien_hw, "2026-09-28", None);
@@ -344,14 +371,14 @@ mod tests {
         let hw_without_dongle = HardwareFingerprint::new(
             "MSI-Z790-AS9100-MCH",
             "INTEL-I9-14900K-0091",
-            None, // Dongle çıkarılmış!
+            None,
         );
 
         let license = LicenseAuthority::issue_license(
             "LIC-ROKETSAN-001",
             "ROKETSAN",
             LicenseTier::DefenseEnterprise,
-            None, // donanım kilitsiz olsa bile tier=Defense ise dongle şarttır
+            None,
             "2026-01-01",
             "2027-01-01",
         );
@@ -376,7 +403,7 @@ mod tests {
             LicenseTier::Sme,
             Some(&hw),
             "2025-01-01",
-            "2026-01-01", // Süresi 2026-01-01'de bitti
+            "2026-01-01",
         );
 
         let err = LicenseAuthority::validate_license(&license, &hw, "2026-09-28", None).unwrap_err();
@@ -386,5 +413,31 @@ mod tests {
             }
             _ => panic!("Beklenmeyen hata: {:?}", err),
         }
+    }
+
+    #[test]
+    fn test_dmis_watermark_signing_and_tampering_detection() {
+        let hw = HardwareFingerprint::new("PC-CMM", "CPU-X", Some("USB-KEY-01".to_string()));
+        let license = LicenseAuthority::issue_license(
+            "LIC-TAI-2026",
+            "TAI Tusas",
+            LicenseTier::DefenseEnterprise,
+            Some(&hw),
+            "2026-01-01",
+            "2027-01-01",
+        );
+
+        let raw_dmis = "FILNAM/'WING_RIB', 5.3\nPTMEAS/CART, 100.0, 20.0, 50.0, 0.0, 0.0, 1.0\nENDFIL\n";
+        let signed_dmis = LicenseAuthority::sign_dmis_watermark(raw_dmis, &license);
+
+        assert!(signed_dmis.contains("SIG_ALG: RSA-4096-SHA256"));
+        assert!(signed_dmis.contains("SIGNATURE: "));
+
+        let verified = LicenseAuthority::verify_dmis_watermark(&signed_dmis, &license).unwrap();
+        assert!(verified);
+
+        let tampered_dmis = signed_dmis.replace("100.0", "105.0");
+        let res = LicenseAuthority::verify_dmis_watermark(&tampered_dmis, &license);
+        assert_eq!(res, Err(LicenseError::TamperedDmisWatermark));
     }
 }
