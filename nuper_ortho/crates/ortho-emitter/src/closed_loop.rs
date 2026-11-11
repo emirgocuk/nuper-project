@@ -1,8 +1,3 @@
-//! # Kapalı Döngü Kalite Geri Bildirimi ve CNC Takım Aşınma Kompanzasyonu (Doc 08 & Doc 13)
-//! 
-//! CMM ölçüm sapmalarını (.csv, Q-DAS .dfq) ayrıştırarak Fanuc, Siemens Sinumerik ve
-//! Heidenhain CNC tezgahlarına doğrudan yüklenebilir takım aşınma ofseti (Wear Offset) üretir.
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -22,18 +17,14 @@ pub enum ClosedLoopError {
     ToolMappingNotFound(String),
 }
 
-/// CNC Kontrol Ünitesi Tipi
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CncControllerType {
-    /// Fanuc 0i / 31i (G10 L12 / G10 L10 Ofset Komutları)
     Fanuc,
-    /// Siemens Sinumerik 840D / ONE ($TC_DP12, $TC_DP13 R-Parametreleri)
     SiemensSinumerik,
-    /// Heidenhain TNC 640 / iTNC 530 (TOOL CALL DL/DR)
     Heidenhain,
+    Haas,
 }
 
-/// CMM Ölçüm Raporundan Çıkarılan Sapma Verisi
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FeatureDeviation {
     pub feature_name: String,
@@ -67,18 +58,28 @@ impl FeatureDeviation {
     }
 }
 
-/// Unsur ile CNC Takım Eşleşmesi
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolCompensationMapping {
     pub feature_name: String,
     pub tool_number: u32,
-    /// Çap / Radyal aşınma kompanzasyon katsayısı (İç çap için ters işaret, dış çap için doğru işaret)
     pub is_internal_feature: bool,
-    /// Maksimum güvenli aşınma düzeltme eşiği (Örn: 0.050 mm). Bu değer aşılırsa kompanzasyon durdurulur!
     pub max_safe_wear_limit_mm: f64,
 }
 
-/// Kapalı Döngü CNC Kompanzasyon Motoru
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SpcAnalysisResult {
+    pub mean: f64,
+    pub std_dev: f64,
+    pub cp: f64,
+    pub cpk: f64,
+    pub slope: f64,
+    pub intercept: f64,
+    pub predicted_next: f64,
+    pub tolerance_consumed_ratio: f64,
+    pub requires_predictive_compensation: bool,
+    pub suggested_compensation_mm: f64,
+}
+
 pub struct ClosedLoopEngine {
     pub controller_type: CncControllerType,
     pub tool_mappings: Vec<ToolCompensationMapping>,
@@ -107,21 +108,19 @@ impl ClosedLoopEngine {
         });
     }
 
-    /// CSV formatındaki CMM ölçüm raporunu ayrıştırır
-    /// Satır formatı: `FEATURE_NAME, NOMINAL, MEASURED, USL, LSL`
     pub fn parse_csv_report(csv_content: &str) -> Result<Vec<FeatureDeviation>, ClosedLoopError> {
         let mut deviations = Vec::new();
 
         for line in csv_content.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with("FEATURE") {
-                continue; // Başlık veya açıklama satırlarını atla
+                continue;
             }
 
             let parts: Vec<&str> = trimmed.split(',').map(|s| s.trim()).collect();
             if parts.len() < 5 {
                 return Err(ClosedLoopError::InvalidReportFormat(format!(
-                    "Yetersiz sütun sayısı (en az 5 olmalı): {}",
+                    "Yetersiz sütun sayısı: {}",
                     trimmed
                 )));
             }
@@ -146,7 +145,94 @@ impl ClosedLoopEngine {
         Ok(deviations)
     }
 
-    /// Sapma verilerinden CNC kontrol ünitesine doğrudan yüklenebilir aşınma blokları üretir
+    pub fn analyze_spc_trend(measurements: &[f64], usl: f64, lsl: f64) -> SpcAnalysisResult {
+        let n = measurements.len();
+        if n == 0 {
+            return SpcAnalysisResult {
+                mean: 0.0,
+                std_dev: 0.0,
+                cp: 0.0,
+                cpk: 0.0,
+                slope: 0.0,
+                intercept: 0.0,
+                predicted_next: 0.0,
+                tolerance_consumed_ratio: 0.0,
+                requires_predictive_compensation: false,
+                suggested_compensation_mm: 0.0,
+            };
+        }
+
+        let mean = measurements.iter().sum::<f64>() / (n as f64);
+        let variance = if n > 1 {
+            measurements.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / ((n - 1) as f64)
+        } else {
+            0.0
+        };
+        let std_dev = variance.sqrt();
+
+        let tolerance = usl - lsl;
+        let cp = if std_dev > 1e-9 {
+            tolerance / (6.0 * std_dev)
+        } else {
+            99.99
+        };
+
+        let cpk = if std_dev > 1e-9 {
+            let cpu = (usl - mean) / (3.0 * std_dev);
+            let cpl = (mean - lsl) / (3.0 * std_dev);
+            cpu.min(cpl)
+        } else {
+            99.99
+        };
+
+        let (slope, intercept) = if n >= 2 {
+            let t_mean = (n as f64 + 1.0) / 2.0;
+            let mut num = 0.0;
+            let mut den = 0.0;
+            for (i, &y) in measurements.iter().enumerate() {
+                let t = (i + 1) as f64;
+                num += (t - t_mean) * (y - mean);
+                den += (t - t_mean).powi(2);
+            }
+            let s = if den.abs() > 1e-12 { num / den } else { 0.0 };
+            let inter = mean - s * t_mean;
+            (s, inter)
+        } else {
+            (0.0, mean)
+        };
+
+        let next_t = (n + 1) as f64;
+        let predicted_next = intercept + slope * next_t;
+        let nominal = (usl + lsl) * 0.5;
+        let half_tol = tolerance * 0.5;
+        let pred_dev = (predicted_next - nominal).abs();
+        let consumption_ratio = if half_tol > 1e-9 {
+            pred_dev / half_tol
+        } else {
+            0.0
+        };
+
+        let requires_predictive = consumption_ratio >= 0.70;
+        let suggested_compensation = if requires_predictive {
+            -(predicted_next - nominal)
+        } else {
+            0.0
+        };
+
+        SpcAnalysisResult {
+            mean,
+            std_dev,
+            cp,
+            cpk,
+            slope,
+            intercept,
+            predicted_next,
+            tolerance_consumed_ratio: consumption_ratio,
+            requires_predictive_compensation: requires_predictive,
+            suggested_compensation_mm: suggested_compensation,
+        }
+    }
+
     pub fn generate_compensation_program(
         &self,
         deviations: &[FeatureDeviation],
@@ -165,6 +251,9 @@ impl ClosedLoopEngine {
             CncControllerType::Heidenhain => {
                 gcode.push_str("BEGIN PGM WEAR_UPDATE MM\n");
             }
+            CncControllerType::Haas => {
+                gcode.push_str("%\nO9901 (NUPER ORTHO HAAS WEAR UPDATE)\n");
+            }
         }
 
         let mut compensated_count = 0;
@@ -175,15 +264,12 @@ impl ClosedLoopEngine {
                 .iter()
                 .find(|m| m.feature_name == dev.feature_name)
             {
-                // İç çapta (delik) delik büyük çıktıysa (+sapma), freze/rayba takımı aşınmış veya esnemiştir:
-                // Nominal boyuta çekmek için takım yarıçapına kompanzasyon uygulanır.
                 let wear_delta = if mapping.is_internal_feature {
-                    -dev.deviation / 2.0 // Yarıçap düzeltmesi
+                    -dev.deviation / 2.0
                 } else {
                     dev.deviation / 2.0
                 };
 
-                // Güvenlik Kilidi: Aşırı sapma varsa takım kırılmış olabilir!
                 if dev.deviation.abs() > mapping.max_safe_wear_limit_mm {
                     return Err(ClosedLoopError::ToolBreakageDetected {
                         tool_number: mapping.tool_number,
@@ -194,7 +280,16 @@ impl ClosedLoopEngine {
 
                 match self.controller_type {
                     CncControllerType::Fanuc => {
-                        // G10 L12 P{tool} R{wear_delta} -> Takım Geometri/Aşınma Yarıçapı Güncelleme
+                        gcode.push_str(&format!(
+                            "(UNSUR: {} | SAPMA: {:+.4} mm)\n",
+                            dev.feature_name, dev.deviation
+                        ));
+                        gcode.push_str(&format!(
+                            "G10 L12 P{} R{:.4}\n",
+                            mapping.tool_number, wear_delta
+                        ));
+                    }
+                    CncControllerType::Haas => {
                         gcode.push_str(&format!(
                             "(UNSUR: {} | SAPMA: {:+.4} mm)\n",
                             dev.feature_name, dev.deviation
@@ -205,7 +300,6 @@ impl ClosedLoopEngine {
                         ));
                     }
                     CncControllerType::SiemensSinumerik => {
-                        // $TC_DP13[T,D] = Aşınma Yarıçapı
                         gcode.push_str(&format!(
                             "; UNSUR: {} | SAPMA: {:+.4} mm\n",
                             dev.feature_name, dev.deviation
@@ -231,7 +325,7 @@ impl ClosedLoopEngine {
         }
 
         match self.controller_type {
-            CncControllerType::Fanuc => gcode.push_str("M30\n%\n"),
+            CncControllerType::Fanuc | CncControllerType::Haas => gcode.push_str("M30\n%\n"),
             CncControllerType::SiemensSinumerik => gcode.push_str("M30\n"),
             CncControllerType::Heidenhain => gcode.push_str("END PGM WEAR_UPDATE MM\n"),
         }
@@ -243,6 +337,38 @@ impl ClosedLoopEngine {
         }
 
         Ok(gcode)
+    }
+
+    pub fn generate_spc_predictive_compensation(
+        &self,
+        tool_number: u32,
+        is_internal_feature: bool,
+        spc: &SpcAnalysisResult,
+    ) -> Option<String> {
+        if !spc.requires_predictive_compensation {
+            return None;
+        }
+
+        let wear_delta = if is_internal_feature {
+            spc.suggested_compensation_mm / 2.0
+        } else {
+            -spc.suggested_compensation_mm / 2.0
+        };
+
+        match self.controller_type {
+            CncControllerType::Fanuc | CncControllerType::Haas => Some(format!(
+                "G10 L12 P{} R{:.4}",
+                tool_number, wear_delta
+            )),
+            CncControllerType::SiemensSinumerik => Some(format!(
+                "$TC_DP13[{}, 1] = $TC_DP13[{}, 1] + ({:.4})",
+                tool_number, tool_number, wear_delta
+            )),
+            CncControllerType::Heidenhain => Some(format!(
+                "TOOL CALL {} DR{:.4}",
+                tool_number, wear_delta
+            )),
+        }
     }
 }
 
@@ -303,18 +429,36 @@ PIN_10_M6, 10.0000, 9.9940, 10.0090, 9.9910
     #[test]
     fn test_fanuc_wear_compensation_generation() {
         let mut engine = ClosedLoopEngine::new(CncControllerType::Fanuc);
-        engine.add_tool_mapping("BORE_20_H7", 3, true, 0.050); // Takım 3: Rayba / Freze
+        engine.add_tool_mapping("BORE_20_H7", 3, true, 0.050);
 
         let devs = vec![FeatureDeviation::new(
             "BORE_20_H7",
             20.0000,
-            20.0140, // +0.014 mm büyük çıkmış
+            20.0140,
             20.0210,
             20.0000,
         )];
 
         let gcode = engine.generate_compensation_program(&devs).unwrap();
         assert!(gcode.contains("G10 L12 P3 R-0.0070"));
+        assert!(gcode.contains("M30"));
+    }
+
+    #[test]
+    fn test_haas_wear_compensation_generation() {
+        let mut engine = ClosedLoopEngine::new(CncControllerType::Haas);
+        engine.add_tool_mapping("BORE_20_H7", 2, true, 0.050);
+
+        let devs = vec![FeatureDeviation::new(
+            "BORE_20_H7",
+            20.0000,
+            20.0100,
+            20.0210,
+            20.0000,
+        )];
+
+        let gcode = engine.generate_compensation_program(&devs).unwrap();
+        assert!(gcode.contains("G10 L12 P2 R-0.0050"));
         assert!(gcode.contains("M30"));
     }
 
@@ -338,12 +482,12 @@ PIN_10_M6, 10.0000, 9.9940, 10.0090, 9.9910
     #[test]
     fn test_tool_breakage_safety_guard_aborts() {
         let mut engine = ClosedLoopEngine::new(CncControllerType::Fanuc);
-        engine.add_tool_mapping("BORE_20_H7", 3, true, 0.050); // Maksimum 0.050 mm
+        engine.add_tool_mapping("BORE_20_H7", 3, true, 0.050);
 
         let catastrophic_dev = vec![FeatureDeviation::new(
             "BORE_20_H7",
             20.0000,
-            20.2500, // +0.250 mm sapma (Takım kesin kırılmış!)
+            20.2500,
             20.0210,
             20.0000,
         )];
@@ -353,6 +497,32 @@ PIN_10_M6, 10.0000, 9.9940, 10.0090, 9.9910
             result,
             Err(ClosedLoopError::ToolBreakageDetected { .. })
         ));
+    }
+
+    #[test]
+    fn test_spc_wear_trend_prediction_and_trigger_at_part_8() {
+        let nominal = 20.000;
+        let usl = 20.030;
+        let lsl = 19.970;
+
+        let mut measurements = Vec::new();
+        for i in 1..=8 {
+            measurements.push(nominal + (i as f64) * 0.003);
+        }
+
+        let spc = ClosedLoopEngine::analyze_spc_trend(&measurements, usl, lsl);
+        assert!((spc.slope - 0.003).abs() < 1e-6);
+        assert_eq!(measurements.len(), 8);
+        assert!((measurements[7] - 20.024).abs() < 1e-6);
+        assert!((spc.predicted_next - 20.027).abs() < 1e-4);
+        assert!(spc.tolerance_consumed_ratio >= 0.70);
+        assert!(spc.requires_predictive_compensation);
+
+        let engine = ClosedLoopEngine::new(CncControllerType::Fanuc);
+        let gcode_line = engine
+            .generate_spc_predictive_compensation(4, true, &spc)
+            .expect("G10 compensation must be generated");
+        assert!(gcode_line.contains("G10 L12 P4 R-0.0135"));
     }
 
     #[test]

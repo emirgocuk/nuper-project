@@ -19,7 +19,8 @@ pub use benchmark::{
 };
 pub use calypso::{CalypsoEmitter, CalypsoError};
 pub use closed_loop::{
-    ClosedLoopEngine, ClosedLoopError, CncControllerType, FeatureDeviation, ToolCompensationMapping,
+    ClosedLoopEngine, ClosedLoopError, CncControllerType, FeatureDeviation, SpcAnalysisResult,
+    ToolCompensationMapping,
 };
 pub use template_engine::{TemplateContextData, TemplateEngine, ThermalConfig};
 pub use wenzel::{WenzelEmitter, WenzelError};

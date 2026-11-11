@@ -300,7 +300,7 @@ export class CodeSnippetGenerator {
     const lines: string[] = [
       `%`,
       `O9901 (NUPER ORTHO CLOSED-LOOP WEAR UPDATE)`,
-      `(FANUC 0i/31i & SIEMENS SINUMERIK 840D/ONE)`,
+      `(FANUC 0i/31i, SIEMENS 840D, HEIDENHAIN TNC640, HAAS)`,
       `(PARCA: ${cleanPart} | ISO 1: 20°C REFERANS TERMAL KALKAN)`,
       `G90`,
     ];
@@ -316,7 +316,8 @@ export class CodeSnippetGenerator {
       if (Math.abs(comp.netWearDeviationMm) > 0.0005) {
         lines.push(`(T0${toolIdx} UNSUR ${d.balloon} | HAM SAPMA: ${comp.rawDeviationMm >= 0 ? '+' : ''}${comp.rawDeviationMm.toFixed(4)} mm | ISIL GENLESME PAYI (20°C ISO 1): ${comp.thermalExpansionMm >= 0 ? '+' : ''}${comp.thermalExpansionMm.toFixed(4)} mm | NET G10 TAKIM TELAFISI: ${comp.netWearOffsetMm.toFixed(4)} mm)`);
         lines.push(`G10 L12 P${toolIdx} R${comp.netWearOffsetMm.toFixed(4)}`);
-        lines.push(`$TC_DP12[${toolIdx}, 1] = $TC_DP12[${toolIdx}, 1] + (${comp.netWearOffsetMm.toFixed(4)})`);
+        lines.push(`$TC_DP13[${toolIdx}, 1] = $TC_DP13[${toolIdx}, 1] + (${comp.netWearOffsetMm.toFixed(4)})`);
+        lines.push(`TOOL CALL ${toolIdx} DR${comp.netWearOffsetMm.toFixed(4)}`);
         toolIdx++;
       }
     }
