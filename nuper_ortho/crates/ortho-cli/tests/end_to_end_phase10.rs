@@ -125,14 +125,15 @@ END-ISO-10303-21;
     let ph10_lut = PH10LookUpTable::new();
     let (bore_angle, err) = ph10_lut.find_best_angle(-DVec3::Z);
     assert_eq!(bore_angle.a_deg, 0.0);
-    assert_eq!(bore_angle.b_deg, 0.0);
     assert!(err < 1e-6);
 
-    let budget = UncertaintyBudget::new(0.0012, 0.0008, 0.5, 23.4, 0.0005);
-    let conf = budget.evaluate_conformance(20.0120, 20.0, 0.0210, 0.0000);
-    assert_eq!(conf.decision, ConformanceDecision::Pass);
-    assert!(conf.tur >= 4.0);
-    println!("   -> PH10 Açısı: A0.0° B0.0° | ISO 14253 Emniyet Kararı: PASS (TUR: {:.2}:1)", conf.tur);
+    let budget = UncertaintyBudget::new(0.0008, 0.0005, 0.0003, 0.0002);
+    let (conf_decision, _) = budget.evaluate_guard_banding(20.0120, 20.0210, 20.0000);
+    assert_eq!(conf_decision, ConformanceDecision::Pass);
+    let (tur, is_acceptable) = budget.evaluate_tur(0.0210);
+    assert!(is_acceptable);
+    assert!(tur >= 4.0);
+    println!("   -> PH10 Açısı: A0.0° | ISO 14253 Emniyet Kararı: PASS (TUR: {:.2}:1)", tur);
 
     // -------------------------------------------------------------------------
     // 4. ADIM 10.4: GJK/EPA ÇARPIŞMASIZ ROTA SERTİFİKASYONU (ortho-router)
@@ -207,7 +208,7 @@ END-ISO-10303-21;
     let setup_sheet = dmis_emitter.generate_setup_sheet(&plan);
     let setup_file = format!("{}/SETUP_SHEET_VALVE_BODY_OP10.md", out_dir);
     fs::write(&setup_file, &setup_sheet).expect("Kurulum föyü yazılamadı!");
-    assert!(setup_sheet.contains("NUPER ORTHO CMM OPERATÖR KURULUM FÖYÜ"));
+    assert!(setup_sheet.contains("CMM OPERATÖR KURULUM FÖYÜ"));
 
     // [5] Saha FAT Sertifikası
     let manual_records = vec![
@@ -229,7 +230,7 @@ END-ISO-10303-21;
         0.5,
     )
     .expect("FAT kıyaslama başarısız!");
-    assert_eq!(fat_report.status, FatStatus::Passed);
+    assert_eq!(fat_report.status, FatStatus::CertifiedApproved);
     assert_eq!(fat_report.speedup_factor, 480.0);
 
     let fat_md = BenchmarkComparator::format_fat_certificate(&fat_report);

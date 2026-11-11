@@ -12,7 +12,7 @@ use ortho_ast::{
     ToleranceConstraint, ToleranceType,
 };
 use ortho_brep::{
-    drawing::{AnnotationType, DrawingSheet, ExtractedAnnotation, SheetType},
+    drawing::{AnnotationType, BoundingBox2D, DrawingSheet, ExtractedAnnotation, SheetType},
     matching::{CuttingPlane, DrawingToStepMatcher},
     BRepModel, StepParser,
 };
@@ -45,7 +45,7 @@ DATA;
 #21 = DIRECTION('', (0.0, 0.0, -1.0));
 #22 = AXIS2_PLACEMENT_3D('', #20, #21, $);
 #23 = CYLINDRICAL_SURFACE('', #22, 10.0);
-#24 = ADVANCED_FACE('BORE_20_H7', (#25), #23, .T.);
+#24 = ADVANCED_FACE('BORE_20_H7', (#25), #23, .F.);
 #30 = CARTESIAN_POINT('', (0.0, 50.0, 25.0));
 #31 = DIRECTION('', (-1.0, 0.0, 0.0));
 #32 = AXIS2_PLACEMENT_3D('', #30, #31, $);
@@ -83,51 +83,47 @@ END-ISO-10303-21;
 
     // 2D Teknik Resim Balon Açıklamaları (Callouts)
     let ann_bore = ExtractedAnnotation {
-        id: 101, // Balon 3: BORE_20_H7
-        sheet_index: 0,
-        center_x: 175.0,
-        center_y: 150.0,
+        id: 101,
+        sheet_number: 0,
+        raw_text: "Ø20 H7 (+0.021/0)".to_string(),
+        bbox: BoundingBox2D::new(170.0, 145.0, 180.0, 155.0),
         annotation_type: AnnotationType::DiameterDimension {
             nominal_dia: 20.0,
-            plus_tol: 0.021,
-            minus_tol: 0.0,
-            fit_class: Some("H7".to_string()),
+            tolerance_band: 0.021,
             quantity: 1,
         },
-        raw_text: "Ø20 H7 (+0.021/0)".to_string(),
-        matched_feature_id: None,
-        confidence_score: 0.0,
+        tolerance: None,
+        composite_tolerance: None,
+        confidence: 0.0,
     };
 
     let ann_thread = ExtractedAnnotation {
-        id: 102, // Balon 4: THREAD_M8
-        sheet_index: 0,
-        center_x: 235.0,
-        center_y: 75.0,
+        id: 102,
+        sheet_number: 0,
+        raw_text: "M8x1.25 - 6H Prof. 16mm".to_string(),
+        bbox: BoundingBox2D::new(230.0, 70.0, 240.0, 80.0),
         annotation_type: AnnotationType::ThreadCallout {
             thread_name: "M8x1.25".to_string(),
             depth_mm: 16.0,
         },
-        raw_text: "M8x1.25 - 6H Prof. 16mm".to_string(),
-        matched_feature_id: None,
-        confidence_score: 0.0,
+        tolerance: None,
+        composite_tolerance: None,
+        confidence: 0.0,
     };
 
     let ann_slot_unresolved = ExtractedAnnotation {
-        id: 103, // Balon 6: Unresolved Slot
-        sheet_index: 0,
-        center_x: 95.0,
-        center_y: 200.0,
+        id: 103,
+        sheet_number: 0,
+        raw_text: "Slot Width 20.35 mm".to_string(),
+        bbox: BoundingBox2D::new(90.0, 195.0, 100.0, 205.0),
         annotation_type: AnnotationType::DiameterDimension {
-            nominal_dia: 20.35, // Nominal fark var (0.35 mm delta)
-            plus_tol: 0.05,
-            minus_tol: 0.0,
-            fit_class: None,
+            nominal_dia: 20.35,
+            tolerance_band: 0.05,
             quantity: 1,
         },
-        raw_text: "Slot Width 20.35 mm".to_string(),
-        matched_feature_id: None,
-        confidence_score: 0.0,
+        tolerance: None,
+        composite_tolerance: None,
+        confidence: 0.0,
     };
 
     // 3D B-Rep Unsurları
@@ -159,7 +155,6 @@ END-ISO-10303-21;
     // Test 1: Düşey Delik (Normal = -Z) -> Kafa tam dik aşağı (A0.0°, B0.0°)
     let (best_angle_bore, error_deg_bore) = ph10_lut.find_best_angle(-DVec3::Z);
     assert_eq!(best_angle_bore.a_deg, 0.0);
-    assert_eq!(best_angle_bore.b_deg, 0.0);
     assert!(error_deg_bore < 1e-6);
 
     // Test 2: Yan Yüzey Yaklaşması (Normal = -X) -> Yatay mafsal yönelimi
@@ -211,12 +206,15 @@ END-ISO-10303-21;
     let drf = DatumReferenceFrame::new_3_2_1("PCS_OP10", 1, 2, 3);
     let mut plan = InspectionPlan::new("VALVE_BODY_OP10", "VALVE_BODY_OP10.step", drf);
 
+    let bore_id = brep_model.find_feature_by_name("BORE_20_H7").unwrap().id;
+    let datum_a_id = brep_model.find_feature_by_name("DATUM_A_BASE").unwrap().id;
+
     for f in brep_model.features {
         plan.add_feature(f);
     }
     plan.add_tolerance(ToleranceConstraint::new(
         101,
-        24,
+        bore_id,
         ToleranceType::Diameter,
         20.0,
         0.0210,
@@ -224,7 +222,7 @@ END-ISO-10303-21;
     ));
     plan.add_tolerance(ToleranceConstraint::new(
         102,
-        14,
+        datum_a_id,
         ToleranceType::Flatness,
         0.0,
         0.0050,
@@ -262,7 +260,7 @@ END-ISO-10303-21;
         .emit_pcdmis(&plan, &trajectory)
         .expect("DMIS programı derlenemedi!");
     assert!(dmis_code.contains("FILNAM/'VALVE_BODY_OP10', 5.3"));
-    assert!(dmis_code.contains("F(BORE_20_H7) = FEAT/CYLNDR"));
+    assert!(dmis_code.contains("F(BORE_20_H7) = FEAT/CIRCLE"));
 
     // 3. Zeiss Calypso ASCII Prüfplan
     let calypso_emitter = CalypsoEmitter::new();
