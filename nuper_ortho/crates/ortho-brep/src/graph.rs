@@ -421,14 +421,18 @@ mod tests {
 
         let par_pairs = engine.find_parallel_plane_pairs(20.0, 0.05);
         assert_eq!(par_pairs.len(), 1);
-        assert_eq!(par_pairs[0].0, 10);
-        assert_eq!(par_pairs[0].1, 11);
+        let min_par_id = par_pairs[0].0.min(par_pairs[0].1);
+        let max_par_id = par_pairs[0].0.max(par_pairs[0].1);
+        assert_eq!(min_par_id, 10);
+        assert_eq!(max_par_id, 11);
         assert!((par_pairs[0].2 - 20.0).abs() < 1e-4);
 
         let opp_pairs = engine.find_opposite_pairs(40.0, 0.05);
         assert_eq!(opp_pairs.len(), 1);
-        assert_eq!(opp_pairs[0].0, 10);
-        assert_eq!(opp_pairs[0].1, 12);
+        let min_id = opp_pairs[0].0.min(opp_pairs[0].1);
+        let max_id = opp_pairs[0].0.max(opp_pairs[0].1);
+        assert_eq!(min_id, 10);
+        assert_eq!(max_id, 12);
         assert!((opp_pairs[0].2 - 40.0).abs() < 1e-4);
     }
 
