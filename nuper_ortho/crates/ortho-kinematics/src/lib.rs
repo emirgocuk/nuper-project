@@ -7,6 +7,7 @@ pub mod laser;
 pub mod ph10;
 pub mod plan;
 pub mod sampling;
+pub mod thermal;
 pub mod tree;
 pub mod uncertainty;
 
@@ -26,6 +27,7 @@ pub use sampling::{
     sample_freeform_surface_adaptive, sample_plane_grid, sample_plane_with_margin, sample_sphere,
     sample_thread_locator_pin, SamplingPoint, SurfaceEvalSample,
 };
+pub use thermal::{TemperatureSensor, ThermalError, ThermalField3D, WorkpieceMaterialType};
 pub use tree::{ProbeStack, StarProbeAssembly, StemMaterial};
 pub use uncertainty::{
     ConformanceDecision, RobustOutlierFilter, UncertaintyBudget,
