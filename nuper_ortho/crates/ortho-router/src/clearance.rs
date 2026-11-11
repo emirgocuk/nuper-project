@@ -25,6 +25,15 @@ impl ClearanceBox {
             retract_distance,
         }
     }
+
+    pub fn contains(&self, pt: DVec3) -> bool {
+        pt.x >= self.min.x - 1e-6
+            && pt.x <= self.max.x + 1e-6
+            && pt.y >= self.min.y - 1e-6
+            && pt.y <= self.max.y + 1e-6
+            && pt.z >= self.min.z - 1e-6
+            && pt.z <= self.max.z + 1e-6
+    }
 }
 
 /// Çelik pabuç ve fikstürler için 3D Yasaklı Bölge (Keep-Out Zone)

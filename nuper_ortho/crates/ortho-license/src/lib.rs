@@ -255,6 +255,12 @@ impl LicenseAuthority {
             });
         }
 
+        if license.tier == LicenseTier::DefenseEnterprise
+            && current_hardware.usb_dongle_serial.is_none()
+        {
+            return Err(LicenseError::MissingHardwareDongle);
+        }
+
         if let Some(locked_hash) = &license.locked_hardware_hash {
             let current_hash = current_hardware.compute_composite_hash();
             if *locked_hash != current_hash {
@@ -263,12 +269,6 @@ impl LicenseAuthority {
                     actual: current_hash,
                 });
             }
-        }
-
-        if license.tier == LicenseTier::DefenseEnterprise
-            && current_hardware.usb_dongle_serial.is_none()
-        {
-            return Err(LicenseError::MissingHardwareDongle);
         }
 
         if let Some(feat) = requested_feature {
@@ -353,7 +353,11 @@ mod tests {
         );
         assert!(result.is_ok());
 
-        let alien_hw = HardwareFingerprint::new("ALIEN-PC-123", "AMD-RYZEN-9", None);
+        let alien_hw = HardwareFingerprint::new(
+            "ALIEN-PC-123",
+            "AMD-RYZEN-9",
+            Some("NUPER-USB-DGL-9841".to_string()),
+        );
         let alien_result =
             LicenseAuthority::validate_license(&license, &alien_hw, "2026-09-28", None);
         assert!(alien_result.is_err());
