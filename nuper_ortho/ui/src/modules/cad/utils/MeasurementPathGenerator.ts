@@ -653,8 +653,8 @@ export class MeasurementPathGenerator {
             const rHoriz = Math.hypot(center[0], center[2]);
             const ux = rHoriz > 1.0 ? center[0] / rHoriz : 1.0;
             const uz = rHoriz > 1.0 ? center[2] / rHoriz : 0.0;
-            const tx = rHoriz > 3.0 ? center[0] : ux * maxPartRadius * 0.55;
-            const tz = rHoriz > 3.0 ? center[2] : uz * maxPartRadius * 0.55;
+            const tx = center[0];
+            const tz = center[2];
             const sDir: [number, number, number] = [-ux, 0, -uz];
 
             const entryOut = new THREE.Vector3(ux * safeOuterR, cy, uz * safeOuterR);
@@ -833,16 +833,15 @@ export class MeasurementPathGenerator {
             normal: [0, 1, 0],
             ph10Label: 'A0° B0°',
           });
-        } else if (isYAxis && isDeepFeature && normal[1] >= -0.25) {
+        } else if (isYAxis && isDeepFeature && Math.abs(normal[1]) < 0.35 && (Math.abs(normal[0]) > 0.7 || Math.abs(normal[2]) > 0.7)) {
           effectiveAngleLabel = 'A0° B90°';
           effectiveAngleObj = { aDeg: 0, bDeg: 90, direction: [-1, 0, 0], label: 'A0° B90°' };
 
           const cy = Math.max(yMinFloor + 1.2, center[1]);
-          const rHoriz = Math.hypot(center[0], center[2]);
-          const ux = rHoriz > 1.0 ? center[0] / rHoriz : (Math.abs(normal[0]) > 0.1 || Math.abs(normal[2]) > 0.1 ? normal[0] / Math.hypot(normal[0], normal[2]) : 1.0);
-          const uz = rHoriz > 1.0 ? center[2] / rHoriz : (Math.abs(normal[0]) > 0.1 || Math.abs(normal[2]) > 0.1 ? normal[2] / Math.hypot(normal[0], normal[2]) : 0.0);
-          const tx = rHoriz > 2.5 ? center[0] : ux * Math.max(6.0, maxPartRadius * 0.65);
-          const tz = rHoriz > 2.5 ? center[2] : uz * Math.max(6.0, maxPartRadius * 0.65);
+          const ux = Math.abs(normal[0]) > 0.1 ? Math.sign(normal[0]) : 1.0;
+          const uz = Math.abs(normal[2]) > 0.1 ? Math.sign(normal[2]) : 0.0;
+          const tx = center[0];
+          const tz = center[2];
           const sDir: [number, number, number] = [-ux, 0, -uz];
 
           const surfPos: [number, number, number] = [tx, cy, tz];
@@ -868,9 +867,20 @@ export class MeasurementPathGenerator {
             ph10Label: 'A0° B90°',
           });
         } else if (feat.faceA_center && feat.faceB_center) {
+          const fnA = feat.faceA_normal || normal;
+          let cB = feat.faceB_center;
+          const isVirtualOrZero = !cB || (Math.abs(cB[0]) < 0.05 && Math.abs(cB[1]) < 0.05 && Math.abs(cB[2]) < 0.05);
+          if (isVirtualOrZero) {
+            cB = [
+              feat.faceA_center[0] - fnA[0] * nom,
+              feat.faceA_center[1] - fnA[1] * nom,
+              feat.faceA_center[2] - fnA[2] * nom,
+            ];
+          }
+          const fnB = feat.faceB_normal || (isVirtualOrZero ? fnA : [-fnA[0], -fnA[1], -fnA[2]]);
           const facesToTouch = [
-            { c: feat.faceA_center, n: feat.faceA_normal || normal },
-            { c: feat.faceB_center, n: feat.faceB_normal || [-normal[0], -normal[1], -normal[2]] },
+            { c: feat.faceA_center, n: fnA },
+            { c: cB, n: fnB },
           ];
           for (let fIdx = 0; fIdx < facesToTouch.length; fIdx++) {
             const fc = facesToTouch[fIdx];
@@ -893,7 +903,7 @@ export class MeasurementPathGenerator {
             }
             const surfPoint: [number, number, number] = [touchX, touchY, touchZ];
             const tAngleObj = isYAxis
-              ? (Math.abs(fn[1]) > 0.7 ? { aDeg: 0, bDeg: 0, direction: [0, -1, 0], label: 'A0° B0°' } : Ph10Kinematics.findBestAngle([-fn[0], -fn[1], -fn[2]]).angle)
+              ? (fn[1] > 0.5 ? { aDeg: 0, bDeg: 0, direction: [0, -1, 0], label: 'A0° B0°' } : (Math.abs(fn[1]) > 0.7 ? { aDeg: 0, bDeg: 0, direction: [0, -1, 0], label: 'A0° B0°' } : Ph10Kinematics.findBestAngle([-fn[0], -fn[1], -fn[2]]).angle))
               : Ph10Kinematics.findBestAngle([-fn[0], -fn[1], -fn[2]]).angle;
 
             const tipCenterPos = new THREE.Vector3(
