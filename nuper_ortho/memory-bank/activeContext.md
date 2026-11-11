@@ -1,19 +1,31 @@
 # Nuper Ortho — Aktif Bağlam
 
-Son güncelleme: 8 Kasım 2026.
+Son güncelleme: 11 Kasım 2026.
 
-## 1. Mevcut durum
+## 1. Tamamlanan Mimari Fazlar (Commit & Push Geçmişi)
 
-Projede YC RFS 2026 "Physical AI" (Kapalı Döngü İmalat ve Otonom Kalite Derleyicisi) vizyonu doğrultusunda otonom CMM kinematik planlayıcı ve üç çekirdekli mimari (TypeScript UI - Python OCP - Rust Kinematics) cerrahi olarak elden geçirilmiş ve eşitlenmiştir:
-1. **Fiziksel CMM Yolu:** Parçanın içinden doğrudan geçişler tamamen engellendi. `safeZ = maxZ + 25.0 mm` Emniyet Düzlemi ve zorunlu 3 aşamalı köprü intikali (`RETRACT_TO_SAFE` $\to$ `SAFE_TRAVERSE` $\to$ `PLUNGE_TO_ENTRY`) devreye alındı.
-2. **Eksenel Delik İnişi:** Deliklere yandan çarpma engellendi; prob delik merkez ekseninden (`AXIAL_ENTRY`, $20\text{ mm/s}$) iner, delik içinde 4 radyal temas noktası alır, tekrar merkeze çekilip eksenel olarak çıkar (`AXIAL_EXIT`, $50\text{ mm/s}$).
-3. **Güvenli PH10 Kafa İndeksi:** Kafa açı değişimleri parçanın tepesinde `safeIndexZ = maxZ + 50.0 mm` kotunda ve `HEAD_ROTATION` güvenli bölgesinde icra edilir.
-4. **AS9102 / ASME Y14.5 Önceliği:** Önce 3-2-1 Datumlar (A:3, B:2, C:1), ardından OP10 standart unsurları (DISTANCE $\to$ POSITION $\to$ THICKNESS, her faz kendi içinde Nearest-Neighbor TSP rotalı) ve OP20 açısal unsurları planlanır.
-5. **Kapalı Döngü CNC & Canlı DMIS:** Fanuc G10 / Siemens G10 L52 & `$TC_DP12` takım aşınma kompanzasyonu ve ANSI DMIS 5.3 blokları canlı simülasyon koordinatlarına bağlandı.
-6. **Canlı Telemetri & Çift Renkli Trajektori:** İntikal ($150\text{ mm/s}$, camgöbeği tüp) ve temas ($5\text{ mm/s}$, neon turuncu tüp) arayüzde anlık dinamik telemetri olarak sunulmaktadır.
+Tüm geliştirmeler AGENTS.md protokolüne (Sıfır yorum satırı kuralı, en fazla 3 modül dosyalık atomik commit kuralı, TDD test doğrulaması) uygun olarak tamamlanmış ve `origin/master` dalına aktarılmıştır:
 
-Tüm testler ve sözleşmeler senkronize durumdadır (TypeScript `check:types` hatasız, 30 dosyada 174 Vitest testi, 47 Pytest testi, `cargo check --workspace` %100 yeşil, `npm run build` hatasız).
-7 kritik mimari hata (Z>=0 Granit Tabla dönüşümü, Yakut Küre Telafisi, EWL stilus boyu denetimi, Canlı Ölçüm Durum Makinesi, Dinamik Teşhis & GUM/TUR, Electron Native IPC, Memory-Bank) çözülmüş ve kilitlenmiştir.
+1. **FAZ 26 (Vektörel Mikro Çizim GD&T ve Çap Topolojisi):** `tools/extractor/spatial.py` & `tools/extractor/vector_extractor.py` (Commit `dcc8372`).
+2. **FAZ 27 (FCF Hücre Bölücü & Kompozit Kutu Ayrıştırıcısı):** `tools/extractor/semantic_grammar.py` (Commit `c402bea`).
+3. **FAZ 28 (Dikey ve Açılı Ölçülerde 90° Rotasyon Normalizasyonu):** `tools/extractor/spatial.py` (Commit `24542b6`).
+4. **FAZ 29 (Ölçü Çizgisi, Uzatma Çizgisi ve Lider Ok Ucu İzleyicisi):** `tools/extractor/spatial.py` (Commit `66dfb95`).
+5. **FAZ 30 (Kısıtlı Mühendislik Alfabesi ve OCR Kontur Font Sanitizer):** `tools/extractor/vision_ai_extractor.py` & `tools/extractor/semantic_grammar.py` (Commit `8ac9f89`).
+6. **FAZ 31 (Tolerans Kritiklik Renklendirmesi ve Işık Masası Isı Haritası):** `ui/src/modules/inspection/utils/InspectionCardFormatter.ts` & `ui/src/modules/drawing/DrawingCanvas.ts` (Commit `2e71e12`).
+7. **FAZ 32 (B-Rep Geometrik Benzerlik Eşleştirme ve Kurulum Hafızası):** `tools/extractor/similarity_engine.py` & `ui/src/modules/cad/utils/PartSimilarityEngine.ts` (Commit `2bf415b`).
+8. **FAZ 6 (B-Rep Topolojik Bilgi Grafiği ve Eksenel Kademeli Delik Sorguları):** `crates/ortho-brep/src/graph.rs` & `crates/ortho-brep/src/lib.rs` (Commit `31c4bbd`).
+9. **FAZ 7 (ASME Y14.5-2018 ve ISO 1101 GD&T Kural Motoru ve Bonus Tolerans):** `crates/ortho-ast/src/composite_gdandt.rs` & `crates/ortho-ast/src/lib.rs` (Commit `b243f1d`).
+10. **FAZ 8 (PTB Onaylı Chebyshev L-Sonsuz Fitting ve GUM ISO 15530-3 Belirsizlik):** `crates/ortho-kinematics/src/fitting.rs` & `tools/extractor/metrology_fitting.py` (Commit `e4236e8`).
+11. **FAZ 9 (Zero-Copy Yüksek Hızlı İkili IPC Protokolü - 80-Bayt Telemetri):** `crates/ortho-router/src/ipc.rs` & `ui/src/modules/ipc/BinaryTelemetry.ts` (Commit `94b76e8`).
+12. **FAZ 10 (Sürekli 5-Eksen Helisel Tarama Kinematiği ve Kuaterniyon Slerp):** `crates/ortho-kinematics/src/ph10.rs` & `ui/src/modules/cad/utils/Ph10Kinematics.ts` (Commit `812ae92`).
+
+## 2. Sıradaki Uygulama Adımları
+
+- **FAZ 11:** Hibrit Metroloji: Optik ve Lazer Çizgi Sensörü (Scan-to-CAD KD-Tree ve Renkli Sapma Mesh Haritası)
+- **FAZ 12:** Otomatik Prob Magazini Değişim Kinematiği (Renishaw MCR20 / FCR25 Emniyetli 6 Adımlı Değişim)
+- **FAZ 13:** I++ DME v1.7 / v2.0 Endüstriyel CMM Denetleyici TCP Köprüsü
+- **FAZ 14:** Tam Gövde BVH + GJK/EPA Çarpışma Fiziği ve Çoklu Fikstür Atlama Rotası
+- **FAZ 15 – FAZ 20:** Blok C (CNC G10 / Sinumerik `$TC_DP12`, AS9102 Rev C FAI, Paletleme)
 
 ## 2. Belge rolleri ve okuma sırası
 
