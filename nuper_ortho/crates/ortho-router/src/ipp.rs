@@ -1,8 +1,6 @@
-//! # I++ DME v1.7 / v2.0 Endüstriyel Ağ Protokolü Katmanı
-//! 
-//! CMM kontrol üniteleri (Hexagon, Zeiss, Mitutoyo, Wenzel, LK) ile çift yönlü
-//! TCP/IP haberleşme, komut serileştirme, yanıt ayrıştırma ve simülasyon motoru.
-
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpStream;
+use std::time::Duration;
 use glam::DVec3;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -17,7 +15,7 @@ pub enum IppError {
     #[error("Bilinmeyen veya desteklenmeyen I++ komutu: {0}")]
     UnknownCommand(String),
 
-    #[error("Oturum başlatılmadı (StartSession çağrılmalı)")]
+    #[error("Oturum başlatılmadı")]
     SessionNotActive,
 
     #[error("CMM Home pozisyonuna gönderilmedi")]
@@ -25,51 +23,56 @@ pub enum IppError {
 
     #[error("Strok limiti aşıldı: {0}")]
     StrokeLimitExceeded(String),
+
+    #[error("I++ DME TCP bağlantı hatası: {0}")]
+    ConnectionError(String),
+
+    #[error("I++ DME I/O hatası: {0}")]
+    IoError(String),
+
+    #[error("I++ DME zaman aşımı: {0}")]
+    Timeout(String),
+
+    #[error("Beklenmeyen prob teması: Tag {tag}, {message}")]
+    UnexpectedContactError { tag: u32, message: String },
+
+    #[error("I++ DME komutu reddedildi: Tag {tag}, {error_code}: {message}")]
+    CommandRejected {
+        tag: u32,
+        error_code: String,
+        message: String,
+    },
 }
 
-/// I++ DME Komut Tipleri (v1.7 / v2.0 Standart)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum IppCommand {
-    /// Oturum Başlatma: `StartSession()`
     StartSession,
-    /// Oturum Sonlandırma: `EndSession()`
     EndSession,
-    /// Protokol ve CMM Versiyonu Sorgulama: `GetDMEVersion()`
     GetDMEVersion,
-    /// Aktif Koordinat Sistemi Sorgulama: `GetCoordSystem()`
     GetCoordSystem,
-    /// Koordinat Sistemi Değiştirme: `SetCoordSystem(PCS)` veya `SetCoordSystem(MCS)`
     SetCoordSystem { name: String },
-    /// CMM'i Mekanik Referans / Sıfır Noktasına Gönderme: `Home()`
     Home,
-    /// Hızlı İntikal Hareketi: `GoTo(X(...), Y(...), Z(...))`
     GoTo { target: DVec3, speed_mms: Option<f64> },
-    /// Yüzey Dokunmatik Ölçüm: `PtMeas(X(...), Y(...), Z(...), I(...), J(...), K(...))`
     PtMeas { target: DVec3, normal: DVec3 },
-    /// Prob Takımı Değişimi: `ChangeTool("TOOL_NAME")`
     ChangeTool { tool_name: String },
-    /// Acil Durum Hareketi Durdurma: `AbortE()`
     AbortE,
 }
 
-/// I++ DME Sunucu Yanıt Tipleri
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum IppResponse {
-    /// İlerleme Bilgisi: `00001 #` (Komut kabul edildi, çalışıyor)
     Ack { tag: u32 },
-    /// Başarıyla Tamamlandı: `00001 %`
     Complete { tag: u32 },
-    /// Veri Yanıtı: `00001 & ...`
     Data { tag: u32, payload: String },
-    /// Hata Yanıtı: `00001 ! Error(...)`
-    Error { tag: u32, error_code: String, message: String },
+    Error {
+        tag: u32,
+        error_code: String,
+        message: String,
+    },
 }
 
-/// I++ DME Protokol Ayrıştırıcı ve Biçimlendirici
 pub struct IppProtocol;
 
 impl IppProtocol {
-    /// Komutu numaralandırılmış I++ DME metin satırına dönüştürür (Örn: `00001 GoTo(X(10.0), ...)`)
     pub fn format_command(tag: u32, cmd: &IppCommand) -> String {
         let tag_str = format!("{:05}", tag);
         match cmd {
@@ -107,7 +110,6 @@ impl IppProtocol {
         }
     }
 
-    /// I++ DME metin satırını ayrıştırır
     pub fn parse_command(line: &str) -> Result<(u32, IppCommand), IppError> {
         let trimmed = line.trim();
         if trimmed.is_empty() {
@@ -159,7 +161,65 @@ impl IppProtocol {
         }
     }
 
-    /// Parantez içindeki parametre metnini çıkarır
+    pub fn parse_response(line: &str) -> Result<IppResponse, IppError> {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            return Err(IppError::InvalidSyntax("Boş satır".to_string()));
+        }
+
+        let parts: Vec<&str> = trimmed.splitn(3, ' ').collect();
+        if parts.is_empty() {
+            return Err(IppError::InvalidSyntax("Boş satır".to_string()));
+        }
+
+        let tag = parts[0]
+            .parse::<u32>()
+            .map_err(|_| IppError::InvalidSyntax(format!("Geçersiz etiket: {}", parts[0])))?;
+
+        if parts.len() < 2 {
+            return Err(IppError::InvalidSyntax("Yanıt tipi eksik".to_string()));
+        }
+
+        let op = parts[1];
+        match op {
+            "#" => Ok(IppResponse::Ack { tag }),
+            "%" => Ok(IppResponse::Complete { tag }),
+            "&" => {
+                let payload = if parts.len() > 2 { parts[2] } else { "" };
+                Ok(IppResponse::Data {
+                    tag,
+                    payload: payload.to_string(),
+                })
+            }
+            "!" => {
+                let err_payload = if parts.len() > 2 { parts[2] } else { "" };
+                let (code, msg) = Self::parse_error_payload(err_payload);
+                Ok(IppResponse::Error {
+                    tag,
+                    error_code: code,
+                    message: msg,
+                })
+            }
+            _ => Err(IppError::InvalidSyntax(format!("Bilinmeyen yanıt sembolü: {}", op))),
+        }
+    }
+
+    fn parse_error_payload(payload: &str) -> (String, String) {
+        let trimmed = payload.trim();
+        if let Some(inner) = trimmed.strip_prefix("Error(").and_then(|s| s.strip_suffix(')')) {
+            if let Some(paren_pos) = inner.find('(') {
+                let code = inner[..paren_pos].trim().to_string();
+                let msg = inner[paren_pos + 1..]
+                    .trim_end_matches(')')
+                    .trim_matches('"')
+                    .to_string();
+                return (code, msg);
+            }
+            return (inner.to_string(), inner.to_string());
+        }
+        ("UnknownError".to_string(), trimmed.to_string())
+    }
+
     fn extract_inside_parens(s: &str) -> Result<String, IppError> {
         let start = s.find('(').ok_or_else(|| IppError::InvalidSyntax("Açılış parantezi eksik".into()))?;
         let end = s.rfind(')').ok_or_else(|| IppError::InvalidSyntax("Kapanış parantezi eksik".into()))?;
@@ -169,7 +229,6 @@ impl IppProtocol {
         Ok(s[start + 1..end].trim().to_string())
     }
 
-    /// `X(...)`, `Y(...)`, `Z(...)` koordinatlarını okur
     fn parse_xyz_params(s: &str) -> Result<(f64, f64, f64), IppError> {
         let extract = |axis: &str| -> Result<f64, IppError> {
             let pattern = format!("{}(", axis);
@@ -185,7 +244,6 @@ impl IppProtocol {
         Ok((extract("X")?, extract("Y")?, extract("Z")?))
     }
 
-    /// `X(...)`, `Y(...)`, `Z(...)`, `I(...)`, `J(...)`, `K(...)` parametrelerini okur
     fn parse_xyzi_params(s: &str) -> Result<(f64, f64, f64, f64, f64, f64), IppError> {
         let (x, y, z) = Self::parse_xyz_params(s)?;
         let extract = |axis: &str| -> Result<f64, IppError> {
@@ -202,7 +260,6 @@ impl IppProtocol {
         Ok((x, y, z, extract("I")?, extract("J")?, extract("K")?))
     }
 
-    /// Yanıtı metin satırına çevirir
     pub fn format_response(resp: &IppResponse) -> String {
         match resp {
             IppResponse::Ack { tag } => format!("{:05} #\r\n", tag),
@@ -215,7 +272,6 @@ impl IppProtocol {
     }
 }
 
-/// Sertifikalı teftiş rotasını I++ DME komut dizisine dönüştürür
 pub fn trajectory_to_ipp_stream(
     trajectory: &CertifiedCollisionFreeTrajectory,
     tool_name: &str,
@@ -223,7 +279,6 @@ pub fn trajectory_to_ipp_stream(
     let mut stream = Vec::new();
     let mut tag = 1;
 
-    // 1. Oturum Başlatma ve Başlangıç El Sıkışması
     stream.push(IppProtocol::format_command(tag, &IppCommand::StartSession));
     tag += 1;
     stream.push(IppProtocol::format_command(tag, &IppCommand::GetDMEVersion));
@@ -245,7 +300,6 @@ pub fn trajectory_to_ipp_stream(
     ));
     tag += 1;
 
-    // 2. Hareket Segmentlerini I++ Formatında Bas
     for seg in &trajectory.segments {
         match seg {
             MotionSegment::RapidLinear { target } => {
@@ -253,7 +307,7 @@ pub fn trajectory_to_ipp_stream(
                     tag,
                     &IppCommand::GoTo {
                         target: *target,
-                        speed_mms: Some(150.0), // 150 mm/s hızlı intikal
+                        speed_mms: Some(150.0),
                     },
                 ));
                 tag += 1;
@@ -273,13 +327,12 @@ pub fn trajectory_to_ipp_stream(
                     tag,
                     &IppCommand::GoTo {
                         target: *target,
-                        speed_mms: Some(25.0), // 25 mm/s geri çekilme
+                        speed_mms: Some(25.0),
                     },
                 ));
                 tag += 1;
             }
             MotionSegment::RotateHead { a_deg, b_deg } => {
-                // I++ kafa rotasyonu takım yönelimi olarak aktarılır
                 stream.push(IppProtocol::format_command(
                     tag,
                     &IppCommand::ChangeTool {
@@ -291,13 +344,11 @@ pub fn trajectory_to_ipp_stream(
         }
     }
 
-    // 3. Oturum Kapatma
     stream.push(IppProtocol::format_command(tag, &IppCommand::EndSession));
 
     stream
 }
 
-/// CMM Donanım ve Kontrol Ünitesi Simülatörü (Virtual I++ Controller)
 #[derive(Debug, Clone)]
 pub struct IppCmmSimulator {
     pub is_session_active: bool,
@@ -307,6 +358,7 @@ pub struct IppCmmSimulator {
     pub current_tool: String,
     pub measured_points_count: usize,
     pub dme_version: String,
+    pub simulate_unexpected_contact: bool,
 }
 
 impl Default for IppCmmSimulator {
@@ -325,10 +377,10 @@ impl IppCmmSimulator {
             current_tool: "DEFAULT_STYLUS".to_string(),
             measured_points_count: 0,
             dme_version: "1.7.0".to_string(),
+            simulate_unexpected_contact: false,
         }
     }
 
-    /// Bir komutu yürütür ve I++ yanıtını üretir
     pub fn execute_command(&mut self, tag: u32, cmd: &IppCommand) -> Vec<IppResponse> {
         let mut responses = Vec::new();
 
@@ -403,10 +455,15 @@ impl IppCmmSimulator {
                         error_code: "MachineNotReady".into(),
                         message: "CMM hazır değil".into(),
                     });
+                } else if self.simulate_unexpected_contact {
+                    responses.push(IppResponse::Error {
+                        tag,
+                        error_code: "UnexpectedContactError".into(),
+                        message: "Beklenmeyen temas algılandı".into(),
+                    });
                 } else {
                     self.current_position = *target;
                     self.measured_points_count += 1;
-                    // Dokunma noktası gerçek koordinat telemetrisi
                     responses.push(IppResponse::Data {
                         tag,
                         payload: format!(
@@ -426,10 +483,194 @@ impl IppCmmSimulator {
     }
 }
 
+pub struct IppClient {
+    stream: Option<TcpStream>,
+    tag_counter: u32,
+    pub is_session_active: bool,
+    pub is_homed: bool,
+    pub active_coord_system: String,
+    pub last_known_position: DVec3,
+}
+
+impl Default for IppClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IppClient {
+    pub fn new() -> Self {
+        Self {
+            stream: None,
+            tag_counter: 0,
+            is_session_active: false,
+            is_homed: false,
+            active_coord_system: "MCS".to_string(),
+            last_known_position: DVec3::ZERO,
+        }
+    }
+
+    pub fn connect(&mut self, addr: &str, timeout_ms: u64) -> Result<(), IppError> {
+        let stream = match addr.parse() {
+            Ok(socket_addr) => TcpStream::connect_timeout(&socket_addr, Duration::from_millis(timeout_ms))
+                .map_err(|e| IppError::ConnectionError(e.to_string()))?,
+            Err(_) => TcpStream::connect(addr).map_err(|e| IppError::ConnectionError(e.to_string()))?,
+        };
+
+        let dur = Duration::from_millis(timeout_ms);
+        stream
+            .set_read_timeout(Some(dur))
+            .map_err(|e| IppError::IoError(e.to_string()))?;
+        stream
+            .set_write_timeout(Some(dur))
+            .map_err(|e| IppError::IoError(e.to_string()))?;
+
+        self.stream = Some(stream);
+        Ok(())
+    }
+
+    pub fn disconnect(&mut self) -> Result<(), IppError> {
+        if self.is_session_active {
+            let _ = self.send_command(&IppCommand::EndSession);
+            self.is_session_active = false;
+        }
+        self.stream = None;
+        Ok(())
+    }
+
+    pub fn send_command(&mut self, cmd: &IppCommand) -> Result<(u32, Vec<IppResponse>), IppError> {
+        let stream = self
+            .stream
+            .as_mut()
+            .ok_or_else(|| IppError::ConnectionError("Bağlantı açık değil".to_string()))?;
+
+        self.tag_counter += 1;
+        let tag = self.tag_counter;
+        let formatted = IppProtocol::format_command(tag, cmd);
+        let wire = format!("{}\r\n", formatted);
+
+        stream
+            .write_all(wire.as_bytes())
+            .map_err(|e| IppError::IoError(e.to_string()))?;
+        stream.flush().map_err(|e| IppError::IoError(e.to_string()))?;
+
+        let mut reader = BufReader::new(stream.try_clone().map_err(|e| IppError::IoError(e.to_string()))?);
+        let mut responses = Vec::new();
+        let mut line_buf = String::new();
+
+        loop {
+            line_buf.clear();
+            let bytes_read = reader
+                .read_line(&mut line_buf)
+                .map_err(|e| IppError::Timeout(e.to_string()))?;
+            if bytes_read == 0 {
+                return Err(IppError::ConnectionError("Sunucu bağlantıyı kapattı".to_string()));
+            }
+
+            let resp = IppProtocol::parse_response(&line_buf)?;
+            let is_terminal = match &resp {
+                IppResponse::Complete { tag: resp_tag } if *resp_tag == tag => true,
+                IppResponse::Error { tag: resp_tag, error_code, message } if *resp_tag == tag => {
+                    if error_code.contains("UnexpectedContact") {
+                        return Err(IppError::UnexpectedContactError {
+                            tag,
+                            message: message.clone(),
+                        });
+                    }
+                    return Err(IppError::CommandRejected {
+                        tag,
+                        error_code: error_code.clone(),
+                        message: message.clone(),
+                    });
+                }
+                _ => false,
+            };
+
+            responses.push(resp);
+            if is_terminal {
+                break;
+            }
+        }
+
+        match cmd {
+            IppCommand::StartSession => self.is_session_active = true,
+            IppCommand::EndSession => self.is_session_active = false,
+            IppCommand::Home => self.is_homed = true,
+            IppCommand::SetCoordSystem { name } => self.active_coord_system = name.clone(),
+            IppCommand::GoTo { target, .. } => self.last_known_position = *target,
+            _ => {}
+        }
+
+        Ok((tag, responses))
+    }
+
+    pub fn perform_handshake(&mut self, coord_system: &str) -> Result<String, IppError> {
+        self.send_command(&IppCommand::StartSession)?;
+        let (_, ver_resps) = self.send_command(&IppCommand::GetDMEVersion)?;
+        let mut version = "UNKNOWN".to_string();
+        for r in ver_resps {
+            if let IppResponse::Data { payload, .. } = r {
+                if let Some(inner) = payload.strip_prefix("DMEVersion(\"").and_then(|s| s.strip_suffix("\")")) {
+                    version = inner.to_string();
+                }
+            }
+        }
+
+        self.send_command(&IppCommand::Home)?;
+        self.send_command(&IppCommand::SetCoordSystem {
+            name: coord_system.to_string(),
+        })?;
+
+        Ok(version)
+    }
+
+    pub fn measure_point(&mut self, target: DVec3, normal: DVec3) -> Result<DVec3, IppError> {
+        let res = self.send_command(&IppCommand::PtMeas { target, normal });
+        match res {
+            Ok((_, responses)) => {
+                self.last_known_position = target;
+                for resp in responses {
+                    if let IppResponse::Data { payload, .. } = resp {
+                        if payload.starts_with("PtMeasReport") {
+                            let (x, y, z) = IppProtocol::parse_xyz_params(&payload)?;
+                            return Ok(DVec3::new(x, y, z));
+                        }
+                    }
+                }
+                Ok(target)
+            }
+            Err(IppError::UnexpectedContactError { tag, message }) => {
+                self.last_known_position = target;
+                let _ = self.recover_unexpected_contact(normal);
+                Err(IppError::UnexpectedContactError { tag, message })
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn recover_unexpected_contact(&mut self, surface_normal: DVec3) -> Result<DVec3, IppError> {
+        let _ = self.send_command(&IppCommand::AbortE);
+        let safe_retract_vector = if surface_normal.length_squared() > 1e-6 {
+            surface_normal.normalize() * 10.0
+        } else {
+            DVec3::new(0.0, 0.0, 10.0)
+        };
+        let retract_target = self.last_known_position + safe_retract_vector;
+        let _ = self.send_command(&IppCommand::GoTo {
+            target: retract_target,
+            speed_mms: Some(20.0),
+        });
+        self.last_known_position = retract_target;
+        Ok(retract_target)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ClearanceBox;
+    use std::net::TcpListener;
+    use std::thread;
 
     #[test]
     fn test_ipp_command_formatting_and_parsing() {
@@ -444,7 +685,6 @@ mod tests {
         assert_eq!(tag, 1);
         assert_eq!(parsed, cmd);
 
-        // PtMeas testi
         let pt_cmd = IppCommand::PtMeas {
             target: DVec3::new(50.0, 50.0, 30.0),
             normal: DVec3::new(0.0, 0.0, 1.0),
@@ -461,21 +701,17 @@ mod tests {
     fn test_ipp_simulator_session_execution() {
         let mut sim = IppCmmSimulator::new();
 
-        // 1. Oturum başlat
         let r1 = sim.execute_command(1, &IppCommand::StartSession);
         assert_eq!(r1, vec![IppResponse::Complete { tag: 1 }]);
         assert!(sim.is_session_active);
 
-        // 2. Home etmeden GoTo yapılırsa hata vermeli
         let r_fail = sim.execute_command(2, &IppCommand::GoTo { target: DVec3::new(10.0, 10.0, 10.0), speed_mms: None });
         assert!(matches!(r_fail[0], IppResponse::Error { .. }));
 
-        // 3. Home et
         let r_home = sim.execute_command(3, &IppCommand::Home);
         assert_eq!(r_home, vec![IppResponse::Complete { tag: 3 }]);
         assert!(sim.is_homed);
 
-        // 4. Nokta ölçümü yap
         let r_meas = sim.execute_command(4, &IppCommand::PtMeas {
             target: DVec3::new(50.0, 50.0, 20.0),
             normal: DVec3::Z,
@@ -497,9 +733,112 @@ mod tests {
         let traj = CertifiedCollisionFreeTrajectory::new(segments, clearance, vec![]);
 
         let stream = trajectory_to_ipp_stream(&traj, "PH10M_TP20_D2");
-        assert!(stream.len() >= 8); // StartSession, GetDMEVersion, Home, ChangeTool, SetCoordSystem, 3 segments, EndSession
+        assert!(stream.len() >= 8);
         assert!(stream[0].contains("StartSession"));
         assert!(stream.iter().any(|s| s.contains("PtMeas")));
         assert!(stream.last().unwrap().contains("EndSession"));
+    }
+
+    #[test]
+    fn test_ipp_client_tcp_handshake_and_12_points_measurement() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let server_handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut sim = IppCmmSimulator::new();
+            let reader_stream = stream.try_clone().unwrap();
+            let mut reader = BufReader::new(reader_stream);
+            let mut line = String::new();
+
+            loop {
+                line.clear();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                    break;
+                }
+                if let Ok((tag, cmd)) = IppProtocol::parse_command(&line) {
+                    let is_end = cmd == IppCommand::EndSession;
+                    let responses = sim.execute_command(tag, &cmd);
+                    for resp in responses {
+                        let wire = IppProtocol::format_response(&resp);
+                        let _ = stream.write_all(wire.as_bytes());
+                    }
+                    let _ = stream.flush();
+                    if is_end {
+                        break;
+                    }
+                }
+            }
+        });
+
+        let mut client = IppClient::new();
+        client.connect(&addr.to_string(), 2000).unwrap();
+
+        let ver = client.perform_handshake("PCS").unwrap();
+        assert_eq!(ver, "1.7.0");
+        assert!(client.is_session_active);
+        assert!(client.is_homed);
+        assert_eq!(client.active_coord_system, "PCS");
+
+        for i in 0..12 {
+            let target = DVec3::new(10.0 * (i as f64 + 1.0), 25.0, 15.0);
+            let normal = DVec3::new(0.0, 0.0, 1.0);
+            let measured = client.measure_point(target, normal).unwrap();
+            assert!((measured.x - target.x).abs() < 1e-3);
+            assert!((measured.y - target.y).abs() < 1e-3);
+            assert!((measured.z - target.z).abs() < 1e-3);
+        }
+
+        client.disconnect().unwrap();
+        server_handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_ipp_unexpected_contact_recovery() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let server_handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut sim = IppCmmSimulator::new();
+            let reader_stream = stream.try_clone().unwrap();
+            let mut reader = BufReader::new(reader_stream);
+            let mut line = String::new();
+
+            loop {
+                line.clear();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                    break;
+                }
+                if let Ok((tag, cmd)) = IppProtocol::parse_command(&line) {
+                    if matches!(cmd, IppCommand::PtMeas { .. }) {
+                        sim.simulate_unexpected_contact = true;
+                    }
+                    let responses = sim.execute_command(tag, &cmd);
+                    for resp in responses {
+                        let wire = IppProtocol::format_response(&resp);
+                        let _ = stream.write_all(wire.as_bytes());
+                    }
+                    let _ = stream.flush();
+                    if cmd == IppCommand::EndSession {
+                        break;
+                    }
+                }
+            }
+        });
+
+        let mut client = IppClient::new();
+        client.connect(&addr.to_string(), 2000).unwrap();
+        client.perform_handshake("PCS").unwrap();
+
+        let target = DVec3::new(50.0, 50.0, 10.0);
+        let normal = DVec3::new(0.0, 0.0, 1.0);
+        let res = client.measure_point(target, normal);
+
+        assert!(matches!(res, Err(IppError::UnexpectedContactError { .. })));
+        assert!(client.last_known_position.z > 10.0);
+
+        client.disconnect().unwrap();
+        server_handle.join().unwrap();
     }
 }

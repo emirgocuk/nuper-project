@@ -24,7 +24,7 @@ pub use hal::{
 };
 pub use ipc::{BinaryMeshPacket, BinaryTrajectoryPacket};
 pub use ipp::{
-    trajectory_to_ipp_stream, IppCmmSimulator, IppCommand, IppError, IppProtocol, IppResponse,
+    trajectory_to_ipp_stream, IppClient, IppCmmSimulator, IppCommand, IppError, IppProtocol, IppResponse,
 };
 pub use stylus::{ReachabilityReport, StylusAssembly, StylusError};
 pub use traversal::{SafeTraversalSequence, ZFirstTraversal};
