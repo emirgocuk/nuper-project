@@ -66,9 +66,9 @@ Rust testleri, fiziksel CMM ve üretici yazılımında çıktı kabulü bu incel
 
 11 Kasım 2026 itibarıyla Faz 1'den Faz 5'e kadar olan temel fiziksel kinematik, B-Rep yüzey kimliği, bağlama pabuçları emniyeti, yıldız prob, çapak ayıklama ve ISO 1 20°C ısıl genleşme kompanzasyonu başarıyla tamamlanmış ve %100 test doğrulamasıyla kilitlenmiştir.
 
-Kullanıcı talebi doğrultusunda [masterRoadmap.md](masterRoadmap.md) altında 20 Aşamalı Büyük Mimari Yol Haritası (Faz 6 – Faz 25) planlanmıştır. Bu yol haritası; B-Rep Topolojik Bilgi Grafiği, ASME Y14.5 / ISO 1101 tam kapsamı, PTB onaylı fitting, I++ DME CMM kontrolcü köprüsü, AS9102 Rev C raporlama ve Physical AI kapalı döngü otonomisini hedefler.
+Kullanıcı talebi doğrultusunda [masterRoadmap.md](masterRoadmap.md) altında 20 Aşamalı Büyük Mimari Uygulama Şartnamesi (Faz 6 – Faz 25) 4 ana blok halinde (Blok A: Çekirdek Geometri & Metroloji, Blok B: Kinematik & Donanım HAL, Blok C: Kapalı Döngü & Kalite, Blok D: Fiziksel AI & Egemen Derleyici) matematiksel formülleri, C++/Rust/Python/TS veri yapıları, IPC şemaları ve TDD kabul kriterleriyle detaylandırılmıştır.
 
-Aktif öncelik: Kullanıcı geri bildirimleri ve önceliklendirmesi doğrultusunda **Faz 6: B-Rep Topolojik Bilgi Grafiği (`BRepGraphEngine`)** uygulamasının başlatılmasıdır.
+Aktif öncelik: Uygulama şartnamesi onayını takiben **Faz 6: B-Rep Topolojik Bilgi Grafiği (`BRepGraphEngine`)** uygulamasının başlatılmasıdır.
 
 ## 7. Kapsam ilkeleri
 
