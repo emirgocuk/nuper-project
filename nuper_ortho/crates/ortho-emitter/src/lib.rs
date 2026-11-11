@@ -12,7 +12,10 @@ use ortho_ast::{
 use ortho_router::{CertifiedCollisionFreeTrajectory, MotionSegment};
 use thiserror::Error;
 
-pub use audit::{AntiTamperAuthority, AuditCertificate, TamperViolation};
+pub use audit::{
+    AntiTamperAuthority, As9102Form1, As9102Form2, As9102Form3Entry, As9102ReportPackage,
+    AuditCertificate, TamperViolation,
+};
 pub use benchmark::{
     BenchmarkComparator, BenchmarkError, BenchmarkReport, FatStatus, FeatureComparison,
     MeasurementRecord,

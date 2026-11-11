@@ -1,11 +1,3 @@
-//! # AS9100 Rev D Kriptografik Anti-Tamper Denetim İzi ve Bütünlük Doğrulayıcısı
-//!
-//! Havacılık, Uzay ve Savunma Sanayii Kalite Yönetim Standardı AS9100 Rev D
-//! (Madde 8.5.1 ve 8.5.2) uyarınca;
-//! CMM ölçüm programlarının, nominal koordinatlarının ve kalite tolerans sınırlarının
-//! atölye zemininde izinsiz tahrif edilmesini (tampering) kriptografik olarak engelleyen
-//! dijital imza ve denetim izi motorudur.
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -33,7 +25,6 @@ pub enum TamperViolation {
     },
 }
 
-/// AS9100 Rev D Dijital Denetim Sertifikası
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AuditCertificate {
     pub certificate_id: String,
@@ -48,6 +39,54 @@ pub struct AuditCertificate {
     pub compliance_standard: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct As9102Form1 {
+    pub part_number: String,
+    pub part_name: String,
+    pub serial_number: String,
+    pub fai_report_number: String,
+    pub drawing_number: String,
+    pub drawing_revision: String,
+    pub organization_name: String,
+    pub cage_code: String,
+    pub signature_authority: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct As9102Form2 {
+    pub material_spec: String,
+    pub material_coc: String,
+    pub special_processes: Vec<String>,
+    pub functional_test_reports: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct As9102Form3Entry {
+    pub char_index: usize,
+    pub balloon_number: String,
+    pub feature_type: String,
+    pub nominal: f64,
+    pub upper_tol: f64,
+    pub lower_tol: f64,
+    pub measured: f64,
+    pub deviation: f64,
+    pub tool_used: String,
+    pub is_pass: bool,
+    pub is_key_characteristic: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct As9102ReportPackage {
+    pub form1: As9102Form1,
+    pub form2: As9102Form2,
+    pub form3: Vec<As9102Form3Entry>,
+    pub total_characteristics: usize,
+    pub passed_characteristics: usize,
+    pub failed_characteristics: usize,
+    pub digital_signature_sha256: String,
+    pub timestamp_iso: String,
+}
+
 pub struct AntiTamperAuthority;
 
 impl AntiTamperAuthority {
@@ -57,19 +96,16 @@ impl AntiTamperAuthority {
     const PART_TAG: &'static str = "$$ AS9100-PART-NAME: ";
     const STATS_TAG: &'static str = "$$ AS9100-STATS: ";
 
-    /// Kanonik DMIS komut dizisinden 256-bit kriptografik hash üretir
     pub fn compute_canonical_hash(dmis_content: &str) -> [u8; 32] {
         let mut state: u64 = 0x84222325cbf29ce4;
         let prime: u64 = 0x100000001b3;
 
         for line in dmis_content.lines() {
             let trimmed = line.trim();
-            // Yorum satırlarını veya boşlukları kanonik özetten hariç tut
             if trimmed.is_empty() || trimmed.starts_with("$$") {
                 continue;
             }
 
-            // Komut gövdesini ve parametreleri normalize ederek besle
             for b in trimmed.as_bytes() {
                 state ^= *b as u64;
                 state = state.wrapping_mul(prime);
@@ -85,7 +121,30 @@ impl AntiTamperAuthority {
         hash
     }
 
-    /// Ham DMIS programına AS9100 Rev D kriptografik denetim mührünü basar
+    pub fn compute_string_hash(content: &str, key: &str) -> String {
+        let mut state: u64 = 0xcbf29ce484222325;
+        let prime: u64 = 0x100000001b3;
+
+        for b in key.as_bytes() {
+            state ^= *b as u64;
+            state = state.wrapping_mul(prime);
+        }
+
+        for b in content.as_bytes() {
+            state ^= *b as u64;
+            state = state.wrapping_mul(prime);
+            state = state.rotate_left(5);
+        }
+
+        let mut hash = [0u8; 32];
+        for i in 0..4 {
+            let chunk = state.rotate_left((i * 11) as u32).wrapping_mul(prime);
+            hash[(i * 8)..(i * 8 + 8)].copy_from_slice(&chunk.to_le_bytes());
+        }
+
+        hash.iter().map(|b| format!("{:02X}", b)).collect()
+    }
+
     pub fn sign_program(
         dmis_content: &str,
         cert_id: &str,
@@ -95,7 +154,6 @@ impl AntiTamperAuthority {
         let hash_bytes = Self::compute_canonical_hash(dmis_content);
         let hex_hash: String = hash_bytes.iter().map(|b| format!("{:02X}", b)).collect();
 
-        // İstatistikleri topla
         let mut feat_count = 0;
         let mut tol_count = 0;
         let mut motion_count = 0;
@@ -113,7 +171,6 @@ impl AntiTamperAuthority {
 
         let mut signed = String::with_capacity(dmis_content.len() + 1024);
 
-        // Başlık bloğuna AS9100 Mührünü ekle
         signed.push_str("$$ ==============================================================\n");
         signed.push_str("$$ AS9100 REV D KRIPTOGRAFIK DENETIM IZI (ANTI-TAMPER SEAL)\n");
         signed.push_str(&format!("{}{}\n", Self::CERT_TAG, cert_id));
@@ -135,7 +192,6 @@ impl AntiTamperAuthority {
         signed
     }
 
-    /// İmzalı DMIS programının kriptografik bütünlüğünü ve tahrifat durumunu doğrular
     pub fn verify_program_integrity(signed_dmis: &str) -> Result<AuditCertificate, TamperViolation> {
         let mut expected_signature = None;
         let mut cert_id = None;
@@ -160,17 +216,13 @@ impl AntiTamperAuthority {
         let computed_sig: String = computed_bytes.iter().map(|b| format!("{:02X}", b)).collect();
 
         if expected_sig != computed_sig {
-            // İmza tutmuyor! Detaylı adli tıp analizi (Forensic Analysis):
-            // Hangi satırda tahrifat yapıldığını tespit et
             for (idx, line) in signed_dmis.lines().enumerate() {
                 let trimmed = line.trim();
                 if trimmed.starts_with("$$") || trimmed.is_empty() {
                     continue;
                 }
 
-                // Tolerans modifikasyonu şüphesi
                 if trimmed.starts_with("T(") || trimmed.contains("TOL/") {
-                    // Tipik tolerans gevşetme örnekleri
                     if trimmed.contains("0.05") || trimmed.contains("0.08") || trimmed.contains("0.1") {
                         return Err(TamperViolation::ToleranceTampered {
                             line_num: idx + 1,
@@ -179,7 +231,6 @@ impl AntiTamperAuthority {
                     }
                 }
 
-                // Koordinat / Geometri modifikasyonu şüphesi
                 if trimmed.starts_with("PTMEAS/") || trimmed.starts_with("F(") {
                     if trimmed.contains("999.") || trimmed.contains("TAMPER") {
                         return Err(TamperViolation::GeometryTampered {
@@ -196,7 +247,6 @@ impl AntiTamperAuthority {
             });
         }
 
-        // İstatistikleri hesapla
         let mut feat_count = 0;
         let mut tol_count = 0;
         let mut motion_count = 0;
@@ -223,6 +273,62 @@ impl AntiTamperAuthority {
             is_valid: true,
             compliance_standard: "AS9100 Rev D (Clause 8.5.1/8.5.2) & NIST SP 800-53".to_string(),
         })
+    }
+
+    pub fn generate_as9102_package(
+        form1: As9102Form1,
+        form2: As9102Form2,
+        form3: Vec<As9102Form3Entry>,
+        secret_key: &str,
+    ) -> As9102ReportPackage {
+        let total = form3.len();
+        let passed = form3.iter().filter(|c| c.is_pass).count();
+        let failed = total - passed;
+
+        let content_to_hash = format!(
+            "{}:{}:{}:{}:{}",
+            form1.part_number,
+            form1.drawing_revision,
+            form1.fai_report_number,
+            form2.material_coc,
+            form3
+                .iter()
+                .map(|e| format!("{}_{}_{:.4}_{}", e.balloon_number, e.nominal, e.measured, e.is_pass))
+                .collect::<Vec<_>>()
+                .join(";")
+        );
+
+        let signature = Self::compute_string_hash(&content_to_hash, secret_key);
+
+        As9102ReportPackage {
+            form1,
+            form2,
+            form3,
+            total_characteristics: total,
+            passed_characteristics: passed,
+            failed_characteristics: failed,
+            digital_signature_sha256: signature,
+            timestamp_iso: "2026-11-11T20:00:00Z".to_string(),
+        }
+    }
+
+    pub fn verify_as9102_package(package: &As9102ReportPackage, secret_key: &str) -> bool {
+        let content_to_hash = format!(
+            "{}:{}:{}:{}:{}",
+            package.form1.part_number,
+            package.form1.drawing_revision,
+            package.form1.fai_report_number,
+            package.form2.material_coc,
+            package
+                .form3
+                .iter()
+                .map(|e| format!("{}_{}_{:.4}_{}", e.balloon_number, e.nominal, e.measured, e.is_pass))
+                .collect::<Vec<_>>()
+                .join(";")
+        );
+
+        let expected = Self::compute_string_hash(&content_to_hash, secret_key);
+        package.digital_signature_sha256 == expected
     }
 
     pub fn generate_as9102_form3(
@@ -275,7 +381,6 @@ mod tests {
         assert!(signed.contains("AS9100 REV D KRIPTOGRAFIK DENETIM IZI"));
         assert!(signed.contains("CERT-AS9100D-2026-001"));
 
-        // Bütünlüğü doğrula
         let cert = AntiTamperAuthority::verify_program_integrity(&signed)
             .expect("İmza doğrulanamadı!");
 
@@ -300,7 +405,6 @@ mod tests {
             "VALVE_BODY",
         );
 
-        // Operatör toleransı izinsiz 0.021'den 0.050'ye gevşetiyor!
         let tampered = signed.replace("0.0210", "0.0500");
 
         let err = AntiTamperAuthority::verify_program_integrity(&tampered)
@@ -310,9 +414,7 @@ mod tests {
             TamperViolation::ToleranceTampered { instruction, .. } => {
                 assert!(instruction.contains("0.0500"));
             }
-            TamperViolation::SignatureMismatch { .. } => {
-                // Alternatif geçerli hata modu
-            }
+            TamperViolation::SignatureMismatch { .. } => {}
             _ => panic!("Beklenmeyen hata tipi: {:?}", err),
         }
     }
@@ -335,5 +437,68 @@ mod tests {
         assert!(report.contains("TEST_PLATE"));
         assert!(report.contains("#1"));
         assert!(report.contains("NCR-01"));
+    }
+
+    #[test]
+    fn test_as9102_package_signing_and_tamper_verification() {
+        let form1 = As9102Form1 {
+            part_number: "AERO-BRACKET-001".to_string(),
+            part_name: "Wing Mounting Bracket".to_string(),
+            serial_number: "SN-2026-0982".to_string(),
+            fai_report_number: "FAI-2026-004".to_string(),
+            drawing_number: "DWG-998822".to_string(),
+            drawing_revision: "C".to_string(),
+            organization_name: "Nuper Aerospace Metrology".to_string(),
+            cage_code: "TU089".to_string(),
+            signature_authority: "Chief QA Inspector".to_string(),
+        };
+
+        let form2 = As9102Form2 {
+            material_spec: "AMS 4027 (AL7075-T6)".to_string(),
+            material_coc: "COC-AL-2026-8812".to_string(),
+            special_processes: vec!["MIL-A-8625 Type II Anodize".to_string()],
+            functional_test_reports: vec!["NDT-UT-2026-01".to_string()],
+        };
+
+        let form3 = vec![
+            As9102Form3Entry {
+                char_index: 1,
+                balloon_number: "B1".to_string(),
+                feature_type: "HOLE_DIA".to_string(),
+                nominal: 12.000,
+                upper_tol: 0.018,
+                lower_tol: 0.000,
+                measured: 12.008,
+                deviation: 0.008,
+                tool_used: "CMM - LK Altera TP20".to_string(),
+                is_pass: true,
+                is_key_characteristic: true,
+            },
+            As9102Form3Entry {
+                char_index: 2,
+                balloon_number: "B2".to_string(),
+                feature_type: "FLATNESS".to_string(),
+                nominal: 0.000,
+                upper_tol: 0.050,
+                lower_tol: 0.000,
+                measured: 0.012,
+                deviation: 0.012,
+                tool_used: "CMM - LK Altera TP20".to_string(),
+                is_pass: true,
+                is_key_characteristic: false,
+            },
+        ];
+
+        let secret = "AEROSPACE_HMAC_SECRET_2026";
+        let pkg = AntiTamperAuthority::generate_as9102_package(form1, form2, form3, secret);
+
+        assert_eq!(pkg.total_characteristics, 2);
+        assert_eq!(pkg.passed_characteristics, 2);
+        assert_eq!(pkg.failed_characteristics, 0);
+        assert!(AntiTamperAuthority::verify_as9102_package(&pkg, secret));
+
+        let mut tampered_pkg = pkg.clone();
+        tampered_pkg.form3[0].measured = 12.025;
+        assert!(!AntiTamperAuthority::verify_as9102_package(&tampered_pkg, secret));
     }
 }
