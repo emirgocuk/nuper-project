@@ -252,6 +252,101 @@ impl PH10LookUpTable {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Continuous5AxisWaypoint {
+    pub tip_pos: DVec3,
+    pub normal: DVec3,
+    pub head_a_deg: f64,
+    pub head_b_deg: f64,
+    pub nominal_surface_pt: DVec3,
+}
+
+pub fn generate_helical_scan_5axis(
+    center: DVec3,
+    bore_radius: f64,
+    depth: f64,
+    pitch_mm: f64,
+    stylus_radius: f64,
+    points_per_rev: usize,
+) -> Vec<Continuous5AxisWaypoint> {
+    let eff_radius = (bore_radius - stylus_radius).max(0.001);
+    let total_revs = (depth / pitch_mm.max(0.1)).ceil() as usize;
+    let total_points = total_revs * points_per_rev;
+    let mut waypoints = Vec::with_capacity(total_points);
+
+    let angle_step = std::f64::consts::TAU / (points_per_rev as f64);
+    let z_step = depth / (total_points as f64);
+
+    for i in 0..=total_points {
+        let theta = (i as f64) * angle_step;
+        let z_offset = (i as f64) * z_step;
+
+        let cos_t = theta.cos();
+        let sin_t = theta.sin();
+
+        let tip_x = center.x + eff_radius * cos_t;
+        let tip_y = center.y + eff_radius * sin_t;
+        let tip_z = center.z - z_offset;
+
+        let surf_x = center.x + bore_radius * cos_t;
+        let surf_y = center.y + bore_radius * sin_t;
+        let surf_z = tip_z;
+
+        let normal = DVec3::new(cos_t, sin_t, 0.0);
+        let b_deg = theta.to_degrees().rem_euclid(360.0);
+        let a_deg = 15.0;
+
+        waypoints.push(Continuous5AxisWaypoint {
+            tip_pos: DVec3::new(tip_x, tip_y, tip_z),
+            normal,
+            head_a_deg: a_deg,
+            head_b_deg: b_deg,
+            nominal_surface_pt: DVec3::new(surf_x, surf_y, surf_z),
+        });
+    }
+
+    waypoints
+}
+
+pub fn slerp_quaternion(
+    q1: [f64; 4],
+    q2: [f64; 4],
+    tau: f64,
+) -> [f64; 4] {
+    let mut dot = q1[0] * q2[0] + q1[1] * q2[1] + q1[2] * q2[2] + q1[3] * q2[3];
+    let mut q2_adj = q2;
+    if dot < 0.0 {
+        dot = -dot;
+        q2_adj = [-q2[0], -q2[1], -q2[2], -q2[3]];
+    }
+
+    if dot > 0.9995 {
+        let result = [
+            q1[0] + tau * (q2_adj[0] - q1[0]),
+            q1[1] + tau * (q2_adj[1] - q1[1]),
+            q1[2] + tau * (q2_adj[2] - q1[2]),
+            q1[3] + tau * (q2_adj[3] - q1[3]),
+        ];
+        let norm = (result[0] * result[0] + result[1] * result[1] + result[2] * result[2] + result[3] * result[3]).sqrt();
+        return [result[0] / norm, result[1] / norm, result[2] / norm, result[3] / norm];
+    }
+
+    let theta_0 = dot.acos();
+    let theta = theta_0 * tau;
+    let sin_theta = theta.sin();
+    let sin_theta_0 = theta_0.sin();
+
+    let s1 = (theta_0 - theta).sin() / sin_theta_0;
+    let s2 = sin_theta / sin_theta_0;
+
+    [
+        s1 * q1[0] + s2 * q2_adj[0],
+        s1 * q1[1] + s2 * q2_adj[1],
+        s1 * q1[2] + s2 * q2_adj[2],
+        s1 * q1[3] + s2 * q2_adj[3],
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -313,5 +408,33 @@ mod tests {
         let (clusters, star_suggestion) = lut.cluster_manual_angles_mh20i(&targets, 2);
         assert_eq!(clusters.len(), 2);
         assert!(star_suggestion.is_some(), "Star probe suggestion must be given for multi-directional targets");
+    }
+
+    #[test]
+    fn test_continuous_5axis_helical_scan() {
+        let waypoints = generate_helical_scan_5axis(
+            DVec3::new(100.0, 50.0, 0.0),
+            20.0,
+            60.0,
+            2.0,
+            2.0,
+            72,
+        );
+
+        assert!(!waypoints.is_empty());
+        for wp in &waypoints {
+            let radial_dist = ((wp.tip_pos.x - 100.0).powi(2) + (wp.tip_pos.y - 50.0).powi(2)).sqrt();
+            let effective_surface_r = radial_dist + 2.0;
+            assert!((effective_surface_r - 20.0).abs() < 0.0002);
+        }
+    }
+
+    #[test]
+    fn test_slerp_quaternion_interpolation() {
+        let q1 = [0.0, 0.0, 0.0, 1.0];
+        let q2 = [0.0, 0.70710678, 0.0, 0.70710678];
+        let q_mid = slerp_quaternion(q1, q2, 0.5);
+        let norm = (q_mid[0] * q_mid[0] + q_mid[1] * q_mid[1] + q_mid[2] * q_mid[2] + q_mid[3] * q_mid[3]).sqrt();
+        assert!((norm - 1.0).abs() < 1e-6);
     }
 }

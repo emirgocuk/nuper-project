@@ -83,5 +83,31 @@ describe('Ph10Kinematics — Renishaw PH10 A/B Motorize Açı ve Yönelim Motoru
     const isCollisionClose = Ph10Kinematics.verifySweepClearance([50, 60, 50], bbox, 60, 50, 'Y');
     expect(isCollisionClose).toBe(false);
   });
+
+  it('Kesintisiz 5-eksen helisel delik tarama takim yolunu 0.0002mm toleransla uretir (Faz 10)', () => {
+    const waypoints = Ph10Kinematics.generateHelicalScan5Axis(
+      [100.0, 50.0, 0.0],
+      20.0,
+      60.0,
+      2.0,
+      2.0,
+      72
+    );
+
+    expect(waypoints.length).toBeGreaterThan(100);
+    for (const wp of waypoints) {
+      const radialDist = Math.hypot(wp.tipPos[0] - 100.0, wp.tipPos[1] - 50.0);
+      const effectiveSurfaceR = radialDist + 2.0;
+      expect(Math.abs(effectiveSurfaceR - 20.0)).toBeLessThan(0.0002);
+    }
+  });
+
+  it('Kuaterniyon slerp acisal enterpolasyonunu dogrular (Faz 10)', () => {
+    const q1: [number, number, number, number] = [0, 0, 0, 1];
+    const q2: [number, number, number, number] = [0, 0.70710678, 0, 0.70710678];
+    const mid = Ph10Kinematics.slerpQuaternion(q1, q2, 0.5);
+    const norm = Math.hypot(...mid);
+    expect(Math.abs(norm - 1.0)).toBeLessThan(1e-5);
+  });
 });
 

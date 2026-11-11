@@ -10,6 +10,14 @@ export interface AngleMatchResult {
   angularErrorDeg: number;
 }
 
+export interface Continuous5AxisWaypoint {
+  tipPos: [number, number, number];
+  normal: [number, number, number];
+  headADeg: number;
+  headBDeg: number;
+  nominalSurfacePt: [number, number, number];
+}
+
 export class Ph10Kinematics {
   private static cachedLut: PH10Angle[] | null = null;
 
@@ -171,5 +179,91 @@ export class Ph10Kinematics {
     }
 
     return clusterMap;
+  }
+
+  public static generateHelicalScan5Axis(
+    center: [number, number, number],
+    boreRadius: number,
+    depth: number,
+    pitchMm: number,
+    stylusRadius: number,
+    pointsPerRev: number = 72
+  ): Continuous5AxisWaypoint[] {
+    const effRadius = Math.max(0.001, boreRadius - stylusRadius);
+    const totalRevs = Math.ceil(depth / Math.max(0.1, pitchMm));
+    const totalPoints = totalRevs * pointsPerRev;
+    const waypoints: Continuous5AxisWaypoint[] = [];
+
+    const angleStep = (2.0 * Math.PI) / pointsPerRev;
+    const zStep = depth / totalPoints;
+
+    for (let i = 0; i <= totalPoints; i++) {
+      const theta = i * angleStep;
+      const zOffset = i * zStep;
+
+      const cosT = Math.cos(theta);
+      const sinT = Math.sin(theta);
+
+      const tipX = center[0] + effRadius * cosT;
+      const tipY = center[1] + effRadius * sinT;
+      const tipZ = center[2] - zOffset;
+
+      const surfX = center[0] + boreRadius * cosT;
+      const surfY = center[1] + boreRadius * sinT;
+      const surfZ = tipZ;
+
+      const normal: [number, number, number] = [cosT, sinT, 0.0];
+      const bDeg = ((theta * 180.0) / Math.PI) % 360.0;
+      const aDeg = 15.0;
+
+      waypoints.push({
+        tipPos: [tipX, tipY, tipZ],
+        normal,
+        headADeg: aDeg,
+        headBDeg: bDeg,
+        nominalSurfacePt: [surfX, surfY, surfZ],
+      });
+    }
+
+    return waypoints;
+  }
+
+  public static slerpQuaternion(
+    q1: [number, number, number, number],
+    q2: [number, number, number, number],
+    tau: number
+  ): [number, number, number, number] {
+    let dot = q1[0] * q2[0] + q1[1] * q2[1] + q1[2] * q2[2] + q1[3] * q2[3];
+    let q2Adj = [...q2];
+    if (dot < 0.0) {
+      dot = -dot;
+      q2Adj = [-q2[0], -q2[1], -q2[2], -q2[3]];
+    }
+
+    if (dot > 0.9995) {
+      const res: [number, number, number, number] = [
+        q1[0] + tau * (q2Adj[0] - q1[0]),
+        q1[1] + tau * (q2Adj[1] - q1[1]),
+        q1[2] + tau * (q2Adj[2] - q1[2]),
+        q1[3] + tau * (q2Adj[3] - q1[3]),
+      ];
+      const norm = Math.hypot(...res);
+      return [res[0] / norm, res[1] / norm, res[2] / norm, res[3] / norm];
+    }
+
+    const theta0 = Math.acos(dot);
+    const theta = theta0 * tau;
+    const sinTheta = Math.sin(theta);
+    const sinTheta0 = Math.sin(theta0);
+
+    const s1 = Math.sin(theta0 - theta) / sinTheta0;
+    const s2 = sinTheta / sinTheta0;
+
+    return [
+      s1 * q1[0] + s2 * q2Adj[0],
+      s1 * q1[1] + s2 * q2Adj[1],
+      s1 * q1[2] + s2 * q2Adj[2],
+      s1 * q1[3] + s2 * q2Adj[3],
+    ];
   }
 }
