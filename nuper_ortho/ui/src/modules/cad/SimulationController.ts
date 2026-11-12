@@ -321,6 +321,22 @@ export class SimulationController {
     };
   }
 
+  public static evaluateIso14253Compliance(
+    deviation: number,
+    tolerance: number,
+    u95 = 0.003
+  ): 'PASS' | 'GUARD_BAND_WARNING' | 'FAIL' {
+    const absDev = Math.abs(deviation);
+    const safeLimit = Math.max(0, tolerance - u95);
+    if (absDev <= safeLimit) {
+      return 'PASS';
+    }
+    if (absDev <= tolerance) {
+      return 'GUARD_BAND_WARNING';
+    }
+    return 'FAIL';
+  }
+
   public getWaypoints(): Waypoint[] {
     return this.waypoints;
   }

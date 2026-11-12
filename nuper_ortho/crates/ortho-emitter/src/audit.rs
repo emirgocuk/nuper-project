@@ -73,6 +73,12 @@ pub struct As9102Form3Entry {
     pub tool_used: String,
     pub is_pass: bool,
     pub is_key_characteristic: bool,
+    #[serde(default = "default_conformance_status")]
+    pub conformance_status: String,
+}
+
+fn default_conformance_status() -> String {
+    "PASS".to_string()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -552,6 +558,7 @@ mod tests {
                 tool_used: "CMM - LK Altera TP20".to_string(),
                 is_pass: true,
                 is_key_characteristic: true,
+                conformance_status: "PASS".to_string(),
             },
             As9102Form3Entry {
                 char_index: 2,
@@ -565,6 +572,7 @@ mod tests {
                 tool_used: "CMM - LK Altera TP20".to_string(),
                 is_pass: true,
                 is_key_characteristic: false,
+                conformance_status: "PASS".to_string(),
             },
         ];
 
