@@ -38,6 +38,22 @@ pub enum DatumPrecedence {
     Tertiary = 3,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DatumGeometryType {
+    Plane,
+    Cylinder,
+    MidPlane,
+    Circle,
+    Line,
+    Point,
+}
+
+impl Default for DatumGeometryType {
+    fn default() -> Self {
+        Self::Plane
+    }
+}
+
 /// Nötr AST içindeki tekil Datum tanımı
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DatumFeature {
@@ -45,6 +61,8 @@ pub struct DatumFeature {
     pub feature_id: u32,
     pub precedence: DatumPrecedence,
     pub min_touch_points: usize,
+    #[serde(default)]
+    pub geometry_type: DatumGeometryType,
 }
 
 /// 3-2-1 Hizalama Zincirini ve 6 Serbestlik Derecesini (6-DoF) Kitleyen Referans Çerçevesi
@@ -71,19 +89,36 @@ impl DatumReferenceFrame {
                 feature_id: primary_id,
                 precedence: DatumPrecedence::Primary,
                 min_touch_points: 3,
+                geometry_type: DatumGeometryType::Plane,
             },
             secondary: Some(DatumFeature {
                 label: DatumLabel::B,
                 feature_id: secondary_id,
                 precedence: DatumPrecedence::Secondary,
                 min_touch_points: 2,
+                geometry_type: DatumGeometryType::Line,
             }),
             tertiary: Some(DatumFeature {
                 label: DatumLabel::C,
                 feature_id: tertiary_id,
                 precedence: DatumPrecedence::Tertiary,
                 min_touch_points: 1,
+                geometry_type: DatumGeometryType::Point,
             }),
+        }
+    }
+
+    pub fn new_flexible(
+        name: impl Into<String>,
+        primary: DatumFeature,
+        secondary: Option<DatumFeature>,
+        tertiary: Option<DatumFeature>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            primary,
+            secondary,
+            tertiary,
         }
     }
 
@@ -98,17 +133,21 @@ impl DatumReferenceFrame {
 
         // 1. Birincil Datum Kontrolü
         let primary_f = find_feature(self.primary.feature_id)?;
-        let mut locked_dof = match primary_f.feature_type {
-            FeatureType::Plane => 3,
-            FeatureType::ExternalCylinder | FeatureType::InternalCylinder => 4,
-            _ => {
-                return Err(AstError::IncompleteDatumFrame {
-                    reason: format!(
-                        "Primer Datum (A) bir düzlem (Plane) veya silindir (Cylinder) olmalıdır; bulunan tip: {:?}",
-                        primary_f.feature_type
-                    ),
-                });
-            }
+        let mut locked_dof = match self.primary.geometry_type {
+            DatumGeometryType::Cylinder => 4,
+            DatumGeometryType::MidPlane | DatumGeometryType::Plane => 3,
+            _ => match primary_f.feature_type {
+                FeatureType::Plane => 3,
+                FeatureType::ExternalCylinder | FeatureType::InternalCylinder => 4,
+                _ => {
+                    return Err(AstError::IncompleteDatumFrame {
+                        reason: format!(
+                            "Primer Datum (A) bir düzlem (Plane) veya silindir (Cylinder) olmalıdır; bulunan tip: {:?}",
+                            primary_f.feature_type
+                        ),
+                    });
+                }
+            },
         };
 
         // 2. İkincil Datum Kontrolü

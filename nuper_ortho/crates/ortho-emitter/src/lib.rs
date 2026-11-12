@@ -270,19 +270,58 @@ impl DmisEmitter {
         writeln!(out, "$$ ==============================================================")?;
         writeln!(out, "$$ 1. OPERATOR REHBERLIGI: MANUEL KABA ON-HIZALAMA (3-2-1)")?;
         writeln!(out, "$$ ==============================================================")?;
-        writeln!(out, "MODE/MAN")?;
-        writeln!(out, "TEXT/OPER, 'JOYSTICK ILE PRIMER DATUM A DUZLEMINE 3 NOKTA TEMAS ALINIZ'")?;
-        writeln!(
-            out,
-            "F(ROUGH_A) = FEAT/PLANE,CART, 0.0, 0.0, {:.4}, 0.0, 0.0, 1.0",
-            trajectory.clearance_box.max.z
-        )?;
-        writeln!(out, "MEAS/PLANE, F(ROUGH_A), 3")?;
-        writeln!(out, "  PTMEAS/CART, 0.0, 0.0, {:.4}, 0.0, 0.0, 1.0", trajectory.clearance_box.max.z)?;
-        writeln!(out, "  PTMEAS/CART, 20.0, 0.0, {:.4}, 0.0, 0.0, 1.0", trajectory.clearance_box.max.z)?;
-        writeln!(out, "  PTMEAS/CART, 0.0, 20.0, {:.4}, 0.0, 0.0, 1.0", trajectory.clearance_box.max.z)?;
-        writeln!(out, "ENDMES")?;
-        writeln!(out, "DATDEF/FA(ROUGH_A), DAT(A)")?;
+        match plan.datum_frame.primary.geometry_type {
+            ortho_ast::DatumGeometryType::Cylinder => {
+                writeln!(out, "MODE/MAN")?;
+                writeln!(out, "TEXT/OPER, 'JOYSTICK ILE PRIMER DATUM A SILINDIRINE 4 NOKTA TEMAS ALINIZ'")?;
+                writeln!(
+                    out,
+                    "F(ROUGH_A) = FEAT/CYLNDR,CART, 0.0, 0.0, {:.4}, 0.0, 0.0, 1.0, 20.0",
+                    trajectory.clearance_box.max.z
+                )?;
+                writeln!(out, "MEAS/CYLNDR, F(ROUGH_A), 4")?;
+                writeln!(out, "  PTMEAS/CART, 10.0, 0.0, {:.4}, -1.0, 0.0, 0.0", trajectory.clearance_box.max.z)?;
+                writeln!(out, "  PTMEAS/CART, -10.0, 0.0, {:.4}, 1.0, 0.0, 0.0", trajectory.clearance_box.max.z)?;
+                writeln!(out, "  PTMEAS/CART, 0.0, 10.0, {:.4}, 0.0, -1.0, 0.0", trajectory.clearance_box.max.z)?;
+                writeln!(out, "  PTMEAS/CART, 0.0, -10.0, {:.4}, 0.0, 1.0, 0.0", trajectory.clearance_box.max.z)?;
+                writeln!(out, "ENDMES")?;
+                writeln!(out, "DATDEF/FA(ROUGH_A), DAT(A)")?;
+                writeln!(out, "DATSET/DAT(A), ZDIR, DAT(A), XYORIG")?;
+            }
+            ortho_ast::DatumGeometryType::MidPlane => {
+                writeln!(out, "MODE/MAN")?;
+                writeln!(out, "TEXT/OPER, 'JOYSTICK ILE PARALEL YUZEYLERI OLCEREK ORTA DUZLEM DATUM A OLUSTURUNUZ'")?;
+                writeln!(
+                    out,
+                    "F(ROUGH_A_L) = FEAT/PLANE,CART, -10.0, 0.0, {:.4}, 1.0, 0.0, 0.0",
+                    trajectory.clearance_box.max.z
+                )?;
+                writeln!(
+                    out,
+                    "F(ROUGH_A_R) = FEAT/PLANE,CART, 10.0, 0.0, {:.4}, -1.0, 0.0, 0.0",
+                    trajectory.clearance_box.max.z
+                )?;
+                writeln!(out, "CONST/PLANE, F(ROUGH_A), MID, F(ROUGH_A_L), F(ROUGH_A_R)")?;
+                writeln!(out, "DATDEF/FA(ROUGH_A), DAT(A)")?;
+                writeln!(out, "DATSET/DAT(A), XDIR, DAT(A), XORIG")?;
+            }
+            _ => {
+                writeln!(out, "MODE/MAN")?;
+                writeln!(out, "TEXT/OPER, 'JOYSTICK ILE PRIMER DATUM A DUZLEMINE 3 NOKTA TEMAS ALINIZ'")?;
+                writeln!(
+                    out,
+                    "F(ROUGH_A) = FEAT/PLANE,CART, 0.0, 0.0, {:.4}, 0.0, 0.0, 1.0",
+                    trajectory.clearance_box.max.z
+                )?;
+                writeln!(out, "MEAS/PLANE, F(ROUGH_A), 3")?;
+                writeln!(out, "  PTMEAS/CART, 0.0, 0.0, {:.4}, 0.0, 0.0, 1.0", trajectory.clearance_box.max.z)?;
+                writeln!(out, "  PTMEAS/CART, 20.0, 0.0, {:.4}, 0.0, 0.0, 1.0", trajectory.clearance_box.max.z)?;
+                writeln!(out, "  PTMEAS/CART, 0.0, 20.0, {:.4}, 0.0, 0.0, 1.0", trajectory.clearance_box.max.z)?;
+                writeln!(out, "ENDMES")?;
+                writeln!(out, "DATDEF/FA(ROUGH_A), DAT(A)")?;
+                writeln!(out, "DATSET/DAT(A), ZDIR, DAT(A), ZORIG")?;
+            }
+        }
         writeln!(out)?;
 
         // 5. OTONOM DCC MODA GEÇİŞ
@@ -983,6 +1022,33 @@ mod tests {
         let emitter = DmisEmitter::new();
         let code = emitter.emit_pcdmis(&plan, &traj).unwrap();
         assert!(code.contains("FEDRAT/MESVEL, 2.0"));
+    }
+
+    #[test]
+    fn test_cylindrical_datum_a_emission() {
+        let mut drf = DatumReferenceFrame::new_3_2_1("PCS_CYL", 1, 2, 3);
+        drf.primary.geometry_type = ortho_ast::DatumGeometryType::Cylinder;
+        let plan = InspectionPlan::new("CYL_PART", "shaft.step", drf);
+        let clearance = ClearanceBox::from_bounding_box(DVec3::ZERO, DVec3::new(50.0, 50.0, 20.0));
+        let traj = CertifiedCollisionFreeTrajectory::new(vec![], clearance, vec![]);
+        let emitter = DmisEmitter::new();
+        let code = emitter.emit_pcdmis(&plan, &traj).unwrap();
+        assert!(code.contains("FEAT/CYLNDR"));
+        assert!(code.contains("MEAS/CYLNDR"));
+        assert!(code.contains("DATSET/DAT(A), ZDIR, DAT(A), XYORIG"));
+    }
+
+    #[test]
+    fn test_midplane_datum_a_emission() {
+        let mut drf = DatumReferenceFrame::new_3_2_1("PCS_MID", 1, 2, 3);
+        drf.primary.geometry_type = ortho_ast::DatumGeometryType::MidPlane;
+        let plan = InspectionPlan::new("MID_PART", "fork.step", drf);
+        let clearance = ClearanceBox::from_bounding_box(DVec3::ZERO, DVec3::new(50.0, 50.0, 20.0));
+        let traj = CertifiedCollisionFreeTrajectory::new(vec![], clearance, vec![]);
+        let emitter = DmisEmitter::new();
+        let code = emitter.emit_pcdmis(&plan, &traj).unwrap();
+        assert!(code.contains("CONST/PLANE, F(ROUGH_A), MID"));
+        assert!(code.contains("DATSET/DAT(A), XDIR, DAT(A), XORIG"));
     }
 }
 

@@ -28,7 +28,7 @@ pub use composite_gdandt::{
     compute_bonus_tolerance, BonusToleranceResult, CompositeTolerance, GdAndTEvaluation,
     GdAndTEvaluator, SingleToleranceZone,
 };
-pub use datum::{DatumFeature, DatumLabel, DatumPrecedence, DatumReferenceFrame};
+pub use datum::{DatumFeature, DatumGeometryType, DatumLabel, DatumPrecedence, DatumReferenceFrame};
 pub use error::AstError;
 pub use feature::{FeatureType, GeometricFeature};
 pub use plan::{
