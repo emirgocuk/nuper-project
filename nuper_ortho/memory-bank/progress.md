@@ -134,6 +134,56 @@ Aşağıdaki sonuçlar 12 Kasım 2026 kapsamlı 8-Madde entegrasyon ve kalite g�
    - `cargo test --workspace`: 9 crate, 83+ birim/entegrasyon/doc testi başarılı (%100 yeşil).
    - `npm run build`: Başarılı (0 hata, üretim paketi derlendi).
 
+### 4.3. 4. Dalga: 7 İleri Seviye Metroloji ve Mimari Sorunun Giderilmesi (13 Kasım 2026)
+
+1. **İç Çap (Bore) ile Dış Çap (Boss / Mil) Ayrımı (Topological Polarity):**
+   - *Kök Neden:* STEP'te delik de mil de `CYLINDRICAL_SURFACE` olarak gelir. Ayrım yapılmadığında prob dolu metal milin içine daldırılıp çarpışmaya yol açıyordu.
+   - *Çözüm:* `brep_verifier.py`, `crates/ortho-brep/src/step_parser.rs` ve `MeasurementPathGenerator.ts` içinde `ADVANCED_FACE`, `SAME_SENSE` (`.T.` vs `.F.`) ve $(\vec{P} - \vec{P}_{\text{axis}}) \cdot \hat{n}$ radial iç çarpımı ile delik/mil kutupsallığı ayrıldı. Delikler için içeriden dışarıya ($R - R_{\text{tip}}$), miller için dışarıdan içeriye ($R + R_{\text{tip}} + \text{approach}$) güvenli dokunma kinematiği sağlandı.
+   - *Commit:* `81a98ad`
+
+2. **3D Prob Yakut Küre Yarıçap Telafisi (Stylus Radius Compensation / Kosinüs Hatası):**
+   - *Kök Neden:* Ham CMM tetikleme noktası küre merkezidir ($P_{\text{center}}$); temas noktası yüzey normali yönünde $R_{\text{eff}}$ kadar ofsetlidir. Düzlem ve silindir fitting algoritmaları bu telafiyi yapmadığında kosinüs hatası oluşuyordu.
+   - *Çözüm:* `crates/ortho-kinematics/src/fitting.rs` ve `tools/extractor/metrology_fitting.py` içine $P_{\text{surf}} = P_{\text{center}} - R_{\text{eff}} \hat{n}_{\text{approach}}$ telafisi eklendi; delik için $D_{\text{act}} = D_{\text{fit}} + 2 R_{\text{eff}}$, mil için $D_{\text{act}} = D_{\text{fit}} - 2 R_{\text{eff}}$ çap düzeltmesi uygulandı.
+   - *Commit:* `b93d6d4`
+
+3. **ASME Y14.5 / ISO 2692 Dinamik MMC (Ⓜ) / LMC (Ⓛ) Bonus Tolerans Motoru & Dinamik Simülasyon Süresi:**
+   - *Kök Neden:* Bonus tolerans statik kalıyor, gerçek boyut sapmasına göre dinamik güncellenmiyordu; ayrıca UI simülasyonu trajektori uzunluğundan bağımsız sabit 34 saniye sürüyordu.
+   - *Çözüm:* `crates/ortho-ast/src/tolerance.rs` içine `compute_dynamic_bonus_tolerance` eklendi ($T_{\text{total}} = T_{\text{stated}} + \text{Bonus}$). `SimulationController.ts` içinde sabit 34s yerine dinamik ivmeli hareket süresi hesabı ($T = \sum (t_{\text{accel}} + t_{\text{cruise}} + t_{\text{decel}}) + t_{\text{dwell}}$) ve MMC bonus rozetleri eklendi.
+   - *Commit:* `8cbd036`
+
+4. **Detay Görünüşler (`DETAY / DETAIL 2:1, 5:1`) Yerel Ölçek Koruması:**
+   - *Kök Neden:* 2D PDF teknik resimlerde büyütülmüş detay görünüşlerdeki ölçüler, `validate_scale_consistency` tarafından orantısız bulunup siliniyordu.
+   - *Çözüm:* `tools/extractor/spatial.py` ve `tools/drawing_extractor.py` içine detay ada tespiti ve yerel ölçek çarpanı (`view_scale_ratio`) ayrıştırması eklendi; detay görünüş içindeki ölçülerin silinmesi engellendi.
+   - *Commit:* `3482ef1`
+
+5. **ISO 14253-1 Ölçüm Belirsizliği Koruma Bandı (Guard Banding - `GUARD_BAND_WARNING`):**
+   - *Kök Neden:* Belirsizlik ($U_{95}$) tolerans sınırına yaklaştığında karar kuralı uygulanmıyor, sınır değerler hatalı kabul ediliyordu.
+   - *Çözüm:* `crates/ortho-kinematics/src/uncertainty.rs` içine `evaluate_iso14253_compliance` eklendi: $|\Delta| \le T - U_{95} \to \text{PASS}$, $T - U_{95} < |\Delta| \le T \to \text{GUARD\_BAND\_WARNING}$, $|\Delta| > T \to \text{FAIL}$.
+   - *Commit:* `68ddaad`
+
+6. **AS9102 Form 3 Denetim Kayıtları ve UI Canlı Simülasyon Entegrasyonu:**
+   - *Kök Neden:* ISO 14253-1 kararları resmi AS9102 denetim paketine ve 3D simülasyondaki canlı renk göstergelerine yansımıyordu.
+   - *Çözüm:* `crates/ortho-emitter/src/audit.rs` içine `conformance_status` alanı eklendi; `SimulationController.ts` içinde `GUARD_BAND_WARNING` sarı/kehribar rengiyle ve tolerans tüketim oranıyla canlı olarak gösterildi.
+   - *Commit:* `20ed8dc`, `8d6a308`
+
+7. **Zeiss Calypso (`calypso.rs`) ve Wenzel Quartis (`wenzel.rs`) Diyalekt Eşitliği:**
+   - *Kök Neden:* PC-DMIS dışındaki Calypso ve Wenzel diyalektleri temel blokları içeriyor, ancak ISO 1 20°C ısıl telafi, 3-2-1 temel datum hizalamaları, yıldız prob indeksleri ve OP10/OP20 operasyon sıralamasını içermiyordu.
+   - *Çözüm:* `crates/ortho-emitter/src/calypso.rs` ve `crates/ortho-emitter/src/wenzel.rs` içine ISO 1 20°C başlıkları, `BASE_ALIGNMENT` / `DATUM_SYSTEM_321`, `STAR_PROBE_INDEX`, `SETUP_STAGE`, ve kritik özellik hız profilleri (`MESVEL: 2.0` vs `5.0`) eklendi.
+   - *Commit:* `ebe28e2`
+
+8. **Python Çıkarım Hattı ile Rust `ortho-cli` Arasında Köprü:**
+   - *Kök Neden:* Python çizim çıkarıcısı ile Rust derleyicisi arasında iki yönlü IPC eksikti; arayüz derlenmiş gerçek PC-DMIS, Calypso, Wenzel ve G10 çıktılarını alamıyordu.
+   - *Çözüm:* `crates/ortho-cli/src/main.rs` içine `--input-drawing-json` ve `--emit-all-json` parametreleri eklendi; `schemas/drawing_data.schema.json` güncellenip `npm run codegen` çalıştırıldı; `electron-main.js` ve `src-tauri/src/main.rs` içine `runOrthoCompiler` ve `compile_all_dialects_ipc` entegre edildi.
+   - *Commit:* `575acf5`, `bd3ee89`, `3c9a62b`
+
+9. **6-Fazlı Doğrulama:**
+   - `npm run codegen`: Başarılı.
+   - `npm run check:types`: Başarılı (0 hata).
+   - `python -m pytest tools/tests/`: 75 test başarılı (%100 yeşil).
+   - `npm run test:ui`: 35 test dosyası, 201 test başarılı (%100 yeşil).
+   - `cargo test --workspace`: 9 crate, tüm birim ve E2E testleri başarılı (%100 yeşil).
+   - `npm run build`: Başarılı (0 hata, üretim paketi hazır).
+
 ## 5. Bağımlılık sırası ve görev boyutu
 
 **R0 → R1 → R2 → R3 → R4 → R5 → R6 → R7 → R8**
