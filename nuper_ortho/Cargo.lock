@@ -432,6 +432,8 @@ dependencies = [
  "ortho-kinematics",
  "ortho-license",
  "ortho-router",
+ "serde",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
 ]
