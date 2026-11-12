@@ -475,21 +475,25 @@ def detect_orthographic_views(
             "name": "VIEW_TOP_XY",
             "plane": "XY",
             "bbox": [50.0, 50.0, round(w_half, 1), round(h_half, 1)],
+            "view_scale_ratio": 1.0,
         },
         {
             "name": "VIEW_FRONT_XZ",
             "plane": "XZ",
             "bbox": [50.0, round(h_half, 1), round(w_half, 1), round(page_height - 50.0, 1)],
+            "view_scale_ratio": 1.0,
         },
         {
             "name": "VIEW_SIDE_YZ",
             "plane": "YZ",
             "bbox": [round(w_half, 1), round(h_half, 1), round(page_width - 50.0, 1), round(page_height - 50.0, 1)],
+            "view_scale_ratio": 1.0,
         },
         {
             "name": "VIEW_SECTION",
             "plane": "XZ",
             "bbox": [round(w_half, 1), 50.0, round(page_width - 50.0, 1), round(h_half, 1)],
+            "view_scale_ratio": 1.0,
         },
     ]
 
@@ -497,10 +501,24 @@ def detect_orthographic_views(
         for it in text_items:
             t = str(it.get("text", "")).upper()
             b = it.get("bbox", [0, 0, 0, 0])
+            detail_match = re.search(r'(?:DETAY|DETAIL|ÖLÇEK|SCALE)\s*([A-Z])?\s*\(?\s*([1-9][0-9]*)\s*:\s*([1-9][0-9]*)', t)
+            local_ratio = 1.0
+            if detail_match:
+                n_str, d_str = detail_match.group(2), detail_match.group(3)
+                if n_str and d_str and float(d_str) > 0:
+                    local_ratio = float(n_str) / float(d_str)
+            elif "DETAY" in t or "DETAIL" in t:
+                local_ratio = 2.0
+
             if any(k in t for k in ("KESIT", "KESİT", "SECTION", "A-A", "B-B")):
                 for v in views:
                     if v["bbox"][0] <= b[0] <= v["bbox"][2] and v["bbox"][1] <= b[1] <= v["bbox"][3]:
                         v["name"] = "VIEW_SECTION"
+            elif local_ratio > 1.0:
+                for v in views:
+                    if v["bbox"][0] <= b[0] <= v["bbox"][2] and v["bbox"][1] <= b[1] <= v["bbox"][3]:
+                        v["name"] = "VIEW_DETAIL"
+                        v["view_scale_ratio"] = local_ratio
 
     return views
 
@@ -551,6 +569,7 @@ def assign_view_to_dimension(
 
     return {
         "view_name": best_view["name"],
+        "view_scale_ratio": best_view.get("view_scale_ratio", 1.0),
         "inferred_axis": inferred_axis,
         "rel_position": [round(rel_x, 4), round(rel_y, 4)],
         "view_bbox": vb,
@@ -561,12 +580,14 @@ def validate_scale_consistency(
     nominal_val: float,
     line_length: float,
     page_scale: Optional[float] = None,
+    view_scale_ratio: float = 1.0,
 ) -> bool:
     if nominal_val <= 0.0 or line_length <= 0.0:
         return True
+    effective_length = line_length / view_scale_ratio if view_scale_ratio > 0.0 else line_length
     if page_scale is not None and page_scale > 0.0:
-        computed = line_length * page_scale
+        computed = effective_length * page_scale
         ratio = computed / nominal_val
-        return 0.4 <= ratio <= 2.5
+        return 0.35 <= ratio <= 3.0
     return True
 

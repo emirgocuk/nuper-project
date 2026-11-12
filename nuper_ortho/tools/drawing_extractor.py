@@ -662,7 +662,8 @@ def parse_text_to_metrology(
 
         if tr_res.get("has_dimension_line") and not tr_res.get("scale_consistent", True):
             line_len = tr_res.get("dimension_line_length_pt", 0.0)
-            if isinstance(nom_val, (int, float)) and not validate_scale_consistency(float(nom_val), line_len):
+            view_ratio = float(assigned.get("view_scale_ratio", 1.0))
+            if isinstance(nom_val, (int, float)) and not validate_scale_consistency(float(nom_val), line_len, view_scale_ratio=view_ratio):
                 d["scale_warning"] = True
 
         if d.get("type") == "THREAD" or (isinstance(d.get("nominal_str"), str) and d.get("nominal_str", "").upper().startswith("M")):
