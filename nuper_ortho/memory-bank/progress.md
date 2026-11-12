@@ -37,16 +37,57 @@ drawing_data.schema.json hâlâ çıkarım öğesinde measured, deviation ve sta
 
 ## 4. Doğrulama kaydı
 
-Aşağıdaki sonuçlar 12 Kasım 2026 uçtan uca 7 entegrasyon görevi doğrulamasına aittir; tüm test paketleri çalıştırılmış ve %100 yeşil geçmiştir:
+Aşağıdaki sonuçlar 12 Kasım 2026 kapsamlı 8-Madde entegrasyon ve kalite güvence onarımına aittir; tüm 6 test paketi çalıştırılmış ve %100 yeşil geçmiştir:
 
 | Kontrol | Sonuç | Kanıt sınırı |
 |---|---|---|
-| npm run codegen | Başarılı (0 hata) | JSON şemalarından Python Pydantic & TypeScript modelleri |
-| npm run check:types | Başarılı (0 hata) | TypeScript tür kontrolü (`tsc --noEmit`) |
-| npm run test:ui | 35 dosya / 200 test başarılı (%100 yeşil) | Vitest UI modül ve entegrasyon testleri |
-| npm run test:python | 63 passed, 10 skipped, 0 failed (%100 yeşil) | Pytest Python boru hattı ve çıkarıcı testleri |
-| npm run test:rust & cargo test | Başarılı (0 hata, tüm testler geçti) | Rust workspace (ortho-brep, ortho-emitter, ortho-router, ortho-cli) |
-| npm run build | Başarılı (206ms) | Vite production bundle |
+| `npm run codegen` | Başarılı (0 hata) | TypeScript & Python Pydantic şema senkronizasyonu |
+| `npm run check:types` | Başarılı (0 hata) | TypeScript tür kontrolü (`tsc --noEmit`) |
+| `python -m pytest tools/tests/` | 74 test başarılı (%100 yeşil, 3.81s) | Python B-Rep, GD&T, benzerlik ve planlayıcı testleri |
+| `npm run test:ui` | 35 dosya / 200 test başarılı (%100 yeşil) | Vitest UI modül, ışık masası ve duman testleri |
+| `cargo test --workspace` | Başarılı (0 hata, tüm crate'ler geçti) | 8 Rust crate'i, tüm birim/entegrasyon/doc testleri |
+| `npm run build` | Başarılı (692ms) | Rolldown/Vite üretim paketi derlemesi |
+
+### 4.1. 8 Somut Entegrasyon ve Metroloji Kusurunun Giderilmesi
+
+1. **`cad_metadata.schema.json` & `inspection_plan.schema.json` Şema Senkronizasyonu:**
+   - *Kök Neden:* Yalnızca `drawing_data.schema.json` güncellenmiş; silindir/delik için `is_blind`, `floor_z`, `minor_diameter`, `thread_pitch`, yüzeyler için `face_bbox`, `adjacent_face_ids`, denetim adımları için `risk_level`, `match_confidence`, `match_status`, `recommended_touch_count`, `recommended_touch_speed_mms`, kök seviye için `similar_parts`, `contract_summary`, `thermal_compensation_summary` modellerde eksik kalmıştı.
+   - *Çözüm:* JSON şemaları zenginleştirildi, `scripts/codegen.mjs` yorum satırlarından arındırılarak `npm run codegen` ile TS ve Pydantic modelleri üretildi.
+   - *Commit:* `b1f8c4e`
+
+2. **`tools/inspection_planner.py` Veri Yutma Hatasının Giderilmesi:**
+   - *Kök Neden:* Çizim çıkarıcısının ürettiği kritiklik ve benzerlik alanları nihai ölçüm planına aktarılmıyordu.
+   - *Çözüm:* `risk_level`, `risk_reasons`, `similar_parts`, `contract_summary`, `attachment_points`, `rel_position`, `inferred_axis`, `tolerance_source` alanları plana birebir aktarıldı. `CRITICAL` unsurlar için temas noktası $\ge 8$, temas hızı $2.0\text{ mm/s}$; `WARNING` için $\ge 6$ nokta, $3.5\text{ mm/s}$; normal için 4 nokta, $5.0\text{ mm/s}$ kuralları uygulandı.
+   - *Commit:* `92f2dce`
+
+3. **Rust Kinematik ve I++ Kritiklik Uyarlaması:**
+   - *Kök Neden:* Kinematik planlayıcı ve I++ DME sunucusu kritiklik bilgisini hesaba katmadan sabit temas sayısı ve standart intikal hızı kullanıyordu.
+   - *Çözüm:* `ortho-kinematics` içine `sample_plane_with_tolerance` ve `sample_cylinder_adaptive` eklendi (`CRITICAL` için 8 düzlem, 18 silindir noktası). `ortho-router` içine `trajectory_to_ipp_stream_with_risk` eklenerek PtMeas yaklaşma mesafesi ve hızı ($2.0\text{ mm/s}$) uyarlandı. `autonomous_loop` ve `pallet` modülleri re-export edildi.
+   - *Commit:* `1c18f39`, `181d966`
+
+4. **AS9102 Form 3 ve ANSI DMIS Entegrasyonu:**
+   - *Kök Neden:* AS9102 Form 3 tablosunda Sütun 7 (Karakteristik Sınıflandırıcı: CRITICAL/MAJOR/KEY) ve Sütun 8 (Tolerans Kaynağı: DRAWING/ISO_2768) eksikti; ISO 1 20°C referans dipnotu ve DMIS kritik özellik hız düşümü bulunmuyordu.
+   - *Çözüm:* `ortho-emitter` içinde AS9102 Form 3 jeneratörleri güncellendi, ISO 1 20°C dipnotu eklendi; DMIS çıktısına kritik özellik öncesinde `FEDRAT/MESVEL, 2.0` enjeksiyonu yapıldı.
+   - *Commit:* `ef44716`
+
+5. **`similarity_engine.py` ve SQLite Kalıcılığı:**
+   - *Kök Neden:* Çıkarılan 128 boyutlu parça öznitelik vektörleri diskte saklanmadığı için her oturumda kayboluyordu.
+   - *Çözüm:* `test_assets/benchmarks.db` içinde `part_catalog_vectors` tablosu oluşturuldu (`scripts/init_sqlite_db.py`). `register_part_in_catalog` ve `query_similar_from_db` fonksiyonları yazıldı ve birim testleri eklendi.
+   - *Commit:* `b1c2bff`
+
+6. **Front-End Bildirim ve Işık Masası / Dual Canvas Entegrasyonu:**
+   - *Kök Neden:* Benzer parça önerileri ve kritiklik risk rozetleri UI üzerinde kullanıcıya gösterilmiyordu.
+   - *Çözüm:* `#dual-canvas-2d .pane-toolbar` ve `#modal-drawing-audit` araç çubuklarına `#lightbox-similarity-banner` ve `#lightbox-risk-badges` yerleştirildi. `DrawingCanvas.ts` içine headless-güvenli `updateAuditMetadata` eklendi. `SetupWizard.ts` içinde benzerlik $\ge \%85$ ise `✨ Önerilen Hazırlık: 3 Pabuç, PH10 A0B0 / A90B180` butonu aktif edilerek `showToast` bildirimi bağlandı.
+   - *Commit:* `98138b3`, `4c49b9b`
+
+7. **Electron Bridge CLI Parametre Köprüsü ve `.gitignore` Temizliği:**
+   - *Kök Neden:* CAD yüklenmişken çizim çıkarıcı çağrıldığında `--cad <stepPath>` parametresi Electron bridge tarafından iletilmiyordu; ayrıca geçici ölçüm çıktıları git takibine giriyordu.
+   - *Çözüm:* `electron-main.js` içinde `extract-drawing-data` ve `ortho:extract-drawing` IPC kanalları aktif CAD dosya yolunu `--cad` argümanı olarak iletecek şekilde güncellendi. `tools/drawing_extractor.py` argümanı ayrıştırıp benzerlik ve sözleşme analizini çalıştırdı. `.gitignore` içine `output_pcdmis.dmi`, `output_calypso.txt`, `.ortho-session.json` eklendi.
+   - *Commit:* `45ffa1f`
+
+8. **6-Fazlı Tam Sistem Regresyon Doğrulaması:**
+   - *Kök Neden:* Yapılan kapsamlı değişikliklerin gerilemeye yol açmadığının uçtan uca kanıtlanması gerekiyordu.
+   - *Çözüm:* `npm run codegen`, `npm run check:types`, `python -m pytest tools/tests/` (74/74), `npm run test:ui` (200/200), `cargo test --workspace` (tüm crate ve E2E testleri) ve `npm run build` olmak üzere 6 test adımının tamamı hatasız başarıyla tamamlandı.
 
 ## 5. Bağımlılık sırası ve görev boyutu
 
