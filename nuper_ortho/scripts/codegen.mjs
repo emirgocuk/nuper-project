@@ -31,38 +31,42 @@ const schemas = [
 ];
 
 async function runCodegen() {
+  console.log('🔄 Nuper Ortho Codegen başlatılıyor...');
+
   for (const item of schemas) {
     const schemaPath = path.join(schemasDir, item.file);
     if (!fs.existsSync(schemaPath)) {
+      console.warn(`⚠️ Şema bulunamadı: ${schemaPath}`);
       continue;
     }
 
-    let tsContent = await compileFromFile(schemaPath, {
+    const tsContent = await compileFromFile(schemaPath, {
       bannerComment: ''
     });
-    tsContent = tsContent.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
     const tsFilePath = path.join(tsOutputDir, item.tsOut);
     fs.writeFileSync(tsFilePath, tsContent, 'utf8');
+    console.log(`  ✓ TypeScript üretildi: ${path.relative(rootDir, tsFilePath)}`);
 
     const pyFilePath = path.join(pyOutputDir, item.pyOut);
     try {
-      execSync(`python -m datamodel_code_generator --input "${schemaPath}" --output "${pyFilePath}" --output-model-type pydantic_v2.BaseModel`, {
+      execSync(`datamodel-codegen --input "${schemaPath}" --output "${pyFilePath}" --output-model-type pydantic_v2.BaseModel`, {
         cwd: rootDir,
         stdio: 'pipe'
       });
-      let pyContent = fs.readFileSync(pyFilePath, 'utf8');
-      pyContent = pyContent.replace(/^#.*\r?\n/gm, '');
-      fs.writeFileSync(pyFilePath, pyContent, 'utf8');
+      console.log(`  ✓ Python Pydantic üretildi: ${path.relative(rootDir, pyFilePath)}`);
     } catch (e) {
-      console.warn(e.message);
+      console.warn(`  ⚠️ Python datamodel-codegen uyarısı (${item.file}):`, e.message);
     }
   }
 
   const indexDts = schemas.map(s => `export * from './${s.tsOut.replace('.d.ts', '')}';`).join('\n') + '\n';
   fs.writeFileSync(path.join(tsOutputDir, 'index.d.ts'), indexDts, 'utf8');
+  console.log(`  ✓ TypeScript indeks üretildi: ${path.relative(rootDir, path.join(tsOutputDir, 'index.d.ts'))}`);
+
+  console.log('✅ Tüm tip sözleşmeleri (TypeScript & Python Pydantic) başarıyla senkronize edildi.');
 }
 
 runCodegen().catch(err => {
-  console.error(err);
+  console.error('❌ Codegen başarısız:', err);
   process.exit(1);
 });

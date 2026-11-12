@@ -43,9 +43,29 @@
           "op": { "type": "string" },
           "op_reason": { "type": "string" },
           "operator_approved": { "type": "boolean" },
-          "approval_timestamp": { "type": "string" }
+          "approval_timestamp": { "type": "string" },
+          "risk_level": { "type": "string", "enum": ["NORMAL", "WARNING", "CRITICAL"] },
+          "risk_reasons": { "type": "array", "items": { "type": "string" } },
+          "match_confidence": { "type": "number" },
+          "match_status": {
+            "type": "string",
+            "enum": ["VERIFIED_EXACT", "VERIFIED_TOPOLOGY", "NEEDS_REVIEW", "UNMATCHED", "ENGINEER_LOCKED"]
+          },
+          "matched_face_ids": { "type": "array", "items": { "type": "string" } },
+          "tolerance_source": { "type": "string" },
+          "recommended_touch_count": { "type": "integer" },
+          "recommended_touch_speed_mms": { "type": "number" },
+          "attachment_points": { "type": "array", "items": { "type": "array", "items": { "type": "number" } } },
+          "rel_position": { "type": "array", "items": { "type": "number" } },
+          "inferred_axis": { "type": "string", "enum": ["X", "Y", "Z"] }
         }
       }
-    }
+    },
+    "similar_parts": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "contract_summary": { "type": "object" },
+    "thermal_compensation_summary": { "type": "object" }
   }
 }

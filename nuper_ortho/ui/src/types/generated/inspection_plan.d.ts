@@ -25,7 +25,27 @@ export interface InspectionPlanPayload {
     op_reason?: string;
     operator_approved?: boolean;
     approval_timestamp?: string;
+    risk_level?: "NORMAL" | "WARNING" | "CRITICAL";
+    risk_reasons?: string[];
+    match_confidence?: number;
+    match_status?: "VERIFIED_EXACT" | "VERIFIED_TOPOLOGY" | "NEEDS_REVIEW" | "UNMATCHED" | "ENGINEER_LOCKED";
+    matched_face_ids?: string[];
+    tolerance_source?: string;
+    recommended_touch_count?: number;
+    recommended_touch_speed_mms?: number;
+    attachment_points?: number[][];
+    rel_position?: number[];
+    inferred_axis?: "X" | "Y" | "Z";
     [k: string]: unknown;
   }[];
+  similar_parts?: {
+    [k: string]: unknown;
+  }[];
+  contract_summary?: {
+    [k: string]: unknown;
+  };
+  thermal_compensation_summary?: {
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }

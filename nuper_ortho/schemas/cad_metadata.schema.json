@@ -42,7 +42,11 @@
           "faceA_center": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
           "faceB_center": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
           "faceA_normal": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
-          "faceB_normal": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+          "faceB_normal": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "is_blind": { "type": "boolean" },
+          "floor_z": { "type": "number" },
+          "minor_diameter": { "type": "number" },
+          "thread_pitch": { "type": "number" }
         }
       }
     },
@@ -66,7 +70,15 @@
               "surface_type": { "type": "string", "enum": ["PLANE", "CYLINDER", "CONE", "SPHERE", "TORUS", "BSPLINE", "BEZIER", "REVOLUTION", "EXTRUSION", "OFFSET", "OTHER"] },
               "triangle_start": { "type": "integer" },
               "triangle_count": { "type": "integer" },
-              "area": { "type": "number" }
+              "area": { "type": "number" },
+              "face_bbox": {
+                "type": "array",
+                "items": { "type": "number" }
+              },
+              "adjacent_face_ids": {
+                "type": "array",
+                "items": { "type": "integer" }
+              }
             }
           }
         }

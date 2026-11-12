@@ -48,7 +48,10 @@ export interface DrawingExtractionResult {
     provenance?: {
       source_sha256?: string;
       page?: number;
-      
+      /**
+       * @minItems 4
+       * @maxItems 4
+       */
       bbox?: [number, number, number, number];
       method?: string;
       extractor_version?: string;
@@ -70,15 +73,30 @@ export interface DrawingExtractionResult {
       "AP242_NATIVE_PMI" | "VERIFIED_EXACT" | "VERIFIED_TOPOLOGY" | "ENGINEER_LOCKED" | "NEEDS_REVIEW" | "UNMATCHED";
     matched_face_ids?: number[];
     distance_type?: string;
-    
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
     faceA_center?: [number, number, number];
-    
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
     faceB_center?: [number, number, number];
-    
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
     faceA_normal?: [number, number, number];
-    
+    /**
+     * @minItems 3
+     * @maxItems 3
+     */
     faceB_normal?: [number, number, number];
-    
+    /**
+     * @minItems 4
+     * @maxItems 4
+     */
     bbox?: [number, number, number, number];
     [k: string]: unknown;
   }[];
@@ -97,6 +115,5 @@ export interface DrawingExtractionResult {
     requires_special_probing?: boolean;
     [k: string]: unknown;
   };
-  contract_warnings?: string[];
   [k: string]: unknown;
 }
