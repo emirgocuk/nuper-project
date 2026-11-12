@@ -49,6 +49,60 @@ pub fn sample_plane_grid(centroid: DVec3, normal: DVec3, half_span: f64) -> Vec<
     offsets.iter().map(|&pt| SamplingPoint::new(pt, n)).collect()
 }
 
+pub fn sample_runout_circles(
+    center: DVec3,
+    axis: DVec3,
+    diameter: f64,
+    length: f64,
+    levels: usize,
+    points_per_level: usize,
+) -> Vec<SamplingPoint> {
+    let axis_norm = axis.normalize();
+    let perp = if axis_norm.x.abs() < 0.9 {
+        axis_norm.cross(DVec3::X).normalize()
+    } else {
+        axis_norm.cross(DVec3::Y).normalize()
+    };
+    let binormal = axis_norm.cross(perp).normalize();
+    let radius = diameter / 2.0;
+
+    let mut points = Vec::new();
+    let actual_levels = levels.max(2);
+    let pts_per_lvl = points_per_level.max(4);
+
+    for lvl in 0..actual_levels {
+        let frac = (lvl as f64) / ((actual_levels - 1) as f64);
+        let z_offset = (frac - 0.5) * length;
+        let lvl_center = center + axis_norm * z_offset;
+
+        for i in 0..pts_per_lvl {
+            let angle = (i as f64) * 2.0 * std::f64::consts::PI / (pts_per_lvl as f64);
+            let radial_dir = perp * angle.cos() + binormal * angle.sin();
+            let touch = lvl_center + radial_dir * radius;
+            points.push(SamplingPoint::new(touch, radial_dir));
+        }
+    }
+
+    points
+}
+
+pub fn sample_symmetry_planes(
+    center: DVec3,
+    normal: DVec3,
+    width: f64,
+    span: f64,
+) -> (Vec<SamplingPoint>, Vec<SamplingPoint>) {
+    let n = normal.normalize();
+    let half_w = width / 2.0;
+    let left_center = center - n * half_w;
+    let right_center = center + n * half_w;
+
+    let left_pts = sample_plane_grid(left_center, -n, span / 2.0);
+    let right_pts = sample_plane_grid(right_center, n, span / 2.0);
+
+    (left_pts, right_pts)
+}
+
 /// Çapak emniyet payı ofsetli (1.5 mm + bilye yarıçapı) düzlem örnekleyici (Doc 03 Section 3)
 pub fn sample_plane_with_margin(
     centroid: DVec3,
@@ -625,5 +679,15 @@ mod tests {
         assert_eq!(cyl_crit.len(), 18);
         let cyl_crit_flag = sample_cylinder_adaptive(DVec3::ZERO, DVec3::Z, 20.0, 40.0, 0.1, "CRITICAL");
         assert_eq!(cyl_crit_flag.len(), 18);
+    }
+
+    #[test]
+    fn test_sample_runout_and_symmetry() {
+        let runout_pts = sample_runout_circles(DVec3::ZERO, DVec3::Z, 30.0, 50.0, 3, 8);
+        assert_eq!(runout_pts.len(), 24);
+
+        let (left_pts, right_pts) = sample_symmetry_planes(DVec3::ZERO, DVec3::X, 20.0, 10.0);
+        assert_eq!(left_pts.len(), 4);
+        assert_eq!(right_pts.len(), 4);
     }
 }

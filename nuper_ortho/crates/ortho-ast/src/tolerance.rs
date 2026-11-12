@@ -29,6 +29,7 @@ pub enum ToleranceType {
     ProfileOfLine,
     /// Boyut / Çap Toleransı (Size / Diameter - ∅)
     Diameter,
+    Symmetry,
 }
 
 /// Malzeme Durumu Modifikatörü (Material Condition)
