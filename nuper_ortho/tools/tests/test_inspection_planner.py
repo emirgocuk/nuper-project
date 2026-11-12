@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import json
 import os
 import pytest
@@ -29,19 +28,16 @@ def test_321_datum_hierarchy_order(aski_kancasi_data):
     plan = generate_inspection_plan(aski_kancasi_data)
 
     assert len(plan.items) >= 3
-    # 1. Primary Datum A (3 DOF)
     assert plan.items[0].order == 1
     assert plan.items[0].item_id == "DATUM_A"
     assert plan.items[0].type == Type.DATUM_PRIMARY
     assert plan.items[0].priority == Priority.MANDATORY
 
-    # 2. Secondary Datum B (2 DOF)
     assert plan.items[1].order == 2
     assert plan.items[1].item_id == "DATUM_B"
     assert plan.items[1].type == Type.DATUM_SECONDARY
     assert plan.items[1].priority == Priority.MANDATORY
 
-    # 3. Tertiary Datum C (1 DOF)
     assert plan.items[2].order == 3
     assert plan.items[2].item_id == "DATUM_C"
     assert plan.items[2].type == Type.DATUM_TERTIARY
@@ -51,7 +47,6 @@ def test_321_datum_hierarchy_order(aski_kancasi_data):
 def test_geometric_tolerance_precedence_and_datums(aski_kancasi_data):
     plan = generate_inspection_plan(aski_kancasi_data)
 
-    # Datumlar ölçüldükten sonra türetilmiş geometrik toleranslar gelir
     geometric_items = [it for it in plan.items if it.type == Type.GEOMETRIC_TOL]
     assert len(geometric_items) >= 1
 
@@ -96,7 +91,6 @@ def test_lean_inspection_filter_removes_redundant_patterns():
     }
 
     plan = generate_inspection_plan(data)
-    # 3 Datum + 1 Konsolide R2.5 + 1 Geometrik toleranslı delik = 5 öğe (tekrarlayan kopya elendi)
     assert len(plan.items) == 5
     feature_keys = [it.feature_key for it in plan.items]
     assert "corner_radius" in feature_keys
@@ -111,22 +105,75 @@ def test_avionic_panel_plan_schema_conformance(avionic_panel_data):
     assert len(plan.audit_hash) == 64
     assert len(plan.items) > 3
 
-    # Tüm öğelerin order sırası artan şekilde olmalıdır
     orders = [it.order for it in plan.items]
     assert orders == sorted(orders)
     assert orders[0] == 1
 
 
-def test_print_inspection_plan_summary(aski_kancasi_data):
-    plan = generate_inspection_plan(aski_kancasi_data)
+def test_critical_risk_level_touch_parameters_and_root_summaries():
+    data = {
+        "filename": "critical_bracket.pdf",
+        "title_block": {"part_number": "CRIT-001"},
+        "datums": ["A", "B", "C"],
+        "similar_parts": [{"part_id": "PREV-001", "similarity": 0.92}],
+        "contract_summary": {"unresolved_count": 0, "status": "VERIFIED"},
+        "thermal_compensation_summary": {"material": "Steel", "ref_temp_c": 20.0},
+        "dimensions": [
+            {
+                "id": 1,
+                "nominal": 25.0,
+                "nominal_str": "Ø25.0 ±0.005",
+                "upper_tol": "+0.005",
+                "lower_tol": "-0.005",
+                "risk_level": "CRITICAL",
+                "risk_reasons": ["Tight tolerance <= 0.025mm"],
+                "tolerance_source": "DRAWING_EXPLICIT",
+                "match_confidence": 0.98,
+                "feature_key": "cyl_25",
+            },
+            {
+                "id": 2,
+                "nominal": 50.0,
+                "nominal_str": "50.0 ±0.05",
+                "upper_tol": "+0.05",
+                "lower_tol": "-0.05",
+                "risk_level": "WARNING",
+                "tolerance_source": "ISO_2768_mK",
+                "feature_key": "dist_50",
+            },
+            {
+                "id": 3,
+                "nominal": 100.0,
+                "nominal_str": "100.0 ±0.2",
+                "upper_tol": "+0.2",
+                "lower_tol": "-0.2",
+                "risk_level": "NORMAL",
+                "feature_key": "dist_100",
+            },
+        ],
+    }
+    plan = generate_inspection_plan(data)
+    assert plan.similar_parts is not None
+    assert len(plan.similar_parts) == 1
+    assert plan.similar_parts[0]["part_id"] == "PREV-001"
+    assert plan.contract_summary is not None
+    assert plan.contract_summary["status"] == "VERIFIED"
+    assert plan.thermal_compensation_summary is not None
+    assert plan.thermal_compensation_summary["ref_temp_c"] == 20.0
 
-    print("\n" + "=" * 70)
-    print(f"CMM METROLOJİ ÖLÇÜM PLANI: {plan.part_number} (Audit: {plan.audit_hash[:16]}...)")
-    print("=" * 70)
-    for it in plan.items:
-        datums_str = ",".join(it.datum_reference or [])
-        print(
-            f"[{it.order:02d}] {it.type.value:<16} | ID: {it.item_id:<10} | "
-            f"Nominal: {it.nominal_str:<12} | Datums: [{datums_str:<5}] | Priority: {it.priority.value}"
-        )
-    print("=" * 70)
+    crit_item = next(it for it in plan.items if it.feature_key == "cyl_25")
+    assert crit_item.risk_level.value == "CRITICAL"
+    assert crit_item.recommended_touch_count == 8
+    assert crit_item.recommended_touch_speed_mms == 2.0
+    assert crit_item.tolerance_source == "DRAWING_EXPLICIT"
+    assert crit_item.match_confidence == 0.98
+
+    warn_item = next(it for it in plan.items if it.feature_key == "dist_50")
+    assert warn_item.risk_level.value == "WARNING"
+    assert warn_item.recommended_touch_count == 6
+    assert warn_item.recommended_touch_speed_mms == 3.5
+
+    norm_item = next(it for it in plan.items if it.feature_key == "dist_100")
+    assert norm_item.risk_level.value == "NORMAL"
+    assert norm_item.recommended_touch_count == 4
+    assert norm_item.recommended_touch_speed_mms == 5.0

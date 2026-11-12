@@ -1,23 +1,20 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Nuper Ortho — Teknik Resim Datum Önceliklendirme ve Asgari Ölçü Planlayıcı (Inspection Plan Engine)
-3-2-1 Datum hiyerarşisi (A -> B -> C) ve "Ne Eksik Ne Fazla" asgari ölçüm filtresi (Lean Inspection).
-"""
-
 from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import sys
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from tools.models.generated_inspection_plan import (
+    InferredAxis,
     InspectionPlanPayload,
     Item,
+    MatchStatus,
     Priority,
+    RiskLevel,
     Status,
     Type,
 )
@@ -205,10 +202,6 @@ def generate_inspection_plan(
     items: List[Item] = []
     current_order = 1
 
-    # 1. Datum Hiyerarşisi ve Sıralama Kuralı (3-2-1 Alignment)
-    # [A] Birincil (Primary): 3 DOF kilitler (Z yönelimi + Z ötelemesi)
-    # [B] İkincil (Secondary): 2 DOF kilitler (X/Y eksen rotasyonu + 1 öteleme)
-    # [C] Üçüncül (Tertiary): 1 DOF kilitler (Kalan son öteleme)
     raw_datums = drawing_data.get("datums", ["A", "B", "C"])
     datum_types = [
         ("A", Type.DATUM_PRIMARY, "Taban Düzlemi (3 Temas Noktası, 3 DOF)"),
@@ -238,11 +231,13 @@ def generate_inspection_plan(
                     op="OP10",
                     op_reason=f"3-2-1 hizalama referansı: {desc}",
                     operator_approved=True,
+                    risk_level=RiskLevel.NORMAL,
+                    recommended_touch_count=4,
+                    recommended_touch_speed_mms=5.0,
                 )
             )
             current_order += 1
 
-    # 2. "Ne Eksik Ne Fazla" Asgari Ölçüm Filtresi (Lean Inspection Filter)
     raw_dimensions = drawing_data.get("dimensions", [])
     geometric_items: List[Dict[str, Any]] = []
     linear_items: List[Dict[str, Any]] = []
@@ -254,15 +249,12 @@ def generate_inspection_plan(
         feature_key = dim.get("feature_key", "")
         referenced_datums = parse_datums_from_gdt(gdt_str)
 
-        # FCF içinde atıfta bulunulan veya geometrik tolerans içeren unsurlar
         has_fcf = bool(referenced_datums or any(sym in gdt_str for sym in ["⌖", "∥", "⌒", "⟂", "⌯", "◎", "⌓"]))
 
-        # Tekrarlayan yardımcı ölçü patern kontrolü (ör. '2x R2.5', '4x Ø5')
         is_pattern = bool(re.match(r"^\d+x\s+", nom_str, re.IGNORECASE))
         base_feature = re.sub(r"^\d+x\s+", "", nom_str).strip()
 
         if is_pattern and base_feature in seen_patterns and not has_fcf:
-            # Tekrarlayan yardımcı unsuru LEAN_FILTERED olarak ele
             continue
 
         if is_pattern:
@@ -276,7 +268,6 @@ def generate_inspection_plan(
                 "type": Type.GEOMETRIC_TOL,
             })
         else:
-            # Kritik tolerans (küçük tolerans aralığı) kontrolü
             try:
                 upper = float(str(dim.get("upper_tol", "0.5")).replace("+", ""))
                 lower = float(str(dim.get("lower_tol", "-0.5")).replace("+", ""))
@@ -333,6 +324,63 @@ def generate_inspection_plan(
         except (ValueError, TypeError):
             lower_tol_val = -0.1
 
+        raw_risk = dim.get("risk_level")
+        if isinstance(raw_risk, RiskLevel):
+            risk_enum = raw_risk
+        elif raw_risk == "CRITICAL":
+            risk_enum = RiskLevel.CRITICAL
+        elif raw_risk == "WARNING":
+            risk_enum = RiskLevel.WARNING
+        else:
+            risk_enum = RiskLevel.NORMAL
+
+        if risk_enum == RiskLevel.CRITICAL:
+            recommended_touch_count = int(dim.get("recommended_touch_count") or 8)
+            if recommended_touch_count < 8:
+                recommended_touch_count = 8
+            recommended_touch_speed = 2.0
+        elif risk_enum == RiskLevel.WARNING:
+            recommended_touch_count = int(dim.get("recommended_touch_count") or 6)
+            recommended_touch_speed = 3.5
+        else:
+            recommended_touch_count = int(dim.get("recommended_touch_count") or 4)
+            recommended_touch_speed = 5.0
+
+        raw_match = dim.get("match_status")
+        match_status_enum = None
+        if isinstance(raw_match, MatchStatus):
+            match_status_enum = raw_match
+        elif isinstance(raw_match, str) and raw_match in MatchStatus.__members__:
+            match_status_enum = MatchStatus(raw_match)
+
+        raw_axis = dim.get("inferred_axis")
+        axis_enum = None
+        if isinstance(raw_axis, InferredAxis):
+            axis_enum = raw_axis
+        elif isinstance(raw_axis, str) and raw_axis in InferredAxis.__members__:
+            axis_enum = InferredAxis(raw_axis)
+
+        matched_face_ids = dim.get("matched_face_ids")
+        if matched_face_ids is not None:
+            matched_face_ids = [str(x) for x in matched_face_ids]
+
+        raw_att = dim.get("attachment_points")
+        attachment_points = raw_att if isinstance(raw_att, list) else None
+
+        raw_rel = dim.get("rel_position")
+        rel_position = [float(x) for x in raw_rel] if isinstance(raw_rel, list) else None
+
+        match_conf = dim.get("match_confidence")
+        match_confidence = float(match_conf) if match_conf is not None else None
+
+        tolerance_source = dim.get("tolerance_source")
+
+        risk_reasons = dim.get("risk_reasons")
+        if isinstance(risk_reasons, list):
+            risk_reasons = [str(r) for r in risk_reasons]
+        else:
+            risk_reasons = None
+
         items.append(
             Item(
                 order=current_order,
@@ -353,12 +401,27 @@ def generate_inspection_plan(
                 op=dim.get("op", "OP10"),
                 op_reason=dim.get("op_reason", "Standart prob bağlaması."),
                 operator_approved=False,
+                risk_level=risk_enum,
+                risk_reasons=risk_reasons,
+                match_confidence=match_confidence,
+                match_status=match_status_enum,
+                matched_face_ids=matched_face_ids,
+                tolerance_source=tolerance_source,
+                recommended_touch_count=recommended_touch_count,
+                recommended_touch_speed_mms=recommended_touch_speed,
+                attachment_points=attachment_points,
+                rel_position=rel_position,
+                inferred_axis=axis_enum,
             )
         )
         current_order += 1
 
     generated_id = plan_id or f"PLAN-{part_number}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     audit_hash = compute_plan_audit_hash(part_number, items)
+
+    similar_parts = drawing_data.get("similar_parts") or []
+    contract_summary = drawing_data.get("contract_summary") or {}
+    thermal_summary = drawing_data.get("thermal_compensation_summary") or {}
 
     return InspectionPlanPayload(
         plan_id=generated_id,
@@ -368,6 +431,9 @@ def generate_inspection_plan(
         drawing_reference=drawing_ref,
         audit_hash=audit_hash,
         items=items,
+        similar_parts=similar_parts if similar_parts else None,
+        contract_summary=contract_summary if contract_summary else None,
+        thermal_compensation_summary=thermal_summary if thermal_summary else None,
     )
 
 
