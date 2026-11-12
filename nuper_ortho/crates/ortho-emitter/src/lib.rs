@@ -93,8 +93,21 @@ impl DmisEmitter {
         diameter: f64,
         hit_points: &[ortho_kinematics::SamplingPoint],
     ) -> String {
+        self.emit_circle_block_with_feedrate(feature_name, center, axis, diameter, hit_points, 5.0)
+    }
+
+    pub fn emit_circle_block_with_feedrate(
+        &self,
+        feature_name: &str,
+        center: glam::DVec3,
+        axis: glam::DVec3,
+        diameter: f64,
+        hit_points: &[ortho_kinematics::SamplingPoint],
+        feedrate_mms: f64,
+    ) -> String {
         let mut out = String::new();
         let axis_norm = axis.normalize();
+        let _ = writeln!(out, "FEDRAT/MESVEL, {:.1}", feedrate_mms);
         let _ = writeln!(
             out,
             "F({}) = FEAT/CIRCLE,INNER,CART, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}",
@@ -116,7 +129,6 @@ impl DmisEmitter {
         out
     }
 
-    /// PC-DMIS uyumlu düzlem ölçüm bloğu (FEAT/PLANE, MEAS/PLANE, HIT/BASIC..., ENDMES)
     pub fn emit_plane_block(
         &self,
         feature_name: &str,
@@ -124,8 +136,20 @@ impl DmisEmitter {
         normal: glam::DVec3,
         hit_points: &[ortho_kinematics::SamplingPoint],
     ) -> String {
+        self.emit_plane_block_with_feedrate(feature_name, centroid, normal, hit_points, 5.0)
+    }
+
+    pub fn emit_plane_block_with_feedrate(
+        &self,
+        feature_name: &str,
+        centroid: glam::DVec3,
+        normal: glam::DVec3,
+        hit_points: &[ortho_kinematics::SamplingPoint],
+        feedrate_mms: f64,
+    ) -> String {
         let mut out = String::new();
         let norm = normal.normalize();
+        let _ = writeln!(out, "FEDRAT/MESVEL, {:.1}", feedrate_mms);
         let _ = writeln!(
             out,
             "F({}) = FEAT/PLANE,CART, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}",
@@ -276,6 +300,10 @@ impl DmisEmitter {
         writeln!(out, "$$ ==============================================================")?;
 
         for feature in &plan.features {
+            let is_critical = feature.name.to_uppercase().contains("CRIT")
+                || plan.tolerances.iter().any(|t| t.feature_id == feature.id && (t.upper_tolerance - t.lower_tolerance).abs() <= 0.025);
+            let feedrate = if is_critical { 2.0 } else { 5.0 };
+
             if feature.is_threaded {
                 writeln!(out, "$$ ==============================================================")?;
                 writeln!(out, "$$ [EMNIYET BAYPASI] UNSUR: {} (VIDA DISI / TAPPED HOLE)", feature.name)?;
@@ -291,14 +319,20 @@ impl DmisEmitter {
             match feature.feature_type {
                 FeatureType::Plane => {
                     let span = (feature.area.sqrt() / 2.0).clamp(5.0, 50.0);
-                    let pts = ortho_kinematics::sample_plane_grid(feature.centroid, feature.normal_vector, span);
-                    out.push_str(&self.emit_plane_block(&feature.name, feature.centroid, feature.normal_vector, &pts));
+                    let pts = ortho_kinematics::sample_plane_with_tolerance(
+                        feature.centroid,
+                        feature.normal_vector,
+                        span,
+                        if is_critical { 0.020 } else { 0.1 },
+                        if is_critical { "CRITICAL" } else { "NORMAL" },
+                    );
+                    out.push_str(&self.emit_plane_block_with_feedrate(&feature.name, feature.centroid, feature.normal_vector, &pts, feedrate));
                 }
                 FeatureType::InternalCylinder => {
                     let d = feature.diameter.unwrap_or(20.0);
                     let axis = feature.axis_vector.unwrap_or(glam::DVec3::Z);
                     let pts = ortho_kinematics::sample_circle_4points(feature.centroid, axis, d);
-                    out.push_str(&self.emit_circle_block(&feature.name, feature.centroid, axis, d, &pts));
+                    out.push_str(&self.emit_circle_block_with_feedrate(&feature.name, feature.centroid, axis, d, &pts, feedrate));
                 }
                 FeatureType::FreeformBSpline => {
                     writeln!(out, "F({}) = FEAT/GSURF,CART", feature.name)?;
@@ -916,6 +950,29 @@ mod tests {
         assert!(html_sheet.contains("M8_THREAD_01"));
         assert!(html_sheet.contains("M8x1.25"));
         assert!(html_sheet.contains("@media print"));
+    }
+
+    #[test]
+    fn test_critical_feature_slow_feedrate() {
+        let drf = DatumReferenceFrame::new_3_2_1("PCS_1", 1, 2, 3);
+        let mut plan = InspectionPlan::new("CRIT_TEST", "part.step", drf);
+        let crit_plane = GeometricFeature::new_plane(
+            1,
+            "CRIT_DATUM_FACE",
+            DVec3::new(0.0, 0.0, 10.0),
+            DVec3::Z,
+            100.0,
+            5.0,
+        )
+        .unwrap();
+        plan.features.push(crit_plane);
+
+        let clearance = ClearanceBox::from_bounding_box(DVec3::ZERO, DVec3::new(50.0, 50.0, 20.0));
+        let traj = CertifiedCollisionFreeTrajectory::new(vec![], clearance, vec![]);
+
+        let emitter = DmisEmitter::new();
+        let code = emitter.emit_pcdmis(&plan, &traj).unwrap();
+        assert!(code.contains("FEDRAT/MESVEL, 2.0"));
     }
 }
 

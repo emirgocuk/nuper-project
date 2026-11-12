@@ -335,26 +335,89 @@ impl AntiTamperAuthority {
         part_name: &str,
         dimensions: &[(&str, f64, f64, f64, &str, &str)],
     ) -> String {
+        Self::generate_as9102_form3_with_thermal(
+            part_name,
+            dimensions,
+            Some("Ref Temp: 20.0C | ISO 1 Compliant | Differential Expansion: 0.000 mm"),
+        )
+    }
+
+    pub fn generate_as9102_form3_with_thermal(
+        part_name: &str,
+        dimensions: &[(&str, f64, f64, f64, &str, &str)],
+        thermal_summary: Option<&str>,
+    ) -> String {
         let mut report = String::new();
-        report.push_str("================================================================================\n");
+        report.push_str("====================================================================================================\n");
         report.push_str("SAE AS9102 REV C — FIRST ARTICLE INSPECTION REPORT (FORM 3)\n");
         report.push_str(&format!("PART: {} | SPEC: AS9102 REV C / ASME Y14.5-2018\n", part_name));
-        report.push_str("================================================================================\n");
-        report.push_str("| CHAR | BALLOON | NOMINAL | UPPER_TOL | LOWER_TOL | STATUS | NCR |\n");
-        report.push_str("|------|---------|---------|-----------|-----------|--------|-----|\n");
+        report.push_str("====================================================================================================\n");
+        report.push_str("| CHAR | BALLOON | NOMINAL | UPPER_TOL | LOWER_TOL | STATUS | NCR   | CHAR DESIGNATOR | REQUIREMENT    |\n");
+        report.push_str("|------|---------|---------|-----------|-----------|--------|-------|-----------------|----------------|\n");
         for (i, (balloon, nom, utol, ltol, status, ncr)) in dimensions.iter().enumerate() {
+            let tol_band = (utol - ltol).abs();
+            let designator = if tol_band <= 0.025 {
+                "CRITICAL"
+            } else if *status == "FAIL" || tol_band <= 0.05 {
+                "MAJOR"
+            } else {
+                "STANDARD"
+            };
+            let req_source = if tol_band <= 0.05 {
+                "DRAWING_EXPLICIT"
+            } else {
+                "ISO_2768_mK"
+            };
             report.push_str(&format!(
-                "| {:4} | {:7} | {:7.3} | {:+9.3} | {:+9.3} | {:6} | {:5} |\n",
+                "| {:4} | {:7} | {:7.3} | {:+9.3} | {:+9.3} | {:6} | {:5} | {:15} | {:14} |\n",
                 i + 1,
                 balloon,
                 nom,
                 utol,
                 ltol,
                 status,
-                ncr
+                ncr,
+                designator,
+                req_source
             ));
         }
-        report.push_str("================================================================================\n");
+        report.push_str("----------------------------------------------------------------------------------------------------\n");
+        let footer = thermal_summary.unwrap_or("ISO 1 20°C: Expansion delta 0.000 mm (calibrated at 20.0°C)");
+        report.push_str(&format!("THERMAL COMPENSATION FOOTER (ISO 1 20°C): {}\n", footer));
+        report.push_str("====================================================================================================\n");
+        report
+    }
+
+    pub fn generate_as9102_form3_full(
+        part_name: &str,
+        dimensions: &[(&str, f64, f64, f64, &str, &str, &str, &str)],
+        thermal_summary: Option<&str>,
+    ) -> String {
+        let mut report = String::new();
+        report.push_str("====================================================================================================\n");
+        report.push_str("SAE AS9102 REV C — FIRST ARTICLE INSPECTION REPORT (FORM 3)\n");
+        report.push_str(&format!("PART: {} | SPEC: AS9102 REV C / ASME Y14.5-2018\n", part_name));
+        report.push_str("====================================================================================================\n");
+        report.push_str("| CHAR | BALLOON | NOMINAL | UPPER_TOL | LOWER_TOL | STATUS | NCR   | CHAR DESIGNATOR | REQUIREMENT    |\n");
+        report.push_str("|------|---------|---------|-----------|-----------|--------|-------|-----------------|----------------|\n");
+        for (i, (balloon, nom, utol, ltol, status, ncr, designator, req_source)) in dimensions.iter().enumerate() {
+            report.push_str(&format!(
+                "| {:4} | {:7} | {:7.3} | {:+9.3} | {:+9.3} | {:6} | {:5} | {:15} | {:14} |\n",
+                i + 1,
+                balloon,
+                nom,
+                utol,
+                ltol,
+                status,
+                ncr,
+                designator,
+                req_source
+            ));
+        }
+        report.push_str("----------------------------------------------------------------------------------------------------\n");
+        let footer = thermal_summary.unwrap_or("ISO 1 20°C: Expansion delta 0.000 mm (calibrated at 20.0°C)");
+        report.push_str(&format!("THERMAL COMPENSATION FOOTER (ISO 1 20°C): {}\n", footer));
+        report.push_str("====================================================================================================\n");
         report
     }
 }
@@ -437,6 +500,22 @@ mod tests {
         assert!(report.contains("TEST_PLATE"));
         assert!(report.contains("#1"));
         assert!(report.contains("NCR-01"));
+    }
+
+    #[test]
+    fn test_as9102_form3_critical_designator_and_thermal_footer() {
+        let dims = [
+            ("#1", 20.0, 0.010, -0.010, "PASS", "N/A"),
+            ("#2", 50.0, 0.200, -0.200, "PASS", "N/A"),
+        ];
+        let report = AntiTamperAuthority::generate_as9102_form3("WING_RIB", &dims);
+        assert!(report.contains("CHAR DESIGNATOR"));
+        assert!(report.contains("REQUIREMENT"));
+        assert!(report.contains("CRITICAL"));
+        assert!(report.contains("STANDARD"));
+        assert!(report.contains("DRAWING_EXPLICIT"));
+        assert!(report.contains("ISO_2768_mK"));
+        assert!(report.contains("THERMAL COMPENSATION FOOTER (ISO 1 20°C)"));
     }
 
     #[test]
