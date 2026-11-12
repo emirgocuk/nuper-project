@@ -36,6 +36,7 @@ export interface InspectionPlanPayload {
     attachment_points?: number[][];
     rel_position?: number[];
     inferred_axis?: "X" | "Y" | "Z";
+    requires_manual_3d_binding?: boolean;
     [k: string]: unknown;
   }[];
   similar_parts?: {

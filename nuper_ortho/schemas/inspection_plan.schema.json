@@ -57,7 +57,8 @@
           "recommended_touch_speed_mms": { "type": "number" },
           "attachment_points": { "type": "array", "items": { "type": "array", "items": { "type": "number" } } },
           "rel_position": { "type": "array", "items": { "type": "number" } },
-          "inferred_axis": { "type": "string", "enum": ["X", "Y", "Z"] }
+          "inferred_axis": { "type": "string", "enum": ["X", "Y", "Z"] },
+          "requires_manual_3d_binding": { "type": "boolean" }
         }
       }
     },
