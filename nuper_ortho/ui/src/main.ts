@@ -131,7 +131,8 @@ export class NuperApp {
 
     if (data.similar_parts && data.similar_parts.length > 0 && typeof document !== 'undefined') {
       const topPart = data.similar_parts[0];
-      const simPercent = Math.round((topPart.similarity_score || (topPart.similarity ? topPart.similarity * 100 : 0)));
+      const rawSim = topPart.similarity_score ?? (typeof topPart.similarity === 'number' ? topPart.similarity : 0);
+      const simPercent = Math.round(rawSim * (rawSim <= 1.0 ? 100 : 1));
       const hudDetails = document.getElementById('hud-feature-details');
       if (hudDetails) {
         hudDetails.innerText = `💡 Benzer Parça Eşleşmesi: ${topPart.part_name || topPart.part_id} (%${simPercent} Benzerlik) — Önerilen Kurulum: OP10 (${topPart.recommended_setup_op10 || 'A0B0'}) | Prob: ${topPart.recommended_probe || 'Ø3x50'}`;

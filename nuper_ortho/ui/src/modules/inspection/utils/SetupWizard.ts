@@ -49,8 +49,11 @@ export interface SimilarPartRecommendation {
   part_id?: string;
   part_name?: string;
   similarity_score?: number;
+  similarity_pct?: number;
+  similarity?: number;
   recommended_setup_op10?: string;
   recommended_probe?: string;
+  [k: string]: unknown;
 }
 
 export interface SetupWizardOptions {
@@ -83,7 +86,7 @@ export class SetupWizard {
   private lastActiveFeatureId: number | null = null;
   private featureTouchHits: Map<number, number> = new Map();
   private featureTotalHits: Map<number, number> = new Map();
-  public similarParts: Array<{ part_name?: string; part_id?: string; similarity_pct?: number; similarity?: number }> = [];
+  public similarParts: SimilarPartRecommendation[] = [];
   public contractSummary: { critical_count?: number; warning_count?: number; normal_count?: number; status?: string } | null = null;
 
   private zoom: number = 1.0;
@@ -110,7 +113,6 @@ export class SetupWizard {
   private activeMoveHandler: ((e: MouseEvent) => void) | null = null;
   private activeUpHandler: ((e: MouseEvent) => void) | null = null;
   private activeKeyHandler: ((e: KeyboardEvent) => void) | null = null;
-  private similarParts: SimilarPartRecommendation[] = [];
 
   constructor(app?: unknown, options?: SetupWizardOptions) {
     this.appInstance = app || null;
