@@ -97,6 +97,14 @@ pub struct ToleranceConstraint {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct DynamicBonusResult {
+    pub mmc_size: f64,
+    pub lmc_size: f64,
+    pub bonus_tolerance: f64,
+    pub total_tolerance: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct MmcBonusResult {
     pub mmc_size: f64,
     pub bonus_tolerance: f64,
@@ -104,6 +112,47 @@ pub struct MmcBonusResult {
 }
 
 impl ToleranceConstraint {
+    pub fn compute_dynamic_bonus_tolerance(
+        nominal_size: f64,
+        upper_tol: f64,
+        lower_tol: f64,
+        measured_size: f64,
+        stated_geom_tol: f64,
+        is_internal: bool,
+        material_modifier: MaterialModifier,
+    ) -> DynamicBonusResult {
+        let (d_mmc, d_lmc) = if is_internal {
+            (nominal_size + lower_tol, nominal_size + upper_tol)
+        } else {
+            (nominal_size + upper_tol, nominal_size + lower_tol)
+        };
+
+        let bonus = match material_modifier {
+            MaterialModifier::MMC => {
+                if is_internal {
+                    (measured_size - d_mmc).max(0.0)
+                } else {
+                    (d_mmc - measured_size).max(0.0)
+                }
+            }
+            MaterialModifier::LMC => {
+                if is_internal {
+                    (d_lmc - measured_size).max(0.0)
+                } else {
+                    (measured_size - d_lmc).max(0.0)
+                }
+            }
+            MaterialModifier::RFS => 0.0,
+        };
+
+        DynamicBonusResult {
+            mmc_size: d_mmc,
+            lmc_size: d_lmc,
+            bonus_tolerance: bonus,
+            total_tolerance: stated_geom_tol + bonus,
+        }
+    }
+
     pub fn compute_mmc_bonus(
         nominal: f64,
         upper_tol: f64,
@@ -112,19 +161,19 @@ impl ToleranceConstraint {
         stated_pos_tol: f64,
         is_internal: bool,
     ) -> MmcBonusResult {
-        let (mmc_size, bonus) = if is_internal {
-            let mmc = nominal - lower_tol.abs();
-            let b = (actual_size - mmc).max(0.0);
-            (mmc, b)
-        } else {
-            let mmc = nominal + upper_tol.abs();
-            let b = (mmc - actual_size).max(0.0);
-            (mmc, b)
-        };
+        let dyn_res = Self::compute_dynamic_bonus_tolerance(
+            nominal,
+            upper_tol,
+            lower_tol,
+            actual_size,
+            stated_pos_tol,
+            is_internal,
+            MaterialModifier::MMC,
+        );
         MmcBonusResult {
-            mmc_size,
-            bonus_tolerance: bonus,
-            total_tolerance: stated_pos_tol + bonus,
+            mmc_size: dyn_res.mmc_size,
+            bonus_tolerance: dyn_res.bonus_tolerance,
+            total_tolerance: dyn_res.total_tolerance,
         }
     }
     pub fn new(
@@ -238,5 +287,21 @@ mod tests {
         assert!((res.mmc_size - 25.0).abs() < 1e-6);
         assert!((res.bonus_tolerance - 0.010).abs() < 1e-6);
         assert!((res.total_tolerance - 0.050).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_dynamic_lmc_bonus() {
+        let res = ToleranceConstraint::compute_dynamic_bonus_tolerance(
+            20.0,
+            0.021,
+            0.0,
+            20.015,
+            0.050,
+            true,
+            MaterialModifier::LMC,
+        );
+        assert!((res.lmc_size - 20.021).abs() < 1e-6);
+        assert!((res.bonus_tolerance - 0.006).abs() < 1e-6);
+        assert!((res.total_tolerance - 0.056).abs() < 1e-6);
     }
 }

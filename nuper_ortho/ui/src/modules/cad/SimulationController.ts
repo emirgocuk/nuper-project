@@ -263,9 +263,62 @@ export class SimulationController {
     };
   }
 
-  public setWaypoints(waypoints: Waypoint[]): void {
+  public setWaypoints(waypoints: Waypoint[], totalDurationSec?: number): void {
     this.waypoints = waypoints;
+    if (totalDurationSec !== undefined && totalDurationSec > 0) {
+      this.totalDurationSec = totalDurationSec;
+    } else if (waypoints.length > 1) {
+      this.totalDurationSec = this.calculateTrajectoryDuration(waypoints);
+    }
     this.reset();
+  }
+
+  public calculateTrajectoryDuration(waypoints: Waypoint[]): number {
+    let dur = 0;
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const p1 = waypoints[i].position;
+      const p2 = waypoints[i + 1].position;
+      const dist = p1.distanceTo(p2);
+      const wpNext = waypoints[i + 1] as Waypoint & { feedRate?: number; subPhase?: string };
+      const feed = wpNext.feedRate ?? (wpNext.phase === 'TOUCH' ? this.baseTouchSpeed : this.baseTraverseSpeed);
+      dur += dist / Math.max(1.0, feed);
+      if (wpNext.phase === 'TOUCH') {
+        dur += 0.25;
+      }
+      if (wpNext.subPhase === 'HEAD_ROTATION') {
+        dur += 1.80;
+      }
+    }
+    return Math.max(1.0, parseFloat(dur.toFixed(1)));
+  }
+
+  public static computeDynamicBonusTolerance(
+    nominalSize: number,
+    upperTol: number,
+    lowerTol: number,
+    measuredSize: number,
+    statedGeomTol: number,
+    isInternal: boolean,
+    modifier: 'MMC' | 'LMC' | 'RFS' = 'MMC'
+  ): { mmcSize: number; lmcSize: number; bonus: number; totalTol: number; bonusLabel: string } {
+    const dMmc = isInternal ? nominalSize + lowerTol : nominalSize + upperTol;
+    const dLmc = isInternal ? nominalSize + upperTol : nominalSize + lowerTol;
+    let bonus = 0;
+    if (modifier === 'MMC') {
+      bonus = isInternal ? Math.max(0, measuredSize - dMmc) : Math.max(0, dMmc - measuredSize);
+    } else if (modifier === 'LMC') {
+      bonus = isInternal ? Math.max(0, dLmc - measuredSize) : Math.max(0, measuredSize - dLmc);
+    }
+    const bonusRounded = parseFloat(bonus.toFixed(4));
+    const totalTol = parseFloat((statedGeomTol + bonusRounded).toFixed(4));
+    const bonusLabel = bonusRounded > 0 ? `(+${bonusRounded.toFixed(3)} mm ${modifier} Bonus)` : '';
+    return {
+      mmcSize: parseFloat(dMmc.toFixed(4)),
+      lmcSize: parseFloat(dLmc.toFixed(4)),
+      bonus: bonusRounded,
+      totalTol,
+      bonusLabel,
+    };
   }
 
   public getWaypoints(): Waypoint[] {

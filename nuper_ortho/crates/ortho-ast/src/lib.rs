@@ -40,7 +40,8 @@ pub use threads::{
     ThreadBypassStrategy, ThreadDiameterKind, ThreadSpecification, ThreadStandard,
 };
 pub use tolerance::{
-    FittingAlgorithm, MaterialModifier, ProfileZoneDisposition, ToleranceConstraint, ToleranceType,
+    DynamicBonusResult, FittingAlgorithm, MaterialModifier, MmcBonusResult, ProfileZoneDisposition,
+    ToleranceConstraint, ToleranceType,
 };
 
 #[cfg(test)]
