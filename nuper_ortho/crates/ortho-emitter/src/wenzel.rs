@@ -50,6 +50,11 @@ impl WenzelEmitter {
         writeln!(out, "PROGRAM '{}'", plan.part_name)?;
         writeln!(out, "  DME 'WENZEL LH 87'")?;
         writeln!(out, "  PROBE 'PH10M_TP20_50MM'")?;
+        writeln!(out, "  THERMAL_COMPENSATION(ISO_1_20C, MATERIAL: AL7075, CTE: 23.4)")?;
+        writeln!(out, "  DATUM_SYSTEM_321('PCS_OP10', PRIMARY: 'DATUM_A', SECONDARY: 'DATUM_B', TERTIARY: 'DATUM_C')")?;
+        writeln!(out, "  STAR_PROBE_INDEX(TIP1: 'A0B0', TIP2: 'A90B90', TIP3: 'A90B-90', TIP4: 'A90B0', TIP5: 'A90B180')")?;
+        writeln!(out, "  SETUP_STAGE('OP10', 'PRIMARY_INSPECTION')")?;
+        writeln!(out, "  SETUP_STAGE('OP20', 'FLIP_PART_SECONDARY')")?;
         writeln!(out, "  HEAD_ORIENTATION(A: 0.0, B: 0.0)")?;
 
         let z_clear = trajectory
@@ -58,11 +63,14 @@ impl WenzelEmitter {
         writeln!(out, "  CLEARANCE_PLANE({:.3})", z_clear)?;
         writeln!(out)?;
 
-        // 2. GEOMETRİK UNSURLAR (Features)
         for feature in &plan.features {
+            let is_critical = feature.name.to_uppercase().contains("CRIT")
+                || plan.tolerances.iter().any(|t| t.feature_id == feature.id && (t.upper_tolerance - t.lower_tolerance).abs() <= 0.025);
+            let feedrate = if is_critical { 2.0 } else { 5.0 };
             match feature.feature_type {
                 FeatureType::Plane => {
                     writeln!(out, "  FEATURE '{}' = PLANE(SURFACE, CART)", feature.name)?;
+                    writeln!(out, "    FEEDRATE(MESVEL: {:.1})", feedrate)?;
                     writeln!(
                         out,
                         "    POINT({:.3}, {:.3}, {:.3})",
@@ -76,6 +84,7 @@ impl WenzelEmitter {
                 }
                 FeatureType::InternalCylinder => {
                     writeln!(out, "  FEATURE '{}' = CYLINDER(INTERNAL, CART)", feature.name)?;
+                    writeln!(out, "    FEEDRATE(MESVEL: {:.1})", feedrate)?;
                     writeln!(
                         out,
                         "    CENTER({:.3}, {:.3}, {:.3})",
@@ -96,6 +105,7 @@ impl WenzelEmitter {
                 }
                 FeatureType::ExternalCylinder => {
                     writeln!(out, "  FEATURE '{}' = CYLINDER(EXTERNAL, CART)", feature.name)?;
+                    writeln!(out, "    FEEDRATE(MESVEL: {:.1})", feedrate)?;
                     writeln!(
                         out,
                         "    CENTER({:.3}, {:.3}, {:.3})",

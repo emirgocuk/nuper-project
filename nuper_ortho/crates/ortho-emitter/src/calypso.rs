@@ -39,12 +39,38 @@ impl CalypsoEmitter {
         writeln!(out, "; PART_NAME: {}", plan.part_name)?;
         writeln!(out, "; CAD_MODEL: {}", plan.cad_source_file)?;
         writeln!(out, "; UNITS: METRIC_MM")?;
+        writeln!(out, "; THERMAL_COMPENSATION: ISO 1 20.0C REFERENCE (CTE: 23.4 um/m/K)")?;
         writeln!(out, "; -------------------------------------------------------------")?;
         writeln!(out)?;
 
-        // 2. GEOMETRİK UNSURLAR (Geometrieelemente / Features)
+        writeln!(out, "[BASE_ALIGNMENT]")?;
+        writeln!(out, "COORDINATE_SYSTEM: PCS_OP10")?;
+        writeln!(out, "PRIMARY: DATUM_A (3-POINT PLANE)")?;
+        writeln!(out, "SECONDARY: DATUM_B (2-POINT LINE)")?;
+        writeln!(out, "TERTIARY: DATUM_C (1-POINT STOP)")?;
+        writeln!(out, "END_BASE_ALIGNMENT")?;
+        writeln!(out)?;
+
+        writeln!(out, "[PROBE_INDEXES]")?;
+        writeln!(out, "TIP_1: MASTER_A0B0 (INDEX 1)")?;
+        writeln!(out, "TIP_2: STAR_X_POS_A90B90 (INDEX 2)")?;
+        writeln!(out, "TIP_3: STAR_X_NEG_A90B-90 (INDEX 3)")?;
+        writeln!(out, "TIP_4: STAR_Y_POS_A90B0 (INDEX 4)")?;
+        writeln!(out, "TIP_5: STAR_Y_NEG_A90B180 (INDEX 5)")?;
+        writeln!(out, "END_PROBE_INDEXES")?;
+        writeln!(out)?;
+
+        writeln!(out, "[OPERATIONS]")?;
+        writeln!(out, "OP10: PRIMARY_SETUP (DATUMS_AND_TOP_FEATURES)")?;
+        writeln!(out, "OP20: FLIP_SETUP (REVERSE_BOTTOM_FEATURES)")?;
+        writeln!(out, "END_OPERATIONS")?;
+        writeln!(out)?;
+
         writeln!(out, "[FEATURES]")?;
         for feature in &plan.features {
+            let is_critical = feature.name.to_uppercase().contains("CRIT")
+                || plan.tolerances.iter().any(|t| t.feature_id == feature.id && (t.upper_tolerance - t.lower_tolerance).abs() <= 0.025);
+            let feedrate = if is_critical { 2.0 } else { 5.0 };
             match feature.feature_type {
                 FeatureType::Plane => {
                     writeln!(out, "FEATURE_TYPE: PLANE")?;
@@ -60,6 +86,7 @@ impl CalypsoEmitter {
                         feature.normal_vector.x, feature.normal_vector.y, feature.normal_vector.z
                     )?;
                     writeln!(out, "AREA: {:.2}", feature.area)?;
+                    writeln!(out, "MEAS_FEEDRATE: {:.1}", feedrate)?;
                     writeln!(out, "END_FEATURE")?;
                     writeln!(out)?;
                 }
@@ -75,6 +102,7 @@ impl CalypsoEmitter {
                     writeln!(out, "NOM_AXIS: {:.4}, {:.4}, {:.4}", axis.x, axis.y, axis.z)?;
                     writeln!(out, "NOM_DIAMETER: {:.4}", feature.diameter.unwrap_or(10.0))?;
                     writeln!(out, "NOM_LENGTH: {:.4}", feature.depth_or_length.unwrap_or(20.0))?;
+                    writeln!(out, "MEAS_FEEDRATE: {:.1}", feedrate)?;
                     writeln!(out, "END_FEATURE")?;
                     writeln!(out)?;
                 }
@@ -90,6 +118,7 @@ impl CalypsoEmitter {
                     writeln!(out, "NOM_AXIS: {:.4}, {:.4}, {:.4}", axis.x, axis.y, axis.z)?;
                     writeln!(out, "NOM_DIAMETER: {:.4}", feature.diameter.unwrap_or(10.0))?;
                     writeln!(out, "NOM_LENGTH: {:.4}", feature.depth_or_length.unwrap_or(20.0))?;
+                    writeln!(out, "MEAS_FEEDRATE: {:.1}", feedrate)?;
                     writeln!(out, "END_FEATURE")?;
                     writeln!(out)?;
                 }
@@ -107,6 +136,7 @@ impl CalypsoEmitter {
                         feature.normal_vector.x, feature.normal_vector.y, feature.normal_vector.z
                     )?;
                     writeln!(out, "AREA: {:.2}", feature.area)?;
+                    writeln!(out, "MEAS_FEEDRATE: {:.1}", feedrate)?;
                     writeln!(out, "END_FEATURE")?;
                     writeln!(out)?;
                 }
