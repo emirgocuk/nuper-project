@@ -257,6 +257,67 @@ impl GeometricFeature {
         Ok(feature)
     }
 
+    pub fn new_torus(
+        id: u32,
+        name: impl Into<String>,
+        centroid: DVec3,
+        axis_vector: DVec3,
+        major_radius: f64,
+        minor_radius: f64,
+        area: f64,
+        min_wall_thickness: f64,
+    ) -> Result<Self, AstError> {
+        let axis = axis_vector.normalize();
+        let feature = Self {
+            id,
+            name: name.into(),
+            feature_type: FeatureType::Torus,
+            centroid,
+            normal_vector: axis,
+            axis_vector: Some(axis),
+            diameter: Some(minor_radius * 2.0),
+            depth_or_length: Some(major_radius),
+            cone_half_angle_rad: None,
+            area,
+            min_wall_thickness,
+            is_datum_candidate: false,
+            is_threaded: false,
+            thread_spec: None,
+            boundary_polygon: Vec::new(),
+        };
+        feature.validate()?;
+        Ok(feature)
+    }
+
+    pub fn new_sphere(
+        id: u32,
+        name: impl Into<String>,
+        centroid: DVec3,
+        radius: f64,
+        area: f64,
+        min_wall_thickness: f64,
+    ) -> Result<Self, AstError> {
+        let feature = Self {
+            id,
+            name: name.into(),
+            feature_type: FeatureType::Sphere,
+            centroid,
+            normal_vector: DVec3::Z,
+            axis_vector: None,
+            diameter: Some(radius * 2.0),
+            depth_or_length: Some(radius),
+            cone_half_angle_rad: None,
+            area,
+            min_wall_thickness,
+            is_datum_candidate: false,
+            is_threaded: false,
+            thread_spec: None,
+            boundary_polygon: Vec::new(),
+        };
+        feature.validate()?;
+        Ok(feature)
+    }
+
     /// Geometrinin fiziksel geçerlilik sınırlarını denetler
     pub fn validate(&self) -> Result<(), AstError> {
         let normal_len = self.normal_vector.length();

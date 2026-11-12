@@ -497,6 +497,57 @@ impl StepParser {
                                     }
                                 }
                             }
+                            "TOROIDAL_SURFACE" => {
+                                let place_refs = self.extract_id_references(&surf_entity.raw_args);
+                                if let Some(&place_id) = place_refs.first() {
+                                    if let Some((origin, axis, _)) =
+                                        self.resolve_axis2_placement_3d(place_id)
+                                    {
+                                        let floats = self.extract_floats(&surf_entity.raw_args);
+                                        let major_r = floats.first().copied().unwrap_or(20.0);
+                                        let minor_r = floats.get(1).copied().unwrap_or(3.0);
+                                        let name = format!("TORUS_R{:.1}", minor_r);
+                                        let area = 4.0 * std::f64::consts::PI.powi(2) * major_r * minor_r;
+                                        let mut feat = GeometricFeature::new_torus(
+                                            feature_id_counter,
+                                            name,
+                                            origin,
+                                            axis,
+                                            major_r,
+                                            minor_r,
+                                            area,
+                                            5.0,
+                                        )?;
+                                        feat.boundary_polygon = boundary_poly;
+                                        features.push(feat);
+                                        feature_id_counter += 1;
+                                    }
+                                }
+                            }
+                            "SPHERICAL_SURFACE" => {
+                                let place_refs = self.extract_id_references(&surf_entity.raw_args);
+                                if let Some(&place_id) = place_refs.first() {
+                                    if let Some((origin, _, _)) =
+                                        self.resolve_axis2_placement_3d(place_id)
+                                    {
+                                        let floats = self.extract_floats(&surf_entity.raw_args);
+                                        let radius = floats.first().copied().unwrap_or(10.0);
+                                        let name = format!("SPHERE_SR{:.1}", radius);
+                                        let area = 4.0 * std::f64::consts::PI * radius.powi(2);
+                                        let mut feat = GeometricFeature::new_sphere(
+                                            feature_id_counter,
+                                            name,
+                                            origin,
+                                            radius,
+                                            area,
+                                            5.0,
+                                        )?;
+                                        feat.boundary_polygon = boundary_poly;
+                                        features.push(feat);
+                                        feature_id_counter += 1;
+                                    }
+                                }
+                            }
                             "B_SPLINE_SURFACE_WITH_KNOTS" | "BSPLINE_SURFACE" => {
                                 let ctrl_pts = self.resolve_bspline_control_points(surf_entity);
                                 let name = format!("FREEFORM_SURF_{}", feature_id_counter);

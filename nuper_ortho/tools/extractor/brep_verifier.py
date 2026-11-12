@@ -897,6 +897,24 @@ def parse_step_file(step_path: str) -> Dict[str, Any]:
             "is_face": (t_id in face_surface_ids) if face_surface_ids else True,
         })
 
+    spheres: List[Dict[str, Any]] = []
+    for m in re.finditer(
+        r"#(\d+)\s*=\s*SPHERICAL_SURFACE\s*\(\s*(?:\'[^\']*\'|\$)\s*,\s*#(\d+)\s*,\s*([-\d.eE+]+)\s*\)",
+        content,
+    ):
+        s_id = m.group(1)
+        axis_id = m.group(2)
+        r_val = float(m.group(3))
+        placement = axis_placements.get(axis_id, {"origin": (0.0, 0.0, 0.0), "axis": (0.0, 0.0, 1.0)})
+        spheres.append({
+            "id": s_id,
+            "radius": round(r_val, 4),
+            "diameter": round(r_val * 2.0, 4),
+            "placement": placement,
+            "center": placement["origin"],
+            "is_face": (s_id in face_surface_ids) if face_surface_ids else True,
+        })
+
     circles: List[Dict[str, Any]] = []
     for m in re.finditer(
         r"#(\d+)\s*=\s*CIRCLE\s*\(\s*(?:\'[^\']*\'|\$)\s*,\s*#(\d+)\s*,\s*([-\d.eE+]+)\s*\)",
@@ -1005,6 +1023,7 @@ def parse_step_file(step_path: str) -> Dict[str, Any]:
         "planes": planes,
         "cones": cones,
         "toroids": toroids,
+        "spheres": spheres,
         "circles": circles,
         "linear_distances": linear_distances,
         "rotational_diameters": rotational_diameters,
@@ -1012,6 +1031,8 @@ def parse_step_file(step_path: str) -> Dict[str, Any]:
         "total_cylinders": len(cylinders),
         "total_planes": len(planes),
         "total_cones": len(cones),
+        "total_toroids": len(toroids),
+        "total_spheres": len(spheres),
     }
 
 
@@ -1115,6 +1136,7 @@ def verify_dimensions_against_step(
     step_planes = step_data.get("planes", [])
     step_cones = step_data.get("cones", [])
     step_toroids = step_data.get("toroids", [])
+    step_spheres = step_data.get("spheres", [])
     step_circles = step_data.get("circles", [])
     step_linear = step_data.get("linear_distances", [])
     step_rot_dia = step_data.get("rotational_diameters", [])
@@ -1198,8 +1220,18 @@ def verify_dimensions_against_step(
                         "radius": t["minor_radius"],
                         "nominal": t["minor_radius"],
                         "id": t["id"],
-                        "center": t.get("origin", [0.0, 0.0, 0.0]),
-                        "axis": t.get("axis", [0.0, 0.0, 1.0]),
+                        "center": t.get("placement", {}).get("origin", [0.0, 0.0, 0.0]),
+                        "axis": t.get("placement", {}).get("axis", [0.0, 0.0, 1.0]),
+                    })
+            for s in step_spheres:
+                if abs(s["radius"] - nom) <= tol_dia:
+                    candidate_features.append({
+                        "type": "SPHERE_RADIUS",
+                        "radius": s["radius"],
+                        "nominal": s["radius"],
+                        "id": s["id"],
+                        "center": s.get("center", [0.0, 0.0, 0.0]),
+                        "axis": [0.0, 0.0, 1.0],
                     })
             for c in step_cylinders:
                 if abs(c["radius"] - nom) <= tol_dia:
