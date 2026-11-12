@@ -47,6 +47,7 @@
           "id": { "type": "integer" },
           "balloon": { "type": "string" },
           "page": { "type": "integer" },
+          "page_number": { "type": "integer" },
           "datum_reference": { "type": "string" },
           "type": { "type": "string" },
           "type_label": { "type": "string" },

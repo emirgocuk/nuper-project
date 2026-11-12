@@ -25,6 +25,7 @@ export interface DrawingExtractionResult {
     id: number;
     balloon: string;
     page?: number;
+    page_number?: number;
     datum_reference?: string;
     type: string;
     type_label: string;
