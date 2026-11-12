@@ -256,7 +256,7 @@ def normalize_ai_dimensions(
 
         bbox = item.get("bbox")
         if not isinstance(bbox, list) or len(bbox) != 4:
-            bbox = [100.0, 100.0, 150.0, 120.0]
+            bbox = [0.0, 0.0, 0.0, 0.0]
         else:
             bbox = [round(float(c), 1) for c in bbox]
 

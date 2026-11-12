@@ -86,7 +86,9 @@ def generate_cmm_waypoints(
     current_angle = "A0B0"
 
     for feat in features:
-        center = feat.get("center") or feat.get("cad_center") or [0.0, 0.0, 0.0]
+        center = feat.get("center") or feat.get("cad_center")
+        if not center or center == [0.0, 0.0, 0.0]:
+            continue
         is_hole = feat.get("feature_type") == "INTERNAL_CYLINDER" or feat.get("type") == "DIAMETER"
         dia = float(feat.get("nominal_dimension") or feat.get("nominal") or 10.0)
         radius = dia / 2.0
@@ -381,6 +383,8 @@ def generate_inspection_plan(
         else:
             risk_reasons = None
 
+        req_manual = (match_status_enum == MatchStatus.UNMATCHED) or (raw_match == "UNMATCHED")
+
         items.append(
             Item(
                 order=current_order,
@@ -412,6 +416,7 @@ def generate_inspection_plan(
                 attachment_points=attachment_points,
                 rel_position=rel_position,
                 inferred_axis=axis_enum,
+                requires_manual_3d_binding=req_manual,
             )
         )
         current_order += 1

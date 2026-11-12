@@ -223,63 +223,8 @@ def find_similar_parts(
     cursor = db.conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM part_setups")
     if cursor.fetchone()[0] == 0:
-        db.register_setup(
-            part_id="KPT_3051_GOBEK",
-            part_name="KPT - 3051 Göbek Bağı Oluğu",
-            vector=extract_feature_vector({
-                "bbox_x": 395.5,
-                "bbox_y": 305.2,
-                "bbox_z": 55.0,
-                "hole_count": 12.0,
-                "cylinder_ratio": 0.65,
-                "min_tolerance": 0.02,
-                "surface_area": 18500.0,
-            }),
-            op_fixtures={"op10": "V-Block + Pabuç", "op20": "Ayna Mandreni"},
-            ph10_angles=[(0.0, 0.0), (90.0, 45.0), (180.0, 0.0)],
-            strategy={
-                "recommended_setup_op10": "OP10 (A0B0) + OP20 (180°)",
-                "recommended_probe": "Ø3x50",
-            },
-        )
-        db.register_setup(
-            part_id="FLANGE_ADAPTER",
-            part_name="Flanş Adaptörü",
-            vector=extract_feature_vector({
-                "bbox_x": 120.0,
-                "bbox_y": 120.0,
-                "bbox_z": 40.0,
-                "hole_count": 6.0,
-                "cylinder_ratio": 0.50,
-                "min_tolerance": 0.05,
-                "surface_area": 4500.0,
-            }),
-            op_fixtures={"op10": "Manyetik Tabla"},
-            ph10_angles=[(0.0, 0.0)],
-            strategy={
-                "recommended_setup_op10": "OP10 (A0B0)",
-                "recommended_probe": "Ø2x20",
-            },
-        )
-        db.register_setup(
-            part_id="VALVE_BODY_OP10",
-            part_name="Valf Gövdesi (Valve Body)",
-            vector=extract_feature_vector({
-                "bbox_x": 150.0,
-                "bbox_y": 100.0,
-                "bbox_z": 80.0,
-                "hole_count": 8.0,
-                "cylinder_ratio": 0.40,
-                "min_tolerance": 0.03,
-                "surface_area": 7200.0,
-            }),
-            op_fixtures={"op10": "Modüler Pabuç Seti"},
-            ph10_angles=[(0.0, 0.0), (90.0, 0.0)],
-            strategy={
-                "recommended_setup_op10": "OP10 (A0B0) + OP20 (90°)",
-                "recommended_probe": "Ø3x40",
-            },
-        )
+        db.close()
+        return []
 
     matches = db.query_similar(query_vec, min_similarity=0.60, top_k=3)
     results = []
