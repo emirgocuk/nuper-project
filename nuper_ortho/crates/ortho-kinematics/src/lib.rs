@@ -19,7 +19,10 @@ pub use fitting::{
     load_ptb_test_points, CompositePositionEvaluation, CylinderFitResult, FittingError,
     PlaneFitResult, SurfaceProfileEvaluation,
 };
-pub use ph10::{AngleSelectionResult, ManualIndexCluster, PH10Angle, PH10LookUpTable};
+pub use ph10::{
+    compute_head_sweep_clearance_z, AngleSelectionResult, ManualIndexCluster, PH10Angle,
+    PH10LookUpTable,
+};
 pub use plan::{CompoundFeatureInspection, OrientedFeatureInspection, OrientedSamplingPlan};
 pub use sampling::{
     sample_annular_step_face, sample_circle_4points, sample_cone_flank, sample_countersink_chamfer_for_center,

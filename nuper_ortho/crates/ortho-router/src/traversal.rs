@@ -51,6 +51,23 @@ impl ZFirstTraversal {
     ) -> Result<SafeTraversalSequence, String> {
         Self::plan_safe_approach(current_pos, park_pos, z_ceiling)
     }
+
+    pub fn plan_safe_index_retract(
+        current_pos: DVec3,
+        z_safe_index: f64,
+    ) -> Result<DVec3, String> {
+        if z_safe_index < current_pos.z {
+            return Ok(current_pos);
+        }
+        Ok(DVec3::new(current_pos.x, current_pos.y, z_safe_index))
+    }
+}
+
+pub fn plan_safe_index_retract(
+    current_pos: DVec3,
+    z_safe_index: f64,
+) -> Result<DVec3, String> {
+    ZFirstTraversal::plan_safe_index_retract(current_pos, z_safe_index)
 }
 
 #[cfg(test)]

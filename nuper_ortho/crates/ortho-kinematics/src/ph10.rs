@@ -61,6 +61,22 @@ impl PH10Angle {
         let dist = head_center.distance(DVec3::new(closest_x, closest_y, closest_z));
         dist >= sweep_radius + 10.0
     }
+
+    pub fn compute_head_sweep_clearance_z(
+        part_max_z: f64,
+        stylus_length: f64,
+        head_radius: f64,
+    ) -> f64 {
+        part_max_z + stylus_length + head_radius + 25.0
+    }
+}
+
+pub fn compute_head_sweep_clearance_z(
+    part_max_z: f64,
+    stylus_length: f64,
+    head_radius: f64,
+) -> f64 {
+    part_max_z + stylus_length + head_radius + 25.0
 }
 
 /// Açı seçim ve optimizasyon sonucu
@@ -436,5 +452,13 @@ mod tests {
         let q_mid = slerp_quaternion(q1, q2, 0.5);
         let norm = (q_mid[0] * q_mid[0] + q_mid[1] * q_mid[1] + q_mid[2] * q_mid[2] + q_mid[3] * q_mid[3]).sqrt();
         assert!((norm - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_compute_head_sweep_clearance_z() {
+        let safe_z = compute_head_sweep_clearance_z(50.0, 50.0, 40.0);
+        assert!((safe_z - 165.0).abs() < 1e-6);
+        let safe_z_method = PH10Angle::compute_head_sweep_clearance_z(50.0, 50.0, 40.0);
+        assert!((safe_z_method - 165.0).abs() < 1e-6);
     }
 }
