@@ -128,6 +128,7 @@ fn test_end_to_end_inspection_pipeline() {
             deviation: 0.014,
             tool_used: "CMM - Renishaw TP20".to_string(),
             is_pass: true,
+            conformance_status: "PASS".to_string(),
             is_key_characteristic: true,
         },
         As9102Form3Entry {
@@ -141,6 +142,7 @@ fn test_end_to_end_inspection_pipeline() {
             deviation: -0.080,
             tool_used: "CMM - Renishaw TP20".to_string(),
             is_pass: true,
+            conformance_status: "PASS".to_string(),
             is_key_characteristic: false,
         },
     ];
