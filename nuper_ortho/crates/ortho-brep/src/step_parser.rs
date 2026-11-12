@@ -679,16 +679,30 @@ impl StepParser {
                             let floats = self.extract_floats(&entity.raw_args);
                             let radius = floats.last().copied().unwrap_or(10.0);
                             let diameter = radius * 2.0;
-                            let feat = GeometricFeature::new_internal_cylinder(
-                                feature_id_counter,
-                                format!("BORE_{:.0}", diameter),
-                                origin,
-                                axis,
-                                diameter,
-                                30.0,
-                                std::f64::consts::PI * diameter * 30.0,
-                                10.0,
-                            )?;
+                            let is_internal = !entity.raw_args.contains(".T.");
+                            let feat = if is_internal {
+                                GeometricFeature::new_internal_cylinder(
+                                    feature_id_counter,
+                                    format!("BORE_{:.0}", diameter),
+                                    origin,
+                                    axis,
+                                    diameter,
+                                    30.0,
+                                    std::f64::consts::PI * diameter * 30.0,
+                                    10.0,
+                                )?
+                            } else {
+                                GeometricFeature::new_external_cylinder(
+                                    feature_id_counter,
+                                    format!("BOSS_{:.0}", diameter),
+                                    origin,
+                                    axis,
+                                    diameter,
+                                    30.0,
+                                    std::f64::consts::PI * diameter * 30.0,
+                                    10.0,
+                                )?
+                            };
                             features.push(feat);
                             feature_id_counter += 1;
                         }

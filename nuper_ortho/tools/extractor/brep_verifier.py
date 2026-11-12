@@ -258,6 +258,17 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
 
             ftype = "INTERNAL_CYLINDER" if is_rev else "EXTERNAL_CYLINDER"
             loc_pnt = cyl.Location()
+            axis_pnt = (loc_pnt.X(), loc_pnt.Y(), loc_pnt.Z())
+            rad_vec = (center_vec[0] - axis_pnt[0], center_vec[1] - axis_pnt[1], center_vec[2] - axis_pnt[2])
+            proj_r = rad_vec[0] * canon_axis[0] + rad_vec[1] * canon_axis[1] + rad_vec[2] * canon_axis[2]
+            rad_ortho = (rad_vec[0] - proj_r * canon_axis[0], rad_vec[1] - proj_r * canon_axis[1], rad_vec[2] - proj_r * canon_axis[2])
+            rad_len = math.hypot(rad_ortho[0], rad_ortho[1], rad_ortho[2])
+            if rad_len > 1e-4 and tri is not None and len(all_normals) >= 3:
+                norm_sample = (all_normals[-3], all_normals[-2], all_normals[-1])
+                normal_dot_rad = (norm_sample[0] * rad_ortho[0] + norm_sample[1] * rad_ortho[1] + norm_sample[2] * rad_ortho[2]) / rad_len
+                if abs(normal_dot_rad) >= 0.15:
+                    ftype = "INTERNAL_CYLINDER" if normal_dot_rad < 0.0 else "EXTERNAL_CYLINDER"
+            c_polarity = "INTERNAL_BORE" if ftype == "INTERNAL_CYLINDER" else "EXTERNAL_BOSS"
             proj_dist = loc_pnt.X() * canon_axis[0] + loc_pnt.Y() * canon_axis[1] + loc_pnt.Z() * canon_axis[2]
             ortho_vec = (
                 round(loc_pnt.X() - proj_dist * canon_axis[0], 2),
@@ -448,6 +459,7 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
         extracted_features.append({
             "id": feat_id,
             "feature_type": grp["feature_type"],
+            "cylinder_polarity": "INTERNAL_BORE" if is_int else "EXTERNAL_BOSS",
             "nominal_dimension": grp["diameter"],
             "center": [round(avg_x, 4), round(avg_y, 4), round(avg_z, 4)],
             "normal": grp["axis"],

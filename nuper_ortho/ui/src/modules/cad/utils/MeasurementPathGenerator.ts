@@ -482,6 +482,7 @@ export class MeasurementPathGenerator {
       const nom = feat.nominal;
       const cadId = feat.cad_feature_id ?? '';
       const isInternalHole =
+        (feat as { cylinder_polarity?: string }).cylinder_polarity === 'INTERNAL_BORE' ||
         cadId.startsWith('CAD_HOLE_') ||
         feat.feature_type === 'INTERNAL_CYLINDER' ||
         feat.type === 'THREAD' ||
@@ -570,6 +571,7 @@ export class MeasurementPathGenerator {
         }
 
         const isExtCyl =
+          (feat as { cylinder_polarity?: string }).cylinder_polarity === 'EXTERNAL_BOSS' ||
           feat.feature_type === 'EXTERNAL_CYLINDER' ||
           cadId.startsWith('CAD_CYL_') ||
           cadId.startsWith('CAD_CONE_') ||
