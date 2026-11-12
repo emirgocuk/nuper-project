@@ -239,8 +239,6 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
     ai_result = run_local_or_hybrid_ai_extraction(resolved, max_duration_seconds=4.2)
     if ai_result and ai_result.get("dimensions"):
         dims = ai_result["dimensions"]
-        if not step_path:
-            step_path = find_matching_step_file(resolved)
         if step_path and os.path.exists(step_path):
             step_data = parse_step_file(step_path)
             if step_data.get("success"):
@@ -365,9 +363,6 @@ def parse_text_to_metrology(
     step_path: Optional[str] = None,
     rendered_pages: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    if not step_path and full_path:
-        step_path = find_matching_step_file(full_path)
-
     result = {
         "success": True,
         "filename": filename,
@@ -668,7 +663,7 @@ def parse_text_to_metrology(
         if tr_res.get("has_dimension_line") and not tr_res.get("scale_consistent", True):
             line_len = tr_res.get("dimension_line_length_pt", 0.0)
             if isinstance(nom_val, (int, float)) and not validate_scale_consistency(float(nom_val), line_len):
-                continue
+                d["scale_warning"] = True
 
         if d.get("type") == "THREAD" or (isinstance(d.get("nominal_str"), str) and d.get("nominal_str", "").upper().startswith("M")):
             th_res = parse_thread_callout(str(d.get("nominal_str", "")))
