@@ -147,6 +147,8 @@ describe('LightTableControls — Işık masası görünüm/gezinme çekirdeği',
     expect(resolveLightTableShortcut('PageUp')).toBe('page-prev');
     expect(resolveLightTableShortcut('PageDown')).toBe('page-next');
     expect(resolveLightTableShortcut('Escape')).toBe('cancel');
+    expect(resolveLightTableShortcut('Delete')).toBe('delete-balloon');
+    expect(resolveLightTableShortcut('Backspace')).toBe('delete-balloon');
     expect(resolveLightTableShortcut('a')).toBeNull();
     expect(resolveLightTableShortcut('+', { ctrlKey: true })).toBeNull();
     expect(resolveLightTableShortcut('Escape', { metaKey: true })).toBeNull();
@@ -175,6 +177,8 @@ describe('LightTableControls — Işık masası görünüm/gezinme çekirdeği',
     expect(byId.get('zoom-out')?.enabled).toBe(false);
     expect(byId.get('zoom-in')?.enabled).toBe(true);
     expect(byId.get('fit')?.enabled).toBe(false);
+    expect(byId.get('delete')?.enabled).toBe(true);
+    expect(byId.get('bind-3d')?.enabled).toBe(true);
     expect(byId.get('view-selected')?.enabled).toBe(true);
     expect(byId.get('view-selected')?.active).toBe(true);
   });

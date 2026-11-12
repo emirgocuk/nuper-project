@@ -7,6 +7,8 @@ export type LightTableCommandId =
   | 'tool-select'
   | 'tool-region'
   | 'add'
+  | 'delete'
+  | 'bind-3d'
   | 'zoom-out'
   | 'zoom-in'
   | 'zoom-reset'
@@ -21,7 +23,8 @@ export type LightTableAction =
   | 'zoom-reset'
   | 'page-prev'
   | 'page-next'
-  | 'cancel';
+  | 'cancel'
+  | 'delete-balloon';
 
 export const LIGHT_TABLE_ZOOM_MIN = 0.25;
 export const LIGHT_TABLE_ZOOM_MAX = 4;
@@ -238,6 +241,9 @@ export function resolveLightTableShortcut(
       return 'page-next';
     case 'Escape':
       return 'cancel';
+    case 'Delete':
+    case 'Backspace':
+      return 'delete-balloon';
     default:
       return null;
   }
@@ -250,10 +256,22 @@ export function buildLightTableCommands(state: LightTableCommandState): LightTab
     { id: 'tool-region', label: 'Bölge Seç', enabled: true, active: state.tool === 'region' },
     {
       id: 'add',
-      label: '＋ Unsur Ekle',
+      label: '➕ Manuel Balon Çiz',
       enabled: state.hasDocument,
-      active: false,
+      active: state.tool === 'region',
       reason: state.hasDocument ? undefined : LIGHT_TABLE_ADD_REASON,
+    },
+    {
+      id: 'delete',
+      label: '🗑️ Balonu Sil',
+      enabled: state.hasSelection,
+      active: false,
+    },
+    {
+      id: 'bind-3d',
+      label: '🎯 3D Yüzeye Bağla',
+      enabled: state.hasSelection,
+      active: false,
     },
     { id: 'zoom-out', label: '🔍 −', enabled: state.zoom > LIGHT_TABLE_ZOOM_MIN, active: false },
     { id: 'zoom-in', label: '🔍 ＋', enabled: state.zoom < LIGHT_TABLE_ZOOM_MAX, active: false },

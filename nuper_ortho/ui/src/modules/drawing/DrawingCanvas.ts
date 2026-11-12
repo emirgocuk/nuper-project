@@ -376,6 +376,11 @@ export class DrawingCanvas {
     else if (action === 'zoom-reset') this.setZoom(1);
     else if (action === 'page-prev') this.setActivePage(stepPage(this.activePage, this.totalPages, -1));
     else if (action === 'page-next') this.setActivePage(stepPage(this.activePage, this.totalPages, 1));
+    else if (action === 'delete-balloon' || e.key === 'Delete' || e.key === 'Backspace') {
+      if (this.selectedBalloonId !== null) {
+        this.deleteSelectedBalloon();
+      }
+    }
     else if (action === 'cancel') {
       this.setTool('select');
       this.selectBalloon(null);
@@ -474,7 +479,50 @@ export class DrawingCanvas {
     if (this.selectedBalloonId === String(id)) {
       this.selectedBalloonId = null;
     }
+    for (const cb of this.balloonDeletedListeners) {
+      cb(id);
+    }
     void this.render();
+  }
+
+  public deleteSelectedBalloon(): void {
+    if (this.selectedBalloonId !== null) {
+      this.removeBalloon(this.selectedBalloonId);
+    }
+  }
+
+  public enableManualBalloonDrawMode(): void {
+    this.setTool('region');
+  }
+
+  public bindBalloonTo3DFaceMode(): void {
+    if (this.selectedBalloonId === null) return;
+    const balloon = this.balloons.find((b) => String(b.id) === String(this.selectedBalloonId));
+    if (!balloon) return;
+    for (const listener of this.bind3DFaceListeners) {
+      listener(balloon);
+    }
+    const app = (window as unknown as { nuperApp?: { startBindBalloonTo3DFace?: (id: number) => void } }).nuperApp;
+    if (app && typeof app.startBindBalloonTo3DFace === 'function') {
+      app.startBindBalloonTo3DFace(Number(balloon.id));
+    }
+  }
+
+  private balloonDeletedListeners: Array<(id: number | string) => void> = [];
+  private bind3DFaceListeners: Array<(balloon: BalloonItem) => void> = [];
+
+  public onBalloonDeleted(cb: (id: number | string) => void): () => void {
+    this.balloonDeletedListeners.push(cb);
+    return () => {
+      this.balloonDeletedListeners = this.balloonDeletedListeners.filter((l) => l !== cb);
+    };
+  }
+
+  public onBind3DFaceRequested(cb: (balloon: BalloonItem) => void): () => void {
+    this.bind3DFaceListeners.push(cb);
+    return () => {
+      this.bind3DFaceListeners = this.bind3DFaceListeners.filter((l) => l !== cb);
+    };
   }
 
   public disableMockSvg(): void {
@@ -649,7 +697,7 @@ export class DrawingCanvas {
   }
 
   public getBalloonsForActivePage(): BalloonItem[] {
-    return this.balloons.filter((b) => (b.page ?? 1) === this.activePage);
+    return this.balloons.filter((b) => ((b as unknown as { page_number?: number }).page_number ?? b.page ?? 1) === this.activePage);
   }
 
   public getBalloonPosition(b: BalloonItem): { x: number; y: number } {
@@ -913,6 +961,12 @@ export class DrawingCanvas {
         break;
       case 'add':
         this.promptAddFeature();
+        break;
+      case 'delete':
+        this.deleteSelectedBalloon();
+        break;
+      case 'bind-3d':
+        this.bindBalloonTo3DFaceMode();
         break;
       case 'zoom-out':
         this.setZoom(zoomBy(this.zoom, -1));
