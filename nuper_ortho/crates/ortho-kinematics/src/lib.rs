@@ -33,6 +33,6 @@ pub use sampling::{
 pub use thermal::{TemperatureSensor, ThermalError, ThermalField3D, WorkpieceMaterialType};
 pub use tree::{ProbeStack, StarProbeAssembly, StemMaterial};
 pub use uncertainty::{
-    ConformanceDecision, RobustOutlierFilter, UncertaintyBudget,
+    evaluate_iso14253_compliance, ConformanceDecision, RobustOutlierFilter, UncertaintyBudget,
 };
 

@@ -115,6 +115,25 @@ impl UncertaintyBudget {
     }
 }
 
+pub fn evaluate_iso14253_compliance(
+    deviation: f64,
+    tolerance: f64,
+    u95: f64,
+) -> (ConformanceDecision, String) {
+    let abs_dev = deviation.abs();
+    let safe_limit = (tolerance - u95).max(0.0);
+    if abs_dev <= safe_limit {
+        (ConformanceDecision::Pass, "PASS".to_string())
+    } else if abs_dev <= tolerance {
+        (
+            ConformanceDecision::Suspect,
+            "GUARD_BAND_WARNING".to_string(),
+        )
+    } else {
+        (ConformanceDecision::Fail, "FAIL".to_string())
+    }
+}
+
 /// ISO 16610-31 Sağlam Gauss ve 3-Sigma Uç Değer / Çapak Ayıklama Filtresi
 pub struct RobustOutlierFilter;
 
