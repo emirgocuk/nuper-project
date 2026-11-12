@@ -131,12 +131,18 @@ export class NuperApp {
 
     if (data.similar_parts && data.similar_parts.length > 0 && typeof document !== 'undefined') {
       const topPart = data.similar_parts[0];
-      const simPercent = Math.round((topPart.similarity_score || 0) * 100);
+      const simPercent = Math.round((topPart.similarity_score || (topPart.similarity ? topPart.similarity * 100 : 0)));
       const hudDetails = document.getElementById('hud-feature-details');
       if (hudDetails) {
         hudDetails.innerText = `💡 Benzer Parça Eşleşmesi: ${topPart.part_name || topPart.part_id} (%${simPercent} Benzerlik) — Önerilen Kurulum: OP10 (${topPart.recommended_setup_op10 || 'A0B0'}) | Prob: ${topPart.recommended_probe || 'Ø3x50'}`;
       }
     }
+
+    const rawData = data as unknown as {
+      similar_parts?: Array<{ part_name?: string; part_id?: string; similarity_pct?: number; similarity?: number }>;
+      contract_summary?: { critical_count?: number; warning_count?: number; normal_count?: number; status?: string };
+    };
+    this.drawingCanvas.updateAuditMetadata(rawData.similar_parts, rawData.contract_summary);
 
     this.setupWizard.setExtractedData(data);
   }

@@ -2100,7 +2100,11 @@ FEATURES:
       <!-- 2D Teknik Resim Kanvası (Çift Kanvas Modu: Zorunlu Bölünmüş Görünüm / %50-%50) -->
       <section class="canvas-2d-pane active" id="dual-canvas-2d" style="display: flex !important; width: 100% !important; height: 100% !important; min-width: 300px !important; visibility: visible !important; flex-direction: column !important; position: relative !important; overflow: hidden !important;">
         <div class="pane-toolbar" style="height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: #F8FAFC; border-bottom: 1px solid var(--border-color);">
-          <span>2D Teknik Resim & Balon Eşleme (Drawing PDF / Sayfa 2)</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>2D Teknik Resim & Balon Eşleme (Drawing PDF / Sayfa 2)</span>
+            <div id="lightbox-similarity-banner" style="display: none; align-items: center; background: #047857; color: #FFF; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;"></div>
+            <div id="lightbox-risk-badges" style="display: none; align-items: center; gap: 4px;"></div>
+          </div>
           <span style="font-size: 10px; color: var(--color-datum);" id="drawing-pane-status">Gerçek PDF Görüntüleyici</span>
         </div>
         <div id="drawing-viewer-container" style="display: flex !important; flex: 1; width: 100% !important; height: calc(100% - 36px) !important; min-width: 300px !important; position: relative !important; overflow: auto; background: #FAFAFA; visibility: visible !important; align-items: center; justify-content: center;">
@@ -2224,6 +2228,9 @@ FEATURES:
       <!-- DMIS / Calypso Kod Blokları -->
     </div>
   </footer>
+
+  <!-- 2D METROLOJİ IŞIK MASASI MODAL PENCERESİ -->
+  <div class="nuper-audit-modal-overlay" id="modal-drawing-audit" style="display: none;"></div>
 
   <!-- KURULUM FÖYÜ (SETUP SHEET) MODAL PENCERESİ -->
   <div class="modal-overlay" id="setup-sheet-modal">

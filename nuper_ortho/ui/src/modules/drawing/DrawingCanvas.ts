@@ -567,6 +567,54 @@ export class DrawingCanvas {
     void this.render();
   }
 
+  public updateAuditMetadata(
+    similarParts?: Array<{ part_name?: string; part_id?: string; similarity_pct?: number; similarity?: number }>,
+    contractSummary?: { critical_count?: number; warning_count?: number; normal_count?: number; status?: string }
+  ): void {
+    if (typeof document === 'undefined') return;
+    const similarityBanners = document.querySelectorAll('#lightbox-similarity-banner');
+    if (similarityBanners.length > 0) {
+      if (similarParts && similarParts.length > 0) {
+        const top = similarParts[0];
+        const name = top.part_name || top.part_id || 'Bilinmeyen';
+        const pct = top.similarity_pct ?? (top.similarity ? Math.round(top.similarity * 100) : 0);
+        const text = `💡 Benzer Parça: ${name} (%${pct})`;
+        similarityBanners.forEach((el) => {
+          (el as HTMLElement).textContent = text;
+          (el as HTMLElement).style.display = 'inline-flex';
+        });
+      } else {
+        similarityBanners.forEach((el) => {
+          (el as HTMLElement).textContent = '';
+          (el as HTMLElement).style.display = 'none';
+        });
+      }
+    }
+
+    const riskBadges = document.querySelectorAll('#lightbox-risk-badges');
+    if (riskBadges.length > 0) {
+      if (contractSummary) {
+        const crit = contractSummary.critical_count ?? 0;
+        const warn = contractSummary.warning_count ?? 0;
+        const norm = contractSummary.normal_count ?? 0;
+        const html = `
+          <span style="background: ${crit > 0 ? '#EF4444' : '#64748B'}; color: #FFF; padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: 10px;">Kritik: ${crit}</span>
+          <span style="background: ${warn > 0 ? '#F59E0B' : '#64748B'}; color: #FFF; padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: 10px;">Uyarı: ${warn}</span>
+          <span style="background: #10B981; color: #FFF; padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: 10px;">Normal: ${norm}</span>
+        `;
+        riskBadges.forEach((el) => {
+          el.innerHTML = html;
+          (el as HTMLElement).style.display = 'inline-flex';
+        });
+      } else {
+        riskBadges.forEach((el) => {
+          el.innerHTML = '';
+          (el as HTMLElement).style.display = 'none';
+        });
+      }
+    }
+  }
+
   public setActivePage(page: number): void {
     const clamped = Math.max(1, Math.min(page, this.totalPages));
     if (this.activePage !== clamped) {
