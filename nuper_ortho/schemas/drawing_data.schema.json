@@ -165,6 +165,22 @@
         "min_tolerance_mm": { "type": "number" },
         "requires_special_probing": { "type": "boolean" }
       }
+    },
+    "rust_compiler_outputs": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "pcdmis": { "type": "string" },
+        "calypso": { "type": "string" },
+        "wenzel": { "type": "string" },
+        "cnc_g10": { "type": "string" },
+        "setup_sheet": { "type": "string" },
+        "as9102_certificate_id": { "type": "string" },
+        "as9102_canonical_hash": { "type": "string" },
+        "feature_count": { "type": "integer" },
+        "tolerance_count": { "type": "integer" },
+        "motion_count": { "type": "integer" }
+      }
     }
   }
 }

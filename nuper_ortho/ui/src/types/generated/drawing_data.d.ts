@@ -116,5 +116,19 @@ export interface DrawingExtractionResult {
     requires_special_probing?: boolean;
     [k: string]: unknown;
   };
+  rust_compiler_outputs?: {
+    success?: boolean;
+    pcdmis?: string;
+    calypso?: string;
+    wenzel?: string;
+    cnc_g10?: string;
+    setup_sheet?: string;
+    as9102_certificate_id?: string;
+    as9102_canonical_hash?: string;
+    feature_count?: number;
+    tolerance_count?: number;
+    motion_count?: number;
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }
