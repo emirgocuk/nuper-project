@@ -30,7 +30,8 @@ pub use hal::{
 };
 pub use ipc::{BinaryMeshPacket, BinaryTrajectoryPacket};
 pub use ipp::{
-    trajectory_to_ipp_stream, IppClient, IppCmmSimulator, IppCommand, IppError, IppProtocol, IppResponse,
+    trajectory_to_ipp_stream, trajectory_to_ipp_stream_with_risk, IppClient, IppCmmSimulator,
+    IppCommand, IppError, IppProtocol, IppResponse,
 };
 pub use pallet::{
     optimize_cross_nest_pallet_inspection, partition_trajectory_by_orientation, PalletError,

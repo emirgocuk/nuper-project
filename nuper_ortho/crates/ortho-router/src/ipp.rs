@@ -276,6 +276,14 @@ pub fn trajectory_to_ipp_stream(
     trajectory: &CertifiedCollisionFreeTrajectory,
     tool_name: &str,
 ) -> Vec<String> {
+    trajectory_to_ipp_stream_with_risk(trajectory, tool_name, "NORMAL")
+}
+
+pub fn trajectory_to_ipp_stream_with_risk(
+    trajectory: &CertifiedCollisionFreeTrajectory,
+    tool_name: &str,
+    risk_level: &str,
+) -> Vec<String> {
     let mut stream = Vec::new();
     let mut tag = 1;
 
@@ -300,6 +308,12 @@ pub fn trajectory_to_ipp_stream(
     ));
     tag += 1;
 
+    let (speed, approach_dist) = if risk_level.eq_ignore_ascii_case("CRITICAL") {
+        (2.0, 2.0)
+    } else {
+        (5.0, 5.0)
+    };
+
     for seg in &trajectory.segments {
         match seg {
             MotionSegment::RapidLinear { target } => {
@@ -313,6 +327,15 @@ pub fn trajectory_to_ipp_stream(
                 tag += 1;
             }
             MotionSegment::TouchApproach { target, normal } => {
+                let approach_pos = *target + normal.normalize() * approach_dist;
+                stream.push(IppProtocol::format_command(
+                    tag,
+                    &IppCommand::GoTo {
+                        target: approach_pos,
+                        speed_mms: Some(speed),
+                    },
+                ));
+                tag += 1;
                 stream.push(IppProtocol::format_command(
                     tag,
                     &IppCommand::PtMeas {
