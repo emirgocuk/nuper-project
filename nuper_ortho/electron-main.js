@@ -64,6 +64,57 @@ function createWindow() {
   });
   ipcMain.on('window-close', () => mainWindow && mainWindow.close());
 
+  let cachedOrthoBin = null;
+  async function resolveOrthoBin() {
+    if (cachedOrthoBin && fs.existsSync(cachedOrthoBin)) return cachedOrthoBin;
+    const candidates = [
+      path.join(__dirname, 'target', 'release', 'ortho.exe'),
+      path.join(__dirname, 'target', 'debug', 'ortho.exe'),
+      path.join(__dirname, 'target', 'release', 'ortho'),
+      path.join(__dirname, 'target', 'debug', 'ortho')
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) {
+        cachedOrthoBin = c;
+        return c;
+      }
+    }
+    return null;
+  }
+
+  async function runOrthoCompiler(drawingResult, stepPath) {
+    try {
+      const orthoBin = await resolveOrthoBin();
+      if (!orthoBin) {
+        return null;
+      }
+      const os = require('os');
+      const tmpDrawingPath = path.join(os.tmpdir(), `nuper_drawing_${Date.now()}.json`);
+      await fs.promises.writeFile(tmpDrawingPath, JSON.stringify(drawingResult), 'utf8');
+      const args = ['--emit-all-json', '--input-drawing-json', tmpDrawingPath];
+      if (stepPath && fs.existsSync(stepPath)) {
+        args.push('--step', stepPath);
+      }
+      const { execFile } = require('child_process');
+      return await new Promise((resolve) => {
+        execFile(orthoBin, args, { maxBuffer: 30 * 1024 * 1024 }, (err, stdout) => {
+          fs.promises.unlink(tmpDrawingPath).catch(() => {});
+          if (err || !stdout) {
+            resolve(null);
+          } else {
+            try {
+              resolve(JSON.parse(stdout));
+            } catch {
+              resolve(null);
+            }
+          }
+        });
+      });
+    } catch {
+      return null;
+    }
+  }
+
   let cachedPythonPath = null;
   async function resolvePythonPath() {
     if (cachedPythonPath) return cachedPythonPath;
@@ -242,13 +293,20 @@ print(json.dumps(res))
         args.push('--cad', stepPath);
       }
       return new Promise((resolve) => {
-        execFile(pyBin, args, { maxBuffer: 15 * 1024 * 1024 }, (err, stdout, stderr) => {
+        execFile(pyBin, args, { maxBuffer: 15 * 1024 * 1024 }, async (err, stdout, stderr) => {
           if (err) {
             console.error('[Nuper Drawing] drawing_extractor.py başarısız oldu:', err?.message, stderr?.slice(0, 300));
             resolve({ success: false, error: err?.message || stderr || 'Teknik resim çıkarım hatası' });
           } else {
             try {
-              resolve(JSON.parse(stdout));
+              const parsed = JSON.parse(stdout);
+              if (parsed && parsed.success) {
+                const rustOutputs = await runOrthoCompiler(parsed, stepPath);
+                if (rustOutputs) {
+                  parsed.rust_compiler_outputs = rustOutputs;
+                }
+              }
+              resolve(parsed);
             } catch (e) {
               console.error('[Nuper Drawing] JSON parse error from drawing_extractor:', e, stdout.slice(0, 300));
               resolve({ success: false, error: 'JSON parse hatası: ' + e.message });
@@ -260,6 +318,10 @@ print(json.dumps(res))
       console.error('[Nuper Drawing] Error extracting drawing data:', e);
       return { success: false, error: e.message };
     }
+  });
+
+  ipcMain.handle('compile-all-dialects', async (event, drawingJson, stepPath) => {
+    return await runOrthoCompiler(drawingJson, stepPath);
   });
 
   // Read Local File from Disk (test_assets or citadel)
