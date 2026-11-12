@@ -1,8 +1,11 @@
+import os
 import pytest
 from tools.extractor.similarity_engine import (
     extract_feature_vector,
     cosine_similarity,
     PartSetupDatabase,
+    register_part_in_catalog,
+    query_similar_from_db,
 )
 
 
@@ -98,3 +101,33 @@ def test_part_setup_database_workflow():
     assert len(no_matches) == 0
 
     db.close()
+
+
+def test_part_catalog_vectors_persistence_and_query():
+    db_test_path = os.path.join(os.path.dirname(__file__), "..", "..", "test_assets", "benchmarks.db")
+    register_part_in_catalog(
+        part_id="CATALOG_P1",
+        part_name="Test Bracket Rev 1",
+        material="AL7075",
+        bbox_x=100.0,
+        bbox_y=50.0,
+        bbox_z=20.0,
+        hole_count=4,
+        min_tol=0.015,
+        setup_json={"fixtures": ["clamp1", "clamp2"], "ph10": ["A0B0"]},
+        db_path=db_test_path,
+    )
+    query_vec = extract_feature_vector({
+        "bbox_x": 102.0,
+        "bbox_y": 49.0,
+        "bbox_z": 20.0,
+        "hole_count": 4,
+        "min_tolerance": 0.015,
+    })
+    matches = query_similar_from_db(query_vec, db_path=db_test_path, min_similarity=0.85)
+    assert len(matches) >= 1
+    found = next((m for m in matches if m["part_id"] == "CATALOG_P1"), None)
+    assert found is not None
+    assert found["similarity_pct"] >= 85.0
+    assert found["setup"]["fixtures"] == ["clamp1", "clamp2"]
+

@@ -12,7 +12,6 @@ json_path = os.path.join(os.path.dirname(__file__), '..', 'test_assets', 'BENCH_
 conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
-# 1. Standartlar Tablosu
 cur.execute('''
 CREATE TABLE IF NOT EXISTS standards (
     code TEXT PRIMARY KEY,
@@ -32,7 +31,6 @@ standards_data = [
 
 cur.executemany('INSERT OR REPLACE INTO standards VALUES (?, ?, ?, ?)', standards_data)
 
-# 2. Benchmark Numuneleri Tablosu
 cur.execute('''
 CREATE TABLE IF NOT EXISTS specimens (
     specimen_index INTEGER PRIMARY KEY,
@@ -54,6 +52,20 @@ CREATE TABLE IF NOT EXISTS specimen_tolerances (
     tolerance_type TEXT,
     value REAL,
     unit TEXT
+)
+''')
+
+cur.execute('''
+CREATE TABLE IF NOT EXISTS part_catalog_vectors (
+    part_id TEXT PRIMARY KEY,
+    part_name TEXT,
+    material TEXT,
+    bbox_x REAL,
+    bbox_y REAL,
+    bbox_z REAL,
+    hole_count INTEGER,
+    min_tol REAL,
+    setup_json TEXT
 )
 ''')
 

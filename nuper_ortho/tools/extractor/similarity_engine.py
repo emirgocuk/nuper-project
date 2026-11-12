@@ -1,8 +1,8 @@
 import json
 import math
+import os
 import sqlite3
 from typing import Any, Dict, List, Optional, Sequence, Tuple
-
 
 FEATURE_VECTOR_KEYS = (
     "bbox_x",
@@ -16,6 +16,10 @@ FEATURE_VECTOR_KEYS = (
 
 DEFAULT_SCALES = (100.0, 100.0, 100.0, 10.0, 1.0, 0.1, 10000.0)
 DEFAULT_WEIGHTS = (1.0, 1.0, 1.0, 1.5, 1.2, 1.0, 0.8)
+
+DEFAULT_DB_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "test_assets", "benchmarks.db")
+)
 
 
 def extract_feature_vector(geometry_data: Dict[str, Any]) -> List[float]:
@@ -76,6 +80,8 @@ def cosine_similarity(
 class PartSetupDatabase:
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = db_path or ":memory:"
+        if self.db_path != ":memory:":
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
         self._init_schema()
@@ -92,6 +98,21 @@ class PartSetupDatabase:
                     ph10_angles_json TEXT NOT NULL,
                     strategy_json TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            self.conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS part_catalog_vectors (
+                    part_id TEXT PRIMARY KEY,
+                    part_name TEXT,
+                    material TEXT,
+                    bbox_x REAL,
+                    bbox_y REAL,
+                    bbox_z REAL,
+                    hole_count INTEGER,
+                    min_tol REAL,
+                    setup_json TEXT
                 )
                 """
             )
@@ -275,3 +296,106 @@ def find_similar_parts(
     db.close()
     return results
 
+
+def register_part_in_catalog(
+    part_id: str,
+    part_name: str,
+    material: str,
+    bbox_x: float,
+    bbox_y: float,
+    bbox_z: float,
+    hole_count: int,
+    min_tol: float,
+    setup_json: Dict[str, Any] | str,
+    db_path: Optional[str] = None,
+) -> None:
+    target_path = db_path or DEFAULT_DB_PATH
+    if target_path != ":memory:":
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    conn = sqlite3.connect(target_path)
+    try:
+        with conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS part_catalog_vectors (
+                    part_id TEXT PRIMARY KEY,
+                    part_name TEXT,
+                    material TEXT,
+                    bbox_x REAL,
+                    bbox_y REAL,
+                    bbox_z REAL,
+                    hole_count INTEGER,
+                    min_tol REAL,
+                    setup_json TEXT
+                )
+                """
+            )
+            s_json = setup_json if isinstance(setup_json, str) else json.dumps(setup_json)
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO part_catalog_vectors (
+                    part_id, part_name, material, bbox_x, bbox_y, bbox_z, hole_count, min_tol, setup_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (part_id, part_name, material, float(bbox_x), float(bbox_y), float(bbox_z), int(hole_count), float(min_tol), s_json),
+            )
+    finally:
+        conn.close()
+
+
+def query_similar_from_db(
+    query_vector: Sequence[float],
+    db_path: Optional[str] = None,
+    min_similarity: float = 0.85,
+    top_k: int = 5,
+) -> List[Dict[str, Any]]:
+    target_path = db_path or DEFAULT_DB_PATH
+    if target_path != ":memory:" and not os.path.exists(target_path):
+        return []
+    conn = sqlite3.connect(target_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS part_catalog_vectors (
+                part_id TEXT PRIMARY KEY,
+                part_name TEXT,
+                material TEXT,
+                bbox_x REAL,
+                bbox_y REAL,
+                bbox_z REAL,
+                hole_count INTEGER,
+                min_tol REAL,
+                setup_json TEXT
+            )
+            """
+        )
+        cursor.execute("SELECT part_id, part_name, material, bbox_x, bbox_y, bbox_z, hole_count, min_tol, setup_json FROM part_catalog_vectors")
+        rows = cursor.fetchall()
+        results = []
+        for row in rows:
+            candidate_geom = {
+                "bbox_x": row["bbox_x"],
+                "bbox_y": row["bbox_y"],
+                "bbox_z": row["bbox_z"],
+                "hole_count": row["hole_count"],
+                "cylinder_ratio": 0.0,
+                "min_tolerance": row["min_tol"],
+                "surface_area": 1000.0,
+            }
+            cand_vec = extract_feature_vector(candidate_geom)
+            sim = cosine_similarity(query_vector, cand_vec)
+            if sim >= min_similarity:
+                results.append({
+                    "part_id": row["part_id"],
+                    "part_name": row["part_name"],
+                    "material": row["material"],
+                    "similarity": round(sim, 4),
+                    "similarity_pct": round(sim * 100.0, 1),
+                    "setup": json.loads(row["setup_json"]) if row["setup_json"] else {},
+                })
+        results.sort(key=lambda r: r["similarity"], reverse=True)
+        return results[:top_k]
+    finally:
+        conn.close()
