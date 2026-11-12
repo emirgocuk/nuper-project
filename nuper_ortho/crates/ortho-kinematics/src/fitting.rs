@@ -84,6 +84,43 @@ pub struct CylinderFitWithOutlierResult {
 }
 
 /// PTB / NIST formatındaki `.dat` koordinat dosyalarını ayrıştırır
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CylinderPolarity {
+    InternalBore,
+    ExternalBoss,
+}
+
+pub fn compensate_probe_radius(
+    points: &[DVec3],
+    approach_normals: &[DVec3],
+    effective_tip_radius: f64,
+    _polarity: CylinderPolarity,
+) -> Vec<DVec3> {
+    points
+        .iter()
+        .zip(approach_normals.iter())
+        .map(|(p, n)| {
+            let norm = if n.length_squared() > 1e-12 {
+                n.normalize()
+            } else {
+                DVec3::Z
+            };
+            *p - norm * effective_tip_radius
+        })
+        .collect()
+}
+
+pub fn compensate_cylinder_diameter(
+    center_fit_diameter: f64,
+    effective_tip_radius: f64,
+    polarity: CylinderPolarity,
+) -> f64 {
+    match polarity {
+        CylinderPolarity::InternalBore => center_fit_diameter + 2.0 * effective_tip_radius,
+        CylinderPolarity::ExternalBoss => (center_fit_diameter - 2.0 * effective_tip_radius).max(0.0),
+    }
+}
+
 pub fn load_ptb_test_points(path: impl AsRef<Path>) -> Result<Vec<DVec3>, FittingError> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -1213,6 +1250,27 @@ mod tests {
         let res = fit_minimum_zone_chebyshev_plane(&pts).expect("Chebyshev plane failed");
         assert!(res.flatness < 1e-7);
         assert!((res.normal.z - 1.0).abs() < 1e-7);
+    }
+
+    #[test]
+    fn test_compensate_probe_radius_and_diameter() {
+        let pts = vec![
+            DVec3::new(10.0, 0.0, 5.0),
+            DVec3::new(0.0, 10.0, 5.0),
+        ];
+        let norms = vec![
+            DVec3::new(-1.0, 0.0, 0.0),
+            DVec3::new(0.0, -1.0, 0.0),
+        ];
+        let r_eff = 1.5;
+        let comp = compensate_probe_radius(&pts, &norms, r_eff, CylinderPolarity::InternalBore);
+        assert_relative_eq!(comp[0].x, 11.5, epsilon = 1e-6);
+
+        let d_bore = compensate_cylinder_diameter(20.0, r_eff, CylinderPolarity::InternalBore);
+        assert_relative_eq!(d_bore, 23.0, epsilon = 1e-6);
+
+        let d_boss = compensate_cylinder_diameter(20.0, r_eff, CylinderPolarity::ExternalBoss);
+        assert_relative_eq!(d_boss, 17.0, epsilon = 1e-6);
     }
 }
 

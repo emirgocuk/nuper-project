@@ -394,3 +394,29 @@ def evaluate_measurement_uncertainty(
         "conformance_decision": decision,
         "safe_acceptance_limit": round(safe_limit, 8),
     }
+
+
+def compensate_probe_radius(
+    points: np.ndarray,
+    approach_normals: np.ndarray,
+    effective_tip_radius: float,
+    polarity: str = "INTERNAL_BORE",
+) -> np.ndarray:
+    pts = np.asarray(points, dtype=np.float64)
+    norms = np.asarray(approach_normals, dtype=np.float64)
+    if len(pts) == 0:
+        return pts
+    norm_lens = np.linalg.norm(norms, axis=1, keepdims=True)
+    norm_lens = np.where(norm_lens < 1e-12, 1.0, norm_lens)
+    unit_norms = norms / norm_lens
+    return pts - effective_tip_radius * unit_norms
+
+
+def compensate_cylinder_diameter(
+    center_fit_diameter: float,
+    effective_tip_radius: float,
+    polarity: str = "INTERNAL_BORE",
+) -> float:
+    if polarity.upper() in ("INTERNAL_BORE", "INTERNAL_CYLINDER", "HOLE", "BORE"):
+        return float(center_fit_diameter + 2.0 * effective_tip_radius)
+    return float(max(0.0, center_fit_diameter - 2.0 * effective_tip_radius))

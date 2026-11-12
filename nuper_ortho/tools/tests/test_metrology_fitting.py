@@ -9,6 +9,8 @@ from tools.extractor.metrology_fitting import (
     fit_circle_maximum_inscribed_2d,
     fit_circle_minimum_circumscribed_2d,
     evaluate_measurement_uncertainty,
+    compensate_probe_radius,
+    compensate_cylinder_diameter,
 )
 
 
@@ -112,3 +114,18 @@ def test_evaluate_measurement_uncertainty_gum():
         measured_deviation=0.035,
     )
     assert fail_res["conformance_decision"] == "FAIL"
+
+
+def test_compensate_probe_radius_and_diameter():
+    pts = np.array([[10.0, 0.0, 5.0], [0.0, 10.0, 5.0], [-10.0, 0.0, 5.0], [0.0, -10.0, 5.0]])
+    norms = np.array([[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+    r_eff = 1.5
+    comp_pts = compensate_probe_radius(pts, norms, r_eff)
+    assert comp_pts.shape == pts.shape
+    assert abs(comp_pts[0, 0] - 11.5) < 1e-9
+
+    d_actual_bore = compensate_cylinder_diameter(20.0, r_eff, "INTERNAL_BORE")
+    assert abs(d_actual_bore - 23.0) < 1e-9
+
+    d_actual_boss = compensate_cylinder_diameter(20.0, r_eff, "EXTERNAL_BOSS")
+    assert abs(d_actual_boss - 17.0) < 1e-9
