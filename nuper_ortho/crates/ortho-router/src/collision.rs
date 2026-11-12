@@ -25,6 +25,37 @@ pub enum CollisionError {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProbeCollisionClassification {
+    Clear,
+    ShankCollision,
+    ModuleCollision,
+}
+
+pub fn check_shank_and_module_clearance(
+    probe: &crate::stylus::ProbeGeometryHierarchy,
+    hole_diameter: f64,
+    hole_depth: f64,
+    approach_angle_rad: f64,
+) -> ProbeCollisionClassification {
+    if hole_depth > probe.effective_working_length {
+        let hole_radius = hole_diameter / 2.0;
+        let module_radius = probe.module.diameter / 2.0;
+        if hole_radius < module_radius + 0.5 {
+            return ProbeCollisionClassification::ModuleCollision;
+        }
+    }
+
+    let hole_radius = hole_diameter / 2.0;
+    let effective_stem_radius = probe.stem.radius / approach_angle_rad.cos().abs().max(0.1);
+    let clearance = hole_radius - effective_stem_radius;
+    if clearance <= 0.5 {
+        return ProbeCollisionClassification::ShankCollision;
+    }
+
+    ProbeCollisionClassification::Clear
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CollisionReport {
     pub obstacle_name: String,
@@ -523,5 +554,18 @@ mod tests {
         let mtv = compute_penetration_mtv(start, end, 3.0, &clamp);
         assert!(mtv.is_some());
         assert!(mtv.unwrap().length() > 0.0);
+    }
+
+    #[test]
+    fn test_check_shank_and_module_clearance() {
+        let probe = crate::stylus::ProbeGeometryHierarchy::new(1.0, 30.0);
+        let clear = check_shank_and_module_clearance(&probe, 10.0, 20.0, 0.0);
+        assert_eq!(clear, ProbeCollisionClassification::Clear);
+
+        let module_hit = check_shank_and_module_clearance(&probe, 10.0, 45.0, 0.0);
+        assert_eq!(module_hit, ProbeCollisionClassification::ModuleCollision);
+
+        let shank_hit = check_shank_and_module_clearance(&probe, 2.0, 10.0, 0.0);
+        assert_eq!(shank_hit, ProbeCollisionClassification::ShankCollision);
     }
 }

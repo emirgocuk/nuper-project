@@ -21,9 +21,10 @@ pub use autonomous_loop::{
 };
 pub use clearance::{ClearanceBox, KeepOutZone};
 pub use collision::{
-    ccd_check_trajectory, compute_penetration_mtv, generate_3point_detour, generate_lift_and_hop,
-    resolve_collision_free_path, test_swept_capsule_obstacle, BvhAabb, BvhNode, BvhTree,
-    CollisionError, CollisionReport,
+    ccd_check_trajectory, check_shank_and_module_clearance, compute_penetration_mtv,
+    generate_3point_detour, generate_lift_and_hop, resolve_collision_free_path,
+    test_swept_capsule_obstacle, BvhAabb, BvhNode, BvhTree, CollisionError, CollisionReport,
+    ProbeCollisionClassification,
 };
 pub use hal::{
     CmmMachineProfile, HalError, ProbeTipDefinition, RackConfiguration, RackType, StrokeLimits,
@@ -37,7 +38,10 @@ pub use pallet::{
     optimize_cross_nest_pallet_inspection, partition_trajectory_by_orientation, PalletError,
     PalletGrid, PalletSlot,
 };
-pub use stylus::{ReachabilityReport, StylusAssembly, StylusError};
+pub use stylus::{
+    ModuleCylinder, ProbeGeometryHierarchy, ReachabilityReport, StemCapsule, StylusAssembly,
+    StylusError, TipSphere,
+};
 pub use traversal::{plan_safe_index_retract, SafeTraversalSequence, ZFirstTraversal};
 pub use tsp::{calculate_total_path_length, optimize_inspection_sequence_2opt};
 

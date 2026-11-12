@@ -19,6 +19,52 @@ pub enum StylusError {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TipSphere {
+    pub radius: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StemCapsule {
+    pub radius: f64,
+    pub length: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ModuleCylinder {
+    pub diameter: f64,
+    pub length: f64,
+    pub head_box_size: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProbeGeometryHierarchy {
+    pub tip: TipSphere,
+    pub stem: StemCapsule,
+    pub module: ModuleCylinder,
+    pub effective_working_length: f64,
+}
+
+impl ProbeGeometryHierarchy {
+    pub fn new(tip_radius: f64, stem_length: f64) -> Self {
+        let stem_radius = 0.75 * tip_radius;
+        let ewl = stem_length - (tip_radius - stem_radius);
+        Self {
+            tip: TipSphere { radius: tip_radius },
+            stem: StemCapsule {
+                radius: stem_radius,
+                length: stem_length,
+            },
+            module: ModuleCylinder {
+                diameter: 13.0,
+                length: 35.0,
+                head_box_size: 60.0,
+            },
+            effective_working_length: ewl,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StylusAssembly {
     pub ball_radius: f64,
     pub stem_radius: f64,
