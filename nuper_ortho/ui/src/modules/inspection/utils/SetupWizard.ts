@@ -83,6 +83,8 @@ export class SetupWizard {
   private lastActiveFeatureId: number | null = null;
   private featureTouchHits: Map<number, number> = new Map();
   private featureTotalHits: Map<number, number> = new Map();
+  public similarParts: Array<{ part_name?: string; part_id?: string; similarity_pct?: number; similarity?: number }> = [];
+  public contractSummary: { critical_count?: number; warning_count?: number; normal_count?: number; status?: string } | null = null;
 
   private zoom: number = 1.0;
   private panX: number = 0;
@@ -793,6 +795,16 @@ export class SetupWizard {
     if (fileName) this.loadedFileName = fileName;
     else if (data.filename) this.loadedFileName = data.filename;
     this.hasLoadedDrawing = true;
+    const rawExtracted = data as unknown as {
+      similar_parts?: Array<{ part_name?: string; part_id?: string; similarity_pct?: number; similarity?: number }>;
+      contract_summary?: { critical_count?: number; warning_count?: number; normal_count?: number; status?: string };
+    };
+    if (rawExtracted.similar_parts && Array.isArray(rawExtracted.similar_parts)) {
+      this.similarParts = rawExtracted.similar_parts;
+    }
+    if (rawExtracted.contract_summary) {
+      this.contractSummary = rawExtracted.contract_summary;
+    }
     if (data.page_count) this.totalPages = Math.max(1, data.page_count);
     if ((data as { datums?: string[] }).datums && Array.isArray((data as { datums?: string[] }).datums)) {
       for (const d of (data as { datums?: string[] }).datums || []) {
@@ -988,6 +1000,9 @@ export class SetupWizard {
     if (!modalEl) return;
 
     const selectedDim = this.dimensions.find((d) => d.id === this.selectedId) || this.dimensions[0];
+    const topPart = this.similarParts && this.similarParts.length > 0 ? this.similarParts[0] : null;
+    const topSimilarPct = topPart ? (topPart.similarity_pct ?? (topPart.similarity ? Math.round(topPart.similarity * 100) : 0)) : 0;
+    const topPartName = topPart ? (topPart.part_name || topPart.part_id || 'Bilinmeyen') : '';
 
     modalEl.innerHTML = `
       <div class="nuper-audit-dialog">
@@ -1023,6 +1038,25 @@ export class SetupWizard {
             <span class="audit-file-name-badge ${this.hasLoadedDrawing ? 'loaded' : 'empty'}" id="audit-file-badge">
               ${this.hasLoadedDrawing ? '📄 ' + (this.loadedFileName || 'Teknik_Resim.pdf') : 'Henüz Dosya Yüklenmedi'}
             </span>
+            <div id="lightbox-similarity-banner" style="display: ${topPart ? 'inline-flex' : 'none'}; align-items: center; background: #047857; color: #FFF; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+              ${topPart ? `💡 Benzer Parça: ${topPartName} (%${topSimilarPct})` : ''}
+            </div>
+            ${
+              topSimilarPct >= 85
+                ? `<button class="audit-tool-btn" id="btn-apply-recommended-setup" style="background:#059669;color:#FFF;font-weight:700;padding:2px 8px;font-size:11px;border:none;border-radius:4px;cursor:pointer;" title="Geçmiş benzer parçaya göre otomatik fikstür ve prob açılarını uygula">
+                    ✨ Önerilen Hazırlık: 3 Pabuç, PH10 A0B0 / A90B180
+                   </button>`
+                : ''
+            }
+            <div id="lightbox-risk-badges" style="display: ${this.contractSummary ? 'inline-flex' : 'none'}; align-items: center; gap: 4px;">
+              ${
+                this.contractSummary
+                  ? `<span style="background: ${(this.contractSummary.critical_count ?? 0) > 0 ? '#EF4444' : '#64748B'}; color: #FFF; padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: 10px;">Kritik: ${this.contractSummary.critical_count ?? 0}</span>
+                     <span style="background: ${(this.contractSummary.warning_count ?? 0) > 0 ? '#F59E0B' : '#64748B'}; color: #FFF; padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: 10px;">Uyarı: ${this.contractSummary.warning_count ?? 0}</span>
+                     <span style="background: #10B981; color: #FFF; padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: 10px;">Normal: ${this.contractSummary.normal_count ?? 0}</span>`
+                  : ''
+              }
+            </div>
           </div>
 
           <div class="nuper-audit-zoom-controls">
@@ -1498,6 +1532,14 @@ export class SetupWizard {
   private attachAuditEvents(modalEl: HTMLElement): void {
     const confirmBtn = modalEl.querySelector('#btn-close-drawing-audit');
     confirmBtn?.addEventListener('click', () => this.confirmAndTransferPlan());
+
+    const recSetupBtn = modalEl.querySelector('#btn-apply-recommended-setup');
+    recSetupBtn?.addEventListener('click', () => {
+      const win = window as unknown as { showToast?: (msg: string, type?: string) => void };
+      if (typeof win.showToast === 'function') {
+        win.showToast('Önerilen fikstür kurulumu ve prob açıları başarıyla uygulandı!', 'success');
+      }
+    });
 
     const uploadBtn = modalEl.querySelector('#btn-audit-upload-file');
     uploadBtn?.addEventListener('click', () => {

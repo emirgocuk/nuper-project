@@ -553,4 +553,42 @@ describe('SetupWizard — Sıfır Durum ve Beyaz Temalı Işık Masası Modalı'
     expect(pill2.classList.contains('pass')).toBe(true);
     expect(pill2.textContent).toBe('PASS ✓');
   });
+
+  it('similar_parts and contract_summary render in audit modal with recommended setup button', () => {
+    const wizard = new SetupWizard();
+    wizard.setExtractedData({
+      filename: 'sample.pdf',
+      page_count: 1,
+      dimensions: [
+        { id: 1, balloon: '1', nominal: 25.0, lower_tol: '-0.1', upper_tol: '+0.1' },
+      ],
+      similar_parts: [
+        { part_name: 'VALVE_BODY_OP10', part_id: 'P001', similarity_pct: 92, similarity: 0.92 },
+      ],
+      contract_summary: {
+        critical_count: 2,
+        warning_count: 1,
+        normal_count: 5,
+        status: 'WARNING',
+      },
+    } as unknown as Parameters<typeof wizard.setExtractedData>[0]);
+
+    expect(wizard.similarParts.length).toBe(1);
+    expect(wizard.similarParts[0].similarity_pct).toBe(92);
+    expect(wizard.contractSummary?.critical_count).toBe(2);
+
+    const auditModal = new MockElement('div');
+    auditModal.id = 'modal-drawing-audit';
+    mockDoc.body.appendChild(auditModal);
+    mockDoc.register('modal-drawing-audit', auditModal);
+
+    wizard.renderDrawingAuditModal();
+
+    expect(auditModal.innerHTML).toContain('lightbox-similarity-banner');
+    expect(auditModal.innerHTML).toContain('VALVE_BODY_OP10');
+    expect(auditModal.innerHTML).toContain('%92');
+    expect(auditModal.innerHTML).toContain('btn-apply-recommended-setup');
+    expect(auditModal.innerHTML).toContain('lightbox-risk-badges');
+    expect(auditModal.innerHTML).toContain('Kritik: 2');
+  });
 });
