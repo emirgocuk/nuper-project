@@ -175,7 +175,10 @@ export class MeasurementPathGenerator {
     const stylusLength = options.stylusLengthMm ?? 50.0;
     const headRadius = options.headRadiusMm ?? 40.0;
     const safeHeadIndexAltitude = parseFloat(
-      (topAltitude + stylusLength + headRadius + 25.0).toFixed(2)
+      (options.clearanceZMarginMm !== undefined
+        ? zClearance + 20.0
+        : topAltitude + stylusLength + headRadius + 25.0
+      ).toFixed(2)
     );
 
     const maxPartRadius = isYAxis

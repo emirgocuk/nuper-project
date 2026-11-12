@@ -279,6 +279,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             "rotation": s["rotation"],
             "font_size": s["size"],
             "page": page_num,
+            "page_number": page_num,
             "orientation": dim_orientation,
             "view_cluster": dim_view,
             "inferred_axis": dim_axis,
