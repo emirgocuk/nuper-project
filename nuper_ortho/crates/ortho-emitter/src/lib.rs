@@ -347,12 +347,17 @@ impl DmisEmitter {
         writeln!(out, "$$ 4. SERTIFIKALI CARPISMASIZ HAREKET HATTI")?;
         writeln!(out, "$$ ==============================================================")?;
 
+        let clearance_z = trajectory.clearance_box.z_clearance;
+        let mut last_pos = glam::DVec3::new(0.0, 0.0, clearance_z);
+        let safe_index_z = trajectory.clearance_box.max.z.max(50.0) + 50.0 + 40.0 + 25.0;
         for seg in &trajectory.segments {
             match seg {
                 MotionSegment::RapidLinear { target } => {
+                    last_pos = *target;
                     writeln!(out, "GOTO/CART, {:.4}, {:.4}, {:.4}", target.x, target.y, target.z)?;
                 }
                 MotionSegment::TouchApproach { target, normal } => {
+                    last_pos = *target;
                     writeln!(
                         out,
                         "PTMEAS/CART, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}, {:.4}",
@@ -360,9 +365,14 @@ impl DmisEmitter {
                     )?;
                 }
                 MotionSegment::Retract { target } => {
+                    last_pos = *target;
                     writeln!(out, "GOTO/CART, {:.4}, {:.4}, {:.4}", target.x, target.y, target.z)?;
                 }
                 MotionSegment::RotateHead { a_deg, b_deg } => {
+                    if last_pos.z < safe_index_z {
+                        writeln!(out, "GOTO/CART, {:.4}, {:.4}, {:.4}", last_pos.x, last_pos.y, safe_index_z)?;
+                        last_pos.z = safe_index_z;
+                    }
                     writeln!(out, "SNSLCT/SA(A{:.1}B{:.1})", a_deg, b_deg)?;
                 }
             }

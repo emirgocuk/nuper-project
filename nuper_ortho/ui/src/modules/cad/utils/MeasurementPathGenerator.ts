@@ -98,6 +98,8 @@ export interface PathGeneratorOptions {
   includeDatumSetup?: boolean;
   probeTipRadiusMm?: number;
   stylusEwlMm?: number;
+  stylusLengthMm?: number;
+  headRadiusMm?: number;
   clampBoxes?: ClampBox[];
   datumSurfacePoints?: Array<{
     balloon: 'DATUM_A' | 'DATUM_B' | 'DATUM_C';
@@ -170,8 +172,10 @@ export class MeasurementPathGenerator {
     const topAltitude = isYAxis ? yMaxPart : zMaxPart;
     const zMargin = options.clearanceZMarginMm ?? 25.0;
     const zClearance = parseFloat((topAltitude + zMargin).toFixed(2));
+    const stylusLength = options.stylusLengthMm ?? 50.0;
+    const headRadius = options.headRadiusMm ?? 40.0;
     const safeHeadIndexAltitude = parseFloat(
-      (options.clearanceZMarginMm !== undefined ? zClearance + 20.0 : topAltitude + 50.0).toFixed(2)
+      (topAltitude + stylusLength + headRadius + 25.0).toFixed(2)
     );
 
     const maxPartRadius = isYAxis

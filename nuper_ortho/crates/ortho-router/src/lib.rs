@@ -38,7 +38,7 @@ pub use pallet::{
     PalletGrid, PalletSlot,
 };
 pub use stylus::{ReachabilityReport, StylusAssembly, StylusError};
-pub use traversal::{SafeTraversalSequence, ZFirstTraversal};
+pub use traversal::{plan_safe_index_retract, SafeTraversalSequence, ZFirstTraversal};
 pub use tsp::{calculate_total_path_length, optimize_inspection_sequence_2opt};
 
 /// Ayrık hareket segmenti
