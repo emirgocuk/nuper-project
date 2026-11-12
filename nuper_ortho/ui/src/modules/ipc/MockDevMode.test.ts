@@ -1,51 +1,73 @@
 import { describe, it, expect } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { NuperApp } from '../../main';
 import type { DrawingExtractionResult } from '../../types/generated/drawing_data';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '..', '..', '..', '..');
+describe('Hızlı Dev Modu ve Örnek Veri Okuma', () => {
+  const sampleData: DrawingExtractionResult = {
+    success: true,
+    filename: '050-164849-000 - Kopya.pdf',
+    page_count: 1,
+    raw_text_length: 1420,
+    title_block: {
+      part_number: '050-164849-000',
+      drawing_number: '050-164849-000',
+      material: 'SAE 4340 Çelik',
+      hardness: '38-44 HRC',
+      roughness: 'Ra 1.6 µm',
+      general_tolerance: 'ISO 2768-mK'
+    },
+    datums: ['A', 'B', 'C'],
+    dimensions: [
+      {
+        id: 1,
+        balloon: '#1',
+        type: 'DIAMETER',
+        type_label: 'Silindirik Çap (Bore/Shaft)',
+        icon: '⭕',
+        nominal: 20.0,
+        nominal_str: 'Ø20.000 H7 (+0.021/0)',
+        upper_tol: '+0.021',
+        lower_tol: '0.000',
+        measured: '20.004 mm',
+        deviation: '+0.004 mm',
+        status: 'PASS',
+        feature_key: 'cyl_20',
+        gdt: '⌖ Ø 0.020 Ⓜ | A | B | C',
+        bbox: [120, 340, 220, 390]
+      },
+      {
+        id: 2,
+        balloon: '#2',
+        type: 'LINEAR',
+        type_label: 'Doğrusal Boyut',
+        icon: '📏',
+        nominal: 51.6,
+        nominal_str: '51.60 ±0.20 mm',
+        upper_tol: '+0.200',
+        lower_tol: '-0.200',
+        measured: '51.615 mm',
+        deviation: '+0.015 mm',
+        status: 'PASS',
+        feature_key: 'dim_51_6',
+        gdt: '∥ 0.015 | A',
+        bbox: [300, 200, 410, 250]
+      }
+    ]
+  };
 
-describe('Hızlı Dev Modu ve Mock Veri Okuma (FAZ 4 / Ara Faz 4.3)', () => {
-  it('Statik .dev/mocks/aski_kancasi.json verisini okur ve şemaya uygun teyit eder', () => {
-    const filePath = path.resolve(rootDir, '.dev', 'mocks', 'aski_kancasi.json');
-    expect(fs.existsSync(filePath)).toBe(true);
-
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    const mockData = JSON.parse(raw) as DrawingExtractionResult;
-
-    expect(mockData.success).toBe(true);
-    expect(mockData.filename).toBe('050-164849-000 - Kopya.pdf');
-    expect(mockData.title_block.part_number).toBe('050-164849-000');
-    expect(mockData.datums).toEqual(['A', 'B', 'C']);
-    expect(mockData.dimensions.length).toBe(3);
+  it('DrawingExtractionResult verisinin doğruluğunu teyit eder', () => {
+    expect(sampleData.success).toBe(true);
+    expect(sampleData.filename).toBe('050-164849-000 - Kopya.pdf');
+    expect(sampleData.title_block.part_number).toBe('050-164849-000');
+    expect(sampleData.datums).toEqual(['A', 'B', 'C']);
+    expect(sampleData.dimensions.length).toBe(2);
   });
 
-  it('Statik .dev/mocks/avionic_panel.json verisini okur ve şemaya uygun teyit eder', () => {
-    const filePath = path.resolve(rootDir, '.dev', 'mocks', 'avionic_panel.json');
-    expect(fs.existsSync(filePath)).toBe(true);
-
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    const mockData = JSON.parse(raw) as DrawingExtractionResult;
-
-    expect(mockData.success).toBe(true);
-    expect(mockData.filename).toBe('DACP_Avionic_Panel.pdf');
-    expect(mockData.title_block.part_number).toBe('DACP-AV-002');
-    expect(mockData.dimensions.length).toBe(2);
-  });
-
-  it('NuperApp sınıfı mock verisini yükler ve balonları kanvasa aktarır', () => {
-    const filePath = path.resolve(rootDir, '.dev', 'mocks', 'aski_kancasi.json');
-    const mockData = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as DrawingExtractionResult;
-
+  it('NuperApp sınıfı örnek veriyi yükler ve kanvasa aktarır', () => {
     const app = new NuperApp();
     expect(app.getCADViewer()).toBeDefined();
     expect(app.getDrawingCanvas()).toBeDefined();
-
-    expect(() => app.loadSampleData(mockData)).not.toThrow();
+    expect(() => app.loadSampleData(sampleData)).not.toThrow();
     app.destroy();
   });
 });

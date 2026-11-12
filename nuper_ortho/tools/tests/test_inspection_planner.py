@@ -8,20 +8,126 @@ from tools.models.generated_inspection_plan import Priority, Type
 
 @pytest.fixture
 def aski_kancasi_data():
-    mock_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", ".dev", "mocks", "aski_kancasi.json"
-    )
-    with open(mock_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return {
+        "success": True,
+        "filename": "164849_aski_kancasi.pdf",
+        "page_count": 1,
+        "title_block": {
+            "part_number": "050-164849-000",
+            "drawing_number": "050-164849-000",
+            "material": "SAE 4340 Çelik",
+            "hardness": "38-44 HRC",
+            "roughness": "Ra 1.6 µm",
+            "general_tolerance": "ISO 2768-mK",
+        },
+        "datums": ["A", "B", "C"],
+        "dimensions": [
+            {
+                "id": 1,
+                "balloon": "#1",
+                "type": "DIAMETER",
+                "type_label": "Silindirik Çap (Bore/Shaft)",
+                "icon": "⭕",
+                "nominal": 20.0,
+                "nominal_str": "Ø20.000 H7 (+0.021/0)",
+                "upper_tol": "+0.021",
+                "lower_tol": "0.000",
+                "measured": "20.004 mm",
+                "deviation": "+0.004 mm",
+                "status": "PASS",
+                "feature_key": "cyl_20",
+                "gdt": "⌖ Ø 0.020 Ⓜ | A | B | C",
+                "bbox": [120, 340, 220, 390],
+            },
+            {
+                "id": 2,
+                "balloon": "#2",
+                "type": "LINEAR",
+                "type_label": "Doğrusal Boyut",
+                "icon": "📏",
+                "nominal": 51.6,
+                "nominal_str": "51.60 ±0.20 mm",
+                "upper_tol": "+0.200",
+                "lower_tol": "-0.200",
+                "measured": "51.615 mm",
+                "deviation": "+0.015 mm",
+                "status": "PASS",
+                "feature_key": "dim_51_6",
+                "gdt": "∥ 0.015 | A",
+                "bbox": [300, 200, 410, 250],
+            },
+            {
+                "id": 3,
+                "balloon": "#3",
+                "type": "RADIUS",
+                "type_label": "Kavis / Yarıçap (Fillet/Round)",
+                "icon": "📐",
+                "nominal": 5.0,
+                "nominal_str": "R5.00 ±0.10 mm",
+                "upper_tol": "+0.100",
+                "lower_tol": "-0.100",
+                "measured": "5.008 mm",
+                "deviation": "+0.008 mm",
+                "status": "PASS",
+                "feature_key": "rad_5",
+                "bbox": [210, 110, 270, 150],
+            },
+        ],
+    }
 
 
 @pytest.fixture
 def avionic_panel_data():
-    mock_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", ".dev", "mocks", "avionic_panel.json"
-    )
-    with open(mock_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return {
+        "success": True,
+        "filename": "DACP_Avionic_Panel.pdf",
+        "page_count": 2,
+        "title_block": {
+            "part_number": "DACP-AV-002",
+            "drawing_number": "DACP-AV-002-REV-B",
+            "material": "Al 6061-T6 Alüminyum",
+            "hardness": "95 HB",
+            "roughness": "Ra 0.8 µm",
+            "general_tolerance": "ISO 2768-mK",
+        },
+        "datums": ["A", "B", "C"],
+        "dimensions": [
+            {
+                "id": 1,
+                "balloon": "#1",
+                "type": "DIAMETER",
+                "type_label": "Montaj Deliği (Pin Hole)",
+                "icon": "⭕",
+                "nominal": 6.0,
+                "nominal_str": "Ø6.000 H7 (+0.012/0)",
+                "upper_tol": "+0.012",
+                "lower_tol": "0.000",
+                "measured": "6.003 mm",
+                "deviation": "+0.003 mm",
+                "status": "PASS",
+                "feature_key": "bore_pin_6",
+                "gdt": "⌖ Ø 0.015 | A | B | C",
+                "bbox": [150, 220, 210, 270],
+            },
+            {
+                "id": 2,
+                "balloon": "#2",
+                "type": "LINEAR",
+                "type_label": "Panel Genişliği",
+                "icon": "📏",
+                "nominal": 120.0,
+                "nominal_str": "120.00 ±0.10 mm",
+                "upper_tol": "+0.100",
+                "lower_tol": "-0.100",
+                "measured": "120.045 mm",
+                "deviation": "+0.045 mm",
+                "status": "PASS",
+                "feature_key": "panel_width_120",
+                "gdt": "⏢ 0.020",
+                "bbox": [50, 450, 550, 500],
+            },
+        ],
+    }
 
 
 def test_321_datum_hierarchy_order(aski_kancasi_data):
