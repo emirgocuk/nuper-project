@@ -457,6 +457,86 @@ pub fn sample_freeform_feature_grid(
     points
 }
 
+pub fn sample_plane_with_tolerance(
+    centroid: DVec3,
+    normal: DVec3,
+    half_span: f64,
+    tol_band: f64,
+    risk_level: &str,
+) -> Vec<SamplingPoint> {
+    let is_critical = tol_band <= 0.025 || risk_level.eq_ignore_ascii_case("CRITICAL");
+    if !is_critical {
+        return sample_plane_grid(centroid, normal, half_span);
+    }
+
+    let n = normal.normalize();
+    let up = if n.z.abs() < 0.9 {
+        DVec3::new(0.0, 0.0, 1.0)
+    } else {
+        DVec3::new(1.0, 0.0, 0.0)
+    };
+    let u = n.cross(up).normalize();
+    let v = n.cross(u).normalize();
+
+    let h = half_span;
+    let offsets = [
+        centroid + u * h + v * h,
+        centroid - u * h + v * h,
+        centroid - u * h - v * h,
+        centroid + u * h - v * h,
+        centroid + u * h,
+        centroid - u * h,
+        centroid + v * h,
+        centroid - v * h,
+    ];
+
+    offsets.iter().map(|&pt| SamplingPoint::new(pt, n)).collect()
+}
+
+pub fn sample_cylinder_adaptive(
+    centroid: DVec3,
+    axis: DVec3,
+    diameter: f64,
+    depth: f64,
+    tol_band: f64,
+    risk_level: &str,
+) -> Vec<SamplingPoint> {
+    let is_critical = tol_band <= 0.025 || risk_level.eq_ignore_ascii_case("CRITICAL");
+    if !is_critical {
+        return sample_cylinder_2level(centroid, axis, diameter, depth);
+    }
+
+    let axis_norm = axis.normalize();
+    let radius = diameter / 2.0;
+
+    let ref_dir = if axis_norm.z.abs() < 0.9 {
+        DVec3::new(0.0, 0.0, 1.0)
+    } else {
+        DVec3::new(1.0, 0.0, 0.0)
+    };
+
+    let u = axis_norm.cross(ref_dir).normalize();
+    let v = axis_norm.cross(u).normalize();
+
+    let z_levels = [
+        centroid + axis_norm * (depth * 0.20),
+        centroid + axis_norm * (depth * 0.50),
+        centroid + axis_norm * (depth * 0.80),
+    ];
+
+    let mut points = Vec::with_capacity(18);
+    for center_at_z in z_levels {
+        for i in 0..6 {
+            let angle = (i as f64) * (std::f64::consts::PI / 3.0);
+            let radial_dir = u * angle.cos() + v * angle.sin();
+            let touch_pos = center_at_z + radial_dir * radius;
+            let surface_normal = -radial_dir;
+            points.push(SamplingPoint::new(touch_pos, surface_normal));
+        }
+    }
+    points
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -528,5 +608,22 @@ mod tests {
 
         let samples = sample_freeform_surface_adaptive(&grid, 2, 0.2);
         assert!(samples.len() > 10);
+    }
+
+    #[test]
+    fn test_adaptive_sampling_critical_counts() {
+        let plane_std = sample_plane_with_tolerance(DVec3::ZERO, DVec3::Z, 10.0, 0.1, "NORMAL");
+        assert_eq!(plane_std.len(), 4);
+        let plane_crit = sample_plane_with_tolerance(DVec3::ZERO, DVec3::Z, 10.0, 0.020, "NORMAL");
+        assert_eq!(plane_crit.len(), 8);
+        let plane_crit_flag = sample_plane_with_tolerance(DVec3::ZERO, DVec3::Z, 10.0, 0.1, "CRITICAL");
+        assert_eq!(plane_crit_flag.len(), 8);
+
+        let cyl_std = sample_cylinder_adaptive(DVec3::ZERO, DVec3::Z, 20.0, 40.0, 0.1, "NORMAL");
+        assert_eq!(cyl_std.len(), 8);
+        let cyl_crit = sample_cylinder_adaptive(DVec3::ZERO, DVec3::Z, 20.0, 40.0, 0.015, "NORMAL");
+        assert_eq!(cyl_crit.len(), 18);
+        let cyl_crit_flag = sample_cylinder_adaptive(DVec3::ZERO, DVec3::Z, 20.0, 40.0, 0.1, "CRITICAL");
+        assert_eq!(cyl_crit_flag.len(), 18);
     }
 }

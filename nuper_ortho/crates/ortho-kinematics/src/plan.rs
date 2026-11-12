@@ -8,8 +8,9 @@ use serde::{Deserialize, Serialize};
 use crate::ph10::{AngleSelectionResult, PH10Angle, PH10LookUpTable};
 use crate::sampling::{
     sample_annular_step_face, sample_cone_flank, sample_countersink_chamfer_for_center,
-    sample_cylinder_2level, sample_external_cylinder, sample_freeform_feature_grid,
-    sample_plane_grid, sample_sphere, sample_thread_locator_pin, SamplingPoint,
+    sample_cylinder_2level, sample_cylinder_adaptive, sample_external_cylinder,
+    sample_freeform_feature_grid, sample_plane_with_tolerance,
+    sample_sphere, sample_thread_locator_pin, SamplingPoint,
 };
 use crate::tree::ProbeStack;
 
@@ -85,10 +86,39 @@ impl OrientedSamplingPlan {
         lut: &PH10LookUpTable,
         qualified_angles: &[PH10Angle],
     ) -> Self {
-        Self::build_with_compounds(part_id, features, &[], probe_stack, lut, qualified_angles)
+        Self::build_with_compounds_adaptive(
+            part_id,
+            features,
+            &[],
+            probe_stack,
+            lut,
+            qualified_angles,
+            0.1,
+            "NORMAL",
+        )
     }
 
-    /// Kademeli delikleri ve standart unsurları birlikte işleyen tam teftiş planlayıcısı
+    pub fn build_from_features(
+        part_id: impl Into<String>,
+        features: &[GeometricFeature],
+        probe_stack: &ProbeStack,
+        lut: &PH10LookUpTable,
+        qualified_angles: &[PH10Angle],
+        tol_band: f64,
+        risk_level: &str,
+    ) -> Self {
+        Self::build_with_compounds_adaptive(
+            part_id,
+            features,
+            &[],
+            probe_stack,
+            lut,
+            qualified_angles,
+            tol_band,
+            risk_level,
+        )
+    }
+
     pub fn build_with_compounds(
         part_id: impl Into<String>,
         features: &[GeometricFeature],
@@ -96,6 +126,28 @@ impl OrientedSamplingPlan {
         probe_stack: &ProbeStack,
         lut: &PH10LookUpTable,
         qualified_angles: &[PH10Angle],
+    ) -> Self {
+        Self::build_with_compounds_adaptive(
+            part_id,
+            features,
+            compound_holes,
+            probe_stack,
+            lut,
+            qualified_angles,
+            0.1,
+            "NORMAL",
+        )
+    }
+
+    pub fn build_with_compounds_adaptive(
+        part_id: impl Into<String>,
+        features: &[GeometricFeature],
+        compound_holes: &[CompoundHoleFeature],
+        probe_stack: &ProbeStack,
+        lut: &PH10LookUpTable,
+        qualified_angles: &[PH10Angle],
+        tol_band: f64,
+        risk_level: &str,
     ) -> Self {
         let mut targets = Vec::new();
         let mut compound_targets = Vec::new();
@@ -338,13 +390,19 @@ impl OrientedSamplingPlan {
                 let pts = match feat.feature_type {
                     ortho_ast::FeatureType::Plane => {
                         let half_span = (feat.area.sqrt() / 2.0).clamp(5.0, 30.0);
-                        sample_plane_grid(feat.centroid, feat.normal_vector, half_span)
+                        sample_plane_with_tolerance(
+                            feat.centroid,
+                            feat.normal_vector,
+                            half_span,
+                            tol_band,
+                            risk_level,
+                        )
                     }
                     ortho_ast::FeatureType::InternalCylinder => {
                         let d = feat.diameter.unwrap_or(20.0);
                         let l = feat.depth_or_length.unwrap_or(30.0);
                         let axis = feat.axis_vector.unwrap_or(DVec3::Z);
-                        sample_cylinder_2level(feat.centroid, axis, d, l)
+                        sample_cylinder_adaptive(feat.centroid, axis, d, l, tol_band, risk_level)
                     }
                     ortho_ast::FeatureType::ExternalCylinder => {
                         let d = feat.diameter.unwrap_or(20.0);
