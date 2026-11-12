@@ -1,6 +1,6 @@
 # Nuper Ortho — Kanıta Dayalı Durum ve Onarım Planı
 
-Son güncelleme: 11 Kasım 2026. Güncel iş sırasının ve kabul durumunun tek kaynağı bu belgedir.
+Son güncelleme: 13 Kasım 2026. Güncel iş sırasının ve kabul durumunun tek kaynağı bu belgedir.
 
 ## 1. Hedef ve Sınır (Physical AI Vizyonu)
 
@@ -88,6 +88,51 @@ Aşağıdaki sonuçlar 12 Kasım 2026 kapsamlı 8-Madde entegrasyon ve kalite g�
 8. **6-Fazlı Tam Sistem Regresyon Doğrulaması:**
    - *Kök Neden:* Yapılan kapsamlı değişikliklerin gerilemeye yol açmadığının uçtan uca kanıtlanması gerekiyordu.
    - *Çözüm:* `npm run codegen`, `npm run check:types`, `python -m pytest tools/tests/` (74/74), `npm run test:ui` (200/200), `cargo test --workspace` (tüm crate ve E2E testleri) ve `npm run build` olmak üzere 6 test adımının tamamı hatasız başarıyla tamamlandı.
+
+### 4.2. 3. Dalga: 7 Derin Saha ve Metroloji Hatasının Giderilmesi (13 Kasım 2026)
+
+1. **Kafa Döndürme (Head Indexing A/B) Güvenli Süpürme İrtifası (`SAFE_INDEX_Z`):**
+   - *Kök Neden:* PH10M / TESASTAR-m kafa açısı değişirken ($A0B0 \to A90B180$), $50\text{--}100\text{ mm}$'lik stilus $\approx 120\text{ mm}$ yarıçaplı bir yay süpürür. Kafa standart $Z+10\text{ mm}$ veya $Z+20\text{ mm}$ kotundayken dönerse fikstüre veya parçaya çarpar.
+   - *Çözüm:* `ortho-kinematics` (`ph10.rs`, `traversal.rs`) ve `ortho-emitter` içinde parametrik $Z_{\text{safe\_index}} = Z_{\text{part\_max}} + L_{\text{stylus}} + R_{\text{head}} + 25\text{ mm}$ formülü kodlandı. `plan_safe_index_retract` fonksiyonu ile açı değişiminden önce kafa bu irtifaya çıkarılıp `GOTO` üretildikten sonra `SNSLCT` komutu verilmesi zorunlu kılındı. UI tarafında `MeasurementPathGenerator.ts` bu kurala senkronize edildi.
+   - *Commit:* `66f0b58`, `a126f36`, `a7f3679`
+
+2. **Esnek Datum Referans Çerçevesi (DRF) — Silindirik ve Orta Düzlem Datum A:**
+   - *Kök Neden:* Datum A her zaman 3 noktalı düzlem (`PLANE`) varsayılıyordu; flanş, mil ve göbek parçalarında Datum A silindir eksenidir (4 serbestlik derecesi kilitler) veya iki simetrik yüzeyin orta düzlemidir (`CONST/PLANE, MID`).
+   - *Çözüm:* `ortho-ast` (`datum.rs`) içine `DatumGeometryType` enum (`Plane`, `Cylinder`, `MidPlane`) eklendi. `ortho-emitter` içinde silindirik datumlar `FEAT/CYLNDR` ve eksen kilidiyle, orta düzlemler ise iki paralel yüzeyin `CONST/PLANE, MID` konstruksiyonu ile DMIS'e yazıldı.
+   - *Commit:* `ed78c98`
+
+3. **STEP Ayrıştırıcıda Radyus, Pah ve Küre B-Rep Yüzey Desteği:**
+   - *Kök Neden:* B-Rep ayrıştırıcı yalnızca `PLANE` ve `CYLINDER` tanıyordu; `TOROIDAL_SURFACE` (iç/dış kordon radyusları), `CONICAL_SURFACE` (pah/havşa açıları) ve `SPHERICAL_SURFACE` atlanıyordu.
+   - *Çözüm:* `ortho-brep` (`feature.rs`, `step_parser.rs`) ve `tools/brep_verifier.py` içine toroidal ($R_{\text{major}}, R_{\text{minor}}$), konik (yarı açı / semi-angle) ve küresel yüzey ayrıştırma ve sınıflandırma kuralları eklendi.
+   - *Commit:* `1724e83`
+
+4. **3 Aşamalı Prob Şaftı ve Modül Çarpışma Hiyerarşisi:**
+   - *Kök Neden:* Yalnızca yakut küre ucu ($R_{\text{tip}}$) çarpışma için kontrol ediliyordu; stilus gövdesi ($R_{\text{stem}}$) veya TP20/TP200 gövdesi ($\varnothing 13\text{ mm} \times 35\text{ mm}$) delik ağzına sürttüğünde sistem uyarı vermiyordu.
+   - *Çözüm:* `ortho-router` (`stylus.rs`, `collision.rs`) içine 3 aşamalı geometrik hiyerarşi (`TipSphere`, `StemCapsule`, `ModuleCylinder`) eklendi. `check_shank_and_module_clearance` fonksiyonu ile delik derinliği > EWL veya şaft/modül mesafesi $\le 0.5\text{ mm}$ olduğunda `SHANK_COLLISION` ve `MODULE_COLLISION` bayrakları üretilerek `reachability_report` oluşturuldu.
+   - *Commit:* `d8e3efc`
+
+5. **Simetri, Salgı (Runout) ve Eşmerkezlilik için Konstruksiyon (`CONST`):**
+   - *Kök Neden:* Simetri (`⌯`), Dairesel/Toplam Salgı (`↗`/`↗↗`) ve Eşmerkezlilik (`◎`) tek bir ham ölçümle doğrulanamaz; birden çok Z kesitinin veya karşılıklı düzlemlerin matematiksel bileşkesi gerekir.
+   - *Çözüm:* `ortho-kinematics` (`sampling.rs`, `tolerance.rs`) içine `sample_runout_circles` (en az 3 Z yüksekliğinde dairesel tarama) ve `sample_symmetry_planes` eklendi. `ortho-emitter` içinde DMIS `CONST/PLANE, MID, F(P1), F(P2)` ve `TOL/CRUN` blokları üretildi.
+   - *Commit:* `a9a299a`, `5b57cd3`
+
+6. **Çok Sayfalı Teknik Resim PDF Ayrıştırma ve Sayfa Bazlı Balon Filtreleme:**
+   - *Kök Neden:* Çok sayfalı PDF'lerde tüm ölçüler tek bir sayfaymış gibi çıkarılıyor veya sayfa bilgisi kayboluyordu; 2D kanvasta diğer sayfaların balonları üst üste biniyordu.
+   - *Çözüm:* `schemas/drawing_data.schema.json` içine `page_number` alanı eklendi (`npm run codegen`). `tools/extractor/vector_extractor.py` tüm sayfaları ($1..N$) gezerek ölçüleri sayfa numarasıyla etiketledi. `DrawingCanvas.ts` içinde `setPage(pageNum)` ile sadece aktif sayfaya ait balonların render edilmesi sağlandı. UI'da `◀ Sayfa X / N ▶` sayfa gezinti kontrolleri bağlandı.
+   - *Commit:* `d383232`, `a7f3679`, `50de79b`, `1302508`
+
+7. **Işık Masası Manuel Balon Ekleme/Silme ve 3D Tıkla-Bağla (Click-to-Bind):**
+   - *Kök Neden:* Otomatik OCR/Vektörün kaçırdığı özel notlar için manuel balon çizilemiyordu; yanlış çizilen balonlar silinemiyordu; 2D balon ile 3D STEP yüzeyi arasında doğrudan interaktif bağlama yapılamıyordu.
+   - *Çözüm:* `LightTableControls.ts` içine `enableManualBalloonDrawMode` (tıklayıp sürükleyerek yeni balon oluşturma), `Delete`/`Backspace` kısayolu ve butonuyla balon silme eklendi. `main.ts` ve `CADViewer.ts` raycaster entegrasyonuyla `🎯 3D Yüzeye Bağla` modu etkinleştirildi; 3D parça üzerinde tıklanan yüzeyin `face_id` değeri doğrudan balona bağlanarak `%100` güven skoruyla `ENGINEER_LOCKED` durumuna geçirildi.
+   - *Commit:* `50de79b`, `1302508`
+
+8. **6-Fazlı Bütünleşik Sistem Doğrulaması:**
+   - `npm run codegen`: Başarılı (TypeScript ve Python Pydantic modelleri eksiksiz üretildi).
+   - `npm run check:types`: Başarılı (0 hata).
+   - `python -m pytest tools/tests/`: 74 test başarılı (%100 yeşil).
+   - `npm run test:ui`: 35 test dosyası, 201 test başarılı (%100 yeşil).
+   - `cargo test --workspace`: 9 crate, 83+ birim/entegrasyon/doc testi başarılı (%100 yeşil).
+   - `npm run build`: Başarılı (0 hata, üretim paketi derlendi).
 
 ## 5. Bağımlılık sırası ve görev boyutu
 
