@@ -32,7 +32,6 @@ fn test_end_to_end_phase2_real_step_pipeline() {
         .extract_geometric_features()
         .expect("B-Rep geometrik unsurları çıkarılamadı");
 
-    // Delik 1'i (Internal Cylinder) tespit et
     let hole_1 = features
         .iter()
         .find(|f| f.feature_type == FeatureType::InternalCylinder || f.name.contains("HOLE") || f.name.contains("BORE"))

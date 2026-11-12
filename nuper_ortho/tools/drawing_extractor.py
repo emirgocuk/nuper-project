@@ -15,14 +15,23 @@ if tools_dir not in sys.path:
 
 from extractor.title_block import extract_title_block_fields, extract_datum_labels
 from extractor.parse.dimension import parse_diameter_callouts, parse_radius_callouts, parse_linear_callouts
-from extractor.parse.thread import parse_thread_callout
-from extractor.spatial import match_spatial_bbox, find_spatial_tolerances_near
+from extractor.parse.thread import parse_thread_callout, compute_thread_minor_diameter
+from extractor.spatial import (
+    match_spatial_bbox,
+    find_spatial_tolerances_near,
+    detect_orthographic_views,
+    assign_view_to_dimension,
+    trace_dimension_attachments,
+    validate_scale_consistency,
+)
 from extractor.vector_extractor import extract_vector_dimensions_from_page, get_title_block_mask, is_inside_mask
 from extractor.semantic_grammar import normalize_engineering_callout, build_321_alignment, classify_operation_setup
 from extractor.brep_verifier import parse_step_file, verify_dimensions_against_step
 from extractor.vision_ai_extractor import run_local_or_hybrid_ai_extraction
 from extractor.parse.tolerance import apply_iso2768_tolerance
 from extractor.pmi_extractor import parse_step_pmi
+from extractor.contract_guard import apply_contract_guard
+from extractor.similarity_engine import find_similar_parts
 
 
 def is_feature_in_title_or_notes(box: List[float], items: List[Dict[str, Any]], masks: List[Tuple[float, float, float, float]], page_w: float, page_h: float) -> bool:
@@ -230,6 +239,8 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
     ai_result = run_local_or_hybrid_ai_extraction(resolved, max_duration_seconds=4.2)
     if ai_result and ai_result.get("dimensions"):
         dims = ai_result["dimensions"]
+        if not step_path:
+            step_path = find_matching_step_file(resolved)
         if step_path and os.path.exists(step_path):
             step_data = parse_step_file(step_path)
             if step_data.get("success"):
@@ -238,7 +249,7 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
         for idx, d in enumerate(dims, 1):
             d["id"] = idx
             d["balloon"] = f"#{idx}"
-        return {
+        ai_payload = {
             "success": True,
             "filename": os.path.basename(resolved),
             "page_count": len(rendered_pages) if rendered_pages else 1,
@@ -248,6 +259,10 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
             "datums": ai_result.get("datums", []),
             "dimensions": dims,
         }
+        schema_path = os.path.join(os.path.dirname(__file__), "..", "schemas", "drawing_data.schema.json")
+        ai_payload = apply_contract_guard(ai_payload, schema_path=schema_path)
+        ai_payload["similar_parts"] = find_similar_parts(ai_payload)
+        return ai_payload
 
     ocr_engine = None
     try:
@@ -350,6 +365,9 @@ def parse_text_to_metrology(
     step_path: Optional[str] = None,
     rendered_pages: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
+    if not step_path and full_path:
+        step_path = find_matching_step_file(full_path)
+
     result = {
         "success": True,
         "filename": filename,
@@ -370,8 +388,6 @@ def parse_text_to_metrology(
 
     result["title_block"] = extract_title_block_fields(text, filename)
     result["datums"] = extract_datum_labels(text)
-
-    # 3-2-1 Hizalama Şeması (Katman 2)
     alignment_321 = build_321_alignment(result["datums"])
 
     dims = []
@@ -387,7 +403,17 @@ def parse_text_to_metrology(
         ref_h = float(rendered_pages[0].get("height") or 841.89)
     page_masks = get_title_block_mask(ref_w, ref_h)
 
-    # 1. Katman 1'den gelen vektörel ölçüleri al
+    page_drawings: Dict[int, List[Dict[str, Any]]] = {}
+    if full_path and os.path.exists(full_path):
+        try:
+            import pymupdf
+            doc_aux = pymupdf.open(full_path)
+            for pidx, ppage in enumerate(doc_aux, 1):
+                page_drawings[pidx] = ppage.get_drawings()
+            doc_aux.close()
+        except Exception:
+            pass
+
     has_vector_dims = False
     for p_info in page_entries:
         p_num = p_info.get("page", 1)
@@ -433,14 +459,12 @@ def parse_text_to_metrology(
                 })
                 balloon_idx += 1
 
-    # 2. Vektörel ölçü bulunamadıysa (taranmış resim veya klasik metin analizi)
     if not has_vector_dims:
         for p_info in page_entries:
             p_num = p_info.get("page", 1)
             p_text = p_info.get("text", "")
             p_items = p_info.get("items", [])
 
-            # (A) Çap ve Delik Ölçüleri (Ø)
             for parsed_dia in parse_diameter_callouts(p_text):
                 nom = parsed_dia["nominal"]
                 qty = parsed_dia["quantity"]
@@ -489,7 +513,6 @@ def parse_text_to_metrology(
                 })
                 balloon_idx += 1
 
-            # (B) Yarıçap Ölçüleri (R)
             for parsed_rad in parse_radius_callouts(p_text):
                 r_val = parsed_rad["nominal"]
                 qty = parsed_rad["quantity"]
@@ -526,7 +549,6 @@ def parse_text_to_metrology(
                 })
                 balloon_idx += 1
 
-            # (C) Metrik / Vida Dişleri
             thread_matches = re.finditer(r"\b((?:M\d+(?:\s*x\s*[\d\.]+)?(?:\s*-\s*[0-9A-Za-z]+)?)|(?:\d+/\d+-\d+\s*(?:UNF|UNC|UN)))\b", p_text, re.IGNORECASE)
             for m in thread_matches:
                 th = m.group(1).strip()
@@ -561,7 +583,6 @@ def parse_text_to_metrology(
                 })
                 balloon_idx += 1
 
-            # (D) Açık Toleranslı Doğrusal Boyutlar
             for parsed_lin in parse_linear_callouts(p_text):
                 val = parsed_lin["nominal"]
                 if any(abs(d.get("nominal", 0) - val) < 0.01 and d.get("page") == p_num for d in dims):
@@ -621,7 +642,59 @@ def parse_text_to_metrology(
                 })
                 balloon_idx += 1
 
-    # 3. KATMAN 3: 3D STEP B-Rep Çapraz Doğrulama & Hakem Katmanı (Sanity Check)
+    views_by_page: Dict[int, List[Dict[str, Any]]] = {}
+    for p_info in page_entries:
+        p_num = p_info.get("page", 1)
+        p_items = p_info.get("items", [])
+        p_draws = page_drawings.get(p_num, [])
+        views_by_page[p_num] = detect_orthographic_views(p_draws, ref_w, ref_h, p_items)
+
+    filtered_dims = []
+    for d in dims:
+        p_num = d.get("page", 1)
+        p_views = views_by_page.get(p_num, [])
+        p_draws = page_drawings.get(p_num, [])
+        dim_bbox = d.get("bbox", [100.0, 100.0, 150.0, 120.0])
+
+        assigned = assign_view_to_dimension(dim_bbox, p_views, d.get("type", "LINEAR"))
+        d["view_name"] = assigned.get("view_name")
+        d["inferred_axis"] = assigned.get("inferred_axis")
+        d["rel_position"] = assigned.get("rel_position")
+
+        nom_val = d.get("nominal")
+        tr_res = trace_dimension_attachments(dim_bbox, p_draws, nominal_val=float(nom_val) if isinstance(nom_val, (int, float)) else None)
+        d["attachment_points"] = tr_res.get("attachment_points", [])
+
+        if tr_res.get("has_dimension_line") and not tr_res.get("scale_consistent", True):
+            line_len = tr_res.get("dimension_line_length_pt", 0.0)
+            if isinstance(nom_val, (int, float)) and not validate_scale_consistency(float(nom_val), line_len):
+                continue
+
+        if d.get("type") == "THREAD" or (isinstance(d.get("nominal_str"), str) and d.get("nominal_str", "").upper().startswith("M")):
+            th_res = parse_thread_callout(str(d.get("nominal_str", "")))
+            if th_res:
+                if th_res.get("nominal_dia"):
+                    d["nominal"] = th_res["nominal_dia"]
+                if th_res.get("minor_dia"):
+                    d["minor_diameter"] = th_res["minor_dia"]
+
+        iso_cls = result.get("title_block", {}).get("iso_class", "m")
+        u_tol = str(d.get("upper_tol", "")).strip()
+        l_tol = str(d.get("lower_tol", "")).strip()
+        if (not u_tol or u_tol == "0.000" or u_tol == "0") and (not l_tol or l_tol == "0.000" or l_tol == "0"):
+            nom = d.get("nominal", 0.0)
+            if isinstance(nom, (int, float)) and nom > 0.0:
+                calc_u, calc_l, src_tag = apply_iso2768_tolerance(float(nom), iso_cls)
+                d["upper_tol"] = calc_u
+                d["lower_tol"] = calc_l
+                d["tolerance_source"] = src_tag
+        elif not d.get("tolerance_source"):
+            d["tolerance_source"] = "EXPLICIT_DRAWING"
+
+        filtered_dims.append(d)
+
+    dims = filtered_dims
+
     if step_path and os.path.exists(step_path):
         pmi_data = parse_step_pmi(step_path)
         if pmi_data.get("is_ap242") and pmi_data.get("tolerances"):
@@ -657,20 +730,6 @@ def parse_text_to_metrology(
             verified, pruned = verify_dimensions_against_step(dims, step_data)
             dims = verified
 
-    iso_cls = result.get("title_block", {}).get("iso_class", "m")
-    for d in dims:
-        u_tol = str(d.get("upper_tol", "")).strip()
-        l_tol = str(d.get("lower_tol", "")).strip()
-        if (not u_tol or u_tol == "0.000" or u_tol == "0") and (not l_tol or l_tol == "0.000" or l_tol == "0"):
-            nom = d.get("nominal", 0.0)
-            if isinstance(nom, (int, float)) and nom > 0.0:
-                calc_u, calc_l, src_tag = apply_iso2768_tolerance(float(nom), iso_cls)
-                d["upper_tol"] = calc_u
-                d["lower_tol"] = calc_l
-                d["tolerance_source"] = src_tag
-        elif not d.get("tolerance_source"):
-            d["tolerance_source"] = "EXPLICIT_DRAWING"
-
     for d in dims:
         b = d.get("bbox")
         if b and len(b) >= 4:
@@ -688,6 +747,9 @@ def parse_text_to_metrology(
         d["balloon"] = f"#{idx}"
 
     result["dimensions"] = dims
+    schema_path = os.path.join(os.path.dirname(__file__), "..", "schemas", "drawing_data.schema.json")
+    result = apply_contract_guard(result, schema_path=schema_path)
+    result["similar_parts"] = find_similar_parts(result)
     return result
 
 

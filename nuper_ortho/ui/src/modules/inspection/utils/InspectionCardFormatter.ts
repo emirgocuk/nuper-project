@@ -25,6 +25,8 @@ export interface FormattedInspectionCard {
   bonusTol?: number;
   totalTol?: number;
   criticality?: CriticalityInfo;
+  match_confidence?: number | string;
+  tolerance_source?: string;
 }
 
 export class InspectionCardFormatter {
@@ -177,6 +179,25 @@ export class InspectionCardFormatter {
     const crit = card.criticality || InspectionCardFormatter.computeToleranceCriticality(card.toleranceRange, '', undefined, card.nominalStr);
     const critBadge = `<span class="card-crit-badge ${crit.cssClass}" style="color:${crit.color}; font-weight:700; font-size:9.5px; border:1px solid ${crit.color}; padding:1px 5px; border-radius:3px; background:rgba(255,255,255,0.06);">${crit.badge}</span>`;
 
+    let confBadge = '';
+    if (card.match_confidence !== undefined && card.match_confidence !== null) {
+      const confNum = typeof card.match_confidence === 'number'
+        ? (card.match_confidence <= 1.0 ? Math.round(card.match_confidence * 100) : Math.round(card.match_confidence))
+        : parseInt(String(card.match_confidence).replace(/[^0-9]/g, ''), 10);
+      const isHigh = !isNaN(confNum) && confNum >= 85;
+      const confText = isHigh ? `%${confNum} CAD Doğrulandı` : `%${isNaN(confNum) ? 0 : confNum} Kontrol Et`;
+      const confColor = isHigh ? '#0284c7' : '#eab308';
+      confBadge = `<span class="card-confidence-badge" style="color:${confColor}; font-weight:700; font-size:9.5px; border:1px solid ${confColor}; padding:1px 5px; border-radius:3px; background:rgba(255,255,255,0.06);">${confText}</span>`;
+    }
+
+    let tolSourceBadge = '';
+    if (card.tolerance_source) {
+      const isGeneral = card.tolerance_source.toUpperCase().includes('ISO') || card.tolerance_source.toUpperCase().includes('GENERAL');
+      const tolSourceText = isGeneral ? 'Genel Tolerans' : 'Resim Toleransı';
+      const tolSourceColor = isGeneral ? '#a855f7' : '#64748b';
+      tolSourceBadge = `<span class="card-tol-source-badge" style="color:${tolSourceColor}; font-weight:700; font-size:9.5px; border:1px solid ${tolSourceColor}; padding:1px 5px; border-radius:3px; background:rgba(255,255,255,0.06);">${tolSourceText}</span>`;
+    }
+
     return `
       <div class="inspection-card${activeClass}${statusClass}" data-id="${card.id}" data-page="${card.page}">
         <div class="card-left-badge">
@@ -189,6 +210,8 @@ export class InspectionCardFormatter {
             <div class="card-header-badges">
               ${opBadge}
               ${critBadge}
+              ${confBadge}
+              ${tolSourceBadge}
               <span class="card-datum-badge">${card.datumReference}</span>
             </div>
           </div>

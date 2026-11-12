@@ -28,7 +28,10 @@ use ortho_kinematics::{
 use ortho_license::{
     AirGappedLicense, FeatureFlag, HardwareFingerprint, LicenseAuthority, LicenseError, LicenseTier,
 };
-use ortho_router::{CertifiedCollisionFreeTrajectory, ClearanceBox, CmmMachineProfile, MotionSegment};
+use ortho_router::{
+    optimize_cross_nest_pallet_inspection, AutonomousLoopConfig, AutonomousQualityOrchestrator,
+    CertifiedCollisionFreeTrajectory, ClearanceBox, CmmMachineProfile, MotionSegment, PalletGrid,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🌐 Nuper Ortho: Otonom CMM ve Metroloji Derleyicisi v0.1.0-alpha");
@@ -104,7 +107,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // 3. Air-Gapped Donanım Kilidi (Dongle) ve Lisans Alt Komutu (Adım 7.1)
+    if args.len() > 1 && args[1] == "pallet" {
+        println!("Palet CMM Dizilim Planlayicisi");
+        let grid = PalletGrid::new_grid(2, 3, DVec3::ZERO, 150.0, 120.0);
+        let cl_box = ClearanceBox::from_bounding_box(DVec3::ZERO, DVec3::new(100.0, 80.0, 40.0));
+        let traj = CertifiedCollisionFreeTrajectory::new(
+            vec![
+                MotionSegment::RapidLinear { target: DVec3::new(20.0, 20.0, 50.0) },
+                MotionSegment::TouchApproach { target: DVec3::new(20.0, 20.0, 10.0), normal: DVec3::Z },
+                MotionSegment::Retract { target: DVec3::new(20.0, 20.0, 50.0) },
+            ],
+            cl_box,
+            vec![],
+        );
+        let pallet_segments = optimize_cross_nest_pallet_inspection(&traj, &grid, 80.0)?;
+        println!("Palet Teftis Yorongesi Olusturuldu");
+        println!("Yuva Sayisi: {}", grid.slots.len());
+        println!("Segment Sayisi: {}", pallet_segments.len());
+        return Ok(());
+    }
+
+    if args.len() > 1 && (args[1] == "autonomous-loop" || args[1] == "loop") {
+        println!("Otonom Kapali Cevrim Kalite Dongusu");
+        let config = AutonomousLoopConfig {
+            target_cpk: 1.67,
+            max_iterations: 10,
+            tool_breakage_limit_mm: 0.100,
+            nominal: 20.000,
+            usl: 20.030,
+            lsl: 19.970,
+        };
+        let result = AutonomousQualityOrchestrator::run_autonomous_loop(&config, |part_idx, offset| {
+            config.nominal + 0.015 - (offset * 0.8) + ((part_idx as f64) * 0.0005)
+        });
+        println!("Otonom Dongu Tamamlandi");
+        println!("Yakinsema: {}", result.converged);
+        println!("Iterasyon: {}", result.total_iterations);
+        println!("Nihai Cpk: {:.2}", result.final_cpk);
+        return Ok(());
+    }
+
     if args.len() > 1 && args[1] == "license" {
         println!("🔑 Nuper Ortho Çevrimdışı (Air-Gapped) Savunma Lisans Denetimi");
         let hw = HardwareFingerprint::new(

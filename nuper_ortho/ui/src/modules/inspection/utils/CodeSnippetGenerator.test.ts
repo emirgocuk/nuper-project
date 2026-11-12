@@ -81,6 +81,8 @@ describe('CodeSnippetGenerator (Pure Utility)', () => {
     expect(snippets.threads).toContain('GEÇER MASTAR (GO Plug)');
     expect(snippets.ipp).toContain('StartSession()');
     expect(snippets.closed_loop).toContain('G10 L12');
+    expect(snippets.closed_loop).toContain('$TC_DP12');
+    expect(snippets.closed_loop).toContain('28.0°C');
     expect(snippets.uncertainty).toContain('ISO 15530-3');
     expect(snippets.alignment).toContain('PCS_321');
     expect(snippets.alignment).toContain('det(R) = 1.000000');

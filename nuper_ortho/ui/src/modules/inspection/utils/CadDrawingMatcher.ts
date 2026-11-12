@@ -88,6 +88,43 @@ const EPSILON = 0.15;
 const ENVELOPE_EPSILON = 1.2;
 const FEATURE_MATCH_TOLERANCE = 0.85;
 
+export function computeSpatialProximityScore(
+  dimRelPos?: number[],
+  dimViewName?: string,
+  featCenter?: [number, number, number],
+  cadBbox?: { min?: number[]; max?: number[] }
+): number {
+  if (!dimRelPos || dimRelPos.length < 2 || !featCenter || !cadBbox) {
+    return 8.0;
+  }
+  const bmin = cadBbox.min || [0.0, 0.0, 0.0];
+  const bmax = cadBbox.max || [100.0, 100.0, 100.0];
+  const xSpan = Math.max((bmax[0] || 0.0) - (bmin[0] || 0.0), 1e-6);
+  const ySpan = Math.max((bmax[1] || 0.0) - (bmin[1] || 0.0), 1e-6);
+  const zSpan = Math.max((bmax[2] || 0.0) - (bmin[2] || 0.0), 1e-6);
+
+  const view = String(dimViewName || '').toUpperCase();
+  let u3d = 0.0;
+  let v3d = 0.0;
+  if (view.includes('XZ') || view.includes('FRONT')) {
+    u3d = ((featCenter[0] || 0.0) - (bmin[0] || 0.0)) / xSpan;
+    v3d = ((featCenter[2] || 0.0) - (bmin[2] || 0.0)) / zSpan;
+  } else if (view.includes('YZ') || view.includes('SIDE')) {
+    u3d = ((featCenter[1] || 0.0) - (bmin[1] || 0.0)) / ySpan;
+    v3d = ((featCenter[2] || 0.0) - (bmin[2] || 0.0)) / zSpan;
+  } else {
+    u3d = ((featCenter[0] || 0.0) - (bmin[0] || 0.0)) / xSpan;
+    v3d = ((featCenter[1] || 0.0) - (bmin[1] || 0.0)) / ySpan;
+  }
+  u3d = Math.max(0.0, Math.min(1.0, u3d));
+  v3d = Math.max(0.0, Math.min(1.0, v3d));
+
+  const u2d = Number(dimRelPos[0]);
+  const v2d = Number(dimRelPos[1]);
+  const dist = Math.hypot(u3d - u2d, v3d - v2d);
+  return Math.max(0.0, 15.0 * (1.0 - dist / 1.4142));
+}
+
 export function matchCadWithDrawing(
   cad: CadMetadata,
   drawing: DrawingExtractionResult
@@ -142,7 +179,13 @@ export function matchCadWithDrawing(
           if (delta <= FEATURE_MATCH_TOLERANCE) {
             const deltaScore = delta <= 0.02 ? 40 : (delta <= 0.05 ? 35 : (delta <= 0.15 ? 25 : (delta <= 0.50 ? 15 : 5)));
             const typeScore = 20;
-            const score = deltaScore + typeScore + 25;
+            const proximityScore = computeSpatialProximityScore(
+              (dim as { rel_position?: number[] }).rel_position,
+              (dim as { view_name?: string }).view_name,
+              feat.center,
+              cadBbox
+            );
+            const score = deltaScore + typeScore + 10 + proximityScore;
             if (score > bestScore || (score === bestScore && delta < minDelta)) {
               bestScore = score;
               minDelta = delta;
@@ -271,7 +314,13 @@ export function matchCadWithDrawing(
               const featExt = feat as typeof feat & { axis?: 'X' | 'Y' | 'Z' };
               const axisScore = dimAxis && featExt.axis ? (dimAxis === featExt.axis ? 15 : 0) : 8;
               const countScore = explicitCount > 1 ? 15 : 10;
-              const score = deltaScore + typeScore + axisScore + countScore;
+              const proximityScore = computeSpatialProximityScore(
+                (dim as { rel_position?: number[] }).rel_position,
+                (dim as { view_name?: string }).view_name,
+                feat.center,
+                cadBbox
+              );
+              const score = deltaScore + typeScore + axisScore + countScore + proximityScore;
 
               if (score > bestScore || (score === bestScore && delta < minDelta)) {
                 bestScore = score;

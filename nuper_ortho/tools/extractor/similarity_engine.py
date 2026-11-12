@@ -167,3 +167,111 @@ class PartSetupDatabase:
 
     def close(self) -> None:
         self.conn.close()
+
+
+def find_similar_parts(
+    drawing_data: Dict[str, Any],
+    db_path: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    dims = drawing_data.get("dimensions", [])
+    dia_dims = [d for d in dims if d.get("type") in ("DIAMETER", "HOLE", "THREAD")]
+    hole_count = float(len(dia_dims))
+    cyl_ratio = hole_count / max(len(dims), 1)
+
+    max_dim = 100.0
+    for d in dims:
+        nom = float(d.get("nominal", 0.0))
+        if nom > max_dim:
+            max_dim = nom
+
+    summary = drawing_data.get("contract_summary", {})
+    min_tol = float(summary.get("min_tolerance_mm", 0.05))
+
+    geom = {
+        "bbox_x": max_dim,
+        "bbox_y": max_dim * 0.75,
+        "bbox_z": max_dim * 0.25,
+        "hole_count": hole_count,
+        "cylinder_ratio": cyl_ratio,
+        "min_tolerance": min_tol,
+        "surface_area": max_dim * max_dim * 2.5,
+    }
+    query_vec = extract_feature_vector(geom)
+
+    db = PartSetupDatabase(db_path)
+    cursor = db.conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM part_setups")
+    if cursor.fetchone()[0] == 0:
+        db.register_setup(
+            part_id="KPT_3051_GOBEK",
+            part_name="KPT - 3051 Göbek Bağı Oluğu",
+            vector=extract_feature_vector({
+                "bbox_x": 395.5,
+                "bbox_y": 305.2,
+                "bbox_z": 55.0,
+                "hole_count": 12.0,
+                "cylinder_ratio": 0.65,
+                "min_tolerance": 0.02,
+                "surface_area": 18500.0,
+            }),
+            op_fixtures={"op10": "V-Block + Pabuç", "op20": "Ayna Mandreni"},
+            ph10_angles=[(0.0, 0.0), (90.0, 45.0), (180.0, 0.0)],
+            strategy={
+                "recommended_setup_op10": "OP10 (A0B0) + OP20 (180°)",
+                "recommended_probe": "Ø3x50",
+            },
+        )
+        db.register_setup(
+            part_id="FLANGE_ADAPTER",
+            part_name="Flanş Adaptörü",
+            vector=extract_feature_vector({
+                "bbox_x": 120.0,
+                "bbox_y": 120.0,
+                "bbox_z": 40.0,
+                "hole_count": 6.0,
+                "cylinder_ratio": 0.50,
+                "min_tolerance": 0.05,
+                "surface_area": 4500.0,
+            }),
+            op_fixtures={"op10": "Manyetik Tabla"},
+            ph10_angles=[(0.0, 0.0)],
+            strategy={
+                "recommended_setup_op10": "OP10 (A0B0)",
+                "recommended_probe": "Ø2x20",
+            },
+        )
+        db.register_setup(
+            part_id="VALVE_BODY_OP10",
+            part_name="Valf Gövdesi (Valve Body)",
+            vector=extract_feature_vector({
+                "bbox_x": 150.0,
+                "bbox_y": 100.0,
+                "bbox_z": 80.0,
+                "hole_count": 8.0,
+                "cylinder_ratio": 0.40,
+                "min_tolerance": 0.03,
+                "surface_area": 7200.0,
+            }),
+            op_fixtures={"op10": "Modüler Pabuç Seti"},
+            ph10_angles=[(0.0, 0.0), (90.0, 0.0)],
+            strategy={
+                "recommended_setup_op10": "OP10 (A0B0) + OP20 (90°)",
+                "recommended_probe": "Ø3x40",
+            },
+        )
+
+    matches = db.query_similar(query_vec, min_similarity=0.60, top_k=3)
+    results = []
+    for m in matches:
+        strat = m.get("strategy", {})
+        results.append({
+            "part_id": m["part_id"],
+            "part_name": m["part_name"],
+            "similarity_score": round(m["similarity"], 4),
+            "recommended_setup_op10": strat.get("recommended_setup_op10", "OP10 (A0B0) + OP20 (180°)"),
+            "recommended_probe": strat.get("recommended_probe", "Ø3x50"),
+        })
+
+    db.close()
+    return results
+

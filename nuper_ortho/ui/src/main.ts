@@ -120,8 +120,22 @@ export class NuperApp {
           pageHeight: 595.28,
           confirmed: dim.status === 'PASS',
           feature_label: dim.nominal_str || (dim.nominal !== undefined && dim.nominal !== null ? `${dim.nominal}` : ''),
+          risk_level: dim.risk_level,
+          risk_reasons: dim.risk_reasons,
+          tolerance_source: dim.tolerance_source,
+          match_confidence: dim.match_confidence,
+          match_status: dim.match_status,
         }))
       );
+    }
+
+    if (data.similar_parts && data.similar_parts.length > 0 && typeof document !== 'undefined') {
+      const topPart = data.similar_parts[0];
+      const simPercent = Math.round((topPart.similarity_score || 0) * 100);
+      const hudDetails = document.getElementById('hud-feature-details');
+      if (hudDetails) {
+        hudDetails.innerText = `💡 Benzer Parça Eşleşmesi: ${topPart.part_name || topPart.part_id} (%${simPercent} Benzerlik) — Önerilen Kurulum: OP10 (${topPart.recommended_setup_op10 || 'A0B0'}) | Prob: ${topPart.recommended_probe || 'Ø3x50'}`;
+      }
     }
 
     this.setupWizard.setExtractedData(data);

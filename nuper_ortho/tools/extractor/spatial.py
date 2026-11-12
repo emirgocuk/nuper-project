@@ -459,3 +459,114 @@ def find_spatial_tolerances_near(
     elif lower is not None and upper is None:
         upper = "+0"
     return upper, lower
+
+
+def detect_orthographic_views(
+    drawings: List[Dict[str, Any]],
+    page_width: float,
+    page_height: float,
+    text_items: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    w_half = page_width * 0.5
+    h_half = page_height * 0.5
+
+    views = [
+        {
+            "name": "VIEW_TOP_XY",
+            "plane": "XY",
+            "bbox": [50.0, 50.0, round(w_half, 1), round(h_half, 1)],
+        },
+        {
+            "name": "VIEW_FRONT_XZ",
+            "plane": "XZ",
+            "bbox": [50.0, round(h_half, 1), round(w_half, 1), round(page_height - 50.0, 1)],
+        },
+        {
+            "name": "VIEW_SIDE_YZ",
+            "plane": "YZ",
+            "bbox": [round(w_half, 1), round(h_half, 1), round(page_width - 50.0, 1), round(page_height - 50.0, 1)],
+        },
+        {
+            "name": "VIEW_SECTION",
+            "plane": "XZ",
+            "bbox": [round(w_half, 1), 50.0, round(page_width - 50.0, 1), round(h_half, 1)],
+        },
+    ]
+
+    if text_items:
+        for it in text_items:
+            t = str(it.get("text", "")).upper()
+            b = it.get("bbox", [0, 0, 0, 0])
+            if any(k in t for k in ("KESIT", "KESİT", "SECTION", "A-A", "B-B")):
+                for v in views:
+                    if v["bbox"][0] <= b[0] <= v["bbox"][2] and v["bbox"][1] <= b[1] <= v["bbox"][3]:
+                        v["name"] = "VIEW_SECTION"
+
+    return views
+
+
+def assign_view_to_dimension(
+    dim_bbox: List[float],
+    views: List[Dict[str, Any]],
+    dim_type: str = "LINEAR",
+) -> Dict[str, Any]:
+    cx = (dim_bbox[0] + dim_bbox[2]) / 2.0
+    cy = (dim_bbox[1] + dim_bbox[3]) / 2.0
+
+    best_view = views[0] if views else {
+        "name": "VIEW_FRONT_XZ",
+        "plane": "XZ",
+        "bbox": [0.0, 0.0, 1000.0, 1000.0],
+    }
+    min_dist = float("inf")
+
+    for v in views:
+        vb = v["bbox"]
+        if vb[0] <= cx <= vb[2] and vb[1] <= cy <= vb[3]:
+            best_view = v
+            break
+        vx_c = (vb[0] + vb[2]) / 2.0
+        vy_c = (vb[1] + vb[3]) / 2.0
+        dist = ((cx - vx_c)**2 + (cy - vy_c)**2)**0.5
+        if dist < min_dist:
+            min_dist = dist
+            best_view = v
+
+    vb = best_view["bbox"]
+    span_x = max(vb[2] - vb[0], 1.0)
+    span_y = max(vb[3] - vb[1], 1.0)
+    rel_x = max(0.0, min(1.0, (cx - vb[0]) / span_x))
+    rel_y = max(0.0, min(1.0, (cy - vb[1]) / span_y))
+
+    clean_type = str(dim_type).upper()
+    if any(k in clean_type for k in ("DIAMETER", "HOLE", "RADIUS", "THREAD")):
+        inferred_axis = "RADIAL"
+    else:
+        bw = dim_bbox[2] - dim_bbox[0]
+        bh = dim_bbox[3] - dim_bbox[1]
+        if bw >= bh:
+            inferred_axis = "X" if best_view["plane"] in ("XY", "XZ") else "Y"
+        else:
+            inferred_axis = "Y" if best_view["plane"] == "XY" else "Z"
+
+    return {
+        "view_name": best_view["name"],
+        "inferred_axis": inferred_axis,
+        "rel_position": [round(rel_x, 4), round(rel_y, 4)],
+        "view_bbox": vb,
+    }
+
+
+def validate_scale_consistency(
+    nominal_val: float,
+    line_length: float,
+    page_scale: Optional[float] = None,
+) -> bool:
+    if nominal_val <= 0.0 or line_length <= 0.0:
+        return True
+    if page_scale is not None and page_scale > 0.0:
+        computed = line_length * page_scale
+        ratio = computed / nominal_val
+        return 0.4 <= ratio <= 2.5
+    return True
+

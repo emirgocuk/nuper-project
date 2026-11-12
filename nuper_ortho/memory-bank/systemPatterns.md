@@ -193,5 +193,33 @@ Detaylar için bakınız: [developmentInfrastructureRules.md](file:///d:/Project
 ### H. Kafa Açısı Değişiminde Güvenli Alan Retract Protokolü
 - PH10 kafa açısı değiştiğinde prob önce parçanın en yüksek noktasının üzerindeki güvenli tavan kotuna (`safeHeadIndexAltitude`) dikey olarak çıkar, dönüş hareketini açık alanda tamamlar ve kilitlendikten sonra hedef unsura iner.
 
+---
+
+## 8. Uçtan Uca Entegrasyon Mimarisi (7 Temel Entegrasyon Deseni)
+
+### A. Senkron Şema ve Tip Sözleşmesi (Schema-Driven Codegen)
+- Tüm veri modelleri tek kaynak olan `schemas/*.json` üzerinden tanımlanır.
+- `scripts/codegen.mjs` aracı Python `datamodel-codegen` ve TypeScript `json-schema-to-typescript` çalıştırarak modelleri üretir; kod dosyalarında sıfır yorum satırı garantisi korunur.
+
+### B. 8 Adımlı Bütünleşik Çıkarım Boru Hattı (`drawing_extractor.py`)
+- Antet (`title_block.py`), Vektör GD&T (`vector_extractor.py`), Ortografik Görünüş Adaları (`spatial.py`), Lider Ok Ucu İzleme (`trace_dimension_attachments`), Genel Tolerans (`tolerance.py`), 3D STEP AP242 PMI & B-Rep Topolojik Eşleştirici (`brep_verifier.py`), EDI AG Risk Kalkanı (`contract_guard.py`) ve Cosine Similarity Parça Kurulum Hafızası (`similarity_engine.py`) sıralı tek bir boru hattında birleştirilmiştir.
+
+### C. Uzamsal İzdüşüm ve 2D/3D Proximity Tie-Breaker
+- 2D PDF ok ucu normalize koordinatı $(u_{2d}, v_{2d})$ ile 3D STEP aday yüzey veya delik merkezinin ilgili ortografik projeksiyondaki normalize konumu $(u_{3d}, v_{3d})$ karşılaştırılarak çok kriterli topolojik skora `SpatialProximityScore` (+15 puan) eklenir. Böylece simetrik/eş nominal unsurlar hatasız çözülür.
+
+### D. Rust BRepGraph Topolojik Komşuluk ve Datum Zinciri
+- `crates/ortho-brep/src/graph.rs` yüzey komşuluk grafını oluşturur; FCF kutusunda Datum A veya Datum B taşıyan 2D ölçülerin, BRepGraph üzerinde Datum yüzeyine doğrudan komşu olan 3D aday yüzeylerine ek güven skoru (+0.15) aktarılır.
+- `ortho-router` içindeki `autonomous_loop` ve `pallet` modülleri CLI ve entegrasyon testlerine bağlanarak paletli CMM çoklu parça denetimi ve otonom yeniden ölçüm döngüsü sağlanır.
+
+### E. EDI AG Tolerans Isı Haritası ve UI Rozet Mimarisi
+- `DrawingCanvas.ts` içinde `resolveRiskTheme` fonksiyonu risk seviyesine göre CRITICAL (`#ef4444`), WARNING (`#f59e0b`), NORMAL (`#10b981`) haleleri dinamik olarak çizer.
+- `InspectionCardFormatter.ts` ve `InspectionTable.ts` üzerinde `%98 CAD Doğrulandı` ve `[Genel Tolerans]` / `[Resim Toleransı]` rozetleri sunulur.
+- `SetupWizard.ts` ve `main.ts` çıkarılan verideki `similar_parts` önerisini (`💡 Benzer Parça Eşleşmesi: [Parça Adı] (%98 Benzerlik)`) operatöre canlı tavsiye olarak gösterir.
+
+### F. Kapalı Devre CNC Aşınma Kompanzasyonu ve Diferansiyel Isıl Düzeltme
+- `crates/ortho-emitter/src/closed_loop.rs` içinde Siemens 840D için standart takım aşınma yarıçap parametresi `$TC_DP12` kullanılmıştır.
+- Ortam sıcaklığı sapmasından kaynaklanan ısıl genleşme ($\Delta L_{\text{thermal}} = L \cdot \alpha \cdot (T - 20.0)$) düşülerek net aşınma ofseti ($\Delta_{\text{net}} = \Delta_{\text{raw}} - \Delta L_{\text{thermal}}$) üzerinden Fanuc `G10 L12` ve Siemens `$TC_DP12` blokları üretilir.
+- `CodeSnippetGenerator.ts` arayüzde operatöre 28.0°C ortam sıcaklığı, termal genleşme payı ve net takım aşınma telafisini raporlar.
+
 
 

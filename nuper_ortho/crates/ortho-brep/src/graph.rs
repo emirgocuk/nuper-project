@@ -53,6 +53,8 @@ pub struct BRepGraphEngine {
     pub face_map: HashMap<u32, NodeIndex>,
 }
 
+pub type BRepGraph = BRepGraphEngine;
+
 impl Default for BRepGraphEngine {
     fn default() -> Self {
         Self::new()
@@ -65,6 +67,70 @@ impl BRepGraphEngine {
             graph: DiGraph::new(),
             face_map: HashMap::new(),
         }
+    }
+
+    pub fn from_surfaces(surfaces: &[FaceNode]) -> Self {
+        let mut engine = Self::new();
+        for s in surfaces {
+            engine.add_face(s.clone());
+        }
+        engine.build_relations();
+        engine
+    }
+
+    pub fn from_features(features: &[ortho_ast::GeometricFeature]) -> Self {
+        let mut engine = Self::new();
+        for feat in features {
+            let (stype, radius) = match feat.feature_type {
+                ortho_ast::FeatureType::InternalCylinder => ("Cylinder".to_string(), feat.diameter.map(|d| d / 2.0)),
+                ortho_ast::FeatureType::ExternalCylinder => ("Cylinder".to_string(), feat.diameter.map(|d| d / 2.0)),
+                ortho_ast::FeatureType::Plane => ("Plane".to_string(), None),
+                ortho_ast::FeatureType::Sphere => ("Sphere".to_string(), feat.diameter.map(|d| d / 2.0)),
+                ortho_ast::FeatureType::Torus => ("Torus".to_string(), feat.diameter.map(|d| d / 2.0)),
+                ortho_ast::FeatureType::Cone => ("Cone".to_string(), feat.diameter.map(|d| d / 2.0)),
+                ortho_ast::FeatureType::FreeformBSpline => ("Freeform".to_string(), None),
+            };
+            engine.add_face(FaceNode {
+                surface_id: feat.id,
+                surface_type: stype,
+                area: feat.area,
+                normal: Some(feat.normal_vector),
+                axis: feat.axis_vector.or(Some(feat.normal_vector)),
+                origin: Some(feat.centroid),
+                radius,
+                is_internal: feat.feature_type == ortho_ast::FeatureType::InternalCylinder,
+                z_min: feat.centroid.z - feat.depth_or_length.unwrap_or(0.0) / 2.0,
+                z_max: feat.centroid.z + feat.depth_or_length.unwrap_or(0.0) / 2.0,
+            });
+        }
+        engine.build_relations();
+        engine
+    }
+
+    pub fn are_faces_adjacent_or_related(&self, face_a_id: u32, face_b_id: u32) -> bool {
+        if face_a_id == face_b_id {
+            return true;
+        }
+        let idx_a = match self.face_map.get(&face_a_id) {
+            Some(&idx) => idx,
+            None => return false,
+        };
+        let idx_b = match self.face_map.get(&face_b_id) {
+            Some(&idx) => idx,
+            None => return false,
+        };
+
+        for edge in self.graph.edges_directed(idx_a, Direction::Outgoing) {
+            if edge.target() == idx_b {
+                return true;
+            }
+        }
+        for edge in self.graph.edges_directed(idx_a, Direction::Incoming) {
+            if edge.source() == idx_b {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn add_face(&mut self, face: FaceNode) -> NodeIndex {

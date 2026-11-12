@@ -145,14 +145,13 @@ BOSS_PIN_10, 10.000, 9.994, 10.000, 9.985
     assert!(fanuc_gcode.contains("G10 L12 P2 R-0.0030"), "Dış çap pim küçüldüğünde takım yarıçapı negatif kompanze edilmeli (-0.0030)");
     println!("  [OK] Fanuc Kapalı Döngü Aşınma G-Kodu Doğrulandı (G10 L12)");
 
-    // 2.2 Siemens Sinumerik 840D için R-Parametresi Üretimi
     let mut siemens_engine = ClosedLoopEngine::new(CncControllerType::SiemensSinumerik);
     siemens_engine.add_tool_mapping("PORT_A_CYL", 1, true, 0.050);
     siemens_engine.add_tool_mapping("BOSS_PIN_10", 2, false, 0.050);
 
     let siemens_code = siemens_engine.generate_compensation_program(&deviations).expect("Siemens kompanzasyonu üretilmeli");
-    assert!(siemens_code.contains("$TC_DP13[1, 1] = $TC_DP13[1, 1] + (-0.0060)"), "Siemens $TC_DP13 yarıçap aşınması doğru hesaplanmalı");
-    println!("  [OK] Siemens Sinumerik Kapalı Döngü Aşınma Kodu Doğrulandı ($TC_DP13)");
+    assert!(siemens_code.contains("$TC_DP12[1, 1] = $TC_DP12[1, 1] + (-0.0060)"), "Siemens $TC_DP12 yarıçap aşınması doğru hesaplanmalı");
+    println!("  [OK] Siemens Sinumerik Kapalı Döngü Aşınma Kodu Doğrulandı ($TC_DP12)");
 
     // 2.3 Takım Kırılma Emniyet Kilidi Testi (Fail-Safe)
     let catastrophic_csv = "\

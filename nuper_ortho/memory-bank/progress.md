@@ -37,15 +37,16 @@ drawing_data.schema.json hâlâ çıkarım öğesinde measured, deviation ve sta
 
 ## 4. Doğrulama kaydı
 
-Aşağıdaki sonuçlar 11 Kasım 2026 doğrulamasına aittir; tüm test paketleri çalıştırılmış ve %100 yeşil geçmiştir:
+Aşağıdaki sonuçlar 12 Kasım 2026 uçtan uca 7 entegrasyon görevi doğrulamasına aittir; tüm test paketleri çalıştırılmış ve %100 yeşil geçmiştir:
 
 | Kontrol | Sonuç | Kanıt sınırı |
 |---|---|---|
-| npm run check:types | Başarılı (0 hata) | TypeScript tür kontrolü |
-| npm run test:ui | 35 dosya / 199 test başarılı (%100 yeşil) | Vitest UI modül ve entegrasyon testleri |
-| python -m pytest tools/tests -q | 73 test başarılı (%100 yeşil) | Python test kapsamı |
-| cargo test --workspace | Başarılı (0 hata, tüm testler geçti) | 8 Rust crate'i, tüm birim/entegrasyon/doc testleri |
-| git status | Temiz (Working tree clean) | `origin/master` ile senkronize, son commit `9b7e48a` |
+| npm run codegen | Başarılı (0 hata) | JSON şemalarından Python Pydantic & TypeScript modelleri |
+| npm run check:types | Başarılı (0 hata) | TypeScript tür kontrolü (`tsc --noEmit`) |
+| npm run test:ui | 35 dosya / 200 test başarılı (%100 yeşil) | Vitest UI modül ve entegrasyon testleri |
+| npm run test:python | 63 passed, 10 skipped, 0 failed (%100 yeşil) | Pytest Python boru hattı ve çıkarıcı testleri |
+| npm run test:rust & cargo test | Başarılı (0 hata, tüm testler geçti) | Rust workspace (ortho-brep, ortho-emitter, ortho-router, ortho-cli) |
+| npm run build | Başarılı (206ms) | Vite production bundle |
 
 ## 5. Bağımlılık sırası ve görev boyutu
 

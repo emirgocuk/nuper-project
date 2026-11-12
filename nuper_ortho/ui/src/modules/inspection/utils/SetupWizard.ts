@@ -45,6 +45,14 @@ import { applyStepModelToScene } from '../../cad/utils/CadImportManager';
 import { CodeSnippetGenerator } from './CodeSnippetGenerator';
 import { InspectionCardFormatter } from './InspectionCardFormatter';
 
+export interface SimilarPartRecommendation {
+  part_id?: string;
+  part_name?: string;
+  similarity_score?: number;
+  recommended_setup_op10?: string;
+  recommended_probe?: string;
+}
+
 export interface SetupWizardOptions {
   onConfirm?: (dimensions: InspectionDimension[]) => void;
 }
@@ -100,6 +108,7 @@ export class SetupWizard {
   private activeMoveHandler: ((e: MouseEvent) => void) | null = null;
   private activeUpHandler: ((e: MouseEvent) => void) | null = null;
   private activeKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+  private similarParts: SimilarPartRecommendation[] = [];
 
   constructor(app?: unknown, options?: SetupWizardOptions) {
     this.appInstance = app || null;
@@ -816,6 +825,10 @@ export class SetupWizard {
       this.generalToleranceSpec = data.title_block.general_tolerance;
     }
 
+    if ((data as { similar_parts?: SimilarPartRecommendation[] }).similar_parts && Array.isArray((data as { similar_parts?: SimilarPartRecommendation[] }).similar_parts)) {
+      this.similarParts = (data as { similar_parts: SimilarPartRecommendation[] }).similar_parts;
+    }
+
     if (data.dimensions && data.dimensions.length > 0) {
       this.dimensions = data.dimensions.map((d) => {
         const tol = this.resolveDimTolerance(d);
@@ -1023,6 +1036,14 @@ export class SetupWizard {
             <span>🖱️ Tekerlek: <b>Zoom</b> | Sol tık sürükle: <b>Pan</b> | Sağ tık sürükle: <b>Balonu Taşı</b> | Çift tık: <b>Unsuru Düzenle</b> | Seç + <b>Del</b>: Sil</span>
           </div>
         </div>
+
+        ${
+          this.similarParts && this.similarParts.length > 0
+            ? `<div class="nuper-similar-parts-banner" style="background: #EFF6FF; border: 1px solid #93C5FD; border-radius: 6px; padding: 6px 14px; margin: 6px 16px; color: #1E40AF; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                <span>💡 Benzer Parça Eşleşmesi: <b>${this.similarParts[0].part_name || this.similarParts[0].part_id}</b> (%${Math.round((this.similarParts[0].similarity_score || 0) * 100)} Benzerlik) — Önerilen Kurulum: OP10 (${this.similarParts[0].recommended_setup_op10 || 'A0B0'}) | Prob: ${this.similarParts[0].recommended_probe || 'Ø3x50'}</span>
+               </div>`
+            : ''
+        }
 
         <div class="nuper-audit-body-container">
           <div class="nuper-audit-pages-sidebar">

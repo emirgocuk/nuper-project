@@ -21,6 +21,9 @@ export interface InspectionTableRow {
   selected?: boolean;
   op?: string;
   op_reason?: string;
+  match_confidence?: number;
+  tolerance_source?: string;
+  risk_level?: string;
 }
 
 export interface InspectionSummary {
@@ -70,6 +73,9 @@ export class InspectionTable {
         selected: dim.id === this.selectedId,
         op: dim.op,
         op_reason: dim.op_reason,
+        match_confidence: dim.match_confidence,
+        tolerance_source: dim.tolerance_source,
+        risk_level: dim.risk_level,
       };
     });
 
@@ -104,6 +110,8 @@ export class InspectionTable {
       selected: row.selected,
       op: row.op,
       op_reason: row.op_reason,
+      match_confidence: row.match_confidence,
+      tolerance_source: row.tolerance_source,
     }));
   }
 

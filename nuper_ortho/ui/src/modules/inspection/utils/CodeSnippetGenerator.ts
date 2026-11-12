@@ -301,7 +301,7 @@ export class CodeSnippetGenerator {
       `%`,
       `O9901 (NUPER ORTHO CLOSED-LOOP WEAR UPDATE)`,
       `(FANUC 0i/31i, SIEMENS 840D, HEIDENHAIN TNC640, HAAS)`,
-      `(PARCA: ${cleanPart} | ISO 1: 20°C REFERANS TERMAL KALKAN)`,
+      `(PARCA: ${cleanPart} | ORTAM SICAKLIGI: 28.0°C | ISO 1: 20.0°C REFERANS TERMAL KALKAN)`,
       `G90`,
     ];
 
@@ -314,9 +314,9 @@ export class CodeSnippetGenerator {
       const comp = compensateThermalExpansion(nom, rawDev, 'ALUMINUM', 28.0, 20.0);
 
       if (Math.abs(comp.netWearDeviationMm) > 0.0005) {
-        lines.push(`(T0${toolIdx} UNSUR ${d.balloon} | HAM SAPMA: ${comp.rawDeviationMm >= 0 ? '+' : ''}${comp.rawDeviationMm.toFixed(4)} mm | ISIL GENLESME PAYI (20°C ISO 1): ${comp.thermalExpansionMm >= 0 ? '+' : ''}${comp.thermalExpansionMm.toFixed(4)} mm | NET G10 TAKIM TELAFISI: ${comp.netWearOffsetMm.toFixed(4)} mm)`);
+        lines.push(`(T0${toolIdx} UNSUR ${d.balloon} | SICAKLIK: 28.0°C | HAM SAPMA: ${comp.rawDeviationMm >= 0 ? '+' : ''}${comp.rawDeviationMm.toFixed(4)} mm | TERMAL GENLESME: ${comp.thermalExpansionMm >= 0 ? '+' : ''}${comp.thermalExpansionMm.toFixed(4)} mm | NET TAKIM ASINMA TELAFISI: ${comp.netWearOffsetMm.toFixed(4)} mm)`);
         lines.push(`G10 L12 P${toolIdx} R${comp.netWearOffsetMm.toFixed(4)}`);
-        lines.push(`$TC_DP13[${toolIdx}, 1] = $TC_DP13[${toolIdx}, 1] + (${comp.netWearOffsetMm.toFixed(4)})`);
+        lines.push(`$TC_DP12[${toolIdx}, 1] = $TC_DP12[${toolIdx}, 1] + (${comp.netWearOffsetMm.toFixed(4)})`);
         lines.push(`TOOL CALL ${toolIdx} DR${comp.netWearOffsetMm.toFixed(4)}`);
         toolIdx++;
       }

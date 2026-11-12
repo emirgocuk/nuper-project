@@ -1,9 +1,3 @@
-/* eslint-disable */
-/**
- * Bu dosya schemas/drawing_data.schema.json üzerinden otomatik üretilmiştir.
- * ELLE DEĞİŞTİRMEYİN. 'npm run codegen' ile güncelleyin.
- */
-
 export interface DrawingExtractionResult {
   success: boolean;
   error?: string;
@@ -54,10 +48,7 @@ export interface DrawingExtractionResult {
     provenance?: {
       source_sha256?: string;
       page?: number;
-      /**
-       * @minItems 4
-       * @maxItems 4
-       */
+      
       bbox?: [number, number, number, number];
       method?: string;
       extractor_version?: string;
@@ -67,36 +58,45 @@ export interface DrawingExtractionResult {
     gdt?: string;
     op?: string;
     op_reason?: string;
+    risk_level?: "NORMAL" | "WARNING" | "CRITICAL";
+    risk_reasons?: string[];
+    tolerance_source?: string;
+    view_name?: string;
+    inferred_axis?: "X" | "Y" | "Z" | "RADIAL" | "UNKNOWN";
+    attachment_points?: number[][];
+    rel_position?: number[];
     match_confidence?: number;
-    match_status?: "VERIFIED_EXACT" | "VERIFIED_TOPOLOGY" | "NEEDS_REVIEW" | "UNMATCHED" | "ENGINEER_LOCKED";
-    inferred_axis?: "X" | "Y" | "Z";
+    match_status?:
+      "AP242_NATIVE_PMI" | "VERIFIED_EXACT" | "VERIFIED_TOPOLOGY" | "ENGINEER_LOCKED" | "NEEDS_REVIEW" | "UNMATCHED";
+    matched_face_ids?: number[];
     distance_type?: string;
-    /**
-     * @minItems 3
-     * @maxItems 3
-     */
+    
     faceA_center?: [number, number, number];
-    /**
-     * @minItems 3
-     * @maxItems 3
-     */
+    
     faceB_center?: [number, number, number];
-    /**
-     * @minItems 3
-     * @maxItems 3
-     */
+    
     faceA_normal?: [number, number, number];
-    /**
-     * @minItems 3
-     * @maxItems 3
-     */
+    
     faceB_normal?: [number, number, number];
-    /**
-     * @minItems 4
-     * @maxItems 4
-     */
+    
     bbox?: [number, number, number, number];
     [k: string]: unknown;
   }[];
+  similar_parts?: {
+    part_id?: string;
+    part_name?: string;
+    similarity_score?: number;
+    recommended_setup_op10?: string;
+    recommended_probe?: string;
+    [k: string]: unknown;
+  }[];
+  contract_summary?: {
+    critical_count?: number;
+    warning_count?: number;
+    min_tolerance_mm?: number;
+    requires_special_probing?: boolean;
+    [k: string]: unknown;
+  };
+  contract_warnings?: string[];
   [k: string]: unknown;
 }

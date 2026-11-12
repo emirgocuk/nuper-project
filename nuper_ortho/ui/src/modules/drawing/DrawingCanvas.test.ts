@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { DrawingCanvas, type BalloonItem } from './DrawingCanvas';
+import { DrawingCanvas, resolveRiskTheme, type BalloonItem } from './DrawingCanvas';
 import type { DrawingExtractionResult } from '../../types/generated/drawing_data';
 
 class SimpleMockElement {
@@ -103,7 +103,6 @@ describe('DrawingCanvas — Gerçek PDF Render ve Balon Koordinat Sabitleme', ()
     expect(fs.existsSync(pdfPath)).toBe(true);
 
     const controlsContainer = document.createElement('div') as unknown as HTMLElement;
-    // Mock page count for unit test of page controls
     (canvas as unknown as { totalPages: number }).totalPages = 3;
     canvas.mountPageControls(controlsContainer);
 
@@ -225,5 +224,22 @@ describe('DrawingCanvas — Gerçek PDF Render ve Balon Koordinat Sabitleme', ()
     expect(typeof canvas.promptAddFeature).toBe('function');
     expect(typeof canvas.promptEditFeature).toBe('function');
     expect(typeof canvas.removeBalloon).toBe('function');
+  });
+
+  it('5. resolveRiskTheme risk seviyesine gore dogru renk ve hale kodlarini cozer', () => {
+    const crit = resolveRiskTheme('CRITICAL');
+    expect(crit.stroke).toBe('#ef4444');
+    expect(crit.halo).toBe('rgba(239, 68, 68, 0.22)');
+
+    const warn = resolveRiskTheme('WARNING');
+    expect(warn.stroke).toBe('#f59e0b');
+    expect(warn.halo).toBe('rgba(245, 158, 11, 0.20)');
+
+    const norm = resolveRiskTheme('NORMAL');
+    expect(norm.stroke).toBe('#10b981');
+    expect(norm.halo).toBe('rgba(2, 132, 199, 0.22)');
+
+    const fallback = resolveRiskTheme(undefined);
+    expect(fallback.stroke).toBe('#10b981');
   });
 });

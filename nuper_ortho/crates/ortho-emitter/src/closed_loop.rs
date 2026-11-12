@@ -305,7 +305,7 @@ impl ClosedLoopEngine {
                             dev.feature_name, dev.deviation
                         ));
                         gcode.push_str(&format!(
-                            "$TC_DP13[{}, 1] = $TC_DP13[{}, 1] + ({:.4})\n",
+                            "$TC_DP12[{}, 1] = $TC_DP12[{}, 1] + ({:.4})\n",
                             mapping.tool_number, mapping.tool_number, wear_delta
                         ));
                     }
@@ -313,6 +313,129 @@ impl ClosedLoopEngine {
                         gcode.push_str(&format!(
                             "; UNSUR: {} | SAPMA: {:+.4} mm\n",
                             dev.feature_name, dev.deviation
+                        ));
+                        gcode.push_str(&format!(
+                            "TOOL CALL {} DR{:.4}\n",
+                            mapping.tool_number, wear_delta
+                        ));
+                    }
+                }
+                compensated_count += 1;
+            }
+        }
+
+        match self.controller_type {
+            CncControllerType::Fanuc | CncControllerType::Haas => gcode.push_str("M30\n%\n"),
+            CncControllerType::SiemensSinumerik => gcode.push_str("M30\n"),
+            CncControllerType::Heidenhain => gcode.push_str("END PGM WEAR_UPDATE MM\n"),
+        }
+
+        if compensated_count == 0 {
+            return Err(ClosedLoopError::ToolMappingNotFound(
+                "Raporlanan hiçbir unsur için tanımlı takım eşleşmesi bulunamadı".into(),
+            ));
+        }
+
+        Ok(gcode)
+    }
+
+    pub fn generate_compensation_program_with_thermal(
+        &self,
+        deviations: &[FeatureDeviation],
+        material: WorkpieceMaterial,
+        part_temp_c: f64,
+        cmm_temp_c: f64,
+    ) -> Result<String, ClosedLoopError> {
+        let mut gcode = String::new();
+
+        match self.controller_type {
+            CncControllerType::Fanuc => {
+                gcode.push_str("%\nO9901 (NUPER ORTHO CLOSED-LOOP WEAR UPDATE)\n");
+                gcode.push_str(&format!(
+                    "(FANUC 0i/31i TOOL WEAR COMPENSATION | TEMP: {:.1}C REF: 20.0C)\n",
+                    part_temp_c
+                ));
+            }
+            CncControllerType::SiemensSinumerik => {
+                gcode.push_str("; NUPER ORTHO CLOSED-LOOP WEAR UPDATE\n");
+                gcode.push_str(&format!(
+                    "; SIEMENS SINUMERIK 840D / ONE | TEMP: {:.1}C REF: 20.0C\n",
+                    part_temp_c
+                ));
+            }
+            CncControllerType::Heidenhain => {
+                gcode.push_str("BEGIN PGM WEAR_UPDATE MM\n");
+            }
+            CncControllerType::Haas => {
+                gcode.push_str("%\nO9901 (NUPER ORTHO HAAS WEAR UPDATE)\n");
+            }
+        }
+
+        let mut compensated_count = 0;
+
+        for dev in deviations {
+            if let Some(mapping) = self
+                .tool_mappings
+                .iter()
+                .find(|m| m.feature_name == dev.feature_name)
+            {
+                let (thermal_expansion, net_dev, _) = compensate_thermal_expansion(
+                    dev.nominal_value,
+                    dev.deviation,
+                    material,
+                    part_temp_c,
+                    cmm_temp_c,
+                );
+
+                let wear_delta = if mapping.is_internal_feature {
+                    -net_dev / 2.0
+                } else {
+                    net_dev / 2.0
+                };
+
+                if dev.deviation.abs() > mapping.max_safe_wear_limit_mm {
+                    return Err(ClosedLoopError::ToolBreakageDetected {
+                        tool_number: mapping.tool_number,
+                        deviation: dev.deviation,
+                        threshold: mapping.max_safe_wear_limit_mm,
+                    });
+                }
+
+                match self.controller_type {
+                    CncControllerType::Fanuc => {
+                        gcode.push_str(&format!(
+                            "(UNSUR: {} | HAM: {:+.4} mm | TERMAL: {:+.4} mm | NET: {:+.4} mm)\n",
+                            dev.feature_name, dev.deviation, thermal_expansion, net_dev
+                        ));
+                        gcode.push_str(&format!(
+                            "G10 L12 P{} R{:.4}\n",
+                            mapping.tool_number, wear_delta
+                        ));
+                    }
+                    CncControllerType::Haas => {
+                        gcode.push_str(&format!(
+                            "(UNSUR: {} | HAM: {:+.4} mm | TERMAL: {:+.4} mm | NET: {:+.4} mm)\n",
+                            dev.feature_name, dev.deviation, thermal_expansion, net_dev
+                        ));
+                        gcode.push_str(&format!(
+                            "G10 L12 P{} R{:.4}\n",
+                            mapping.tool_number, wear_delta
+                        ));
+                    }
+                    CncControllerType::SiemensSinumerik => {
+                        gcode.push_str(&format!(
+                            "; UNSUR: {} | HAM: {:+.4} mm | TERMAL: {:+.4} mm | NET: {:+.4} mm\n",
+                            dev.feature_name, dev.deviation, thermal_expansion, net_dev
+                        ));
+                        gcode.push_str(&format!(
+                            "$TC_DP12[{}, 1] = $TC_DP12[{}, 1] + ({:.4})\n",
+                            mapping.tool_number, mapping.tool_number, wear_delta
+                        ));
+                    }
+                    CncControllerType::Heidenhain => {
+                        gcode.push_str(&format!(
+                            "; UNSUR: {} | HAM: {:+.4} mm | TERMAL: {:+.4} mm | NET: {:+.4} mm\n",
+                            dev.feature_name, dev.deviation, thermal_expansion, net_dev
                         ));
                         gcode.push_str(&format!(
                             "TOOL CALL {} DR{:.4}\n",
@@ -361,7 +484,7 @@ impl ClosedLoopEngine {
                 tool_number, wear_delta
             )),
             CncControllerType::SiemensSinumerik => Some(format!(
-                "$TC_DP13[{}, 1] = $TC_DP13[{}, 1] + ({:.4})",
+                "$TC_DP12[{}, 1] = $TC_DP12[{}, 1] + ({:.4})",
                 tool_number, tool_number, wear_delta
             )),
             CncControllerType::Heidenhain => Some(format!(
@@ -476,7 +599,44 @@ PIN_10_M6, 10.0000, 9.9940, 10.0090, 9.9910
         )];
 
         let gcode = engine.generate_compensation_program(&devs).unwrap();
-        assert!(gcode.contains("$TC_DP13[5, 1] = $TC_DP13[5, 1] + (-0.0040)"));
+        assert!(gcode.contains("$TC_DP12[5, 1] = $TC_DP12[5, 1] + (-0.0040)"));
+    }
+
+    #[test]
+    fn test_closed_loop_thermal_compensation_siemens_and_fanuc() {
+        let mut fanuc = ClosedLoopEngine::new(CncControllerType::Fanuc);
+        fanuc.add_tool_mapping("BORE_20_H7", 3, true, 0.100);
+
+        let mut siemens = ClosedLoopEngine::new(CncControllerType::SiemensSinumerik);
+        siemens.add_tool_mapping("BORE_20_H7", 3, true, 0.100);
+
+        let devs = vec![FeatureDeviation::new(
+            "BORE_20_H7",
+            20.0000,
+            20.0200,
+            20.0210,
+            20.0000,
+        )];
+
+        let fanuc_gcode = fanuc
+            .generate_compensation_program_with_thermal(
+                &devs,
+                WorkpieceMaterial::Aluminum,
+                28.0,
+                20.0,
+            )
+            .unwrap();
+        assert!(fanuc_gcode.contains("G10 L12 P3"));
+
+        let siemens_gcode = siemens
+            .generate_compensation_program_with_thermal(
+                &devs,
+                WorkpieceMaterial::Aluminum,
+                28.0,
+                20.0,
+            )
+            .unwrap();
+        assert!(siemens_gcode.contains("$TC_DP12[3, 1] = $TC_DP12[3, 1] +"));
     }
 
     #[test]

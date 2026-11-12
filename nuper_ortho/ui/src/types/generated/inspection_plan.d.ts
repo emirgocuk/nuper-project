@@ -1,9 +1,3 @@
-/* eslint-disable */
-/**
- * Bu dosya schemas/inspection_plan.schema.json üzerinden otomatik üretilmiştir.
- * ELLE DEĞİŞTİRMEYİN. 'npm run codegen' ile güncelleyin.
- */
-
 export interface InspectionPlanPayload {
   plan_id: string;
   created_at?: string;

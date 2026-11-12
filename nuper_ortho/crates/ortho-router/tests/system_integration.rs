@@ -153,3 +153,44 @@ fn test_end_to_end_inspection_pipeline() {
     assert_eq!(fai_pkg.failed_characteristics, 0);
     assert!(AntiTamperAuthority::verify_as9102_package(&fai_pkg, secret_key));
 }
+
+#[test]
+fn test_pallet_inspection_dispatch() {
+    let grid = ortho_router::PalletGrid::new_grid(2, 2, DVec3::ZERO, 100.0, 100.0);
+    assert_eq!(grid.slots.len(), 4);
+
+    let cl_box = ClearanceBox::from_bounding_box(DVec3::ZERO, DVec3::new(50.0, 50.0, 30.0));
+    let base_traj = CertifiedCollisionFreeTrajectory::new(
+        vec![
+            MotionSegment::RapidLinear { target: DVec3::new(10.0, 10.0, 40.0) },
+            MotionSegment::TouchApproach { target: DVec3::new(10.0, 10.0, 10.0), normal: DVec3::Z },
+            MotionSegment::Retract { target: DVec3::new(10.0, 10.0, 40.0) },
+        ],
+        cl_box,
+        vec![],
+    );
+
+    let pallet_segments = ortho_router::optimize_cross_nest_pallet_inspection(&base_traj, &grid, 80.0)
+        .expect("Pallet inspection generation failed");
+    assert!(!pallet_segments.is_empty());
+}
+
+#[test]
+fn test_autonomous_closed_loop_orchestration() {
+    let config = ortho_router::AutonomousLoopConfig {
+        target_cpk: 1.5,
+        max_iterations: 8,
+        tool_breakage_limit_mm: 0.100,
+        nominal: 25.000,
+        usl: 25.025,
+        lsl: 24.975,
+    };
+
+    let result = ortho_router::AutonomousQualityOrchestrator::run_autonomous_loop(&config, |_part_idx, offset| {
+        config.nominal + 0.010 + offset
+    });
+
+    assert!(!result.safety_aborted);
+    assert!(result.total_iterations <= config.max_iterations);
+    assert!(!result.records.is_empty());
+}

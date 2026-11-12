@@ -2,7 +2,6 @@ import os
 import sys
 import pytest
 
-# Add parent directory to sys.path so tools and models are importable
 current_dir = os.path.dirname(os.path.abspath(__file__))
 tools_dir = os.path.dirname(current_dir)
 root_dir = os.path.dirname(tools_dir)
@@ -43,11 +42,21 @@ def test_drawing_extractor_basic_metrology():
     assert 15.45 in nominals
     assert 2.5 in nominals
 
+    assert "contract_summary" in data
+    assert data["contract_summary"]["critical_count"] >= 0
+    assert "similar_parts" in data
+    assert isinstance(data["similar_parts"], list)
+
+    for d in data["dimensions"]:
+        assert "risk_level" in d
+        assert d["risk_level"] in ("NORMAL", "WARNING", "CRITICAL")
+        assert "view_name" in d
+        assert "inferred_axis" in d
+
     validated = DrawingExtractionResult.model_validate(data)
     assert validated.success is True
     assert len(validated.dimensions) > 0
 
-    # Y2 & Invariant: Drawing parser must emit UNMEASURED, no fake measurements
     for dim in validated.dimensions:
         assert dim.status.value == "UNMEASURED"
         assert dim.measured == ""
@@ -55,7 +64,6 @@ def test_drawing_extractor_basic_metrology():
 
 
 def test_drawing_extractor_empty_text_zero_fabrication():
-    """Invariant: Boş input -> sıfır fabricated characteristic."""
     data = parse_text_to_metrology("", 0, "empty.pdf")
     validated = DrawingExtractionResult.model_validate(data)
     assert validated.success is True
@@ -68,7 +76,6 @@ def test_drawing_extractor_empty_text_zero_fabrication():
 
 
 def test_filename_cannot_alter_behavior():
-    """Invariant Y4: Dosya adı davranışı değiştiremez. 'gobek' veya '3051' sahte veri tetikleyemez."""
     data = parse_text_to_metrology("", 0, "KPT_3051_gobek_bagi_olugu.pdf", "path/to/3051_gobek.pdf")
     validated = DrawingExtractionResult.model_validate(data)
     assert validated.success is True
@@ -78,7 +85,6 @@ def test_filename_cannot_alter_behavior():
 
 
 def test_gobek_bagi_olugu_real_extraction():
-    """Gerçek PDF dosyasından uydurmasız, deterministik ayıklama."""
     data = extract_from_pdf("test_assets/GOBEK_BAGI_OLUGU_TR_AB.pdf")
     assert data["success"] is True
     assert data["page_count"] == 3
@@ -86,16 +92,18 @@ def test_gobek_bagi_olugu_real_extraction():
     dims = data["dimensions"]
     assert len(dims) > 0
 
-    # Tüm ayıklanan ölçüler UNMEASURED olmalı, sentetik PASS veya measured içermemeli
+    assert "contract_summary" in data
+    assert "similar_parts" in data
+    assert len(data["similar_parts"]) > 0
+
     for d in dims:
         assert d["status"] == "UNMEASURED"
         assert d["measured"] == ""
         assert d["deviation"] == ""
+        assert "risk_level" in d
+        assert "view_name" in d
+        assert "inferred_axis" in d
 
-    # Pydantic şema doğrulaması
     validated = DrawingExtractionResult.model_validate(data)
     assert validated.success is True
     assert len(validated.dimensions) == len(dims)
-
-
-

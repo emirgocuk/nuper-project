@@ -1015,6 +1015,92 @@ def parse_step_file(step_path: str) -> Dict[str, Any]:
     }
 
 
+def compute_topological_match_score(
+    dim: Dict[str, Any],
+    candidate_feature: Dict[str, Any],
+    step_bbox: Dict[str, Any],
+    view_name: Optional[str] = None,
+) -> float:
+    dim_nom = float(dim.get("nominal", 0.0))
+    cand_nom = float(candidate_feature.get("nominal", candidate_feature.get("diameter", candidate_feature.get("radius", candidate_feature.get("value", 0.0)))))
+    delta = abs(dim_nom - cand_nom)
+
+    if delta <= 0.02:
+        score_nom = 40.0
+    elif delta <= 0.05:
+        score_nom = 35.0
+    elif delta <= 0.15:
+        score_nom = 25.0
+    elif delta <= 0.50:
+        score_nom = 15.0
+    elif delta <= 1.0:
+        score_nom = 5.0
+    else:
+        score_nom = 0.0
+
+    d_type = str(dim.get("type", "LINEAR")).upper()
+    c_type = str(candidate_feature.get("type", "")).upper()
+    if d_type in ("DIAMETER", "HOLE") and ("CYLINDER" in c_type or "CIRCLE" in c_type):
+        score_type = 20.0
+    elif d_type == "RADIUS" and ("TOROID" in c_type or "RADIUS" in c_type or "FILLET" in c_type):
+        score_type = 20.0
+    elif d_type in ("LINEAR", "CHAMFER") and ("PLANE" in c_type or "SPAN" in c_type or "DISTANCE" in c_type):
+        score_type = 20.0
+    elif d_type == "THREAD" and ("CYLINDER" in c_type or "THREAD" in c_type):
+        score_type = 20.0
+    else:
+        score_type = 10.0
+
+    score_axis = 10.0
+    dim_axis = dim.get("inferred_axis")
+    cand_axis = candidate_feature.get("axis")
+    if dim_axis and cand_axis and isinstance(cand_axis, (list, tuple)) and len(cand_axis) == 3:
+        if dim_axis == "X" and abs(cand_axis[0]) > 0.8:
+            score_axis = 15.0
+        elif dim_axis == "Y" and abs(cand_axis[1]) > 0.8:
+            score_axis = 15.0
+        elif dim_axis == "Z" and abs(cand_axis[2]) > 0.8:
+            score_axis = 15.0
+
+    score_datum = 5.0
+    if dim.get("datum_reference"):
+        score_datum = 10.0
+
+    b_min = step_bbox.get("min", [0.0, 0.0, 0.0])
+    b_max = step_bbox.get("max", [100.0, 100.0, 100.0])
+    center = candidate_feature.get("center", candidate_feature.get("origin", [0.0, 0.0, 0.0]))
+    if not isinstance(center, (list, tuple)) or len(center) != 3:
+        center = [0.0, 0.0, 0.0]
+
+    cx, cy, cz = center[0], center[1], center[2]
+    xmin, ymin, zmin = b_min[0], b_min[1], b_min[2]
+    xmax, ymax, zmax = b_max[0], b_max[1], b_max[2]
+
+    v_clean = str(view_name or dim.get("view_name", "VIEW_FRONT_XZ")).upper()
+    if "XZ" in v_clean or "FRONT" in v_clean:
+        u_3d = (cx - xmin) / max(xmax - xmin, 1e-6)
+        v_3d = (cz - zmin) / max(zmax - zmin, 1e-6)
+    elif "YZ" in v_clean or "SIDE" in v_clean:
+        u_3d = (cy - ymin) / max(ymax - ymin, 1e-6)
+        v_3d = (cz - zmin) / max(zmax - zmin, 1e-6)
+    else:
+        u_3d = (cx - xmin) / max(xmax - xmin, 1e-6)
+        v_3d = (cy - ymin) / max(ymax - ymin, 1e-6)
+
+    u_3d = max(0.0, min(1.0, u_3d))
+    v_3d = max(0.0, min(1.0, v_3d))
+
+    score_proximity = 8.0
+    rel_pos = dim.get("rel_position")
+    if rel_pos and len(rel_pos) >= 2:
+        u_2d, v_2d = float(rel_pos[0]), float(rel_pos[1])
+        dist = math.sqrt((u_3d - u_2d)**2 + (v_3d - v_2d)**2)
+        score_proximity = max(0.0, 15.0 * (1.0 - dist / 1.4142))
+
+    total = score_nom + score_type + score_axis + score_datum + score_proximity
+    return round(min(100.0, max(0.0, total)), 2)
+
+
 def verify_dimensions_against_step(
     dimensions: List[Dict[str, Any]],
     step_data: Dict[str, Any],
@@ -1032,7 +1118,8 @@ def verify_dimensions_against_step(
     step_circles = step_data.get("circles", [])
     step_linear = step_data.get("linear_distances", [])
     step_rot_dia = step_data.get("rotational_diameters", [])
-    step_bbox_sizes = step_data.get("bbox", {}).get("size", [0.0, 0.0, 0.0])
+    step_bbox = step_data.get("bbox", {})
+    step_bbox_sizes = step_bbox.get("size", [0.0, 0.0, 0.0])
     max_box = max(step_bbox_sizes) if step_bbox_sizes else 0.0
 
     verified_dimensions = []
@@ -1057,75 +1144,148 @@ def verify_dimensions_against_step(
             })
             continue
 
-        matched_feature: Optional[Dict[str, Any]] = None
+        candidate_features: List[Dict[str, Any]] = []
 
         if d_type in ("DIAMETER", "HOLE", "THREAD") or "ø" in dim_str:
             for c in step_cylinders:
                 if abs(c["diameter"] - nom) <= tol_dia:
-                    matched_feature = {"type": "CYLINDER", "diameter": c["diameter"], "id": c["id"]}
-                    break
-            if not matched_feature:
-                for circ in step_circles:
-                    if abs(circ["diameter"] - nom) <= tol_dia:
-                        matched_feature = {"type": "CIRCLE_EDGE", "diameter": circ["diameter"], "id": circ["id"]}
-                        break
-            if not matched_feature and d_type == "DIAMETER":
+                    candidate_features.append({
+                        "type": "CYLINDER",
+                        "diameter": c["diameter"],
+                        "nominal": c["diameter"],
+                        "id": c["id"],
+                        "center": c.get("center", [0.0, 0.0, 0.0]),
+                        "axis": c.get("axis", [0.0, 0.0, 1.0]),
+                    })
+            for circ in step_circles:
+                if abs(circ["diameter"] - nom) <= tol_dia:
+                    candidate_features.append({
+                        "type": "CIRCLE_EDGE",
+                        "diameter": circ["diameter"],
+                        "nominal": circ["diameter"],
+                        "id": circ["id"],
+                        "center": circ.get("center", [0.0, 0.0, 0.0]),
+                        "axis": circ.get("axis", [0.0, 0.0, 1.0]),
+                    })
+            if d_type == "DIAMETER":
                 for cone in step_cones:
                     cone_d = cone["radius"] * 2.0
                     if abs(cone_d - nom) <= tol_dia:
-                        matched_feature = {"type": "CONE_BASE", "diameter": cone_d, "id": cone["id"]}
-                        break
-                if not matched_feature:
-                    for rd in step_rot_dia:
-                        if abs(rd - nom) <= tol_dia:
-                            matched_feature = {"type": "ROTATIONAL_PROFILE_DIAMETER", "diameter": rd}
-                            break
+                        candidate_features.append({
+                            "type": "CONE_BASE",
+                            "diameter": cone_d,
+                            "nominal": cone_d,
+                            "id": cone["id"],
+                            "center": cone.get("placement", {}).get("origin", [0.0, 0.0, 0.0]),
+                            "axis": cone.get("placement", {}).get("axis", [0.0, 0.0, 1.0]),
+                        })
+                for rd in step_rot_dia:
+                    if abs(rd - nom) <= tol_dia:
+                        candidate_features.append({
+                            "type": "ROTATIONAL_PROFILE_DIAMETER",
+                            "diameter": rd,
+                            "nominal": rd,
+                            "id": 0,
+                            "center": [0.0, 0.0, 0.0],
+                            "axis": [0.0, 0.0, 1.0],
+                        })
 
-        if not matched_feature and (d_type == "RADIUS" or "r" in dim_str):
+        if d_type == "RADIUS" or "r" in dim_str:
             for t in step_toroids:
                 if abs(t["minor_radius"] - nom) <= tol_dia:
-                    matched_feature = {"type": "TOROID_FILLET", "radius": t["minor_radius"], "id": t["id"]}
-                    break
-            if not matched_feature:
-                for c in step_cylinders:
-                    if abs(c["radius"] - nom) <= tol_dia:
-                        matched_feature = {"type": "CYLINDER_RADIUS", "radius": c["radius"], "id": c["id"]}
-                        break
-            if not matched_feature:
-                for circ in step_circles:
-                    if abs(circ["radius"] - nom) <= tol_dia:
-                        matched_feature = {"type": "CIRCLE_RADIUS", "radius": circ["radius"], "id": circ["id"]}
-                        break
+                    candidate_features.append({
+                        "type": "TOROID_FILLET",
+                        "radius": t["minor_radius"],
+                        "nominal": t["minor_radius"],
+                        "id": t["id"],
+                        "center": t.get("origin", [0.0, 0.0, 0.0]),
+                        "axis": t.get("axis", [0.0, 0.0, 1.0]),
+                    })
+            for c in step_cylinders:
+                if abs(c["radius"] - nom) <= tol_dia:
+                    candidate_features.append({
+                        "type": "CYLINDER_RADIUS",
+                        "radius": c["radius"],
+                        "nominal": c["radius"],
+                        "id": c["id"],
+                        "center": c.get("center", [0.0, 0.0, 0.0]),
+                        "axis": c.get("axis", [0.0, 0.0, 1.0]),
+                    })
+            for circ in step_circles:
+                if abs(circ["radius"] - nom) <= tol_dia:
+                    candidate_features.append({
+                        "type": "CIRCLE_RADIUS",
+                        "radius": circ["radius"],
+                        "nominal": circ["radius"],
+                        "id": circ["id"],
+                        "center": circ.get("center", [0.0, 0.0, 0.0]),
+                        "axis": circ.get("axis", [0.0, 0.0, 1.0]),
+                    })
 
-        if not matched_feature and d_type == "CHAMFER":
+        if d_type == "CHAMFER":
             for cone in step_cones:
                 if abs(cone["angle_deg"] - 45.0) <= tol_angle or abs(cone["angle_deg"] - 90.0) <= tol_angle:
-                    matched_feature = {"type": "CHAMFER_CONE", "angle": cone["angle_deg"], "id": cone["id"]}
-                    break
-            if not matched_feature:
-                for ld in step_linear:
-                    if abs(ld["value"] - nom) <= tol_linear:
-                        matched_feature = {"type": "CHAMFER_SPAN", "value": ld["value"]}
-                        break
-
-        if not matched_feature and d_type in ("LINEAR", "THREAD", "CUSTOM"):
+                    candidate_features.append({
+                        "type": "CHAMFER_CONE",
+                        "angle": cone["angle_deg"],
+                        "nominal": nom,
+                        "id": cone["id"],
+                        "center": cone.get("placement", {}).get("origin", [0.0, 0.0, 0.0]),
+                        "axis": cone.get("placement", {}).get("axis", [0.0, 0.0, 1.0]),
+                    })
             for ld in step_linear:
                 if abs(ld["value"] - nom) <= tol_linear:
-                    matched_feature = {"type": ld["type"], "matched_value": ld["value"]}
-                    break
+                    candidate_features.append({
+                        "type": "CHAMFER_SPAN",
+                        "value": ld["value"],
+                        "nominal": ld["value"],
+                        "id": 0,
+                        "center": [0.0, 0.0, 0.0],
+                        "axis": ld.get("axis", [0.0, 0.0, 1.0]),
+                    })
+
+        if d_type in ("LINEAR", "THREAD", "CUSTOM"):
+            for ld in step_linear:
+                if abs(ld["value"] - nom) <= tol_linear:
+                    candidate_features.append({
+                        "type": ld["type"],
+                        "value": ld["value"],
+                        "nominal": ld["value"],
+                        "id": 0,
+                        "center": [0.0, 0.0, 0.0],
+                        "axis": ld.get("axis", [0.0, 0.0, 1.0]),
+                    })
+
+        matched_feature: Optional[Dict[str, Any]] = None
+        best_score = 0.0
+
+        if candidate_features:
+            for feat in candidate_features:
+                score = compute_topological_match_score(dim, feat, step_bbox, dim.get("view_name"))
+                if score > best_score:
+                    best_score = score
+                    matched_feature = feat
 
         if matched_feature:
             dim["verification"] = "CAD_VERIFIED"
             dim["status"] = "UNMEASURED"
             dim["cad_match"] = matched_feature
+            dim["match_confidence"] = best_score
+            dim["match_status"] = "VERIFIED_EXACT" if best_score >= 85.0 else ("VERIFIED_TOPOLOGY" if best_score >= 70.0 else "NEEDS_REVIEW")
+            fid = matched_feature.get("id")
+            if isinstance(fid, int) and fid > 0:
+                dim["matched_face_ids"] = [fid]
             verified_dimensions.append(dim)
         else:
             dim["verification"] = "PARSED"
             dim["status"] = "UNMEASURED"
             dim["cad_match"] = None
+            dim["match_confidence"] = 0.0
+            dim["match_status"] = "UNMATCHED"
             verified_dimensions.append(dim)
 
     return verified_dimensions, pruned_dimensions
+
 
 
 def extract_cad_metadata(step_path: str) -> Dict[str, Any]:

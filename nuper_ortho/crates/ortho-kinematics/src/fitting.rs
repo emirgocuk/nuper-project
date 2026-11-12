@@ -1184,7 +1184,7 @@ mod tests {
 
     #[test]
     fn test_outlier_rejection_burr_filtering() {
-        let mut points = vec![
+        let points = vec![
             DVec3::new(0.0, 0.0, 0.001),
             DVec3::new(10.0, 0.0, -0.001),
             DVec3::new(10.0, 10.0, 0.002),

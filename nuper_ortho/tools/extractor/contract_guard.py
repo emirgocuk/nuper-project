@@ -98,3 +98,102 @@ def validate_contract(
                         )
 
     return len(errors) == 0, errors
+
+
+def classify_dimension_risk(dim: Dict[str, Any]) -> Tuple[str, List[str]]:
+    reasons = []
+    upper_str = str(dim.get("upper_tol", "")).strip()
+    lower_str = str(dim.get("lower_tol", "")).strip()
+    nom_str = str(dim.get("nominal_str", "")).strip()
+    gdt_str = str(dim.get("gdt", "")).strip()
+
+    span = None
+    try:
+        u_val = float(upper_str)
+        l_val = float(lower_str)
+        span = abs(u_val - l_val)
+    except (ValueError, TypeError):
+        if "±" in nom_str or "+/-" in nom_str:
+            import re
+            m = re.search(r"[±\+]\s*([0-9\.]+)", nom_str)
+            if m:
+                span = float(m.group(1)) * 2.0
+
+    is_mmc = "Ⓜ" in gdt_str or "(M)" in gdt_str or "|M|" in gdt_str or "MMC" in gdt_str
+    is_tight_gdt = any(sym in gdt_str for sym in ("⌖", "⌒", "PROFILE", "POSITION", "CONCENTRICITY", "RUNOUT"))
+    is_fit = any(fit in nom_str.upper() for fit in ("H7", "H6", "G6", "H8", "P7", "N7", "JS7", "M6"))
+
+    if span is not None and span <= 0.025:
+        reasons.append(f"Tolerans aralığı kritik derecede dar: {span:.4f} mm <= 0.025 mm")
+        return "CRITICAL", reasons
+
+    if is_mmc:
+        reasons.append("Malzeme Durumu Değiştiricisi (MMC) içeriyor")
+        return "CRITICAL", reasons
+
+    if is_tight_gdt:
+        reasons.append("Hassas Geometrik Boyutlandırma ve Toleranslandırma (GD&T)")
+        return "CRITICAL", reasons
+
+    if (span is not None and span <= 0.080) or is_fit:
+        if is_fit:
+            reasons.append("ISO Geçme / Alıştırma Toleransı tanımlı")
+        if span is not None and span <= 0.080:
+            reasons.append(f"Tolerans aralığı dar: {span:.4f} mm <= 0.080 mm")
+        return "WARNING", reasons
+
+    return "NORMAL", reasons
+
+
+def generate_contract_summary(dimensions: List[Dict[str, Any]]) -> Dict[str, Any]:
+    critical_count = 0
+    warning_count = 0
+    min_tol = 999.0
+
+    for d in dimensions:
+        lvl = d.get("risk_level", "NORMAL")
+        if lvl == "CRITICAL":
+            critical_count += 1
+        elif lvl == "WARNING":
+            warning_count += 1
+
+        try:
+            u = float(d.get("upper_tol", 0.0))
+            l = float(d.get("lower_tol", 0.0))
+            diff = abs(u - l)
+            if 0.0 < diff < min_tol:
+                min_tol = diff
+        except Exception:
+            pass
+
+    min_tol_val = round(min_tol, 4) if min_tol < 900.0 else 0.05
+    requires_special = critical_count > 0 or min_tol_val <= 0.025
+
+    return {
+        "critical_count": critical_count,
+        "warning_count": warning_count,
+        "min_tolerance_mm": min_tol_val,
+        "requires_special_probing": requires_special,
+    }
+
+
+def apply_contract_guard(
+    drawing_data: Dict[str, Any],
+    schema_path: Optional[str | Path] = None,
+) -> Dict[str, Any]:
+    dimensions = drawing_data.get("dimensions", [])
+    for dim in dimensions:
+        level, reasons = classify_dimension_risk(dim)
+        dim["risk_level"] = level
+        dim["risk_reasons"] = reasons
+
+    summary = generate_contract_summary(dimensions)
+    drawing_data["contract_summary"] = summary
+
+    if schema_path and Path(schema_path).exists():
+        valid, errors = validate_contract(drawing_data, schema_path)
+        if not valid:
+            drawing_data["contract_warnings"] = errors
+
+    return drawing_data
+

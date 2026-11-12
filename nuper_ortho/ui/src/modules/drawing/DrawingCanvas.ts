@@ -27,6 +27,23 @@ import {
   type Point,
 } from './utils/LightTableControls';
 
+export interface RiskTheme {
+  stroke: string;
+  fill: string;
+  halo: string;
+}
+
+export function resolveRiskTheme(riskLevel?: string): RiskTheme {
+  const norm = String(riskLevel || 'NORMAL').toUpperCase();
+  if (norm === 'CRITICAL') {
+    return { stroke: '#ef4444', fill: 'rgba(239, 68, 68, 0.14)', halo: 'rgba(239, 68, 68, 0.22)' };
+  }
+  if (norm === 'WARNING') {
+    return { stroke: '#f59e0b', fill: 'rgba(245, 158, 11, 0.12)', halo: 'rgba(245, 158, 11, 0.20)' };
+  }
+  return { stroke: '#10b981', fill: 'rgba(16, 185, 129, 0.12)', halo: 'rgba(2, 132, 199, 0.22)' };
+}
+
 export interface BalloonItem {
   id: string | number;
   page?: number;
@@ -36,6 +53,11 @@ export interface BalloonItem {
   pageHeight?: number;
   confirmed?: boolean;
   feature_label?: string;
+  risk_level?: 'NORMAL' | 'WARNING' | 'CRITICAL' | string;
+  risk_reasons?: string[];
+  tolerance_source?: string;
+  match_confidence?: number;
+  match_status?: string;
 }
 
 export const DEFAULT_GOBEK_BALLOONS: BalloonItem[] = [
@@ -157,10 +179,6 @@ function resolvePdfPath(targetPath: string): string {
   return targetPath;
 }
 
-/**
- * Nuper Ortho — Modüler 2D Teknik Resim Kanvası ve Balonlama Motoru
- * PDF 1:1 render, sayfa geçişleri [Sayfa 1] [Sayfa 2] [Sayfa 3] ve bbox tabanlı balon sabitleme.
- */
 export class DrawingCanvas {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
@@ -918,36 +936,42 @@ export class DrawingCanvas {
       const isSelected = String(b.id) === this.selectedBalloonId;
       const isConfirmed = !!b.confirmed;
 
-      let critStroke = isSelected ? '#38bdf8' : isConfirmed ? '#059669' : '#0284c7';
-      let critFill = isSelected ? '#0284c7' : isConfirmed ? '#10b981' : '#ffffff';
+      const riskTheme = resolveRiskTheme(b.risk_level);
+      let critStroke = isSelected ? '#38bdf8' : isConfirmed ? '#059669' : (b.risk_level ? riskTheme.stroke : '#0284c7');
+      let critFill = isSelected ? '#0284c7' : isConfirmed ? '#10b981' : (b.risk_level ? riskTheme.fill : '#ffffff');
 
-      const tolStr = typeof b.tolerance === 'string' ? b.tolerance : '';
-      if (tolStr) {
-        const pmMatch = tolStr.match(/[±\+]\s*([0-9\.]+)/);
-        const slashMatch = tolStr.match(/([+-]?[0-9\.]+)\s*\/\s*([+-]?[0-9\.]+)/);
-        let span = 0.2;
-        if (slashMatch) {
-          span = Math.abs(parseFloat(slashMatch[1]) - parseFloat(slashMatch[2]));
-        } else if (pmMatch) {
-          span = parseFloat(pmMatch[1]) * 2;
-        }
-        if (span < 0.02 || (b.feature_label && (b.feature_label.includes('Ⓜ') || b.feature_label.includes('⌖') || b.feature_label.includes('⌒')))) {
-          critStroke = '#EF4444';
-          if (!isSelected && !isConfirmed) {
-            critFill = '#FEF2F2';
+      if (!b.risk_level) {
+        const tolStr = typeof b.tolerance === 'string' ? b.tolerance : '';
+        if (tolStr) {
+          const pmMatch = tolStr.match(/[±\+]\s*([0-9\.]+)/);
+          const slashMatch = tolStr.match(/([+-]?[0-9\.]+)\s*\/\s*([+-]?[0-9\.]+)/);
+          let span = 0.2;
+          if (slashMatch) {
+            span = Math.abs(parseFloat(slashMatch[1]) - parseFloat(slashMatch[2]));
+          } else if (pmMatch) {
+            span = parseFloat(pmMatch[1]) * 2;
           }
-        } else if (span <= 0.05) {
-          critStroke = '#F59E0B';
-          if (!isSelected && !isConfirmed) {
-            critFill = '#FFFBEB';
+          if (span < 0.02 || (b.feature_label && (b.feature_label.includes('Ⓜ') || b.feature_label.includes('⌖') || b.feature_label.includes('⌒')))) {
+            critStroke = '#ef4444';
+            if (!isSelected && !isConfirmed) {
+              critFill = '#fef2f2';
+            }
+          } else if (span <= 0.05) {
+            critStroke = '#f59e0b';
+            if (!isSelected && !isConfirmed) {
+              critFill = '#fffbeb';
+            }
           }
         }
       }
 
-      if (isSelected) {
+      const hasRiskHalo = b.risk_level === 'CRITICAL' || b.risk_level === 'WARNING' || critStroke.toLowerCase() === '#ef4444' || critStroke.toLowerCase() === '#f59e0b';
+      if (isSelected || hasRiskHalo) {
         ctx.beginPath();
         ctx.arc(balloonPt.x, balloonPt.y, 22 * this.zoom, 0, Math.PI * 2);
-        ctx.fillStyle = critStroke === '#EF4444' ? 'rgba(239, 68, 68, 0.22)' : 'rgba(14, 165, 233, 0.22)';
+        ctx.fillStyle = isSelected
+          ? (critStroke.toLowerCase() === '#ef4444' ? 'rgba(239, 68, 68, 0.22)' : 'rgba(14, 165, 233, 0.22)')
+          : riskTheme.halo;
         ctx.fill();
         ctx.lineWidth = 2 * this.zoom;
         ctx.strokeStyle = critStroke;
@@ -962,7 +986,7 @@ export class DrawingCanvas {
       ctx.strokeStyle = critStroke;
       ctx.stroke();
 
-      ctx.fillStyle = isSelected || isConfirmed ? '#ffffff' : critStroke === '#EF4444' ? '#B91C1C' : critStroke === '#F59E0B' ? '#B45309' : '#0f172a';
+      ctx.fillStyle = isSelected || isConfirmed ? '#ffffff' : critStroke.toLowerCase() === '#ef4444' ? '#b91c1c' : critStroke.toLowerCase() === '#f59e0b' ? '#b45309' : '#0f172a';
       ctx.font = `bold ${Math.max(10, 11 * this.zoom)}px Inter, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';

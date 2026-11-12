@@ -22,7 +22,7 @@ pub use drawing::{
     AnnotationType, BalloonItem, BoundingBox2D, DrawingImagePreprocessor, DrawingSheet,
     ExtractedAnnotation, SheetType, TitleBlock,
 };
-pub use graph::{BRepEdge, BRepGraphEngine, BRepNode, BoltCirclePattern, FaceNode};
+pub use graph::{BRepEdge, BRepGraph, BRepGraphEngine, BRepNode, BoltCirclePattern, FaceNode};
 pub use matching::{CuttingPlane, DrawingToStepMatcher, FeatureMatch};
 pub use multi_body::{MultiBodyFilter, SolidBody};
 pub use pmi::{PmiError, StepPmiReader};

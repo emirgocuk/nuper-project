@@ -86,12 +86,49 @@
           "gdt": { "type": "string" },
           "op": { "type": "string" },
           "op_reason": { "type": "string" },
-          "match_confidence": { "type": "number" },
+          "risk_level": {
+            "type": "string",
+            "enum": ["NORMAL", "WARNING", "CRITICAL"],
+            "default": "NORMAL"
+          },
+          "risk_reasons": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "tolerance_source": {
+            "type": "string",
+            "default": "EXPLICIT"
+          },
+          "view_name": {
+            "type": "string"
+          },
+          "inferred_axis": {
+            "type": "string",
+            "enum": ["X", "Y", "Z", "RADIAL", "UNKNOWN"]
+          },
+          "attachment_points": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": { "type": "number" }
+            }
+          },
+          "rel_position": {
+            "type": "array",
+            "items": { "type": "number" }
+          },
+          "match_confidence": {
+            "type": "number",
+            "default": 0.0
+          },
           "match_status": {
             "type": "string",
-            "enum": ["VERIFIED_EXACT", "VERIFIED_TOPOLOGY", "NEEDS_REVIEW", "UNMATCHED", "ENGINEER_LOCKED"]
+            "enum": ["AP242_NATIVE_PMI", "VERIFIED_EXACT", "VERIFIED_TOPOLOGY", "ENGINEER_LOCKED", "NEEDS_REVIEW", "UNMATCHED"]
           },
-          "inferred_axis": { "type": "string", "enum": ["X", "Y", "Z"] },
+          "matched_face_ids": {
+            "type": "array",
+            "items": { "type": "integer" }
+          },
           "distance_type": { "type": "string" },
           "faceA_center": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
           "faceB_center": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
@@ -105,7 +142,28 @@
           }
         }
       }
+    },
+    "similar_parts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "part_id": { "type": "string" },
+          "part_name": { "type": "string" },
+          "similarity_score": { "type": "number" },
+          "recommended_setup_op10": { "type": "string" },
+          "recommended_probe": { "type": "string" }
+        }
+      }
+    },
+    "contract_summary": {
+      "type": "object",
+      "properties": {
+        "critical_count": { "type": "integer" },
+        "warning_count": { "type": "integer" },
+        "min_tolerance_mm": { "type": "number" },
+        "requires_special_probing": { "type": "boolean" }
+      }
     }
   }
 }
-
