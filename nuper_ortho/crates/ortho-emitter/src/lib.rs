@@ -479,6 +479,71 @@ impl DmisEmitter {
                     writeln!(out, "EVAL/FA(FEAT_{}), TA(TOL_{})", tol.feature_id, tol.id)?;
                     writeln!(out, "OUTPUT/FA(FEAT_{}), TA(TOL_{})", tol.feature_id, tol.id)?;
                 }
+                ToleranceType::Symmetry => {
+                    let total_tol = tol.upper_tolerance - tol.lower_tolerance;
+                    let datums_str = if tol.datum_precedence.is_empty() {
+                        ", DAT(A)".to_string()
+                    } else {
+                        let list: Vec<String> = tol
+                            .datum_precedence
+                            .iter()
+                            .map(|d| format!("DAT({:?})", d))
+                            .collect();
+                        format!(", {}", list.join(", "))
+                    };
+                    writeln!(out, "CONST/PLANE, F(PLN_SYM_MID_{}), MID, F(PLN_SYM_L_{}), F(PLN_SYM_R_{})", tol.id, tol.id, tol.id)?;
+                    writeln!(out, "T(TOL_{}) = TOL/SYMM, {:.4}{}", tol.id, total_tol, datums_str)?;
+                    writeln!(out, "EVAL/FA(PLN_SYM_MID_{}), TA(TOL_{})", tol.id, tol.id)?;
+                    writeln!(out, "OUTPUT/FA(PLN_SYM_MID_{}), TA(TOL_{})", tol.id, tol.id)?;
+                }
+                ToleranceType::CircularRunout => {
+                    let total_tol = tol.upper_tolerance - tol.lower_tolerance;
+                    let datums_str = if tol.datum_precedence.is_empty() {
+                        ", DAT(A)".to_string()
+                    } else {
+                        let list: Vec<String> = tol
+                            .datum_precedence
+                            .iter()
+                            .map(|d| format!("DAT({:?})", d))
+                            .collect();
+                        format!(", {}", list.join(", "))
+                    };
+                    writeln!(out, "T(TOL_{}) = TOL/CRUN, {:.4}{}", tol.id, total_tol, datums_str)?;
+                    writeln!(out, "EVAL/FA(FEAT_{}), TA(TOL_{})", tol.feature_id, tol.id)?;
+                    writeln!(out, "OUTPUT/FA(FEAT_{}), TA(TOL_{})", tol.feature_id, tol.id)?;
+                }
+                ToleranceType::TotalRunout => {
+                    let total_tol = tol.upper_tolerance - tol.lower_tolerance;
+                    let datums_str = if tol.datum_precedence.is_empty() {
+                        ", DAT(A)".to_string()
+                    } else {
+                        let list: Vec<String> = tol
+                            .datum_precedence
+                            .iter()
+                            .map(|d| format!("DAT({:?})", d))
+                            .collect();
+                        format!(", {}", list.join(", "))
+                    };
+                    writeln!(out, "T(TOL_{}) = TOL/TRUN, {:.4}{}", tol.id, total_tol, datums_str)?;
+                    writeln!(out, "EVAL/FA(FEAT_{}), TA(TOL_{})", tol.feature_id, tol.id)?;
+                    writeln!(out, "OUTPUT/FA(FEAT_{}), TA(TOL_{})", tol.feature_id, tol.id)?;
+                }
+                ToleranceType::Concentricity => {
+                    let total_tol = tol.upper_tolerance - tol.lower_tolerance;
+                    let datums_str = if tol.datum_precedence.is_empty() {
+                        ", DAT(A)".to_string()
+                    } else {
+                        let list: Vec<String> = tol
+                            .datum_precedence
+                            .iter()
+                            .map(|d| format!("DAT({:?})", d))
+                            .collect();
+                        format!(", {}", list.join(", "))
+                    };
+                    writeln!(out, "T(TOL_{}) = TOL/CONC, {:.4}{}", tol.id, total_tol, datums_str)?;
+                    writeln!(out, "EVAL/FA(FEAT_{}), TA(TOL_{})", tol.feature_id, tol.id)?;
+                    writeln!(out, "OUTPUT/FA(FEAT_{}), TA(TOL_{})", tol.feature_id, tol.id)?;
+                }
                 _ => {}
             }
         }
@@ -1049,6 +1114,48 @@ mod tests {
         let code = emitter.emit_pcdmis(&plan, &traj).unwrap();
         assert!(code.contains("CONST/PLANE, F(ROUGH_A), MID"));
         assert!(code.contains("DATSET/DAT(A), XDIR, DAT(A), XORIG"));
+    }
+
+    #[test]
+    fn test_symmetry_and_runout_emission() {
+        let drf = DatumReferenceFrame::new_3_2_1("PCS_SYM", 1, 2, 3);
+        let mut plan = InspectionPlan::new("SYM_PART", "part.step", drf);
+        let tol_sym = ortho_ast::tolerance::ToleranceConstraint {
+            id: 10,
+            feature_id: 1,
+            tolerance_type: ortho_ast::tolerance::ToleranceType::Symmetry,
+            nominal_value: 0.0,
+            upper_tolerance: 0.05,
+            lower_tolerance: 0.0,
+            material_modifier: ortho_ast::tolerance::MaterialModifier::RFS,
+            datum_precedence: vec![ortho_ast::DatumLabel::A],
+            recommended_fitting: ortho_ast::tolerance::FittingAlgorithm::GaussLeastSquares,
+            profile_disposition: None,
+            is_composite: false,
+        };
+        let tol_run = ortho_ast::tolerance::ToleranceConstraint {
+            id: 11,
+            feature_id: 2,
+            tolerance_type: ortho_ast::tolerance::ToleranceType::CircularRunout,
+            nominal_value: 0.0,
+            upper_tolerance: 0.03,
+            lower_tolerance: 0.0,
+            material_modifier: ortho_ast::tolerance::MaterialModifier::RFS,
+            datum_precedence: vec![ortho_ast::DatumLabel::A],
+            recommended_fitting: ortho_ast::tolerance::FittingAlgorithm::GaussLeastSquares,
+            profile_disposition: None,
+            is_composite: false,
+        };
+        plan.tolerances.push(tol_sym);
+        plan.tolerances.push(tol_run);
+
+        let clearance = ClearanceBox::from_bounding_box(DVec3::ZERO, DVec3::new(50.0, 50.0, 20.0));
+        let traj = CertifiedCollisionFreeTrajectory::new(vec![], clearance, vec![]);
+        let emitter = DmisEmitter::new();
+        let code = emitter.emit_pcdmis(&plan, &traj).unwrap();
+        assert!(code.contains("CONST/PLANE, F(PLN_SYM_MID_10), MID"));
+        assert!(code.contains("T(TOL_10) = TOL/SYMM"));
+        assert!(code.contains("T(TOL_11) = TOL/CRUN"));
     }
 }
 
