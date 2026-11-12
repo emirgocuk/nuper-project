@@ -21,6 +21,7 @@ export class NuperApp {
   private lastCadFilePath: string | null = null;
   private isSelectingCad = false;
   private isSelectingDrawing = false;
+  private pendingBindBalloonId: number | null = null;
 
   constructor() {
     this.cadViewer = new CADViewer();
@@ -45,6 +46,22 @@ export class NuperApp {
         if (row) {
           this.inspectionTable.selectRow(row.id);
           this.cadViewer.highlightFeature(row.feature_key);
+        }
+      }
+    });
+
+    this.cadViewer.onFaceSelected((details) => {
+      if (this.pendingBindBalloonId !== null) {
+        const balloonId = this.pendingBindBalloonId;
+        this.pendingBindBalloonId = null;
+        const row = this.inspectionTable.getRows().find((r) => r.id === balloonId);
+        if (row) {
+          row.feature_key = `CAD_FACE_${details.faceId}`;
+          (row as unknown as { match_status?: string; match_confidence?: number; matched_face_ids?: number[] }).match_status = 'ENGINEER_LOCKED';
+          (row as unknown as { match_status?: string; match_confidence?: number; matched_face_ids?: number[] }).match_confidence = 1.0;
+          (row as unknown as { match_status?: string; match_confidence?: number; matched_face_ids?: number[] }).matched_face_ids = [details.faceId];
+          this.inspectionTable.render();
+          this.cadViewer.highlightFaceById(details.faceId);
         }
       }
     });
@@ -75,6 +92,14 @@ export class NuperApp {
         datum_reference: '',
       });
     });
+
+    this.drawingCanvas.onBalloonDeleted((id) => {
+      this.inspectionTable.removeRow(Number(id));
+    });
+  }
+
+  public startBindBalloonTo3DFace(balloonId: number): void {
+    this.pendingBindBalloonId = balloonId;
   }
 
   public getCADViewer(): CADViewer {
@@ -416,6 +441,51 @@ if (typeof window !== 'undefined') {
         e.stopPropagation();
         simCtrl.togglePlay();
       });
+    });
+
+    const dc = app.getDrawingCanvas();
+    const prevPageBtn = document.getElementById('btn-drawing-prev-page');
+    if (prevPageBtn) {
+      prevPageBtn.onclick = (e) => {
+        e.preventDefault();
+        const curr = dc.getActivePage();
+        dc.setActivePage(Math.max(1, curr - 1));
+      };
+    }
+    const nextPageBtn = document.getElementById('btn-drawing-next-page');
+    if (nextPageBtn) {
+      nextPageBtn.onclick = (e) => {
+        e.preventDefault();
+        const curr = dc.getActivePage();
+        dc.setActivePage(curr + 1);
+      };
+    }
+    const manualBalloonBtn = document.getElementById('btn-manual-balloon');
+    if (manualBalloonBtn) {
+      manualBalloonBtn.onclick = (e) => {
+        e.preventDefault();
+        dc.enableManualBalloonDrawMode();
+      };
+    }
+    const deleteBalloonBtn = document.getElementById('btn-delete-balloon');
+    if (deleteBalloonBtn) {
+      deleteBalloonBtn.onclick = (e) => {
+        e.preventDefault();
+        dc.deleteSelectedBalloon();
+      };
+    }
+    const bind3DFaceBtn = document.getElementById('btn-bind-3d-face');
+    if (bind3DFaceBtn) {
+      bind3DFaceBtn.onclick = (e) => {
+        e.preventDefault();
+        dc.bindBalloonTo3DFaceMode();
+      };
+    }
+    dc.onPageChange((page: number) => {
+      const ind = document.getElementById('drawing-page-indicator');
+      if (ind) {
+        ind.innerText = `Sayfa ${page} / ${Math.max(page, dc.getTotalPages())}`;
+      }
     });
 
     const btnOp10 = document.getElementById('btn-setup-op10');
