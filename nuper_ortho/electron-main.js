@@ -232,7 +232,6 @@ print(json.dumps(res))
     };
   });
 
-  // Extract Metrology Data & Dimensions from 2D Drawing
   ipcMain.handle('extract-drawing-data', async (event, targetPath, stepPath) => {
     try {
       const { execFile } = require('child_process');
@@ -240,7 +239,7 @@ print(json.dumps(res))
       const scriptPath = path.join(__dirname, 'tools', 'drawing_extractor.py');
       const args = [scriptPath, targetPath];
       if (stepPath) {
-        args.push(stepPath);
+        args.push('--cad', stepPath);
       }
       return new Promise((resolve) => {
         execFile(pyBin, args, { maxBuffer: 15 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -460,7 +459,7 @@ print(json.dumps(res))
       const pyBin = await resolvePythonPath();
       const scriptPath = path.join(__dirname, 'tools', 'drawing_extractor.py');
       const args = [scriptPath, targetPath];
-      if (stepPath) args.push(stepPath);
+      if (stepPath) args.push('--cad', stepPath);
       return new Promise((resolve) => {
         execFile(pyBin, args, { maxBuffer: 15 * 1024 * 1024 }, (err, stdout, stderr) => {
           if (err) {

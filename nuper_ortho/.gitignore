@@ -15,3 +15,6 @@ tools/.ocr_cache/
 __pycache__/
 *.pyc
 test-results/
+output_pcdmis.dmi
+output_calypso.txt
+.ortho-session.json

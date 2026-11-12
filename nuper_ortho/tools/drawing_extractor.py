@@ -745,11 +745,53 @@ def parse_text_to_metrology(
     for idx, d in enumerate(dims, 1):
         d["id"] = idx
         d["balloon"] = f"#{idx}"
+        try:
+            u_val = float(str(d.get("upper_tol", "0.5")).replace("+", ""))
+            l_val = float(str(d.get("lower_tol", "-0.5")).replace("+", ""))
+            span = abs(u_val - l_val)
+            if span <= 0.025:
+                d["risk_level"] = "CRITICAL"
+                d["risk_reasons"] = ["Dar tolerans aralığı (<= 0.025 mm)"]
+            elif span <= 0.05:
+                d["risk_level"] = "WARNING"
+                d["risk_reasons"] = ["Hassas tolerans aralığı (<= 0.05 mm)"]
+            else:
+                d["risk_level"] = "NORMAL"
+        except Exception:
+            d["risk_level"] = "NORMAL"
 
     result["dimensions"] = dims
     schema_path = os.path.join(os.path.dirname(__file__), "..", "schemas", "drawing_data.schema.json")
     result = apply_contract_guard(result, schema_path=schema_path)
-    result["similar_parts"] = find_similar_parts(result)
+
+    crit_cnt = sum(1 for d in dims if d.get("risk_level") == "CRITICAL")
+    warn_cnt = sum(1 for d in dims if d.get("risk_level") == "WARNING")
+    norm_cnt = sum(1 for d in dims if d.get("risk_level") == "NORMAL")
+    if "contract_summary" not in result or not isinstance(result["contract_summary"], dict):
+        result["contract_summary"] = {}
+    result["contract_summary"]["critical_count"] = crit_cnt
+    result["contract_summary"]["warning_count"] = warn_cnt
+    result["contract_summary"]["normal_count"] = norm_cnt
+    result["contract_summary"]["status"] = "VALIDATED" if crit_cnt == 0 else "ATTENTION_REQUIRED"
+
+    try:
+        from tools.extractor.similarity_engine import extract_feature_vector, query_similar_from_db
+        query_geom = {
+            "bbox_x": 100.0,
+            "bbox_y": 100.0,
+            "bbox_z": 20.0,
+            "hole_count": len([d for d in dims if d.get("type") == "DIAMETER"]),
+            "min_tolerance": min([abs(float(str(d.get("upper_tol", "0.1")).replace("+", ""))) for d in dims] or [0.1]),
+        }
+        q_vec = extract_feature_vector(query_geom)
+        db_similar = query_similar_from_db(q_vec, min_similarity=0.85)
+        if db_similar:
+            result["similar_parts"] = db_similar
+        else:
+            result["similar_parts"] = find_similar_parts(result)
+    except Exception:
+        result["similar_parts"] = find_similar_parts(result)
+
     return result
 
 
@@ -758,7 +800,22 @@ if __name__ == "__main__":
         print(json.dumps({"success": False, "error": "Dosya yolu belirtilmedi."}))
         sys.exit(1)
 
-    file_path = sys.argv[1]
-    step_file = sys.argv[2] if len(sys.argv) > 2 else None
+    file_path = None
+    step_file = None
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        if arg == "--cad" and i + 1 < len(sys.argv):
+            step_file = sys.argv[i + 1]
+            i += 2
+        elif not file_path:
+            file_path = arg
+            i += 1
+        elif not step_file:
+            step_file = arg
+            i += 1
+        else:
+            i += 1
+
     res = extract_from_pdf(file_path, step_path=step_file)
     print(json.dumps(res, ensure_ascii=False, indent=2))
