@@ -9,6 +9,8 @@ try:
         get_point_coords,
         normalize_span_to_local_frame,
         trace_dimension_attachments,
+        SpatialHashGrid,
+        prune_hatching_lines,
     )
 except ImportError:
     from .spatial import (
@@ -16,6 +18,8 @@ except ImportError:
         get_point_coords,
         normalize_span_to_local_frame,
         trace_dimension_attachments,
+        SpatialHashGrid,
+        prune_hatching_lines,
     )
 
 try:
@@ -90,6 +94,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
         drawings = page.get_drawings()
     except Exception:
         drawings = []
+    drawings = prune_hatching_lines(drawings)
     vector_symbols = recognize_vector_gdt_symbols(drawings, rect)
 
     for sym in vector_symbols:
@@ -157,6 +162,9 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
 
     grouped_dimensions = []
     used_spans = set()
+    span_grid = SpatialHashGrid(cell_size=24.0)
+    for idx_s, sp in enumerate(spans_pool):
+        span_grid.insert(sp["bbox"], (idx_s, sp))
 
     for i, s in enumerate(spans_pool):
         if i in used_spans:
@@ -181,9 +189,10 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
 
         main_size = s["size"]
         main_bbox = s["bbox"]
+        nearby_spans = span_grid.query_radius(main_bbox, 35.0)
 
         sym_prefix = ""
-        for j, other in enumerate(spans_pool):
+        for j, other in nearby_spans:
             if i == j or j in used_spans:
                 continue
             if other.get("is_vector_symbol"):
@@ -199,7 +208,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
         loc_main = normalize_span_to_local_frame(main_bbox, span_rot)
 
         tol_candidates = []
-        for j, other in enumerate(spans_pool):
+        for j, other in nearby_spans:
             if i == j or j in used_spans:
                 continue
             loc_other = normalize_span_to_local_frame(other["bbox"], span_rot)

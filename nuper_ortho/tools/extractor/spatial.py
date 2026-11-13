@@ -28,14 +28,138 @@ def bbox_distance(b1: List[float], b2: List[float]) -> float:
     return (dx**2 + dy**2)**0.5
 
 
+class SpatialHashGrid:
+    def __init__(self, cell_size: float = 24.0) -> None:
+        self.cell_size = max(1.0, float(cell_size))
+        self.cells: Dict[Tuple[int, int], List[Tuple[int, List[float], Any]]] = {}
+        self._next_id = 0
+
+    def _cell_range(self, bbox: List[float], pad: float = 0.0) -> Tuple[int, int, int, int]:
+        cs = self.cell_size
+        gx0 = int(math.floor((bbox[0] - pad) / cs))
+        gy0 = int(math.floor((bbox[1] - pad) / cs))
+        gx1 = int(math.floor((bbox[2] + pad) / cs))
+        gy1 = int(math.floor((bbox[3] + pad) / cs))
+        return gx0, gy0, gx1, gy1
+
+    def insert(self, bbox: List[float], item: Any) -> int:
+        if not bbox or len(bbox) < 4:
+            return -1
+        b = [float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])]
+        item_id = self._next_id
+        self._next_id += 1
+        gx0, gy0, gx1, gy1 = self._cell_range(b, 0.0)
+        entry = (item_id, b, item)
+        for gx in range(gx0, gx1 + 1):
+            for gy in range(gy0, gy1 + 1):
+                key = (gx, gy)
+                bucket = self.cells.get(key)
+                if bucket is None:
+                    self.cells[key] = [entry]
+                else:
+                    bucket.append(entry)
+        return item_id
+
+    def query_radius(self, bbox: List[float], radius_pt: float) -> List[Any]:
+        if not bbox or len(bbox) < 4:
+            return []
+        b = [float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])]
+        r = max(0.0, float(radius_pt))
+        gx0, gy0, gx1, gy1 = self._cell_range(b, r)
+        seen: set = set()
+        results: List[Any] = []
+        for gx in range(gx0, gx1 + 1):
+            for gy in range(gy0, gy1 + 1):
+                bucket = self.cells.get((gx, gy))
+                if not bucket:
+                    continue
+                for item_id, ib, item in bucket:
+                    if item_id in seen:
+                        continue
+                    seen.add(item_id)
+                    if bbox_distance(b, ib) <= r:
+                        results.append(item)
+        return results
+
+
+def prune_hatching_lines(
+    drawings: List[Dict[str, Any]],
+    min_cluster_size: int = 5,
+    max_spacing_pt: float = 25.0,
+) -> List[Dict[str, Any]]:
+    if not drawings:
+        return []
+
+    diag_groups: Dict[int, List[Tuple[float, float, int]]] = {45: [], 135: []}
+
+    for idx, d in enumerate(drawings):
+        items = d.get("items", [])
+        if len(items) != 1:
+            continue
+        it = items[0]
+        cmd = it[0] if isinstance(it, (list, tuple)) and len(it) > 0 else ""
+        if cmd != "l" or len(it) < 3:
+            continue
+        p1 = get_point_coords(it[1])
+        p2 = get_point_coords(it[2])
+        dx = p2[0] - p1[0]
+        dy = p2[1] - p1[1]
+        length = math.hypot(dx, dy)
+        if length < 4.0:
+            continue
+        deg = math.degrees(math.atan2(dy, dx)) % 180.0
+        if 42.5 <= deg <= 47.5:
+            rad = math.radians(45.0)
+            mid_x = (p1[0] + p2[0]) * 0.5
+            mid_y = (p1[1] + p2[1]) * 0.5
+            perp = -mid_x * math.sin(rad) + mid_y * math.cos(rad)
+            para = mid_x * math.cos(rad) + mid_y * math.sin(rad)
+            diag_groups[45].append((perp, para, idx))
+        elif 132.5 <= deg <= 137.5:
+            rad = math.radians(135.0)
+            mid_x = (p1[0] + p2[0]) * 0.5
+            mid_y = (p1[1] + p2[1]) * 0.5
+            perp = -mid_x * math.sin(rad) + mid_y * math.cos(rad)
+            para = mid_x * math.cos(rad) + mid_y * math.sin(rad)
+            diag_groups[135].append((perp, para, idx))
+
+    hatching_indices: set = set()
+    for entries in diag_groups.values():
+        if len(entries) < min_cluster_size:
+            continue
+        entries.sort(key=lambda e: (e[0], e[1]))
+        run: List[int] = [entries[0][2]]
+        for k in range(1, len(entries)):
+            spacing = abs(entries[k][0] - entries[k - 1][0])
+            para_diff = abs(entries[k][1] - entries[k - 1][1])
+            if 0.2 <= spacing <= max_spacing_pt and para_diff <= 150.0:
+                run.append(entries[k][2])
+            else:
+                if len(run) >= min_cluster_size:
+                    hatching_indices.update(run)
+                run = [entries[k][2]]
+        if len(run) >= min_cluster_size:
+            hatching_indices.update(run)
+
+    pruned: List[Dict[str, Any]] = []
+    for idx, d in enumerate(drawings):
+        if idx in hatching_indices:
+            d["is_hatching"] = True
+        else:
+            pruned.append(d)
+    return pruned
+
+
 def cluster_micro_drawings(
     drawings: List[Dict[str, Any]],
     max_dist: float = 2.5,
     min_size: float = 1.5,
     max_size: float = 22.0,
 ) -> List[List[Dict[str, Any]]]:
-    candidates = []
+    candidates: List[Tuple[Dict[str, Any], List[float]]] = []
     for d in drawings:
+        if d.get("is_hatching"):
+            continue
         box = get_drawing_bbox(d)
         if not box:
             continue
@@ -47,29 +171,28 @@ def cluster_micro_drawings(
     if not candidates:
         return []
 
-    clusters: List[List[Tuple[Dict[str, Any], List[float]]]] = []
-    for d, box in candidates:
-        matched_indices = []
-        for idx, cl in enumerate(clusters):
-            for _, c_box in cl:
-                if bbox_distance(box, c_box) <= max_dist:
-                    matched_indices.append(idx)
-                    break
-        if not matched_indices:
-            clusters.append([(d, box)])
-        elif len(matched_indices) == 1:
-            clusters[matched_indices[0]].append((d, box))
-        else:
-            first_idx = matched_indices[0]
-            new_cl = clusters[first_idx]
-            new_cl.append((d, box))
-            for other_idx in sorted(matched_indices[1:], reverse=True):
-                new_cl.extend(clusters[other_idx])
-                clusters.pop(other_idx)
+    grid = SpatialHashGrid(cell_size=24.0)
+    for idx, (_, box) in enumerate(candidates):
+        grid.insert(box, idx)
 
-    result = []
-    for cl in clusters:
-        result.append([item[0] for item in cl])
+    visited = [False] * len(candidates)
+    result: List[List[Dict[str, Any]]] = []
+
+    for i in range(len(candidates)):
+        if visited[i]:
+            continue
+        visited[i] = True
+        queue = [i]
+        comp = [candidates[i][0]]
+        while queue:
+            curr = queue.pop()
+            _, curr_box = candidates[curr]
+            for nb in grid.query_radius(curr_box, max_dist):
+                if not visited[nb]:
+                    visited[nb] = True
+                    queue.append(nb)
+                    comp.append(candidates[nb][0])
+        result.append(comp)
     return result
 
 
@@ -354,7 +477,8 @@ def recognize_vector_gdt_symbols(
     if not drawings:
         return []
 
-    clusters = cluster_micro_drawings(drawings)
+    filtered_drawings = prune_hatching_lines(drawings)
+    clusters = cluster_micro_drawings(filtered_drawings)
     recognized = []
     for cl in clusters:
         sym = classify_vector_symbol_cluster(cl)
