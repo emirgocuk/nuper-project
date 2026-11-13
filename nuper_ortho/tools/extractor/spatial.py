@@ -292,7 +292,19 @@ def classify_vector_symbol_cluster(cluster: List[Dict[str, Any]]) -> Optional[Di
             confidence = 0.95
 
     if not symbol:
-        if horiz_lines and vert_lines and not curves:
+        if len(horiz_lines) >= 1 and len(vert_lines) >= 1 and len(diag_lines) >= 1 and not curves:
+            h_top = min(horiz_lines, key=lambda hl: min(hl[0][1], hl[1][1]))
+            h_top_y = (h_top[0][1] + h_top[1][1]) * 0.5
+            if abs(h_top_y - min_y) <= 4.0:
+                symbol = "↧"
+                confidence = 0.96
+        elif len(vert_lines) == 2 and len(horiz_lines) == 1 and not diag_lines and not curves:
+            h_line = horiz_lines[0]
+            h_y = (h_line[0][1] + h_line[1][1]) * 0.5
+            if abs(h_y - max_y) <= 4.0:
+                symbol = "⌴"
+                confidence = 0.97
+        elif len(horiz_lines) == 1 and len(vert_lines) == 1 and not diag_lines and not curves:
             h_line = min(horiz_lines, key=lambda hl: hl[0][1])
             v_line = vert_lines[0]
             v_bottom = max(v_line[0][1], v_line[1][1])
@@ -300,14 +312,24 @@ def classify_vector_symbol_cluster(cluster: List[Dict[str, Any]]) -> Optional[Di
             if abs(v_bottom - h_y) <= 4.0:
                 symbol = "⊥"
                 confidence = 0.98
-        elif len(diag_lines) >= 2 and len(lines) == 2:
+        elif len(diag_lines) == 2 and len(lines) == 2 and not curves:
             p1_a, p2_a, _ = diag_lines[0]
             p1_b, p2_b, _ = diag_lines[1]
-            a1 = math.atan2(abs(p2_a[1] - p1_a[1]), abs(p2_a[0] - p1_a[0]))
-            a2 = math.atan2(abs(p2_b[1] - p1_b[1]), abs(p2_b[0] - p1_b[0]))
-            if abs(a1 - a2) <= math.radians(15.0):
-                symbol = "∥"
-                confidence = 0.95
+            bot_a = p1_a if p1_a[1] >= p2_a[1] else p2_a
+            bot_b = p1_b if p1_b[1] >= p2_b[1] else p2_b
+            top_a = p2_a if bot_a == p1_a else p1_a
+            top_b = p2_b if bot_b == p1_b else p1_b
+            bot_dist = math.hypot(bot_a[0] - bot_b[0], bot_a[1] - bot_b[1])
+            top_dist = math.hypot(top_a[0] - top_b[0], top_a[1] - top_b[1])
+            if bot_dist <= 3.5 and top_dist >= 4.0:
+                symbol = "∨"
+                confidence = 0.96
+            else:
+                a1 = math.atan2(abs(p2_a[1] - p1_a[1]), abs(p2_a[0] - p1_a[0]))
+                a2 = math.atan2(abs(p2_b[1] - p1_b[1]), abs(p2_b[0] - p1_b[0]))
+                if abs(a1 - a2) <= math.radians(15.0):
+                    symbol = "∥"
+                    confidence = 0.95
         elif len(lines) == 4 and (len(diag_lines) >= 2 or len(horiz_lines) >= 2):
             symbol = "▱"
             confidence = 0.92

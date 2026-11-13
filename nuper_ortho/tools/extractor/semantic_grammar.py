@@ -381,3 +381,156 @@ def try_local_llm_semantic_parse(text_snippet: str) -> Optional[Dict[str, Any]]:
             return json.loads(data.get("response", "{}"))
     except Exception:
         return None
+
+
+def _is_hole_callout_line(text: str, dim_type: str = "") -> bool:
+    t = text.strip()
+    if any(sym in t for sym in ("Ø", "⌴", "∨", "↧")):
+        return True
+    if re.search(r"\b(DIA|THRU|BOYDAN|CBORE|CSINK|DEPTH|DER[Iİ]NL[Iİ]K|M\d+(?:[xX\.\-]\d+)*)\b", t, re.I):
+        return True
+    if dim_type.upper() in ("HOLE", "DIAMETER", "THREAD"):
+        return True
+    return False
+
+
+def _is_secondary_hole_modifier_line(text: str) -> bool:
+    t = text.strip()
+    if any(sym in t for sym in ("⌴", "∨", "↧")):
+        return True
+    if re.search(r"\b(THRU|BOYDAN|CBORE|CSINK|DEPTH|DER[Iİ]NL[Iİ]K)\b", t, re.I):
+        return True
+    if re.match(r"^(?:M\d+|\d+\s*[xX]\s*\d+\s*°)", t, re.I):
+        return True
+    return False
+
+
+def _parse_compound_hole_attributes(lines: List[str]) -> Dict[str, Any]:
+    full_text = " / ".join(lines)
+    is_thru = bool(re.search(r"\b(THRU|BOYDAN)\b", full_text, re.I))
+    cbore_dia: Optional[float] = None
+    cbore_depth: Optional[float] = None
+    csink_dia: Optional[float] = None
+    csink_angle: Optional[float] = None
+    hole_depth: Optional[float] = None
+
+    for line in lines:
+        if "⌴" in line or re.search(r"\bCBORE\b", line, re.I):
+            m_cb = re.search(r"(?:⌴|CBORE)\s*(?:Ø|DIA)?\s*([0-9]+(?:\.[0-9]+)?)", line, re.I)
+            if m_cb:
+                cbore_dia = float(m_cb.group(1))
+            m_cbd = re.search(r"(?:↧|DEPTH|DER[Iİ]NL[Iİ]K)\s*([0-9]+(?:\.[0-9]+)?)", line, re.I)
+            if m_cbd:
+                cbore_depth = float(m_cbd.group(1))
+        elif "∨" in line or re.search(r"\bCSINK\b", line, re.I):
+            m_cs = re.search(r"(?:∨|CSINK)\s*(?:Ø|DIA)?\s*([0-9]+(?:\.[0-9]+)?)", line, re.I)
+            if m_cs:
+                csink_dia = float(m_cs.group(1))
+            m_ang = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*°", line)
+            if m_ang:
+                csink_angle = float(m_ang.group(1))
+        else:
+            m_hd = re.search(r"(?:↧|DEPTH|DER[Iİ]NL[Iİ]K)\s*([0-9]+(?:\.[0-9]+)?)", line, re.I)
+            if m_hd:
+                hole_depth = float(m_hd.group(1))
+
+    is_compound = (
+        len(lines) > 1
+        or is_thru
+        or cbore_dia is not None
+        or cbore_depth is not None
+        or csink_dia is not None
+        or csink_angle is not None
+        or hole_depth is not None
+    )
+
+    return {
+        "is_compound_hole": is_compound,
+        "is_thru": is_thru,
+        "counterbore_diameter": cbore_dia,
+        "counterbore_depth": cbore_depth,
+        "countersink_diameter": csink_dia,
+        "countersink_angle": csink_angle,
+        "hole_depth": hole_depth,
+    }
+
+
+def merge_stacked_hole_callouts(dimensions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not dimensions:
+        return []
+
+    indexed = list(enumerate(dimensions))
+    indexed.sort(key=lambda pair: (
+        int(pair[1].get("page", pair[1].get("page_number", 1))),
+        float((pair[1].get("bbox") or [0.0, 0.0, 0.0, 0.0])[1]),
+        float((pair[1].get("bbox") or [0.0, 0.0, 0.0, 0.0])[0]),
+    ))
+
+    consumed: set = set()
+    merged_list: List[Tuple[int, Dict[str, Any]]] = []
+
+    for pos, (orig_idx, dim) in enumerate(indexed):
+        if orig_idx in consumed:
+            continue
+
+        raw_txt = str(dim.get("raw_text") or dim.get("nominal_str") or "")
+        dim_type = str(dim.get("type") or "")
+        bbox = dim.get("bbox")
+        if not bbox or len(bbox) < 4 or not _is_hole_callout_line(raw_txt, dim_type):
+            merged_list.append((orig_idx, dim))
+            continue
+
+        stack_dims = [dim]
+        stack_texts = [raw_txt]
+        curr_box = [float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])]
+        page_id = int(dim.get("page", dim.get("page_number", 1)))
+
+        for next_pos in range(pos + 1, len(indexed)):
+            next_orig_idx, next_dim = indexed[next_pos]
+            if next_orig_idx in consumed:
+                continue
+            next_page = int(next_dim.get("page", next_dim.get("page_number", 1)))
+            if next_page != page_id:
+                break
+            nb = next_dim.get("bbox")
+            if not nb or len(nb) < 4:
+                continue
+            nb_f = [float(nb[0]), float(nb[1]), float(nb[2]), float(nb[3])]
+            h_curr = max(8.0, curr_box[3] - curr_box[1])
+            dy = nb_f[1] - curr_box[3]
+            if dy > 1.6 * h_curr:
+                break
+            dx_left = abs(nb_f[0] - curr_box[0])
+            cx_curr = (curr_box[0] + curr_box[2]) * 0.5
+            cx_next = (nb_f[0] + nb_f[2]) * 0.5
+            dx_center = abs(cx_next - cx_curr)
+
+            next_txt = str(next_dim.get("raw_text") or next_dim.get("nominal_str") or "")
+            if (dx_left <= 16.0 or dx_center <= 24.0) and -4.0 <= dy <= 1.6 * h_curr:
+                if _is_secondary_hole_modifier_line(next_txt) or _is_hole_callout_line(next_txt, str(next_dim.get("type") or "")):
+                    consumed.add(next_orig_idx)
+                    stack_dims.append(next_dim)
+                    stack_texts.append(next_txt)
+                    curr_box = [
+                        min(curr_box[0], nb_f[0]),
+                        min(curr_box[1], nb_f[1]),
+                        max(curr_box[2], nb_f[2]),
+                        max(curr_box[3], nb_f[3]),
+                    ]
+
+        attrs = _parse_compound_hole_attributes(stack_texts)
+        updated = dict(dim)
+        if len(stack_dims) > 1:
+            combined_text = " / ".join(stack_texts)
+            if "raw_text" in updated:
+                updated["raw_text"] = combined_text
+            if "nominal_str" in updated:
+                updated["nominal_str"] = combined_text
+            updated["bbox"] = [round(c, 1) for c in curr_box]
+        if attrs["is_compound_hole"]:
+            updated.update(attrs)
+        merged_list.append((orig_idx, updated))
+
+    merged_list.sort(key=lambda pair: pair[0])
+    return [pair[1] for pair in merged_list]
+

@@ -23,9 +23,9 @@ except ImportError:
     )
 
 try:
-    from extractor.semantic_grammar import parse_fcf_cells
+    from extractor.semantic_grammar import parse_fcf_cells, merge_stacked_hole_callouts
 except ImportError:
-    from .semantic_grammar import parse_fcf_cells
+    from .semantic_grammar import parse_fcf_cells, merge_stacked_hole_callouts
 
 
 def get_title_block_mask(page_width: float, page_height: float) -> List[Tuple[float, float, float, float]]:
@@ -337,6 +337,8 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
                     "cells": [],
                     "bbox": fb,
                 })
+
+    grouped_dimensions = merge_stacked_hole_callouts(grouped_dimensions)
 
     return {
         "page": page_num,
