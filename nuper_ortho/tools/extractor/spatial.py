@@ -348,11 +348,100 @@ def classify_vector_symbol_cluster(cluster: List[Dict[str, Any]]) -> Optional[Di
     }
 
 
+def extract_circle_primitives(
+    drawings: List[Dict[str, Any]],
+    min_radius: float = 1.5,
+    max_radius: float = 300.0,
+) -> List[Dict[str, Any]]:
+    circles: List[Dict[str, Any]] = []
+    if not drawings:
+        return circles
+
+    for d in drawings:
+        if d.get("is_hatching"):
+            continue
+        if "circle_center" in d and "circle_radius" in d:
+            cc = d["circle_center"]
+            cr = float(d["circle_radius"])
+            if min_radius <= cr <= max_radius:
+                circles.append({
+                    "center": [round(float(cc[0]), 2), round(float(cc[1]), 2)],
+                    "radius_pt": round(cr, 2),
+                    "bbox": [
+                        round(float(cc[0]) - cr, 2),
+                        round(float(cc[1]) - cr, 2),
+                        round(float(cc[0]) + cr, 2),
+                        round(float(cc[1]) + cr, 2),
+                    ],
+                })
+            continue
+
+        items = d.get("items", [])
+        curve_count = 0
+        line_count = 0
+        pts_x: List[float] = []
+        pts_y: List[float] = []
+
+        for it in items:
+            cmd = it[0] if isinstance(it, (list, tuple)) and len(it) > 0 else ""
+            if cmd == "c" and len(it) >= 5:
+                curve_count += 1
+                for k in (1, 4):
+                    px, py = get_point_coords(it[k])
+                    pts_x.append(px)
+                    pts_y.append(py)
+            elif cmd == "l" and len(it) >= 3:
+                line_count += 1
+                for k in (1, 2):
+                    px, py = get_point_coords(it[k])
+                    pts_x.append(px)
+                    pts_y.append(py)
+
+        box = get_drawing_bbox(d)
+        if not box and pts_x and pts_y:
+            box = [min(pts_x), min(pts_y), max(pts_x), max(pts_y)]
+        if not box:
+            continue
+
+        w = box[2] - box[0]
+        h = box[3] - box[1]
+        if w <= 0.0 or h <= 0.0:
+            continue
+        aspect = w / h
+        r = (w + h) * 0.25
+        if not (min_radius <= r <= max_radius):
+            continue
+
+        is_bezier_circle = curve_count >= 2 and 0.80 <= aspect <= 1.25
+        is_poly_circle = curve_count == 0 and line_count >= 8 and 0.85 <= aspect <= 1.18 and d.get("closePath", True)
+        if is_bezier_circle or is_poly_circle:
+            ccx = (box[0] + box[2]) * 0.5
+            ccy = (box[1] + box[3]) * 0.5
+            circles.append({
+                "center": [round(ccx, 2), round(ccy, 2)],
+                "radius_pt": round(r, 2),
+                "bbox": [round(box[0], 2), round(box[1], 2), round(box[2], 2), round(box[3], 2)],
+            })
+
+    deduped: List[Dict[str, Any]] = []
+    for c in circles:
+        duplicate = False
+        for ex in deduped:
+            dist_c = math.hypot(c["center"][0] - ex["center"][0], c["center"][1] - ex["center"][1])
+            if dist_c <= 2.0 and abs(c["radius_pt"] - ex["radius_pt"]) <= 2.0:
+                duplicate = True
+                break
+        if not duplicate:
+            deduped.append(c)
+    return deduped
+
+
 def trace_dimension_attachments(
     dim_bbox: List[float],
     drawings: List[Dict[str, Any]],
     nominal_val: Optional[float] = None,
     page_scale: Optional[float] = None,
+    text_spans: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     x0, y0, x1, y1 = dim_bbox
     cx = (x0 + x1) / 2.0
@@ -362,6 +451,8 @@ def trace_dimension_attachments(
 
     all_lines: List[Tuple[Tuple[float, float], Tuple[float, float]]] = []
     for d in drawings:
+        if d.get("is_hatching"):
+            continue
         for it in d.get("items", []):
             cmd = it[0] if isinstance(it, (list, tuple)) and len(it) > 0 else ""
             if cmd == "l" and len(it) >= 3:
@@ -369,9 +460,12 @@ def trace_dimension_attachments(
                 p2 = get_point_coords(it[2])
                 all_lines.append((p1, p2))
 
+    circles = extract_circle_primitives(drawings)
+
     best_dim_line = None
     min_dist = float("inf")
     dim_is_horiz = bw >= bh
+    topology_type = "UNRESOLVED"
 
     for p1, p2 in all_lines:
         dx = p2[0] - p1[0]
@@ -399,9 +493,10 @@ def trace_dimension_attachments(
     p_start = None
     p_end = None
     line_length = 0.0
-    attachments = []
+    attachments: List[List[float]] = []
 
     if best_dim_line:
+        topology_type = "LINEAR_INSIDE"
         p1, p2, line_length, orientation = best_dim_line
         if p1[0] < p2[0] or (p1[0] == p2[0] and p1[1] < p2[1]):
             p_start = [round(p1[0], 2), round(p1[1], 2)]
@@ -431,13 +526,73 @@ def trace_dimension_attachments(
                                 break
                 if matched_for_target:
                     break
+    else:
+        ext_lines = []
+        for lp1, lp2 in all_lines:
+            ldx = lp2[0] - lp1[0]
+            ldy = lp2[1] - lp1[1]
+            l_len = math.hypot(ldx, ldy)
+            if l_len < 8.0:
+                continue
+            l_angle = math.degrees(math.atan2(abs(ldy), abs(ldx)))
+            mid_x = (lp1[0] + lp2[0]) * 0.5
+            mid_y = (lp1[1] + lp2[1]) * 0.5
+            if dim_is_horiz and l_angle >= 75.0 and abs(mid_y - cy) <= 35.0 and abs(mid_x - cx) <= max(bw * 1.5, 45.0):
+                ext_lines.append((mid_x, lp1, lp2))
+            elif not dim_is_horiz and l_angle <= 15.0 and abs(mid_x - cx) <= 35.0 and abs(mid_y - cy) <= max(bh * 1.5, 45.0):
+                ext_lines.append((mid_y, lp1, lp2))
 
-    leader_tip = None
-    if not best_dim_line or line_length < 15.0:
+        if len(ext_lines) >= 2:
+            ext_lines.sort(key=lambda item: item[0])
+            best_pair = None
+            min_gap = float("inf")
+            for idx_e in range(len(ext_lines) - 1):
+                gap = abs(ext_lines[idx_e + 1][0] - ext_lines[idx_e][0])
+                if 1.0 <= gap < min_gap:
+                    min_gap = gap
+                    best_pair = (ext_lines[idx_e], ext_lines[idx_e + 1])
+            if best_pair and min_gap <= 30.0:
+                e1, e2 = best_pair
+                topology_type = "LINEAR_OUTSIDE_NARROW"
+                line_length = min_gap
+                if dim_is_horiz:
+                    p_start = [round(e1[0], 2), round(cy, 2)]
+                    p_end = [round(e2[0], 2), round(cy, 2)]
+                else:
+                    p_start = [round(cx, 2), round(e1[0], 2)]
+                    p_end = [round(cx, 2), round(e2[0], 2)]
+                attachments.append([round(e1[2][0], 2), round(e1[2][1], 2)])
+                attachments.append([round(e2[2][0], 2), round(e2[2][1], 2)])
+
+    leader_tip: Optional[List[float]] = None
+    circle_cx: Optional[float] = None
+    circle_cy: Optional[float] = None
+    circle_r_pt: Optional[float] = None
+
+    if not best_dim_line or line_length < 15.0 or len(attachments) < 2:
+        shelf_pts: List[Tuple[float, float]] = []
+        for lp1, lp2 in all_lines:
+            ldx = lp2[0] - lp1[0]
+            ldy = lp2[1] - lp1[1]
+            l_len = math.hypot(ldx, ldy)
+            if l_len < 4.0:
+                continue
+            angle = math.degrees(math.atan2(abs(ldy), abs(ldx)))
+            d_box = min(
+                math.hypot(lp1[0] - cx, lp1[1] - cy),
+                math.hypot(lp2[0] - cx, lp2[1] - cy),
+            )
+            if angle <= 15.0 and d_box <= max(bw, bh) + 20.0:
+                shelf_pts.extend([lp1, lp2])
+
         leader_segments = []
         for lp1, lp2 in all_lines:
-            d1 = min(((lp1[0] - cx)**2 + (lp1[1] - cy)**2)**0.5, ((lp2[0] - cx)**2 + (lp2[1] - cy)**2)**0.5)
-            if d1 <= max(bw, bh) * 1.5 + 25.0:
+            d1 = min(math.hypot(lp1[0] - cx, lp1[1] - cy), math.hypot(lp2[0] - cx, lp2[1] - cy))
+            connected_to_shelf = any(
+                math.hypot(lp1[0] - sp[0], lp1[1] - sp[1]) <= 4.5 or math.hypot(lp2[0] - sp[0], lp2[1] - sp[1]) <= 4.5
+                for sp in shelf_pts
+            )
+            if d1 <= max(bw, bh) * 1.5 + 25.0 or connected_to_shelf:
                 leader_segments.append((lp1, lp2))
 
         if leader_segments:
@@ -445,28 +600,79 @@ def trace_dimension_attachments(
             max_d = float("-inf")
             for lp1, lp2 in leader_segments:
                 for pt in (lp1, lp2):
-                    d_from_center = ((pt[0] - cx)**2 + (pt[1] - cy)**2)**0.5
+                    d_from_center = math.hypot(pt[0] - cx, pt[1] - cy)
                     if d_from_center > max_d:
                         max_d = d_from_center
                         furthest_pt = pt
-            if furthest_pt and max_d >= 15.0:
+            if furthest_pt and max_d >= 12.0:
                 leader_tip = [round(furthest_pt[0], 2), round(furthest_pt[1], 2)]
+
+    if leader_tip and circles:
+        tx, ty = leader_tip[0], leader_tip[1]
+        best_circle = None
+        best_err = float("inf")
+        for c in circles:
+            ccx, ccy = c["center"]
+            cr = c["radius_pt"]
+            dist_to_center = math.hypot(tx - ccx, ty - ccy)
+            rim_err = abs(dist_to_center - cr)
+            tol_rim = max(5.0, cr * 0.22)
+            if rim_err <= tol_rim or dist_to_center <= 5.0:
+                score_err = min(rim_err, dist_to_center)
+                if score_err < best_err:
+                    best_err = score_err
+                    best_circle = c
+        if best_circle is not None:
+            circle_cx = best_circle["center"][0]
+            circle_cy = best_circle["center"][1]
+            circle_r_pt = best_circle["radius_pt"]
+            topology_type = "LEADER_CIRCLE"
+            if not attachments:
+                attachments.append([circle_cx, circle_cy])
+
+    is_ordinate = False
+    ordinate_origin: Optional[List[float]] = None
+    if text_spans and not best_dim_line and circle_cx is None:
+        for sp in text_spans:
+            st = str(sp.get("text", "")).strip()
+            if st in ("0", "0.0", "0,0"):
+                sb = sp.get("bbox", [0.0, 0.0, 0.0, 0.0])
+                scx = (sb[0] + sb[2]) * 0.5
+                scy = (sb[1] + sb[3]) * 0.5
+                if abs(scy - cy) <= 18.0 and abs(scx - cx) > 8.0:
+                    is_ordinate = True
+                    ordinate_origin = [round(scx, 2), round(scy, 2)]
+                    line_length = abs(cx - scx)
+                    topology_type = "ORDINATE_BASELINE"
+                    break
+                if abs(scx - cx) <= 18.0 and abs(scy - cy) > 8.0:
+                    is_ordinate = True
+                    ordinate_origin = [round(scx, 2), round(scy, 2)]
+                    line_length = abs(cy - scy)
+                    topology_type = "ORDINATE_BASELINE"
+                    break
 
     scale_consistent = True
     ratio = None
-    if best_dim_line and nominal_val is not None and page_scale is not None and nominal_val > 0.0:
+    if (best_dim_line or is_ordinate or topology_type == "LINEAR_OUTSIDE_NARROW") and nominal_val is not None and page_scale is not None and nominal_val > 0.0 and line_length > 0.0:
         computed_dist = line_length * page_scale
         ratio = computed_dist / nominal_val
         if ratio < 0.65 or ratio > 1.45:
             scale_consistent = False
 
     return {
-        "has_dimension_line": best_dim_line is not None,
+        "has_dimension_line": best_dim_line is not None or topology_type == "LINEAR_OUTSIDE_NARROW",
         "dimension_line_length_pt": round(line_length, 2),
         "p_start": p_start,
         "p_end": p_end,
         "attachment_points": attachments,
         "leader_tip": leader_tip,
+        "circle_cx": circle_cx,
+        "circle_cy": circle_cy,
+        "circle_r_pt": circle_r_pt,
+        "is_ordinate": is_ordinate,
+        "ordinate_origin": ordinate_origin,
+        "topology_type": topology_type,
         "scale_consistent": scale_consistent,
         "computed_scale_ratio": round(ratio, 3) if ratio is not None else None,
     }

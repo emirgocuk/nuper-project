@@ -277,7 +277,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             dim_view = "VIEW_SIDE_YZ"
             dim_axis = "Z" if dim_orientation == "HORIZONTAL" else "Y"
 
-        attachment_info = trace_dimension_attachments(main_bbox, drawings, nominal_val=base_nom)
+        attachment_info = trace_dimension_attachments(main_bbox, drawings, nominal_val=base_nom, text_spans=spans_pool)
 
         grouped_dimensions.append({
             "raw_text": combined_str,
