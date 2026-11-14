@@ -16,7 +16,7 @@
     "test:ui": "vitest run",
     "test:visual": "playwright test",
     "test:python": "python -m pytest tools/tests -q",
-    "test:rust": "cross-env PATH=\"%USERPROFILE%\\.cargo\\bin;%PATH%\" cargo check --workspace",
+    "test:rust": "cargo check --workspace",
     "test:fast": "cargo check --workspace && python -m pytest tools/tests -q",
     "check:all": "npm run check:types && npm run test:ui && npm run test:python && npm run test:rust",
     "test:all": "npm run check:types && npm run test:ui && npm run test:python && npm run test:rust",

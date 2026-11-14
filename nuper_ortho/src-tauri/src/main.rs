@@ -110,6 +110,23 @@ pub fn compile_all_dialects_ipc(drawing_json: &str, step_path: &str) -> Result<S
                 let nom = dim.get("nominal").and_then(|v| v.as_f64()).unwrap_or(0.0);
                 let upper = dim.get("upper_tol").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.05);
                 let lower = dim.get("lower_tol").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(-0.05);
+                let match_status = dim.get("match_status").and_then(|v| v.as_str()).unwrap_or("");
+                let requires_manual = dim.get("requires_manual_3d_binding").and_then(|v| v.as_bool()).unwrap_or(false);
+                if requires_manual || match_status == "UNMATCHED" {
+                    if let Ok(mut unmatched_feat) = ortho_ast::GeometricFeature::new_plane(
+                        1000 + id,
+                        format!("UNMATCHED_DIM_{}", id),
+                        DVec3::ZERO,
+                        DVec3::Z,
+                        1.0,
+                        1.0,
+                    ) {
+                        unmatched_feat.match_status = Some("UNMATCHED".to_string());
+                        unmatched_feat.requires_manual_3d_binding = true;
+                        plan.features.push(unmatched_feat);
+                    }
+                    continue;
+                }
                 if let Some(matched) = plan.features.iter().find(|f| {
                     f.diameter.map(|d| (d - nom).abs() < 0.2).unwrap_or(false)
                         || f.depth_or_length.map(|l| (l - nom).abs() < 0.2).unwrap_or(false)
@@ -123,6 +140,17 @@ pub fn compile_all_dialects_ipc(drawing_json: &str, step_path: &str) -> Result<S
                         lower,
                     );
                     plan.tolerances.push(tol);
+                } else if let Ok(mut unmatched_feat) = ortho_ast::GeometricFeature::new_plane(
+                    1000 + id,
+                    format!("UNMATCHED_DIM_{}", id),
+                    DVec3::ZERO,
+                    DVec3::Z,
+                    1.0,
+                    1.0,
+                ) {
+                    unmatched_feat.match_status = Some("UNMATCHED".to_string());
+                    unmatched_feat.requires_manual_3d_binding = true;
+                    plan.features.push(unmatched_feat);
                 }
             }
         }
@@ -234,6 +262,28 @@ pub fn check_license_ipc(dongle_id: Option<String>) -> Result<AirGappedLicense, 
         .map_err(|e| e.to_string())?;
 
     Ok(license)
+}
+
+fn run_active_learning_cli(args: &[&str]) -> Result<String, String> {
+    let output = std::process::Command::new("python")
+        .arg("tools/extractor/active_learning_engine.py")
+        .args(args)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+pub fn undo_last_feedback_ipc() -> Result<String, String> {
+    run_active_learning_cli(&["--undo-last"])
+}
+
+pub fn clear_feedback_for_part_ipc(part_hash: &str) -> Result<String, String> {
+    let target = if part_hash.trim().is_empty() { "*" } else { part_hash.trim() };
+    run_active_learning_cli(&["--clear-part", target])
 }
 
 fn main() {
