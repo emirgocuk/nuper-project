@@ -5439,16 +5439,16 @@ DURUM: ONAYLANDI (AIR-GAPPED ASKERI TESIS LISANSI AKTIF)`
 
     function exportCompleteInspectionBundle() {
       // 1. DMIS 5.2 Programı
-      downloadFile('VALVE_BODY_OP10.DMI', codeSnippets.dmis);
+      downloadFile('PARCA_YUKLENMEDI.DMI', codeSnippets.dmis);
 
       // 2. Zeiss Calypso Formatı
       setTimeout(() => {
-        downloadFile('VALVE_BODY_OP10_CALYPSO.txt', codeSnippets.calypso);
+        downloadFile('PARCA_YUKLENMEDI_CALYPSO.txt', codeSnippets.calypso);
       }, 150);
 
       // 3. Fikstür ve Kurulum Föyü
       const setupSheetContent = `# NUPER ORTHO CMM OPERATOR KURULUM FOYU
-Parca: VALVE_BODY_OP10.step
+Parca: Parça Yüklenmedi
 Baglama: OP10 (3-2-1 Destek Pabuclari Z=0, Yan Dayamalar X=0, Y=0)
 Prob: Renishaw PH10M (Stilus: Ø2x20mm Yakut Bilye)
 CMM: LK-Altera 10.7.6
@@ -5456,7 +5456,7 @@ Guvenlik: Collision-Free Certified
 SHA-256 Seal: 170D62F7A8E0F0E681A1BA41EC19231C6FB60AC6A98DA49CC4330F7C80EF251B
 `;
       setTimeout(() => {
-        downloadFile('SETUP_SHEET_VALVE_BODY_OP10.md', setupSheetContent, 'text/markdown;charset=utf-8');
+        downloadFile('SETUP_SHEET_PARCA_YUKLENMEDI.md', setupSheetContent, 'text/markdown;charset=utf-8');
       }, 300);
 
       // 4. FAT Kabul Sertifikası
@@ -5466,7 +5466,7 @@ SHA-256 Seal: 170D62F7A8E0F0E681A1BA41EC19231C6FB60AC6A98DA49CC4330F7C80EF251B
 
       // 5. AS9100 Rev D SHA-256 Dijital Mührü
       const sealContent = `AS9100 REV D KRIPTOGRAFIK MUHUR SERTIFIKASI
-Dosya: VALVE_BODY_OP10
+Dosya: Parça Yüklenmedi
 Zaman: 2026-09-28T18:00:00Z
 Denetci: Muh. Emir Gocuk (Lead QA & Metrology)
 Kanonik SHA-256: 170D62F7A8E0F0E681A1BA41EC19231C6FB60AC6A98DA49CC4330F7C80EF251B
@@ -5477,7 +5477,7 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
       }, 600);
 
       setTimeout(() => {
-        alert("📦 NUPER ORTHO ÜRETİM PAKETİ DAĞITILDI!\n\nİndirilen Dosyalar:\n1. VALVE_BODY_OP10.DMI (Kanonik DMIS 5.2)\n2. VALVE_BODY_OP10_CALYPSO.txt (Zeiss Calypso)\n3. SETUP_SHEET_VALVE_BODY_OP10.md (Fikstür Planı)\n4. FAT_CERTIFICATE_AS9100D_VALVE_001.md (Saha Kabul)\n5. AS9100D_DIGITAL_SEAL_SHA256.sig (Kriptografik Mühür)\n\n✅ Durum: Çarpışmasız & AS9100 Rev D Mühürlü!");
+        alert("📦 NUPER ORTHO ÜRETİM PAKETİ DAĞITILDI!\n\nİndirilen Dosyalar:\n1. PARCA_YUKLENMEDI.DMI (Kanonik DMIS 5.2)\n2. PARCA_YUKLENMEDI_CALYPSO.txt (Zeiss Calypso)\n3. SETUP_SHEET_PARCA_YUKLENMEDI.md (Fikstür Planı)\n4. FAT_CERTIFICATE_AS9100D_VALVE_001.md (Saha Kabul)\n5. AS9100D_DIGITAL_SEAL_SHA256.sig (Kriptografik Mühür)\n\n✅ Durum: Çarpışmasız & AS9100 Rev D Mühürlü!");
       }, 750);
     }
 
