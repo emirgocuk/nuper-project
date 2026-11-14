@@ -69,7 +69,7 @@
 
       const activeName = (typeof currentUploadedCad !== 'undefined' && currentUploadedCad && currentUploadedCad.name) 
         ? currentUploadedCad.name 
-        : 'VALVE_BODY_OP10.step';
+        : 'Parça Yüklenmedi';
       if (cadNameEl) cadNameEl.innerText = 'MODEL: ' + activeName;
 
       const checks = [];
@@ -2262,7 +2262,7 @@ FEATURES:
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 14px;">
-          <div><b style="font-size: 10px; color:#64748B; text-transform:uppercase;">Parça Adı:</b><br><span style="font-family: var(--font-mono); font-weight: 600;">VALVE_BODY_OP10</span></div>
+          <div><b style="font-size: 10px; color:#64748B; text-transform:uppercase;">Parça Adı:</b><br><span style="font-family: var(--font-mono); font-weight: 600;">Parça Yüklenmedi</span></div>
           <div><b style="font-size: 10px; color:#64748B; text-transform:uppercase;">CAD Modeli:</b><br><span style="font-family: var(--font-mono); font-weight: 600;">valve_block.step</span></div>
           <div><b style="font-size: 10px; color:#64748B; text-transform:uppercase;">Malzeme / Sıcaklık:</b><br><span style="font-family: var(--font-mono); font-weight: 600;">7075-T6 (20.0 °C)</span></div>
           <div><b style="font-size: 10px; color:#64748B; text-transform:uppercase;">CMM Tezgahı:</b><br><span style="font-family: var(--font-mono); font-weight: 600;">LK-Altera 10.7.6</span></div>
@@ -3166,7 +3166,7 @@ FEATURES:
     let activeFeatureKey = 'bore_h7';
     var featureDatabase = window.featureDatabase = window.featureDatabase || {};
     let currentUploadedCad = {
-      name: "VALVE_BODY_OP10.step",
+      name: "Parça Yüklenmedi",
       protocol: "ISO 10303-21 (AP214)",
       bbox: "100.0 x 50.0 x 100.0 mm",
       faces: 14,
@@ -5220,14 +5220,13 @@ DURUM: ONAYLANDI (AIR-GAPPED ASKERI TESIS LISANSI AKTIF)`
 
       const badge = document.getElementById('part-name-badge');
       if (op === 'OP20') {
-        badge.innerText = "VALVE_BODY_OP20.step (180° Ters)";
+        badge.innerText = (currentUploadedCad && currentUploadedCad.name && currentUploadedCad.name !== "Parça Yüklenmedi") ? currentUploadedCad.name + " (OP20 180° Ters)" : "Parça Yüklenmedi";
         badge.style.color = "#0284C7";
-        // 180° Parça çevirme (Flip around X axis)
         blockGroup.rotation.x = Math.PI;
         blockGroup.position.y = 50;
         selectFeature('bottom_mounting_face');
       } else {
-        badge.innerText = "VALVE_BODY_OP10.step";
+        badge.innerText = (currentUploadedCad && currentUploadedCad.name) ? currentUploadedCad.name : "Parça Yüklenmedi";
         badge.style.color = "#334155";
         blockGroup.rotation.x = 0;
         blockGroup.position.y = 0;
@@ -5486,7 +5485,7 @@ Status: CERTIFIED UNTAMPERED (AS9100 Rev D Clause 8.5.1 / 8.5.2)
     // 15. CANLI CAD INGESTION VE B-REP GEOMETRİ MOTORU (FAZ 9)
     // ==========================================================================
     currentUploadedCad = {
-      name: "VALVE_BODY_OP10.step",
+      name: "Parça Yüklenmedi",
       protocol: "ISO 10303-21 (AP214)",
       bbox: "100.0 x 50.0 x 100.0 mm",
       faces: 14,
