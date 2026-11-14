@@ -33,12 +33,16 @@ try:
         normalize_decimal_commas,
         is_reference_dimension,
         parse_tolerance,
+        can_bind_multiplier,
+        is_standalone_sub_millimeter_noise,
     )
 except ImportError:
     from .parse.dimension import (
         normalize_decimal_commas,
         is_reference_dimension,
         parse_tolerance,
+        can_bind_multiplier,
+        is_standalone_sub_millimeter_noise,
     )
 
 try:
@@ -214,6 +218,10 @@ def extract_vector_dimensions_from_page(
             continue
         if re.search(r"[°\^]C|OC\b|ASTM|MIL-STD|SAE\b|HRC|HB\b|DIN\b|EN\b\s*\d+|ISO\b\s*\d+|ASME\s*B1\.13M|ISO\s*965", txt, re.I):
             continue
+        if re.match(r"^\d+\s*[xX]$", txt.strip()):
+            continue
+        if re.match(r"^[±\+\-]\s*0?\.[0-9]+$", txt.strip()):
+            continue
 
         nom_match = re.search(r"(?:[Ø\u00d8@]|R|M)?\s*([0-9]+(?:\.[0-9]+)?)", txt)
         if not nom_match:
@@ -223,6 +231,8 @@ def extract_vector_dimensions_from_page(
             continue
 
         base_nom = float(nom_match.group(1))
+        if is_standalone_sub_millimeter_noise(txt, base_nom):
+            continue
         if base_nom < 0.2 or base_nom > 3500.0:
             continue
         if base_nom in [2375.0, 1907.0, 1444.0, 2417.0, 2024.0, 2025.0, 2026.0]:
@@ -245,6 +255,17 @@ def extract_vector_dimensions_from_page(
                     used_spans.add(j)
                     break
 
+        mult_prefix = ""
+        if not re.match(r"^\d+\s*[xX]\b", txt.strip()):
+            for j, other in nearby_spans:
+                if i == j or j in used_spans or other.get("is_vector_symbol"):
+                    continue
+                other_clean = normalize_decimal_commas(other["text"]).strip()
+                if re.match(r"^\d+\s*[xX]$", other_clean) and can_bind_multiplier(tuple(other["bbox"]), tuple(main_bbox), txt):
+                    mult_prefix = f"{other_clean.lower()} "
+                    used_spans.add(j)
+                    break
+
         span_rot = s.get("rotation", 0.0)
         loc_main = normalize_span_to_local_frame(main_bbox, span_rot)
 
@@ -255,15 +276,22 @@ def extract_vector_dimensions_from_page(
             loc_other = normalize_span_to_local_frame(other["bbox"], span_rot)
             dx = loc_other[0] - loc_main[2]
             dy = abs(loc_other[1] - loc_main[1])
-            is_smaller = other["size"] <= main_size * 0.85
-            if -6.0 <= dx <= 28.0 and dy <= 22.0 and is_smaller:
-                other_text = normalize_decimal_commas(other["text"])
+            other_text = normalize_decimal_commas(other["text"])
+            is_tol_fragment = bool(re.match(r"^[±\+\-]\s*0?\.[0-9]+$", other_text.strip()))
+            is_sub_mm = False
+            sub_m = re.match(r"^(0?\.[0-9]+)$", other_text.strip())
+            if sub_m:
+                is_sub_mm = is_standalone_sub_millimeter_noise(other_text, float(sub_m.group(1)))
+            is_smaller = other["size"] <= main_size * 0.85 or is_tol_fragment or is_sub_mm
+            dx_limit = 32.0 if (is_tol_fragment or is_sub_mm) else 28.0
+            if -8.0 <= dx <= dx_limit and dy <= 22.0 and is_smaller:
                 if re.search(r"[+-]?[0-9\.]+|[0-9\.]+", other_text):
                     tol_candidates.append((j, other, loc_other))
 
         upper_tol = ""
         lower_tol = ""
-        combined_str = f"{sym_prefix}{txt}" if sym_prefix and not txt.startswith(sym_prefix) else txt
+        combined_core = f"{sym_prefix}{txt}" if sym_prefix and not txt.startswith(sym_prefix) else txt
+        combined_str = f"{mult_prefix}{combined_core}" if mult_prefix else combined_core
 
         if len(tol_candidates) >= 2:
             c1_idx, c1, loc_c1 = tol_candidates[0]

@@ -25,6 +25,39 @@ def is_reference_dimension(raw_text: str) -> bool:
     return False
 
 
+def can_bind_multiplier(
+    mult_bbox: Tuple[float, float, float, float],
+    dim_bbox: Tuple[float, float, float, float],
+    dim_text: str,
+) -> bool:
+    if not dim_text or is_reference_dimension(dim_text):
+        return False
+    cy_mult = (mult_bbox[1] + mult_bbox[3]) / 2.0
+    cy_dim = (dim_bbox[1] + dim_bbox[3]) / 2.0
+    dx = dim_bbox[0] - mult_bbox[2]
+    if abs(cy_mult - cy_dim) <= 3.0 and 0.0 <= dx <= 12.0:
+        return True
+    cx_mult = (mult_bbox[0] + mult_bbox[2]) / 2.0
+    cx_dim = (dim_bbox[0] + dim_bbox[2]) / 2.0
+    dy = dim_bbox[1] - mult_bbox[3]
+    if abs(cx_mult - cx_dim) <= 3.0 and 0.0 <= dy <= 12.0:
+        return True
+    return False
+
+
+def is_standalone_sub_millimeter_noise(raw_text: str, nominal: Optional[float]) -> bool:
+    if nominal is None or nominal <= 0.0 or nominal >= 1.0:
+        return False
+    norm = normalize_decimal_commas(str(raw_text or "")).strip()
+    if not norm:
+        return False
+    if "°" in norm or "^" in norm:
+        return False
+    if re.match(r"^(?:\d+\s*[xX]\s*)?[Ø\u00d8\u2300RM±\+\-]", norm):
+        return False
+    return True
+
+
 def parse_tolerance(
     tol_str: str,
     nominal: Optional[float] = None,

@@ -506,6 +506,11 @@ def parse_text_to_metrology(
                 u_tol = vd.get("upper_tol") or norm.get("upper_tol", "")
                 l_tol = vd.get("lower_tol") or norm.get("lower_tol", "")
 
+                vd_gdt = vd.get("gdt") or vd.get("fcf") or ""
+                vd_datums: List[str] = []
+                if "|" in vd_gdt:
+                    for seg in vd_gdt.split("|")[1:]:
+                        vd_datums.extend(re.findall(r"\b([A-Z])\b", seg.strip()))
                 dims.append({
                     "id": balloon_idx,
                     "balloon": f"#{balloon_idx}",
@@ -522,8 +527,8 @@ def parse_text_to_metrology(
                     "status": "UNMEASURED",
                     "verification": "PARSED",
                     "feature_key": f"feat_{nom}_{balloon_idx}".replace(".", "_"),
-                    "gdt": "",
-                    "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
+                    "gdt": vd_gdt,
+                    "datum_reference": f"[{vd_datums[0]}]" if vd_datums else "",
                     "op": norm.get("op", "OP10"),
                     "op_reason": norm.get("op_reason", "Standart üst kurulum."),
                     "inferred_axis": vd.get("inferred_axis"),
@@ -578,7 +583,7 @@ def parse_text_to_metrology(
                     "verification": "PARSED",
                     "feature_key": f"dia_{nom}_{balloon_idx}".replace(".", "_"),
                     "gdt": "",
-                    "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
+                    "datum_reference": "",
                     "op": norm.get("op", "OP10"),
                     "op_reason": norm.get("op_reason", "Dikey Z- probu ile taranabilir."),
                     "bbox": box,
@@ -614,7 +619,7 @@ def parse_text_to_metrology(
                     "verification": "PARSED",
                     "feature_key": f"radius_{r_val}_{balloon_idx}".replace(".", "_"),
                     "gdt": "",
-                    "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
+                    "datum_reference": "",
                     "op": norm.get("op", "OP10"),
                     "op_reason": norm.get("op_reason", "Kavis prob taraması."),
                     "bbox": box,
@@ -648,7 +653,7 @@ def parse_text_to_metrology(
                     "verification": "PARSED",
                     "feature_key": f"thread_{balloon_idx}",
                     "gdt": "",
-                    "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
+                    "datum_reference": "",
                     "op": "OP10",
                     "op_reason": "Diş ölçümü.",
                     "bbox": box,
@@ -707,7 +712,7 @@ def parse_text_to_metrology(
                     "verification": "PARSED",
                     "feature_key": f"lin_{str(val).replace('.', '_')}_{balloon_idx}",
                     "gdt": "",
-                    "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
+                    "datum_reference": "",
                     "op": "OP10",
                     "op_reason": op_reason,
                     "bbox": box,
@@ -801,7 +806,7 @@ def parse_text_to_metrology(
                     "tolerance_source": "AP242_PMI",
                     "feature_key": f"pmi_{pmi_tol.get('step_id')}_{balloon_idx}",
                     "gdt": pmi_tol.get("type", ""),
-                    "datum_reference": f"[{result['datums'][0]}]" if result["datums"] else "",
+                    "datum_reference": "",
                     "op": "OP10",
                     "op_reason": "AP242 Gömülü 3D PMI Geometrik Toleransı",
                     "bbox": [100.0, 100.0, 200.0, 150.0],
