@@ -140,7 +140,15 @@
             "items": { "type": "number" },
             "minItems": 4,
             "maxItems": 4
-          }
+          },
+          "is_reference_dimension": { "type": "boolean" },
+          "requires_manual_3d_binding": { "type": "boolean" },
+          "cylinder_polarity": {
+            "type": "string",
+            "enum": ["INTERNAL_BORE", "EXTERNAL_BOSS", "PLANAR", "UNKNOWN"]
+          },
+          "recommended_stylus": { "type": "string" },
+          "learning_applied": { "type": "boolean" }
         }
       }
     },
@@ -181,6 +189,8 @@
         "tolerance_count": { "type": "integer" },
         "motion_count": { "type": "integer" }
       }
-    }
+    },
+    "ollama_status": { "type": "string" },
+    "learning_applied": { "type": "boolean" }
   }
 }

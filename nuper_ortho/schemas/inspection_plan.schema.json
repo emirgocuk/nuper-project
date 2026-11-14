@@ -58,7 +58,14 @@
           "attachment_points": { "type": "array", "items": { "type": "array", "items": { "type": "number" } } },
           "rel_position": { "type": "array", "items": { "type": "number" } },
           "inferred_axis": { "type": "string", "enum": ["X", "Y", "Z"] },
-          "requires_manual_3d_binding": { "type": "boolean" }
+          "requires_manual_3d_binding": { "type": "boolean" },
+          "is_reference_dimension": { "type": "boolean" },
+          "cylinder_polarity": {
+            "type": "string",
+            "enum": ["INTERNAL_BORE", "EXTERNAL_BOSS", "PLANAR", "UNKNOWN"]
+          },
+          "recommended_stylus": { "type": "string" },
+          "learning_applied": { "type": "boolean" }
         }
       }
     },
@@ -67,6 +74,8 @@
       "items": { "type": "object" }
     },
     "contract_summary": { "type": "object" },
-    "thermal_compensation_summary": { "type": "object" }
+    "thermal_compensation_summary": { "type": "object" },
+    "ollama_status": { "type": "string" },
+    "learning_applied": { "type": "boolean" }
   }
 }

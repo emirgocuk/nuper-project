@@ -46,7 +46,16 @@
           "is_blind": { "type": "boolean" },
           "floor_z": { "type": "number" },
           "minor_diameter": { "type": "number" },
-          "thread_pitch": { "type": "number" }
+          "thread_pitch": { "type": "number" },
+          "cylinder_polarity": {
+            "type": "string",
+            "enum": ["INTERNAL_BORE", "EXTERNAL_BOSS", "PLANAR", "UNKNOWN"]
+          },
+          "recommended_stylus": { "type": "string" },
+          "is_through": { "type": "boolean" },
+          "axial_min": { "type": "number" },
+          "axial_max": { "type": "number" },
+          "stem_blocked": { "type": "boolean" }
         }
       }
     },
