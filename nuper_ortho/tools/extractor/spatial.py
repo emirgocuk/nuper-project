@@ -436,12 +436,92 @@ def extract_circle_primitives(
     return deduped
 
 
+def build_page_geometry_index(drawings: List[Dict[str, Any]]) -> Dict[str, Any]:
+    lines: List[Tuple[Tuple[float, float], Tuple[float, float], float, float, float, float]] = []
+    horiz_lines: List[Tuple[Tuple[float, float], Tuple[float, float], float, float, float, float]] = []
+    vert_lines: List[Tuple[Tuple[float, float], Tuple[float, float], float, float, float, float]] = []
+    endpoint_cells: Dict[Tuple[int, int], List[Tuple[int, Tuple[float, float], Tuple[float, float], float, float]]] = {}
+    segment_grid = SpatialHashGrid(cell_size=32.0)
+    overflow_lines: List[int] = []
+
+    if drawings:
+        for d in drawings:
+            if d.get("is_hatching"):
+                continue
+            for it in d.get("items", []):
+                cmd = it[0] if isinstance(it, (list, tuple)) and len(it) > 0 else ""
+                if cmd == "l" and len(it) >= 3:
+                    p1 = get_point_coords(it[1])
+                    p2 = get_point_coords(it[2])
+                    dx = p2[0] - p1[0]
+                    dy = p2[1] - p1[1]
+                    line_len = math.hypot(dx, dy)
+                    angle_deg = math.degrees(math.atan2(abs(dy), abs(dx)))
+                    mid_x = (p1[0] + p2[0]) * 0.5
+                    mid_y = (p1[1] + p2[1]) * 0.5
+                    line_idx = len(lines)
+                    rec = (p1, p2, line_len, angle_deg, mid_x, mid_y)
+                    lines.append(rec)
+
+                    if line_len >= 10.0:
+                        if angle_deg <= 20.0:
+                            horiz_lines.append(rec)
+                        elif angle_deg >= 70.0:
+                            vert_lines.append(rec)
+
+                    c1 = (int(math.floor(p1[0] / 6.0)), int(math.floor(p1[1] / 6.0)))
+                    c2 = (int(math.floor(p2[0] / 6.0)), int(math.floor(p2[1] / 6.0)))
+                    endpoint_cells.setdefault(c1, []).append((line_idx, p1, p2, line_len, angle_deg))
+                    endpoint_cells.setdefault(c2, []).append((line_idx, p2, p1, line_len, angle_deg))
+
+                    min_x = p1[0] if p1[0] <= p2[0] else p2[0]
+                    max_x = p2[0] if p1[0] <= p2[0] else p1[0]
+                    min_y = p1[1] if p1[1] <= p2[1] else p2[1]
+                    max_y = p2[1] if p1[1] <= p2[1] else p1[1]
+                    gx0 = int(math.floor(min_x / 32.0))
+                    gy0 = int(math.floor(min_y / 32.0))
+                    gx1 = int(math.floor(max_x / 32.0))
+                    gy1 = int(math.floor(max_y / 32.0))
+                    if (gx1 - gx0 + 1) * (gy1 - gy0 + 1) <= 64:
+                        segment_grid.insert([min_x, min_y, max_x, max_y], line_idx)
+                    else:
+                        overflow_lines.append(line_idx)
+
+    circles = extract_circle_primitives(drawings)
+    return {
+        "lines": lines,
+        "horiz_lines": horiz_lines,
+        "vert_lines": vert_lines,
+        "endpoint_cells": endpoint_cells,
+        "segment_grid": segment_grid,
+        "overflow_lines": overflow_lines,
+        "circles": circles,
+    }
+
+
+def _query_endpoint_candidates(
+    endpoint_cells: Dict[Tuple[int, int], List[Tuple[int, Tuple[float, float], Tuple[float, float], float, float]]],
+    px: float,
+    py: float,
+) -> List[Tuple[int, Tuple[float, float], Tuple[float, float], float, float]]:
+    cx_cell = int(math.floor(px / 6.0))
+    cy_cell = int(math.floor(py / 6.0))
+    out: List[Tuple[int, Tuple[float, float], Tuple[float, float], float, float]] = []
+    for gx in range(cx_cell - 1, cx_cell + 2):
+        for gy in range(cy_cell - 1, cy_cell + 2):
+            bucket = endpoint_cells.get((gx, gy))
+            if bucket:
+                out.extend(bucket)
+    return out
+
+
 def trace_dimension_attachments(
     dim_bbox: List[float],
     drawings: List[Dict[str, Any]],
     nominal_val: Optional[float] = None,
     page_scale: Optional[float] = None,
     text_spans: Optional[List[Dict[str, Any]]] = None,
+    precomputed: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     x0, y0, x1, y1 = dim_bbox
     cx = (x0 + x1) / 2.0
@@ -449,41 +529,29 @@ def trace_dimension_attachments(
     bw = x1 - x0
     bh = y1 - y0
 
-    all_lines: List[Tuple[Tuple[float, float], Tuple[float, float]]] = []
-    for d in drawings:
-        if d.get("is_hatching"):
-            continue
-        for it in d.get("items", []):
-            cmd = it[0] if isinstance(it, (list, tuple)) and len(it) > 0 else ""
-            if cmd == "l" and len(it) >= 3:
-                p1 = get_point_coords(it[1])
-                p2 = get_point_coords(it[2])
-                all_lines.append((p1, p2))
-
-    circles = extract_circle_primitives(drawings)
+    geom = precomputed if precomputed is not None else build_page_geometry_index(drawings)
+    lines = geom["lines"]
+    horiz_lines = geom["horiz_lines"]
+    vert_lines = geom["vert_lines"]
+    endpoint_cells = geom["endpoint_cells"]
+    segment_grid = geom["segment_grid"]
+    overflow_lines = geom["overflow_lines"]
+    circles = geom["circles"]
 
     best_dim_line = None
     min_dist = float("inf")
     dim_is_horiz = bw >= bh
     topology_type = "UNRESOLVED"
 
-    for p1, p2 in all_lines:
-        dx = p2[0] - p1[0]
-        dy = p2[1] - p1[1]
-        line_len = (dx**2 + dy**2)**0.5
-        if line_len < 10.0:
-            continue
-        angle = math.degrees(math.atan2(abs(dy), abs(dx)))
-        line_cx = (p1[0] + p2[0]) / 2.0
-        line_cy = (p1[1] + p2[1]) / 2.0
-
-        if dim_is_horiz and angle <= 20.0:
+    if dim_is_horiz:
+        for p1, p2, line_len, angle, line_cx, line_cy in horiz_lines:
             dist = abs(line_cy - cy)
             if dist <= 35.0 and abs(line_cx - cx) <= line_len * 0.6:
                 if dist < min_dist:
                     min_dist = dist
                     best_dim_line = (p1, p2, line_len, "HORIZONTAL")
-        elif not dim_is_horiz and angle >= 70.0:
+    else:
+        for p1, p2, line_len, angle, line_cx, line_cy in vert_lines:
             dist = abs(line_cx - cx)
             if dist <= 35.0 and abs(line_cy - cy) <= line_len * 0.6:
                 if dist < min_dist:
@@ -506,40 +574,40 @@ def trace_dimension_attachments(
             p_end = [round(p1[0], 2), round(p1[1], 2)]
 
         for p_target in (p_start, p_end):
-            matched_for_target = False
-            for lp1, lp2 in all_lines:
-                for candidate_pt, other_pt in ((lp1, lp2), (lp2, lp1)):
-                    dist_to_end = ((candidate_pt[0] - p_target[0])**2 + (candidate_pt[1] - p_target[1])**2)**0.5
-                    if dist_to_end <= 4.0:
-                        ldx = other_pt[0] - candidate_pt[0]
-                        ldy = other_pt[1] - candidate_pt[1]
-                        l_len = (ldx**2 + ldy**2)**0.5
-                        if l_len >= 8.0:
-                            l_angle = math.degrees(math.atan2(abs(ldy), abs(ldx)))
-                            if orientation == "HORIZONTAL" and l_angle >= 65.0:
-                                attachments.append([round(other_pt[0], 2), round(other_pt[1], 2)])
-                                matched_for_target = True
-                                break
-                            elif orientation == "VERTICAL" and l_angle <= 25.0:
-                                attachments.append([round(other_pt[0], 2), round(other_pt[1], 2)])
-                                matched_for_target = True
-                                break
-                if matched_for_target:
-                    break
+            ptx, pty = p_target[0], p_target[1]
+            cands = _query_endpoint_candidates(endpoint_cells, ptx, pty)
+            cands.sort(key=lambda item: item[0])
+            for _, candidate_pt, other_pt, l_len, l_angle in cands:
+                if l_len < 8.0:
+                    continue
+                if abs(candidate_pt[0] - ptx) > 4.0 or abs(candidate_pt[1] - pty) > 4.0:
+                    continue
+                if math.hypot(candidate_pt[0] - ptx, candidate_pt[1] - pty) <= 4.0:
+                    if orientation == "HORIZONTAL" and l_angle >= 65.0:
+                        attachments.append([round(other_pt[0], 2), round(other_pt[1], 2)])
+                        break
+                    elif orientation == "VERTICAL" and l_angle <= 25.0:
+                        attachments.append([round(other_pt[0], 2), round(other_pt[1], 2)])
+                        break
     else:
         ext_lines = []
-        for lp1, lp2 in all_lines:
-            ldx = lp2[0] - lp1[0]
-            ldy = lp2[1] - lp1[1]
-            l_len = math.hypot(ldx, ldy)
+        rx = max(bw * 1.5, 45.0)
+        ry = max(bh * 1.5, 45.0)
+        search_box = (
+            [cx - rx, cy - 35.0, cx + rx, cy + 35.0]
+            if dim_is_horiz
+            else [cx - 35.0, cy - ry, cx + 35.0, cy + ry]
+        )
+        local_indices = list(segment_grid.query_radius(search_box, 4.0))
+        if overflow_lines:
+            local_indices.extend(overflow_lines)
+        for line_idx in local_indices:
+            lp1, lp2, l_len, l_angle, mid_x, mid_y = lines[line_idx]
             if l_len < 8.0:
                 continue
-            l_angle = math.degrees(math.atan2(abs(ldy), abs(ldx)))
-            mid_x = (lp1[0] + lp2[0]) * 0.5
-            mid_y = (lp1[1] + lp2[1]) * 0.5
-            if dim_is_horiz and l_angle >= 75.0 and abs(mid_y - cy) <= 35.0 and abs(mid_x - cx) <= max(bw * 1.5, 45.0):
+            if dim_is_horiz and l_angle >= 75.0 and abs(mid_y - cy) <= 35.0 and abs(mid_x - cx) <= rx:
                 ext_lines.append((mid_x, lp1, lp2))
-            elif not dim_is_horiz and l_angle <= 15.0 and abs(mid_x - cx) <= 35.0 and abs(mid_y - cy) <= max(bh * 1.5, 45.0):
+            elif not dim_is_horiz and l_angle <= 15.0 and abs(mid_x - cx) <= 35.0 and abs(mid_y - cy) <= ry:
                 ext_lines.append((mid_y, lp1, lp2))
 
         if len(ext_lines) >= 2:
@@ -571,34 +639,45 @@ def trace_dimension_attachments(
 
     if not best_dim_line or line_length < 15.0 or len(attachments) < 2:
         shelf_pts: List[Tuple[float, float]] = []
-        for lp1, lp2 in all_lines:
-            ldx = lp2[0] - lp1[0]
-            ldy = lp2[1] - lp1[1]
-            l_len = math.hypot(ldx, ldy)
-            if l_len < 4.0:
+        shelf_r = max(bw, bh) + 20.0
+        shelf_indices = list(segment_grid.query_radius([cx, cy, cx, cy], shelf_r + 2.0))
+        if overflow_lines:
+            shelf_indices.extend(overflow_lines)
+        for line_idx in shelf_indices:
+            lp1, lp2, l_len, angle, _, _ = lines[line_idx]
+            if l_len < 4.0 or angle > 15.0:
                 continue
-            angle = math.degrees(math.atan2(abs(ldy), abs(ldx)))
             d_box = min(
                 math.hypot(lp1[0] - cx, lp1[1] - cy),
                 math.hypot(lp2[0] - cx, lp2[1] - cy),
             )
-            if angle <= 15.0 and d_box <= max(bw, bh) + 20.0:
+            if d_box <= shelf_r:
                 shelf_pts.extend([lp1, lp2])
 
-        leader_segments = []
-        for lp1, lp2 in all_lines:
+        leader_idx_set = set()
+        max_r = max(bw, bh) * 1.5 + 25.0
+        near_indices = list(segment_grid.query_radius([cx, cy, cx, cy], max_r + 2.0))
+        if overflow_lines:
+            near_indices.extend(overflow_lines)
+        for line_idx in near_indices:
+            lp1, lp2, _, _, _, _ = lines[line_idx]
             d1 = min(math.hypot(lp1[0] - cx, lp1[1] - cy), math.hypot(lp2[0] - cx, lp2[1] - cy))
-            connected_to_shelf = any(
-                math.hypot(lp1[0] - sp[0], lp1[1] - sp[1]) <= 4.5 or math.hypot(lp2[0] - sp[0], lp2[1] - sp[1]) <= 4.5
-                for sp in shelf_pts
-            )
-            if d1 <= max(bw, bh) * 1.5 + 25.0 or connected_to_shelf:
-                leader_segments.append((lp1, lp2))
+            if d1 <= max_r:
+                leader_idx_set.add(line_idx)
 
-        if leader_segments:
+        for sp in shelf_pts:
+            spx, spy = sp[0], sp[1]
+            for line_idx, ep, _, _, _ in _query_endpoint_candidates(endpoint_cells, spx, spy):
+                if line_idx not in leader_idx_set:
+                    if abs(ep[0] - spx) <= 4.5 and abs(ep[1] - spy) <= 4.5:
+                        if math.hypot(ep[0] - spx, ep[1] - spy) <= 4.5:
+                            leader_idx_set.add(line_idx)
+
+        if leader_idx_set:
             furthest_pt = None
             max_d = float("-inf")
-            for lp1, lp2 in leader_segments:
+            for line_idx in leader_idx_set:
+                lp1, lp2, _, _, _, _ = lines[line_idx]
                 for pt in (lp1, lp2):
                     d_from_center = math.hypot(pt[0] - cx, pt[1] - cy)
                     if d_from_center > max_d:

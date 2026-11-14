@@ -9,6 +9,7 @@ try:
         get_point_coords,
         normalize_span_to_local_frame,
         trace_dimension_attachments,
+        build_page_geometry_index,
         SpatialHashGrid,
         prune_hatching_lines,
     )
@@ -18,6 +19,7 @@ except ImportError:
         get_point_coords,
         normalize_span_to_local_frame,
         trace_dimension_attachments,
+        build_page_geometry_index,
         SpatialHashGrid,
         prune_hatching_lines,
     )
@@ -165,6 +167,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
     span_grid = SpatialHashGrid(cell_size=24.0)
     for idx_s, sp in enumerate(spans_pool):
         span_grid.insert(sp["bbox"], (idx_s, sp))
+    page_geom_index = build_page_geometry_index(drawings)
 
     for i, s in enumerate(spans_pool):
         if i in used_spans:
@@ -277,7 +280,13 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             dim_view = "VIEW_SIDE_YZ"
             dim_axis = "Z" if dim_orientation == "HORIZONTAL" else "Y"
 
-        attachment_info = trace_dimension_attachments(main_bbox, drawings, nominal_val=base_nom, text_spans=spans_pool)
+        attachment_info = trace_dimension_attachments(
+            main_bbox,
+            drawings,
+            nominal_val=base_nom,
+            text_spans=spans_pool,
+            precomputed=page_geom_index,
+        )
 
         grouped_dimensions.append({
             "raw_text": combined_str,

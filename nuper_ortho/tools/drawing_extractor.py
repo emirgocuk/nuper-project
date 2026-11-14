@@ -22,6 +22,7 @@ from extractor.spatial import (
     detect_orthographic_views,
     assign_view_to_dimension,
     trace_dimension_attachments,
+    build_page_geometry_index,
     validate_scale_consistency,
 )
 from extractor.vector_extractor import extract_vector_dimensions_from_page, get_title_block_mask, is_inside_mask
@@ -644,6 +645,7 @@ def parse_text_to_metrology(
         p_draws = page_drawings.get(p_num, [])
         views_by_page[p_num] = detect_orthographic_views(p_draws, ref_w, ref_h, p_items)
 
+    geom_by_page: Dict[int, Dict[str, Any]] = {}
     filtered_dims = []
     for d in dims:
         p_num = d.get("page", 1)
@@ -656,8 +658,16 @@ def parse_text_to_metrology(
         d["inferred_axis"] = assigned.get("inferred_axis")
         d["rel_position"] = assigned.get("rel_position")
 
+        if p_num not in geom_by_page:
+            geom_by_page[p_num] = build_page_geometry_index(p_draws)
+
         nom_val = d.get("nominal")
-        tr_res = trace_dimension_attachments(dim_bbox, p_draws, nominal_val=float(nom_val) if isinstance(nom_val, (int, float)) else None)
+        tr_res = trace_dimension_attachments(
+            dim_bbox,
+            p_draws,
+            nominal_val=float(nom_val) if isinstance(nom_val, (int, float)) else None,
+            precomputed=geom_by_page[p_num],
+        )
         d["attachment_points"] = tr_res.get("attachment_points", [])
 
         if tr_res.get("has_dimension_line") and not tr_res.get("scale_consistent", True):
