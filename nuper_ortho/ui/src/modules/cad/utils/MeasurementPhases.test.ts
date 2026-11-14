@@ -33,8 +33,20 @@ describe('StylusSelector', () => {
   });
 
   it('Ø2 sığmıyorsa Ø1 önerir', () => {
-    expect(selectStylusForHole(3.0)).toEqual({ ballDiameterMm: 1.0, feasible: true, changedFromDefault: true });
-    expect(selectStylusForHole(2.5)).toEqual({ ballDiameterMm: 1.0, feasible: true, changedFromDefault: true });
+    expect(selectStylusForHole(3.0)).toEqual({
+      ballDiameterMm: 1.0,
+      feasible: true,
+      changedFromDefault: true,
+      recommended_stylus: 'Ø1x20',
+      recommendedModel: 'PH10M (Ø1x20)',
+    });
+    expect(selectStylusForHole(2.5)).toEqual({
+      ballDiameterMm: 1.0,
+      feasible: true,
+      changedFromDefault: true,
+      recommended_stylus: 'Ø1x20',
+      recommendedModel: 'PH10M (Ø1x20)',
+    });
   });
 
   it('Ø1 de sığmıyorsa uygulanamaz işaretler', () => {

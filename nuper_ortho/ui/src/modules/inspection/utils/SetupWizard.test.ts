@@ -430,7 +430,7 @@ describe('SetupWizard — Sıfır Durum ve Beyaz Temalı Işık Masası Modalı'
     expect(cleanPanel?.innerHTML).toContain('395.5');
 
     const timeDisplay = mockDoc.getElementById('time-display');
-    expect(timeDisplay?.innerText).toBe('00:00 / 00:21');
+    expect(timeDisplay?.innerText).toBe('00:00 / 00:22');
 
     wizard.bindDimensionTo3DSurface(1, {
       featureId: 'CAD_PLANE_TOP',

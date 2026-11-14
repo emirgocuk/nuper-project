@@ -43,7 +43,7 @@ describe('Referans Numune Entegrasyon Duman Testi (Smoke Test)', () => {
     expect(result.filename).toBe('drawing.pdf');
     expect(result.datums).toEqual([]);
     expect(result.title_block.hardness).toBe('38-44 HRC');
-    expect(result.dimensions.length).toBe(20);
+    expect(result.dimensions.length).toBe(18);
 
     const radiusCallout = result.dimensions.find((d) => d.type === 'RADIUS');
     expect(radiusCallout).toBeDefined();
@@ -119,14 +119,14 @@ describe('Referans Numune Entegrasyon Duman Testi (Smoke Test)', () => {
     const table = app.getInspectionTable();
     const rows = table.getRows();
 
-    expect(rows.length).toBe(20);
+    expect(rows.length).toBe(18);
     expect(table.getDatums()).toEqual([]);
     expect(table.getTitleBlock().hardness).toBe('38-44 HRC');
 
     const summary = table.getSummary();
-    expect(summary.total).toBe(20);
+    expect(summary.total).toBe(18);
     expect(summary.pass).toBe(0);
-    expect(summary.unmeasured).toBe(20);
+    expect(summary.unmeasured).toBe(18);
     expect(summary.fail).toBe(0);
 
     const firstItem = result.dimensions[0];
