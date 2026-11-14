@@ -135,11 +135,11 @@ def classify_dimension_risk(dim: Dict[str, Any]) -> Tuple[str, List[str]]:
         reasons.append("Hassas Geometrik Boyutlandırma ve Toleranslandırma (GD&T)")
         return "CRITICAL", reasons
 
-    if (span is not None and span <= 0.080) or is_fit:
+    if (span is not None and span <= 0.1001) or is_fit:
         if is_fit:
             reasons.append("ISO Geçme / Alıştırma Toleransı tanımlı")
-        if span is not None and span <= 0.080:
-            reasons.append(f"Tolerans aralığı dar: {span:.4f} mm <= 0.080 mm")
+        if span is not None and span <= 0.1001:
+            reasons.append(f"Tolerans aralığı dar: {span:.4f} mm <= 0.1000 mm")
         return "WARNING", reasons
 
     return "NORMAL", reasons

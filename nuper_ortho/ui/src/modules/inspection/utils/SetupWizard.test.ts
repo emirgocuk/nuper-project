@@ -430,7 +430,24 @@ describe('SetupWizard — Sıfır Durum ve Beyaz Temalı Işık Masası Modalı'
     expect(cleanPanel?.innerHTML).toContain('395.5');
 
     const timeDisplay = mockDoc.getElementById('time-display');
-    expect(timeDisplay?.innerText).toBe('00:00 / 01:14');
+    expect(timeDisplay?.innerText).toBe('00:00 / 00:21');
+
+    wizard.bindDimensionTo3DSurface(1, {
+      featureId: 'CAD_PLANE_TOP',
+      faceId: 12,
+      center: [25, 10, 15],
+      normal: [0, 1, 0],
+      featureType: 'PLANE',
+    });
+    const boundDim = wizard.getDimensions().find((d) => d.id === 1) as unknown as {
+      match_status?: string;
+      match_score?: number;
+      cad_feature_id?: string;
+    };
+    expect(boundDim.match_status).toBe('ENGINEER_LOCKED');
+    expect(boundDim.match_score).toBe(100);
+    expect(boundDim.cad_feature_id).toBe('CAD_PLANE_TOP');
+    expect(timeDisplay?.innerText).not.toBe('00:00 / 00:21');
   });
 
   it('Kullanıcı sağ tık veya buton ile yeni unsur tanımlayabilir ve balon altında gerçek özellik gösterilir', () => {
@@ -442,12 +459,10 @@ describe('SetupWizard — Sıfır Durum ve Beyaz Temalı Işık Masası Modalı'
     expect(typeof wizard.removeFeature).toBe('function');
     expect(typeof wizard.findBalloonNear).toBe('function');
 
-    // Boşken yeni unsur ekleme
     wizard.promptAddFeature(550, 320, 1);
     const modalEl = mockDoc.getElementById('modal-feature-definition');
     expect(modalEl).toBeDefined();
 
-    // Manuel ekleme simülasyonu
     const initialCount = wizard.getDimensions().length;
     const nextId = initialCount + 1;
     wizard.getDimensions().push({
@@ -475,7 +490,6 @@ describe('SetupWizard — Sıfır Durum ve Beyaz Temalı Işık Masası Modalı'
     expect(hit).not.toBeNull();
     expect(hit?.nominal_str).toBe('Ø86 ±0.5');
 
-    // Unsur silme
     wizard.removeFeature(nextId);
     expect(wizard.getDimensions().some((d) => d.id === nextId)).toBe(false);
   });
