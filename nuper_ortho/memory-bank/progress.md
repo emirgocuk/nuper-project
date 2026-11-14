@@ -1,6 +1,6 @@
 # Nuper Ortho — Kanıta Dayalı Durum ve Onarım Planı
 
-Son güncelleme: 13 Kasım 2026. Güncel iş sırasının ve kabul durumunun tek kaynağı bu belgedir.
+Son güncelleme: 14 Kasım 2026. Güncel iş sırasının ve kabul durumunun tek kaynağı bu belgedir.
 
 ## 1. Hedef ve Sınır (Physical AI Vizyonu)
 
@@ -183,6 +183,28 @@ Aşağıdaki sonuçlar 12 Kasım 2026 kapsamlı 8-Madde entegrasyon ve kalite g�
    - `npm run test:ui`: 35 test dosyası, 201 test başarılı (%100 yeşil).
    - `cargo test --workspace`: 9 crate, tüm birim ve E2E testleri başarılı (%100 yeşil).
    - `npm run build`: Başarılı (0 hata, üretim paketi hazır).
+
+### 4.4. Teknik Resim Çıkarım Derinleştirme, O(1) Uzamsal İndeks ve Sıfır Mockup (Tamamlandı)
+
+1. **Sıfır Mockup ve Dürüst Eşleşme Sözleşmesi (`7ee60eb`, `e574665`, `1974f74`):**
+   - `.dev/mocks/` kalıntıları kaldırıldı; UI/Python testleri izole fikstürlere geçirildi.
+   - `similarity_engine.py` boş katalogda uydurma eşleşme yerine `[]` döner.
+   - 3B yüzeyle eşleşmeyen adımlar için `requires_manual_3d_binding` şema alanı eklendi (`vision_ai_extractor.py`, `inspection_planner.py`).
+2. **Tarama Çizgisi Budama, O(1) `SpatialHashGrid` ve Sayfa İçi İndeks (`f61920e`, `6468a2b`):**
+   - `spatial.py` içinde `SpatialHashGrid` (`cell_size = 24.0`), `prune_hatching_lines` (45°/135° tarama budaması) ve sayfa bazlı `build_page_geometry_index` önbelleklemesi eklendi; `GOBEK BAGI OLUGU_TR_AB.pdf` çalışma süresi `13.865s -> 2.936s` düzeyine indirildi.
+3. **Vektörel Delik Sembolleri ve Çok Satırlı Çağrı Birleştirme (`32df058`):**
+   - `⌴` (Havşa/Counterbore), `∨` (Konik Havşa/Countersink), `↧` (Derinlik) sembol sınıflandırması ve `merge_stacked_hole_callouts` eklendi.
+4. **Kırık Kılavuz Çizgisi, Dar Dış Oklar ve Ordinat Referansı (`2fbc685`):**
+   - `extract_circle_primitives`, `LINEAR_OUTSIDE_NARROW`, `LEADER_CIRCLE` ve `ORDINATE_BASELINE` eklendi.
+5. **2B-3B Afin/Procrustes Kaydı ve Kesit Görünümü Kilitleme (`e3a85b0`):**
+   - `brep_verifier.py` içinde `align_view_to_3d_projection` ve `transform_2d_to_3d` ile çok noktalı afin dönüşüm eklendi; `KESİT` / `SECTION` görünüm kilitlemesi (+20 iç çap öncelik puanı) sağlandı.
+6. **6-Fazlı Doğrulama:**
+   - `npm run codegen`: Başarılı.
+   - `npm run check:types`: Başarılı (0 hata).
+   - `python -m pytest tools/tests/`: 86 test başarılı (`5.27s`).
+   - `npm run test:ui`: 35 test dosyası, 200 test başarılı (`17.02s`).
+   - `cargo test --workspace`: 28 test paketi, 176 test başarılı (0 hata).
+   - `npm run build`: Başarılı (`vite build` 700ms, 0 hata).
 
 ## 5. Bağımlılık sırası ve görev boyutu
 
