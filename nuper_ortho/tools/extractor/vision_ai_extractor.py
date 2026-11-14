@@ -125,6 +125,101 @@ def select_best_vision_model(available_models: List[str]) -> Optional[str]:
     return None
 
 
+def build_few_shot_system_prompt(db_path: Optional[str] = None) -> str:
+    base_prompt = VLM_SYSTEM_PROMPT
+    corrections: List[Dict[str, Any]] = []
+    try:
+        from extractor.active_learning_engine import ActiveLearningMatcher
+        corrections = ActiveLearningMatcher(db_path).get_recent_parsing_corrections(limit=8)
+    except Exception:
+        try:
+            from tools.extractor.active_learning_engine import ActiveLearningMatcher
+            corrections = ActiveLearningMatcher(db_path).get_recent_parsing_corrections(limit=8)
+        except Exception:
+            corrections = []
+
+    if not corrections:
+        return base_prompt
+
+    lines = [
+        base_prompt,
+        "",
+        "ENGINEER VERIFIED FEW-SHOT PARSING CORRECTIONS (FOLLOW STRICTLY):",
+    ]
+    import json as _json
+    for idx, corr in enumerate(corrections, start=1):
+        raw_t = str(corr.get("raw_text") or "").strip()
+        corr_obj = corr.get("corrected_json")
+        corr_str = _json.dumps(corr_obj, ensure_ascii=False) if corr_obj is not None else "{}"
+        if raw_t:
+            lines.append(f"Example {idx}: input '{raw_t}' -> {corr_str}")
+    return "\n".join(lines)
+
+
+def check_local_ollama_status(
+    ollama_url: str = "http://127.0.0.1:11434",
+    timeout_s: float = 0.8,
+    verify_generate: bool = True,
+) -> Dict[str, Any]:
+    import json as _json
+    import urllib.request as _req
+
+    base = ollama_url.rstrip("/")
+    models: List[str] = []
+    tags_ok = False
+    generate_ok = False
+    try:
+        req = _req.Request(f"{base}/api/tags", method="GET")
+        with _req.urlopen(req, timeout=timeout_s) as resp:
+            if getattr(resp, "status", 200) == 200:
+                payload = _json.loads(resp.read().decode("utf-8"))
+                models = [str(m.get("name")) for m in payload.get("models", []) if m.get("name")]
+                tags_ok = True
+    except Exception:
+        tags_ok = False
+
+    preferred_models = [
+        "qwen2.5-vl:7b",
+        "qwen2.5vl:7b",
+        "qwen2.5vl:3b",
+        "qwen2.5-coder:7b",
+        "llama3.2-vision:latest",
+        "moondream:latest",
+    ]
+    selected_model = select_best_vision_model(models)
+    if selected_model is None:
+        for cand in preferred_models:
+            if cand in models:
+                selected_model = cand
+                break
+    if selected_model is None and models:
+        selected_model = models[0]
+
+    if tags_ok and verify_generate and selected_model:
+        try:
+            gen_body = _json.dumps({"model": selected_model, "stream": False, "keep_alive": "5m"}).encode("utf-8")
+            gen_req = _req.Request(
+                f"{base}/api/generate",
+                data=gen_body,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with _req.urlopen(gen_req, timeout=max(timeout_s, 1.2)) as resp:
+                generate_ok = getattr(resp, "status", 200) == 200
+        except Exception:
+            generate_ok = False
+
+    active = tags_ok and len(models) > 0
+    return {
+        "active": active,
+        "tags_reachable": tags_ok,
+        "generate_ready": generate_ok,
+        "models": models,
+        "selected_model": selected_model,
+        "status_label": "GPU: Aktif | Yerel AI + Öğrenen Motor" if active else "Yerel AI Çevrimdışı | Kural Motoru + Öğrenen Motor",
+    }
+
+
 def call_ollama_vision(
     b64_image: str,
     model: str,
@@ -134,7 +229,7 @@ def call_ollama_vision(
     endpoint = f"{ollama_url.rstrip('/')}/api/generate"
     payload = {
         "model": model,
-        "prompt": VLM_SYSTEM_PROMPT,
+        "prompt": build_few_shot_system_prompt(),
         "images": [b64_image],
         "stream": False,
         "format": "json",

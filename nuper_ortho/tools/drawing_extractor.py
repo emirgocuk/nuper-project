@@ -14,7 +14,13 @@ if tools_dir not in sys.path:
     sys.path.insert(0, tools_dir)
 
 from extractor.title_block import extract_title_block_fields, extract_datum_labels
-from extractor.parse.dimension import parse_diameter_callouts, parse_radius_callouts, parse_linear_callouts
+from extractor.parse.dimension import (
+    parse_diameter_callouts,
+    parse_radius_callouts,
+    parse_linear_callouts,
+    is_reference_dimension,
+    normalize_decimal_commas,
+)
 from extractor.parse.thread import parse_thread_callout, compute_thread_minor_diameter
 from extractor.spatial import (
     match_spatial_bbox,
@@ -33,6 +39,8 @@ from extractor.parse.tolerance import apply_iso2768_tolerance
 from extractor.pmi_extractor import parse_step_pmi
 from extractor.contract_guard import apply_contract_guard
 from extractor.similarity_engine import find_similar_parts
+from extractor.spatial import detect_table_regions, is_bbox_in_table_region
+from extractor.active_learning_engine import ActiveLearningMatcher
 
 
 def is_feature_in_title_or_notes(box: List[float], items: List[Dict[str, Any]], masks: List[Tuple[float, float, float, float]], page_w: float, page_h: float) -> bool:
@@ -355,6 +363,74 @@ def extract_from_pdf(pdf_path: str, step_path: Optional[str] = None) -> Dict[str
     )
 
 
+def _filter_and_learn_dimensions(
+    dims: List[Dict[str, Any]],
+    page_entries: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    table_regions_by_page: Dict[int, List[Tuple[float, float, float, float]]] = {}
+    for p_info in page_entries:
+        p_num = int(p_info.get("page", 1))
+        existing_tr = list(p_info.get("table_regions") or [])
+        p_items = p_info.get("items") or []
+        if p_items and not existing_tr:
+            page_w = float(p_info.get("width", 842.0) or 842.0)
+            page_h = float(p_info.get("height", 595.0) or 595.0)
+            existing_tr = detect_table_regions([], p_items, page_w, page_h)
+        table_regions_by_page[p_num] = existing_tr
+
+    al_matcher: Optional[ActiveLearningMatcher] = None
+    try:
+        al_matcher = ActiveLearningMatcher()
+    except Exception:
+        al_matcher = None
+
+    cleaned: List[Dict[str, Any]] = []
+    for d in dims:
+        raw_str = str(d.get("nominal_str", "") or "")
+        if d.get("is_reference_dimension") or is_reference_dimension(raw_str):
+            continue
+
+        p_num = int(d.get("page", 1))
+        bbox = d.get("bbox")
+        p_tables = table_regions_by_page.get(p_num, [])
+        if bbox and len(bbox) >= 4 and p_tables and is_bbox_in_table_region(bbox, p_tables):
+            continue
+
+        if al_matcher is not None:
+            try:
+                corr = al_matcher.apply_learned_parsing_correction(raw_str)
+                if isinstance(corr, dict):
+                    if corr.get("nominal") is not None:
+                        d["nominal"] = float(corr["nominal"])
+                    if corr.get("nominal_str"):
+                        d["nominal_str"] = str(corr["nominal_str"])
+                    if "upper_tol" in corr and corr["upper_tol"] is not None:
+                        d["upper_tol"] = str(corr["upper_tol"])
+                    if "lower_tol" in corr and corr["lower_tol"] is not None:
+                        d["lower_tol"] = str(corr["lower_tol"])
+                    if corr.get("type"):
+                        d["type"] = str(corr["type"])
+                cand_feat = {
+                    "raw_text": str(d.get("nominal_str", raw_str)),
+                    "nominal": float(d.get("nominal", 0.0) or 0.0),
+                    "upper_tol": d.get("upper_tol", ""),
+                    "lower_tol": d.get("lower_tol", ""),
+                    "in_table_region": False,
+                    "is_reference_dimension": False,
+                    "has_leader_line": bool(d.get("attachments")),
+                    "has_extension_line": bool(d.get("upper_tol") or d.get("lower_tol")),
+                }
+                is_valid, _ = al_matcher.predict_is_valid_dimension(cand_feat)
+                if not is_valid:
+                    continue
+            except Exception:
+                pass
+
+        d.pop("is_reference_dimension", None)
+        cleaned.append(d)
+    return cleaned
+
+
 def parse_text_to_metrology(
     text: str,
     page_count: int,
@@ -461,7 +537,7 @@ def parse_text_to_metrology(
             p_text = p_info.get("text", "")
             p_items = p_info.get("items", [])
 
-            for parsed_dia in parse_diameter_callouts(p_text):
+            for parsed_dia in parse_diameter_callouts(normalize_decimal_commas(p_text)):
                 nom = parsed_dia["nominal"]
                 qty = parsed_dia["quantity"]
                 fit = parsed_dia["fit"] or ""
@@ -509,7 +585,7 @@ def parse_text_to_metrology(
                 })
                 balloon_idx += 1
 
-            for parsed_rad in parse_radius_callouts(p_text):
+            for parsed_rad in parse_radius_callouts(normalize_decimal_commas(p_text)):
                 r_val = parsed_rad["nominal"]
                 qty = parsed_rad["quantity"]
                 key = f"RAD_{p_num}_{qty}_{r_val}"
@@ -579,7 +655,7 @@ def parse_text_to_metrology(
                 })
                 balloon_idx += 1
 
-            for parsed_lin in parse_linear_callouts(p_text):
+            for parsed_lin in parse_linear_callouts(normalize_decimal_commas(p_text), include_reference=False):
                 val = parsed_lin["nominal"]
                 if any(abs(d.get("nominal", 0) - val) < 0.01 and d.get("page") == p_num for d in dims):
                     continue
@@ -699,7 +775,7 @@ def parse_text_to_metrology(
 
         filtered_dims.append(d)
 
-    dims = filtered_dims
+    dims = _filter_and_learn_dimensions(filtered_dims, page_entries)
 
     if step_path and os.path.exists(step_path):
         pmi_data = parse_step_pmi(step_path)
@@ -758,9 +834,9 @@ def parse_text_to_metrology(
             if span <= 0.025:
                 d["risk_level"] = "CRITICAL"
                 d["risk_reasons"] = ["Dar tolerans aralığı (<= 0.025 mm)"]
-            elif span <= 0.05:
+            elif span <= 0.1001:
                 d["risk_level"] = "WARNING"
-                d["risk_reasons"] = ["Hassas tolerans aralığı (<= 0.05 mm)"]
+                d["risk_reasons"] = ["Hassas tolerans aralığı (<= 0.10 mm)"]
             else:
                 d["risk_level"] = "NORMAL"
         except Exception:

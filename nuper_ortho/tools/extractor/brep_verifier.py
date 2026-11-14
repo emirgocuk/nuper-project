@@ -644,96 +644,6 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
         min_y, max_y = 0.0, round(size_y, 4)
         min_z, max_z = round(-size_z / 2.0, 4), round(size_z / 2.0, 4)
 
-    cyl_features = [
-        f for f in extracted_features
-        if f.get("feature_type") in ("INTERNAL_CYLINDER", "EXTERNAL_CYLINDER") and f.get("center")
-    ]
-    seen_dists = set()
-    dist_idx = 1
-    for i_c in range(len(cyl_features)):
-        for j_c in range(i_c + 1, len(cyl_features)):
-            c1 = cyl_features[i_c]["center"]
-            c2 = cyl_features[j_c]["center"]
-            dx = c1[0] - c2[0]
-            dz = c1[2] - c2[2]
-            d_xz = round(math.sqrt(dx * dx + dz * dz), 2)
-            if d_xz >= 1.0:
-                cyl_key = (min(cyl_features[i_c].get("id", ""), cyl_features[j_c].get("id", "")), max(cyl_features[i_c].get("id", ""), cyl_features[j_c].get("id", "")), d_xz)
-                if cyl_key not in seen_dists:
-                    seen_dists.add(cyl_key)
-                    extracted_features.append({
-                        "id": f"CAD_DIST_{d_xz:.2f}_{dist_idx}",
-                        "feature_type": "PLANE",
-                        "nominal_dimension": d_xz,
-                        "center": [round((c1[0] + c2[0]) / 2.0, 4), round(max(c1[1], c2[1]), 4), round((c1[2] + c2[2]) / 2.0, 4)],
-                        "normal": [0.0, 1.0, 0.0],
-                        "area_or_length": d_xz,
-                        "description": f"Eksenler Arasi Mesafe ({d_xz:.2f} mm)",
-                        "axis": "XZ",
-                        "distance_type": "AXIS_DISTANCE",
-                        "faceA_id": cyl_features[i_c].get("id", ""),
-                        "faceB_id": cyl_features[j_c].get("id", ""),
-                        "faceA_center": [round(float(c1[0]), 4), round(float(c1[1]), 4), round(float(c1[2]), 4)],
-                        "faceB_center": [round(float(c2[0]), 4), round(float(c2[1]), 4), round(float(c2[2]), 4)],
-                        "faceA_normal": cyl_features[i_c].get("normal", [0.0, 1.0, 0.0]),
-                        "faceB_normal": cyl_features[j_c].get("normal", [0.0, 1.0, 0.0]),
-                    })
-                    dist_idx += 1
-
-    plane_features = [f for f in extracted_features if f.get("feature_type") == "PLANE" and f.get("normal") and f.get("center") and not f["id"].startswith("CAD_DIST_")]
-    virtual_extremes = [
-        {"id": "VIRTUAL_BOTTOM_Y0", "center": [0.0, 0.0, 0.0], "normal": [0.0, -1.0, 0.0]},
-        {"id": "VIRTUAL_TOP_YMAX", "center": [0.0, round(size_y, 4), 0.0], "normal": [0.0, 1.0, 0.0]},
-    ]
-    all_ref_planes = plane_features + virtual_extremes
-    for i_p in range(len(plane_features)):
-        for j_p in range(i_p + 1, len(all_ref_planes)):
-            p1 = plane_features[i_p]
-            p2 = all_ref_planes[j_p]
-            n1 = (float(p1["normal"][0]), float(p1["normal"][1]), float(p1["normal"][2]))
-            n2 = (float(p2["normal"][0]), float(p2["normal"][1]), float(p2["normal"][2]))
-            dot_n = _dot(n1, n2)
-            if abs(dot_n) > 0.98:
-                c1 = p1["center"]
-                c2 = p2["center"]
-                diff = (c1[0] - c2[0], c1[1] - c2[1], c1[2] - c2[2])
-                d_perp = round(abs(_dot(diff, n1)), 2)
-                if d_perp >= 0.5:
-                    axis_name = "Y" if abs(n1[1]) > 0.85 else ("X" if abs(n1[0]) > 0.85 else "Z")
-                    if dot_n > 0.95:
-                        dist_type = "STEP_HEIGHT"
-                    else:
-                        v12 = (c2[0] - c1[0], c2[1] - c1[1], c2[2] - c1[2])
-                        dist_type = "INTERNAL_SLOT" if _dot(n1, v12) > 0.01 else "EXTERNAL_WIDTH"
-
-                    pair_key = (min(p1.get("id", ""), p2.get("id", "")), max(p1.get("id", ""), p2.get("id", "")), d_perp)
-                    if pair_key not in seen_dists:
-                        seen_dists.add(pair_key)
-                        out_nx = round(n1[0], 4)
-                        out_ny = round(abs(n1[1]), 4)
-                        out_nz = round(n1[2], 4)
-                        if c1[0] * out_nx + c1[2] * out_nz < -1.0:
-                            out_nx = -out_nx
-                            out_nz = -out_nz
-                        extracted_features.append({
-                            "id": f"CAD_STEP_DIST_{d_perp:.2f}_{dist_idx}",
-                            "feature_type": "PLANE",
-                            "nominal_dimension": d_perp,
-                            "center": [round(float(c1[0]), 4), round(float(c1[1]), 4), round(float(c1[2]), 4)],
-                            "normal": [out_nx, out_ny, out_nz],
-                            "area_or_length": d_perp,
-                            "description": f"Dogrusal Boyut / {dist_type} ({d_perp:.2f} mm - Eksen {axis_name})",
-                            "axis": axis_name,
-                            "distance_type": dist_type,
-                            "faceA_id": p1.get("id", f"FACE_A_{i_p}"),
-                            "faceB_id": p2.get("id", f"FACE_B_{j_p}"),
-                            "faceA_center": [round(float(c1[0]), 4), round(float(c1[1]), 4), round(float(c1[2]), 4)],
-                            "faceB_center": [round(float(c2[0]), 4), round(float(c2[1]), 4), round(float(c2[2]), 4)],
-                            "faceA_normal": [round(float(n1[0]), 4), round(float(n1[1]), 4), round(float(n1[2]), 4)],
-                            "faceB_normal": [round(float(n2[0]), 4), round(float(n2[1]), 4), round(float(n2[2]), 4)],
-                        })
-                        dist_idx += 1
-
     pos_bytes = struct.pack(f"<{len(all_positions)}f", *all_positions)
     norm_bytes = struct.pack(f"<{len(all_normals)}f", *all_normals)
     idx_bytes = struct.pack(f"<{len(all_indices)}I", *all_indices)
@@ -1304,7 +1214,7 @@ def compute_topological_match_score(
 
     d_type = str(dim.get("type", "LINEAR")).upper()
     c_type = str(candidate_feature.get("type", "")).upper()
-    if d_type in ("DIAMETER", "HOLE") and ("CYLINDER" in c_type or "CIRCLE" in c_type):
+    if d_type in ("DIAMETER", "HOLE") and ("CYLINDER" in c_type or "CIRCLE" in c_type or "ROTATIONAL" in c_type or "CONE" in c_type):
         score_type = 20.0
     elif d_type == "RADIUS" and ("TOROID" in c_type or "RADIUS" in c_type or "FILLET" in c_type):
         score_type = 20.0
@@ -1433,6 +1343,17 @@ def verify_dimensions_against_step(
 
     verified_dimensions = []
     pruned_dimensions = []
+
+    al_matcher = None
+    try:
+        from extractor.active_learning_engine import ActiveLearningMatcher
+        al_matcher = ActiveLearningMatcher()
+    except Exception:
+        try:
+            from tools.extractor.active_learning_engine import ActiveLearningMatcher
+            al_matcher = ActiveLearningMatcher()
+        except Exception:
+            al_matcher = None
 
     view_circles_by_view: Dict[str, List[Dict[str, Any]]] = {}
     extra_view_circles = step_data.get("view_circles_2d")
@@ -1607,16 +1528,22 @@ def verify_dimensions_against_step(
         if candidate_features:
             for feat in candidate_features:
                 score = compute_topological_match_score(dim, feat, step_bbox, dim.get("view_name"), alignment=dim_align)
+                if al_matcher is not None:
+                    try:
+                        ml_prob = al_matcher.predict_surface_match_probability(dim, feat)
+                        score = min(100.0, max(0.0, score + (ml_prob - 0.5) * 12.0))
+                    except Exception:
+                        pass
                 if score > best_score:
                     best_score = score
                     matched_feature = feat
 
-        if matched_feature:
+        if matched_feature and best_score >= 75.0:
             dim["verification"] = "CAD_VERIFIED"
             dim["status"] = "UNMEASURED"
             dim["cad_match"] = matched_feature
-            dim["match_confidence"] = best_score
-            dim["match_status"] = "VERIFIED_EXACT" if best_score >= 85.0 else ("VERIFIED_TOPOLOGY" if best_score >= 70.0 else "NEEDS_REVIEW")
+            dim["match_confidence"] = round(best_score, 2)
+            dim["match_status"] = "VERIFIED_EXACT" if best_score >= 85.0 else "VERIFIED_TOPOLOGY"
             fid = matched_feature.get("id")
             if isinstance(fid, int) and fid > 0:
                 dim["matched_face_ids"] = [fid]
@@ -1627,6 +1554,7 @@ def verify_dimensions_against_step(
             dim["cad_match"] = None
             dim["match_confidence"] = 0.0
             dim["match_status"] = "UNMATCHED"
+            dim["matched_face_ids"] = []
             verified_dimensions.append(dim)
 
     return verified_dimensions, pruned_dimensions
@@ -1680,25 +1608,6 @@ def extract_cad_metadata(step_path: str) -> Dict[str, Any]:
             "center": [round(v, 4) for v in cone["placement"]["origin"]],
             "normal": [round(v, 4) for v in cone["placement"]["axis"]],
             "area_or_length": cone["angle_deg"],
-        })
-
-    for idx, ld in enumerate(step_data.get("linear_distances", [])):
-        dist_val = round(ld["value"], 4)
-        ld_id = f"MESAFE_{ld['type']}_{dist_val:.2f}_{idx}"
-        norm = ld.get("normal", [0.0, 0.0, 1.0])
-        if isinstance(norm, (list, tuple)):
-            norm_list = [round(float(v), 4) for v in norm]
-        else:
-            norm_list = [0.0, 0.0, 1.0]
-        if len(norm_list) != 3:
-            norm_list = [0.0, 0.0, 1.0]
-        features.append({
-            "id": ld_id,
-            "feature_type": "PLANE",
-            "nominal_dimension": dist_val,
-            "center": [0.0, 0.0, 0.0],
-            "normal": norm_list,
-            "area_or_length": dist_val,
         })
 
     stat = os.stat(step_path)
