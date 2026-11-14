@@ -6,9 +6,18 @@ import json
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-db_path = os.path.join(os.path.dirname(__file__), '..', 'test_assets', 'benchmarks.db')
-json_path = os.path.join(os.path.dirname(__file__), '..', 'test_assets', 'BENCH_LAB', 'master_laboratory_index.json')
+base_dir = os.path.dirname(__file__)
+tools_dir = os.path.abspath(os.path.join(base_dir, '..', 'tools'))
+if tools_dir not in sys.path:
+    sys.path.insert(0, tools_dir)
 
+from extractor.active_learning_engine import ensure_learning_tables
+
+db_path = os.path.join(base_dir, '..', 'test_assets', 'benchmarks.db')
+learning_db_path = os.path.join(base_dir, '..', 'test_assets', 'ortho_learning.db')
+json_path = os.path.join(base_dir, '..', 'test_assets', 'BENCH_LAB', 'master_laboratory_index.json')
+
+os.makedirs(os.path.dirname(db_path), exist_ok=True)
 conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
@@ -101,4 +110,7 @@ if os.path.exists(json_path):
 
 conn.commit()
 conn.close()
+
+ensure_learning_tables(db_path)
+ensure_learning_tables(learning_db_path)
 print(f"✓ SQLite veritabanı başarıyla oluşturuldu ve indekslendi: {os.path.abspath(db_path)}")

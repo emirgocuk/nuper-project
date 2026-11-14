@@ -12,6 +12,8 @@ try:
         build_page_geometry_index,
         SpatialHashGrid,
         prune_hatching_lines,
+        detect_table_regions,
+        is_bbox_in_table_region,
     )
 except ImportError:
     from .spatial import (
@@ -22,7 +24,27 @@ except ImportError:
         build_page_geometry_index,
         SpatialHashGrid,
         prune_hatching_lines,
+        detect_table_regions,
+        is_bbox_in_table_region,
     )
+
+try:
+    from extractor.parse.dimension import (
+        normalize_decimal_commas,
+        is_reference_dimension,
+        parse_tolerance,
+    )
+except ImportError:
+    from .parse.dimension import (
+        normalize_decimal_commas,
+        is_reference_dimension,
+        parse_tolerance,
+    )
+
+try:
+    from extractor.active_learning_engine import ActiveLearningMatcher
+except ImportError:
+    from .active_learning_engine import ActiveLearningMatcher
 
 try:
     from extractor.semantic_grammar import parse_fcf_cells, merge_stacked_hole_callouts
@@ -82,7 +104,11 @@ def extract_fcf_boxes(page: Any) -> List[Dict[str, Any]]:
     return fcf_boxes
 
 
-def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[str, Any]:
+def extract_vector_dimensions_from_page(
+    page: Any,
+    page_num: int = 1,
+    learning_matcher: Optional[ActiveLearningMatcher] = None,
+) -> Dict[str, Any]:
     rect = page.rect
     page_w = rect.width
     page_h = rect.height
@@ -91,6 +117,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
 
     page_dict = page.get_text("dict")
     spans_pool = []
+    all_page_spans = []
 
     try:
         drawings = page.get_drawings()
@@ -133,6 +160,10 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
                 if not txt:
                     continue
                 bbox = span.get("bbox", (0, 0, 0, 0))
+                all_page_spans.append({
+                    "text": txt,
+                    "bbox": [round(b, 1) for b in bbox],
+                })
                 if is_inside_mask(bbox, masks):
                     continue
                 if is_drawing_border_margin(bbox, page_w, page_h, text=txt):
@@ -153,7 +184,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
                     continue
 
                 spans_pool.append({
-                    "text": txt,
+                    "text": normalize_decimal_commas(txt),
                     "font": span.get("font", ""),
                     "size": round(span.get("size", 10.0), 2),
                     "origin": span.get("origin", (0, 0)),
@@ -161,6 +192,9 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
                     "rotation": rotation_deg,
                     "flags": span.get("flags", 0),
                 })
+
+    table_regions = detect_table_regions(drawings, all_page_spans, page_w, page_h)
+    matcher = learning_matcher or ActiveLearningMatcher()
 
     grouped_dimensions = []
     used_spans = set()
@@ -172,9 +206,13 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
     for i, s in enumerate(spans_pool):
         if i in used_spans:
             continue
-        txt = s["text"]
+        txt = normalize_decimal_commas(s["text"])
 
-        if re.search(r"[°\^]C|OC\b|ASTM|MIL-STD|SAE\b|HRC|HB\b|DIN\b|EN\b\s*\d+|ISO\b\s*\d+", txt, re.I):
+        if is_reference_dimension(txt):
+            continue
+        if is_bbox_in_table_region(s["bbox"], table_regions):
+            continue
+        if re.search(r"[°\^]C|OC\b|ASTM|MIL-STD|SAE\b|HRC|HB\b|DIN\b|EN\b\s*\d+|ISO\b\s*\d+|ASME\s*B1\.13M|ISO\s*965", txt, re.I):
             continue
 
         nom_match = re.search(r"(?:[Ø\u00d8@]|R|M)?\s*([0-9]+(?:\.[0-9]+)?)", txt)
@@ -219,7 +257,7 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             dy = abs(loc_other[1] - loc_main[1])
             is_smaller = other["size"] <= main_size * 0.85
             if -6.0 <= dx <= 28.0 and dy <= 22.0 and is_smaller:
-                other_text = other["text"]
+                other_text = normalize_decimal_commas(other["text"])
                 if re.search(r"[+-]?[0-9\.]+|[0-9\.]+", other_text):
                     tol_candidates.append((j, other, loc_other))
 
@@ -232,8 +270,8 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             c2_idx, c2, loc_c2 = tol_candidates[1]
             used_spans.add(c1_idx)
             used_spans.add(c2_idx)
-            t1 = c1["text"]
-            t2 = c2["text"]
+            t1 = normalize_decimal_commas(c1["text"])
+            t2 = normalize_decimal_commas(c2["text"])
             if "+" in t1 and ("-" in t2 or t2 in ("0", "-0")):
                 upper_cand, lower_cand = c1, c2
             elif "+" in t2 and ("-" in t1 or t1 in ("0", "-0")):
@@ -241,13 +279,13 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             else:
                 upper_cand = c1 if loc_c1[1] > loc_c2[1] else c2
                 lower_cand = c2 if loc_c1[1] > loc_c2[1] else c1
-            upper_tol = upper_cand["text"]
-            lower_tol = lower_cand["text"]
+            upper_tol = normalize_decimal_commas(upper_cand["text"])
+            lower_tol = normalize_decimal_commas(lower_cand["text"])
             combined_str = f"{combined_str} {upper_tol}/{lower_tol}"
         elif len(tol_candidates) == 1:
             c_idx, c, _ = tol_candidates[0]
             used_spans.add(c_idx)
-            t_txt = c["text"]
+            t_txt = normalize_decimal_commas(c["text"])
             if "±" in t_txt:
                 val = t_txt.replace("±", "").strip()
                 upper_tol = f"+{val}"
@@ -257,6 +295,12 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             elif "-" in t_txt:
                 lower_tol = t_txt.strip()
             combined_str = f"{combined_str} {t_txt}"
+
+        if not upper_tol and not lower_tol and re.search(r"(?:±|\+\s*[0-9\.]+)", txt):
+            u_in, l_in = parse_tolerance(txt, nominal=base_nom)
+            if u_in or l_in:
+                upper_tol = u_in
+                lower_tol = l_in
 
         used_spans.add(i)
         rot_val = abs(float(s.get("rotation", 0.0))) % 180.0
@@ -287,6 +331,33 @@ def extract_vector_dimensions_from_page(page: Any, page_num: int = 1) -> Dict[st
             text_spans=spans_pool,
             precomputed=page_geom_index,
         )
+
+        has_leader = bool(
+            attachment_info.get("leader_tip")
+            or attachment_info.get("has_dimension_line")
+            or len(attachment_info.get("attachment_points", [])) > 0
+        )
+        cand_features = {
+            "raw_text": combined_str,
+            "aspect_ratio": round((main_bbox[2] - main_bbox[0]) / max(1.0, main_bbox[3] - main_bbox[1]), 3),
+            "in_table_region": 1 if is_bbox_in_table_region(main_bbox, table_regions) else 0,
+            "has_leader_line": 1 if has_leader else 0,
+            "has_extension_line": 1 if len(attachment_info.get("attachment_points", [])) >= 2 else 0,
+            "relative_page_y": round(dim_cy / max(1.0, page_h), 4),
+            "is_reference_dimension": 1 if is_reference_dimension(combined_str) else 0,
+        }
+        is_valid_cand, _ = matcher.predict_is_valid_dimension(cand_features)
+        if not is_valid_cand:
+            continue
+
+        learned_corr = matcher.apply_learned_parsing_correction(combined_str)
+        if learned_corr:
+            if learned_corr.get("nominal", 0.0) > 0.0:
+                base_nom = learned_corr["nominal"]
+            if learned_corr.get("upper_tol"):
+                upper_tol = learned_corr["upper_tol"]
+            if learned_corr.get("lower_tol"):
+                lower_tol = learned_corr["lower_tol"]
 
         grouped_dimensions.append({
             "raw_text": combined_str,
