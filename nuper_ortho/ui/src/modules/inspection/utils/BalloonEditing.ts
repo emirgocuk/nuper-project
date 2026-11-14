@@ -89,6 +89,91 @@ export function saveBalloonSessionState(state: BalloonSessionState): void {
   } catch {}
 }
 
+export type LearningFeedbackEventType =
+  | 'FALSE_POSITIVE_BALLOON'
+  | 'PARSING_CORRECTION'
+  | 'SURFACE_BINDING_POSITIVE';
+
+export interface LearningFeedbackEvent {
+  event_type: LearningFeedbackEventType;
+  raw_text?: string;
+  bbox?: [number, number, number, number];
+  in_table_region?: boolean;
+  has_leader_line?: boolean;
+  has_extension_line?: boolean;
+  relative_page_y?: number;
+  is_reference_dimension?: boolean;
+  corrected?: {
+    type?: string;
+    nominal?: number;
+    nominal_str?: string;
+    upper_tol?: string;
+    lower_tol?: string;
+  };
+  feature_2d?: Record<string, unknown>;
+  surface_3d?: Record<string, unknown>;
+  part_name?: string;
+  timestamp?: number;
+}
+
+const recordedFeedbackHistory: LearningFeedbackEvent[] = [];
+
+export function getRecordedFeedbackHistory(): LearningFeedbackEvent[] {
+  return recordedFeedbackHistory.slice();
+}
+
+export function clearRecordedFeedbackHistory(): void {
+  recordedFeedbackHistory.length = 0;
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.removeItem === 'function') {
+      localStorage.removeItem('ortho_learning_feedback_history');
+    }
+  } catch {}
+}
+
+export async function recordFeedback(event: LearningFeedbackEvent): Promise<unknown> {
+  const enriched: LearningFeedbackEvent = {
+    ...event,
+    timestamp: event.timestamp ?? Date.now(),
+  };
+  recordedFeedbackHistory.push(enriched);
+  if (recordedFeedbackHistory.length > 200) {
+    recordedFeedbackHistory.shift();
+  }
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+      localStorage.setItem('ortho_learning_feedback_history', JSON.stringify(recordedFeedbackHistory));
+    }
+  } catch {}
+
+  try {
+    if (typeof window !== 'undefined') {
+      const win = window as unknown as {
+        electronAPI?: {
+          recordFeedback?: (payload: LearningFeedbackEvent) => Promise<unknown>;
+        };
+        electronIpc?: {
+          invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>;
+        };
+        ipcRenderer?: {
+          invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>;
+        };
+      };
+      if (typeof win.electronAPI?.recordFeedback === 'function') {
+        return await win.electronAPI.recordFeedback(enriched);
+      }
+      if (typeof win.electronIpc?.invoke === 'function') {
+        return await win.electronIpc.invoke('ortho:record-feedback', enriched);
+      }
+      if (typeof win.ipcRenderer?.invoke === 'function') {
+        return await win.ipcRenderer.invoke('ortho:record-feedback', enriched);
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
 export function loadBalloonSessionState(fingerprint: string): BalloonSessionState | null {
   try {
     if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function') {

@@ -1,6 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { FeatureDefinitionModal, type DefinedFeatureData } from '../inspection/utils/FeatureDefinitionModal';
+import { recordFeedback } from '../inspection/utils/BalloonEditing';
 import {
   allocateBalloonId,
   buildLightTableCommands,
@@ -462,9 +463,23 @@ export class DrawingCanvas {
         nominal_str: balloon.feature_label || (balloon.nominal !== undefined ? `${balloon.nominal}` : ''),
       },
       onSave: (data: DefinedFeatureData) => {
+        const previousRaw = balloon.feature_label || (balloon.nominal !== undefined ? `${balloon.nominal}` : '');
         balloon.nominal = data.nominal;
         balloon.tolerance = `${data.lower_tol}/${data.upper_tol}`;
         balloon.feature_label = data.nominal_str;
+        void recordFeedback({
+          event_type: 'PARSING_CORRECTION',
+          raw_text: previousRaw,
+          bbox: Array.isArray(balloon.bbox) && balloon.bbox.length >= 4
+            ? [balloon.bbox[0], balloon.bbox[1], balloon.bbox[2], balloon.bbox[3]]
+            : undefined,
+          corrected: {
+            nominal: data.nominal,
+            nominal_str: data.nominal_str,
+            upper_tol: data.upper_tol,
+            lower_tol: data.lower_tol,
+          },
+        });
         void this.render();
 
         for (const cb of this.balloonUpdatedListeners) {
@@ -475,6 +490,19 @@ export class DrawingCanvas {
   }
 
   public removeBalloon(id: number | string): void {
+    const removed = this.balloons.find((b) => String(b.id) === String(id));
+    if (removed) {
+      void recordFeedback({
+        event_type: 'FALSE_POSITIVE_BALLOON',
+        raw_text: removed.feature_label || (removed.nominal !== undefined ? `${removed.nominal}` : ''),
+        bbox: Array.isArray(removed.bbox) && removed.bbox.length >= 4
+          ? [removed.bbox[0], removed.bbox[1], removed.bbox[2], removed.bbox[3]]
+          : undefined,
+        in_table_region: false,
+        has_leader_line: false,
+        has_extension_line: false,
+      });
+    }
     this.balloons = this.balloons.filter((b) => String(b.id) !== String(id));
     if (this.selectedBalloonId === String(id)) {
       this.selectedBalloonId = null;

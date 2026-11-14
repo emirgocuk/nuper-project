@@ -21,6 +21,7 @@ import {
   computeDrawingFingerprint,
   saveBalloonSessionState,
   loadBalloonSessionState,
+  recordFeedback,
   type LabelOffset,
 } from './BalloonEditing';
 import {
@@ -86,6 +87,7 @@ export class SetupWizard {
   private lastActiveFeatureId: number | null = null;
   private featureTouchHits: Map<number, number> = new Map();
   private featureTotalHits: Map<number, number> = new Map();
+  private pendingSurfaceBindDimensionId: number | null = null;
   public similarParts: SimilarPartRecommendation[] = [];
   public contractSummary: { critical_count?: number; warning_count?: number; normal_count?: number; status?: string } | null = null;
 
@@ -227,6 +229,7 @@ export class SetupWizard {
       this.recomputeCadMatch();
       this.renderDrawingAuditModal();
     }
+    this.updateLiveDmisAndClosedLoopCode();
   }
 
   private updateSetupTelemetry(): void {
@@ -345,19 +348,13 @@ export class SetupWizard {
             target.cad_normal = coneFeat.normal || [0.85, 0.52, 0];
             target.match_confidence = 'EXACT';
           }
-        } else if (!target.cad_feature_id) {
-          const nearStep = cadFeats.find(
-            (f) => f.nominal_dimension !== undefined && Math.abs(f.nominal_dimension - target.nominal) <= 2.2
-          );
-          if (nearStep) {
-            target.cad_feature_id = nearStep.id;
-            target.cad_center = nearStep.center;
-            target.cad_normal = nearStep.normal || [1, 0, 0];
-            target.match_confidence = 'ENVELOPE';
-          }
+        } else if (!target.cad_feature_id || !target.cad_center) {
+          target.cad_feature_id = undefined;
+          target.cad_center = undefined;
+          target.match_confidence = 'UNMATCHED';
         }
 
-        if (!target.cad_center) {
+        if (!target.cad_center || !target.cad_feature_id) {
           target.match_confidence = 'UNMATCHED';
         }
 
@@ -1941,6 +1938,7 @@ export class SetupWizard {
     if (mode === 'edit') {
       const dim = this.dimensions.find((d) => d.id === id);
       if (dim) {
+        const prevText = dim.nominal_str || String(dim.nominal ?? '');
         dim.type = type;
         dim.type_label = typeLabel;
         dim.icon = meta.icon;
@@ -1950,6 +1948,21 @@ export class SetupWizard {
         dim.lower_tol = lower;
         dim.datum_reference = datum;
         this.updateBalloonMeta(dim);
+        void recordFeedback({
+          event_type: 'PARSING_CORRECTION',
+          raw_text: prevText,
+          bbox: Array.isArray(dim.bbox) && dim.bbox.length >= 4
+            ? [dim.bbox[0], dim.bbox[1], dim.bbox[2], dim.bbox[3]]
+            : undefined,
+          corrected: {
+            type,
+            nominal,
+            nominal_str: callout,
+            upper_tol: upper,
+            lower_tol: lower,
+          },
+          part_name: this.activeCadModelName || this.loadedFileName || '',
+        });
       }
     } else {
       const page = parseInt(form.getAttribute('data-page') || String(this.pendingAddPage), 10);
@@ -2138,6 +2151,20 @@ export class SetupWizard {
   }
 
   public removeFeature(id: number): void {
+    const removedDim = this.dimensions.find((d) => d.id === id);
+    if (removedDim) {
+      void recordFeedback({
+        event_type: 'FALSE_POSITIVE_BALLOON',
+        raw_text: removedDim.nominal_str || String(removedDim.nominal ?? ''),
+        bbox: Array.isArray(removedDim.bbox) && removedDim.bbox.length >= 4
+          ? [removedDim.bbox[0], removedDim.bbox[1], removedDim.bbox[2], removedDim.bbox[3]]
+          : undefined,
+        in_table_region: false,
+        has_leader_line: false,
+        has_extension_line: Boolean(removedDim.upper_tol || removedDim.lower_tol),
+        part_name: this.activeCadModelName || this.loadedFileName || '',
+      });
+    }
     this.dimensions = this.dimensions.filter((d) => d.id !== id);
     this.balloons = this.balloons.filter((b) => b.id !== id);
     this.balloonLabelOffsets.delete(id);
@@ -2273,20 +2300,25 @@ export class SetupWizard {
         : { min: [-30, 20, -20] as [number, number, number], max: [30, 26, 20] as [number, number, number] });
 
     const cadFeatList = this.currentCadMetadata?.features || [];
-    const fallbackCenter = {
-      x: (bbox.min[0] + bbox.max[0]) / 2,
-      y: bbox.max[1],
-      z: (bbox.min[2] + bbox.max[2]) / 2,
-    };
-    const pathFeatures: PathFeatureInput[] = activeDims.map((d) => {
-      const coords = d.cad_center
-        ? { x: d.cad_center[0], y: d.cad_center[1], z: d.cad_center[2] }
-        : fallbackCenter;
+    const verifiableDims = activeDims.filter((d) => {
+      const dExt = d as InspectionDimension & { match_status?: string; match_confidence?: number | string };
+      const mStatus = dExt.match_status;
+      if (mStatus === 'UNMATCHED' || d.cad_feature_id === 'UNMATCHED' || d.match_confidence === 'UNMATCHED') {
+        return false;
+      }
+      if (!d.cad_center) {
+        return false;
+      }
+      return Boolean(d.cad_feature_id || mStatus === 'ENGINEER_LOCKED');
+    });
+    const pathFeatures: PathFeatureInput[] = verifiableDims.map((d) => {
+      const coords = { x: d.cad_center![0], y: d.cad_center![1], z: d.cad_center![2] };
       const matchedCadFeat = d.cad_feature_id ? cadFeatList.find((cf) => cf.id === d.cad_feature_id) : undefined;
       const dExt = d as InspectionDimension & {
         axial_min?: number;
         axial_max?: number;
         stem_blocked?: boolean;
+        match_status?: string;
         cad_instances?: PathFeatureInput['cad_instances'];
       };
       const cfExt = matchedCadFeat as (typeof matchedCadFeat & {
@@ -2304,6 +2336,7 @@ export class SetupWizard {
         cad_center: [coords.x, coords.y, coords.z],
         cad_normal: d.cad_normal || [0, 1, 0],
         cad_feature_id: d.cad_feature_id,
+        match_status: dExt.match_status,
         feature_type: matchedCadFeat?.feature_type,
         operation: (d.operation as 'OP10' | 'OP20') || 'OP10',
         axial_min: dExt.axial_min ?? cfExt?.axial_min,
@@ -2574,19 +2607,23 @@ export class SetupWizard {
     }
   }
 
-  private updateLiveDmisAndClosedLoopCode(plan: GeneratedMeasurementPlan): void {
+  private updateLiveDmisAndClosedLoopCode(plan?: GeneratedMeasurementPlan): void {
     if (typeof window === 'undefined') return;
     const win = window as unknown as {
       codeSnippets?: Record<string, string>;
       switchCodeTab?: (tab: string) => void;
     };
-    const partName = this.activeCadModelName || this.currentCadMetadata?.model_name || '10142739_dc_modul_plaka.stp';
+    const partName =
+      this.activeCadModelName ||
+      this.currentCadMetadata?.model_name ||
+      this.loadedFileName ||
+      'PARCA_YUKLENMEDI.step';
 
     const snippets = CodeSnippetGenerator.generateAll({
       partName,
       dimensions: this.dimensions,
       plan,
-      zClearance: plan.zClearance,
+      zClearance: plan?.zClearance ?? 50.0,
     });
 
     if (!win.codeSnippets) win.codeSnippets = {};
@@ -2683,21 +2720,25 @@ export class SetupWizard {
       : { min: [0, 35, 0] as [number, number, number], max: [120, 95, 45] as [number, number, number] };
 
     const cadFeatList = this.currentCadMetadata?.features || [];
-    const fallbackCenter = {
-      x: (bbox.min[0] + bbox.max[0]) / 2,
-      y: bbox.max[1],
-      z: (bbox.min[2] + bbox.max[2]) / 2,
-    };
-    const pathFeatures: PathFeatureInput[] = dims.map((d) => {
-      const rawCoords = d.cad_center
-        ? { x: d.cad_center[0], y: d.cad_center[1], z: d.cad_center[2] }
-        : fallbackCenter;
+    const verifiableOpDims = dims.filter((d) => {
+      const dExt = d as InspectionDimension & { match_status?: string };
+      if (dExt.match_status === 'UNMATCHED' || d.cad_feature_id === 'UNMATCHED' || d.match_confidence === 'UNMATCHED') {
+        return false;
+      }
+      if (!d.cad_center) {
+        return false;
+      }
+      return Boolean(d.cad_feature_id || dExt.match_status === 'ENGINEER_LOCKED');
+    });
+    const pathFeatures: PathFeatureInput[] = verifiableOpDims.map((d) => {
+      const rawCoords = { x: d.cad_center![0], y: d.cad_center![1], z: d.cad_center![2] };
       const coords = {
         x: Math.max(bbox.min[0], Math.min(bbox.max[0], rawCoords.x)),
         y: Math.max(bbox.min[1], Math.min(bbox.max[1], rawCoords.y)),
         z: Math.max(bbox.min[2], Math.min(bbox.max[2], rawCoords.z)),
       };
       const matchedCadFeat = d.cad_feature_id ? cadFeatList.find((cf) => cf.id === d.cad_feature_id) : undefined;
+      const dExt = d as InspectionDimension & { match_status?: string };
       return {
         id: d.id,
         balloon: d.balloon,
@@ -2708,6 +2749,7 @@ export class SetupWizard {
         cad_center: [coords.x, coords.y, coords.z],
         cad_normal: d.cad_normal || [0, 1, 0],
         cad_feature_id: d.cad_feature_id,
+        match_status: dExt.match_status,
         feature_type: matchedCadFeat?.feature_type,
         operation: (d.operation as 'OP10' | 'OP20') || 'OP10',
       };
@@ -2817,26 +2859,40 @@ export class SetupWizard {
             const measStr = d.measured && d.measured !== '--' && d.measured !== 'UNMEASURED' ? d.measured : '--';
             const devStr = d.deviation && d.deviation !== '--' ? `(${d.deviation})` : '';
 
-            const dExt = d as unknown as { match_status?: string; match_score?: number };
-            const mStatus = dExt.match_status || (d.cad_feature_id ? 'VERIFIED_EXACT' : 'UNMATCHED');
-            const mScore = dExt.match_score ?? (d.cad_feature_id ? 95 : 0);
+            const dExt = d as unknown as { match_status?: string; match_score?: number; match_confidence?: number | string };
+            const rawScore =
+              typeof dExt.match_score === 'number'
+                ? Math.round(dExt.match_score)
+                : typeof dExt.match_confidence === 'number'
+                ? Math.round(dExt.match_confidence)
+                : dExt.match_confidence === 'EXACT'
+                ? 95
+                : dExt.match_confidence === 'ENVELOPE'
+                ? 78
+                : 0;
+            const isExplicitUnmatched =
+              dExt.match_status === 'UNMATCHED' ||
+              d.cad_feature_id === 'UNMATCHED' ||
+              d.match_confidence === 'UNMATCHED' ||
+              !d.cad_feature_id ||
+              (dExt.match_status !== 'ENGINEER_LOCKED' && rawScore > 0 && rawScore < 75);
+            const mStatus = isExplicitUnmatched
+              ? 'UNMATCHED'
+              : dExt.match_status || (rawScore >= 85 ? 'VERIFIED_EXACT' : 'VERIFIED_TOPOLOGY');
+            const mScore = isExplicitUnmatched ? 0 : rawScore;
             const badgeLabel = mStatus === 'ENGINEER_LOCKED'
               ? '🔒 %100 Kilitli'
               : mStatus === 'VERIFIED_EXACT'
               ? `✓ %${mScore}`
               : mStatus === 'VERIFIED_TOPOLOGY'
               ? `~ %${mScore}`
-              : mStatus === 'NEEDS_REVIEW'
-              ? `⚠ %${mScore}`
-              : '✕ Eşleşmedi';
+              : '⚠️ Eşleşmedi — 3D Yüzey Seçin';
             const badgeClass = mStatus === 'ENGINEER_LOCKED'
               ? 'locked'
               : mStatus === 'VERIFIED_EXACT'
               ? 'exact'
               : mStatus === 'VERIFIED_TOPOLOGY'
               ? 'topology'
-              : mStatus === 'NEEDS_REVIEW'
-              ? 'review'
               : 'unmatched';
 
             return `
@@ -2852,9 +2908,9 @@ export class SetupWizard {
                   <span>Nominal: <b>${d.nominal_str}</b></span>
                   <span>Ölçülen: <b style="color:${measColor};">${measStr}</b> ${devStr}</span>
                   ${
-                    d.cad_feature_id
+                    !isExplicitUnmatched && d.cad_feature_id
                       ? `<span class="clean-cad-tag" title="CAD B-Rep Eşlendi: ${d.cad_feature_id}">🎯 ${d.cad_feature_id}</span>`
-                      : `<span>Datum: ${d.datum_reference || '[A]'}</span>`
+                      : `<span>⚠️ 3D Yüzey Bağlanmadı (${d.datum_reference || '[A]'})</span>`
                   }
                   <button class="clean-snap-btn" data-snap-id="${d.id}" title="3D CAD Modelinde Yüzeye Kilitle">🎯 Yüzey Seç</button>
                 </div>
@@ -2887,22 +2943,115 @@ export class SetupWizard {
     });
   }
 
+  public getPendingSurfaceBindDimensionId(): number | null {
+    return this.pendingSurfaceBindDimensionId;
+  }
+
+  public clearPendingSurfaceBind(): void {
+    this.pendingSurfaceBindDimensionId = null;
+  }
+
   public triggerSurfacePickingForDimension(id: number): void {
     const dim = this.dimensions.find((d) => d.id === id);
     if (!dim) return;
-    const app = this.appInstance as { getCADViewer?: () => CADViewer } | null;
+    this.pendingSurfaceBindDimensionId = id;
+    const app = this.appInstance as {
+      getCADViewer?: () => CADViewer;
+      startBindBalloonTo3DFace?: (balloonId: number) => void;
+    } | null;
     const cadViewer = app?.getCADViewer?.();
-    if (!cadViewer) return;
+    if (cadViewer && dim.cad_feature_id && dim.cad_feature_id !== 'UNMATCHED') {
+      cadViewer.highlightFeature(dim.cad_feature_id);
+    }
+    const globalApp = typeof window !== 'undefined'
+      ? (window as unknown as {
+          nuperApp?: { startBindBalloonTo3DFace?: (balloonId: number) => void };
+          showToast?: (msg: string) => void;
+        })
+      : null;
+    if (typeof app?.startBindBalloonTo3DFace === 'function') {
+      app.startBindBalloonTo3DFace(id);
+    } else if (typeof globalApp?.nuperApp?.startBindBalloonTo3DFace === 'function') {
+      globalApp.nuperApp.startBindBalloonTo3DFace(id);
+    }
+    const msg = `🎯 3D Yüzey Seçim Modu (${dim.balloon} ${dim.nominal_str}): Lütfen 3D CAD modelinde ilgili yüzeye tıklayın.`;
+    if (typeof globalApp?.showToast === 'function') {
+      globalApp.showToast(msg);
+    }
+    if (typeof document !== 'undefined') {
+      const hudDetails = document.getElementById('hud-feature-details');
+      if (hudDetails) hudDetails.innerText = msg;
+    }
+  }
 
-    cadViewer.highlightFeature(dim.cad_feature_id || `feat_${id}`);
-    const dExt = dim as unknown as { match_status?: string; match_score?: number };
+  public bindDimensionTo3DSurface(
+    id: number,
+    surface: {
+      featureId?: string;
+      faceId?: number | string;
+      center: [number, number, number];
+      normal: [number, number, number];
+      area?: number;
+      featureType?: string;
+    }
+  ): void {
+    const dim = this.dimensions.find((d) => d.id === id);
+    if (!dim) return;
+    const lockedFeatureId =
+      surface.featureId ||
+      (surface.faceId !== undefined ? `FACE_${surface.faceId}` : `ENGINEER_FACE_${id}`);
+    dim.cad_feature_id = lockedFeatureId;
+    dim.cad_center = [surface.center[0], surface.center[1], surface.center[2]];
+    dim.cad_normal = [surface.normal[0], surface.normal[1], surface.normal[2]];
+    dim.verification = 'HUMAN_VERIFIED';
+
+    const dExt = dim as unknown as {
+      match_status?: string;
+      match_score?: number;
+      match_confidence?: number | string;
+      matched_face_ids?: number[];
+    };
     dExt.match_status = 'ENGINEER_LOCKED';
     dExt.match_score = 100;
-    dim.verification = 'HUMAN_VERIFIED';
-    const sidebar = document.getElementById('clean-features-panel')?.parentElement;
-    if (sidebar) {
-      this.renderVerifiedFeaturesList(sidebar, this.dimensions);
+    dExt.match_confidence = 100;
+    if (typeof surface.faceId === 'number' && Number.isFinite(surface.faceId)) {
+      dExt.matched_face_ids = [surface.faceId];
     }
+
+    this.pendingSurfaceBindDimensionId = null;
+
+    void recordFeedback({
+      event_type: 'SURFACE_BINDING_POSITIVE',
+      raw_text: dim.nominal_str || String(dim.nominal ?? ''),
+      feature_2d: {
+        id: dim.id,
+        balloon: dim.balloon,
+        type: dim.type,
+        nominal: dim.nominal,
+        nominal_str: dim.nominal_str,
+        upper_tol: dim.upper_tol,
+        lower_tol: dim.lower_tol,
+      },
+      surface_3d: {
+        id: lockedFeatureId,
+        feature_type: surface.featureType || dim.type || 'PLANE',
+        nominal_dimension: dim.nominal,
+        center: surface.center,
+        normal: surface.normal,
+        area: surface.area ?? 0,
+      },
+      part_name: this.activeCadModelName || this.loadedFileName || '',
+    });
+
+    if (typeof document !== 'undefined') {
+      const sidebar = document.getElementById('clean-features-panel')?.parentElement;
+      if (sidebar) {
+        this.renderVerifiedFeaturesList(sidebar, this.dimensions);
+      }
+    }
+    this.syncBalloonsToCanvas();
+    this.persistBalloonSession();
+    this.applyActivePlanToWorkspace(this.dimensions);
   }
 
   public activateDimensionIn3d(id: number): void {
