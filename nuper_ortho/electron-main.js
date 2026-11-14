@@ -39,7 +39,6 @@ function createWindow() {
     mainWindow.loadFile(distIndexPath);
   }
 
-  // Shortcuts: F5 / Ctrl+R to reload, F12 to toggle DevTools
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown') {
       if (input.key === 'F5' || (input.control && input.key.toLowerCase() === 'r')) {
@@ -52,7 +51,6 @@ function createWindow() {
     }
   });
 
-  // Window control IPCs
   ipcMain.on('window-minimize', () => mainWindow && mainWindow.minimize());
   ipcMain.on('window-maximize', () => {
     if (!mainWindow) return;
@@ -171,7 +169,6 @@ function createWindow() {
     }
   }
 
-  // Python Çekirdek ve OCP Çalışma Zamanı Sağlık Kontrolü IPC
   ipcMain.handle('check-python-runtime', async () => {
     try {
       const { execFile } = require('child_process');
@@ -214,7 +211,6 @@ print(json.dumps(res))
     }
   });
 
-  // Native CAD File Chooser IPC
   ipcMain.handle('select-cad-file', async () => {
     if (!mainWindow) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -251,7 +247,6 @@ print(json.dumps(res))
     };
   });
 
-  // Native Drawing File Chooser IPC
   ipcMain.handle('select-drawing-file', async () => {
     if (!mainWindow) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -324,21 +319,17 @@ print(json.dumps(res))
     return await runOrthoCompiler(drawingJson, stepPath);
   });
 
-  // Read Local File from Disk (test_assets or citadel)
   ipcMain.handle('read-local-cad', async (event, targetPath) => {
     try {
       let resolved = path.resolve(targetPath);
       if (!fs.existsSync(resolved)) {
-        // Try inside test_assets/BENCH_LAB
         const benchPath = path.resolve(__dirname, 'test_assets', 'BENCH_LAB', targetPath);
         if (fs.existsSync(benchPath)) resolved = benchPath;
         else {
-          // Search in test_assets root or subfolders
           const baseTest = path.resolve(__dirname, 'test_assets');
           const directTest = path.join(baseTest, targetPath);
           if (fs.existsSync(directTest)) resolved = directTest;
           else {
-            // Find by filename recursively in test_assets
             const targetName = path.basename(targetPath).toLowerCase();
             function findRecursive(dir) {
               const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -379,7 +370,6 @@ print(json.dumps(res))
     }
   });
 
-  // Get Benchmark Laboratory Catalog & Flagships
   ipcMain.handle('get-benchmark-catalog', async () => {
     try {
       const benchDir = path.resolve(__dirname, 'test_assets', 'BENCH_LAB');
@@ -404,7 +394,6 @@ print(json.dumps(res))
     }
   });
 
-  // Load a complete benchmark specimen suite (CAD + 2D PDF Drawing + Meta)
   ipcMain.handle('load-benchmark-specimen', async (event, specimenIndex) => {
     try {
       const benchDir = path.resolve(__dirname, 'test_assets', 'BENCH_LAB');
@@ -460,7 +449,6 @@ print(json.dumps(res))
     }
   });
 
-  // Scan and list test assets from test_assets directory
   ipcMain.handle('list-test-assets', async () => {
     const cadDir = path.resolve(__dirname, 'test_assets', 'cad_models');
     const drawDir = path.resolve(__dirname, 'test_assets', 'drawings');
@@ -488,7 +476,6 @@ print(json.dumps(res))
     return result;
   });
 
-  // Scan and list Citadel CAD models on the machine
   ipcMain.handle('list-citadel-models', async () => {
     const citadelDir = path.resolve(__dirname, '..', 'nuper_citadel', 'cad_models');
     if (!fs.existsSync(citadelDir)) return [];
@@ -593,6 +580,30 @@ print(json.dumps(res))
         }
       }
       return { success: false, error: 'Session not found' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('ortho:record-feedback', async (event, feedbackPayload) => {
+    try {
+      const { execFile } = require('child_process');
+      const pyBin = await resolvePythonPath();
+      const scriptPath = path.join(__dirname, 'tools', 'extractor', 'active_learning_engine.py');
+      const payloadJson = JSON.stringify(feedbackPayload || {});
+      return await new Promise((resolve) => {
+        execFile(pyBin, [scriptPath, '--record-json', payloadJson], { timeout: 5000 }, (err, stdout, stderr) => {
+          if (err) {
+            resolve({ success: false, error: err?.message || stderr || 'Feedback write error' });
+          } else {
+            try {
+              resolve({ success: true, result: JSON.parse(stdout) });
+            } catch {
+              resolve({ success: true, raw: stdout });
+            }
+          }
+        });
+      });
     } catch (e) {
       return { success: false, error: e.message };
     }

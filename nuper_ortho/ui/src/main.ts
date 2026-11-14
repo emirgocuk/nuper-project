@@ -51,18 +51,27 @@ export class NuperApp {
     });
 
     this.cadViewer.onFaceSelected((details) => {
-      if (this.pendingBindBalloonId !== null) {
-        const balloonId = this.pendingBindBalloonId;
+      const targetId = this.pendingBindBalloonId ?? this.setupWizard.getPendingSurfaceBindDimensionId();
+      if (targetId !== null) {
         this.pendingBindBalloonId = null;
-        const row = this.inspectionTable.getRows().find((r) => r.id === balloonId);
+        this.setupWizard.bindDimensionTo3DSurface(targetId, {
+          faceId: details.faceId,
+          featureId: details.featureId || `CAD_FACE_${details.faceId}`,
+          center: details.center,
+          normal: details.normal,
+          area: details.area,
+          featureType: details.surfaceType,
+        });
+        const row = this.inspectionTable.getRows().find((r) => r.id === targetId);
         if (row) {
-          row.feature_key = `CAD_FACE_${details.faceId}`;
-          (row as unknown as { match_status?: string; match_confidence?: number; matched_face_ids?: number[] }).match_status = 'ENGINEER_LOCKED';
-          (row as unknown as { match_status?: string; match_confidence?: number; matched_face_ids?: number[] }).match_confidence = 1.0;
-          (row as unknown as { match_status?: string; match_confidence?: number; matched_face_ids?: number[] }).matched_face_ids = [details.faceId];
+          row.feature_key = details.featureId || `CAD_FACE_${details.faceId}`;
+          const rowExt = row as unknown as { match_status?: string; match_confidence?: number; matched_face_ids?: number[] };
+          rowExt.match_status = 'ENGINEER_LOCKED';
+          rowExt.match_confidence = 1.0;
+          rowExt.matched_face_ids = [details.faceId];
           this.inspectionTable.render();
-          this.cadViewer.highlightFaceById(details.faceId);
         }
+        this.cadViewer.highlightFaceById(details.faceId);
       }
     });
 

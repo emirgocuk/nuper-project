@@ -210,6 +210,19 @@ export class IpcClient {
     return !!result;
   }
 
+  public async recordLearningFeedback(event: unknown): Promise<{ success: boolean }> {
+    const ipc = this.ensureIpc();
+    if (!ipc) {
+      return { success: true };
+    }
+    try {
+      const res = (await ipc.invoke('ortho:record-feedback', event)) as { success?: boolean } | null;
+      return { success: res?.success !== false };
+    } catch {
+      return { success: false };
+    }
+  }
+
   public minimizeWindow(): void {
     const ipc = this.ensureIpc();
     if (ipc) {
