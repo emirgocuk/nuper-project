@@ -1048,11 +1048,242 @@ def parse_step_file(step_path: str) -> Dict[str, Any]:
     }
 
 
+def _project_3d_point_to_view(pt: List[float], view_plane: str) -> Tuple[float, float]:
+    vp = str(view_plane or "XY").upper()
+    if "XZ" in vp or "FRONT" in vp:
+        return float(pt[0]), float(pt[2])
+    if "YZ" in vp or "SIDE" in vp:
+        return float(pt[1]), float(pt[2])
+    return float(pt[0]), float(pt[1])
+
+
+def _solve_linear_3x3(a: List[List[float]], b: List[float]) -> Optional[List[float]]:
+    m = [
+        [a[0][0], a[0][1], a[0][2], b[0]],
+        [a[1][0], a[1][1], a[1][2], b[1]],
+        [a[2][0], a[2][1], a[2][2], b[2]],
+    ]
+    for col in range(3):
+        piv = col
+        for r in range(col + 1, 3):
+            if abs(m[r][col]) > abs(m[piv][col]):
+                piv = r
+        if abs(m[piv][col]) < 1e-10:
+            return None
+        m[col], m[piv] = m[piv], m[col]
+        div = m[col][col]
+        for k in range(col, 4):
+            m[col][k] /= div
+        for r in range(3):
+            if r != col:
+                fac = m[r][col]
+                for k in range(col, 4):
+                    m[r][k] -= fac * m[col][k]
+    return [m[0][3], m[1][3], m[2][3]]
+
+
+def align_view_to_3d_projection(
+    view_circles_2d: List[Any],
+    cad_cylinders_3d: List[Any],
+    view_plane: str = "XY",
+) -> Optional[Dict[str, Any]]:
+    pts_2d: List[Tuple[float, float, float]] = []
+    for c in view_circles_2d:
+        if isinstance(c, dict):
+            ctr = c.get("center")
+            if isinstance(ctr, (list, tuple)) and len(ctr) >= 2:
+                pts_2d.append((float(ctr[0]), float(ctr[1]), float(c.get("radius_pt", 0.0) or 0.0)))
+            elif "u" in c and "v" in c:
+                pts_2d.append((float(c["u"]), float(c["v"]), float(c.get("r", c.get("radius_pt", 0.0)) or 0.0)))
+            elif "circle_cx" in c and "circle_cy" in c:
+                pts_2d.append((float(c["circle_cx"]), float(c["circle_cy"]), float(c.get("circle_r_pt", 0.0) or 0.0)))
+        elif isinstance(c, (list, tuple)) and len(c) >= 2:
+            r_pt = float(c[2]) if len(c) >= 3 else 0.0
+            pts_2d.append((float(c[0]), float(c[1]), r_pt))
+
+    pts_3d: List[Tuple[float, float, float]] = []
+    for f in cad_cylinders_3d:
+        if isinstance(f, dict):
+            ctr = f.get("center", f.get("origin"))
+            if isinstance(ctr, (list, tuple)) and len(ctr) >= 3:
+                u3, v3 = _project_3d_point_to_view([float(ctr[0]), float(ctr[1]), float(ctr[2])], view_plane)
+                r_mm = float(f.get("radius", float(f.get("diameter", 0.0) or 0.0) * 0.5) or 0.0)
+                pts_3d.append((u3, v3, r_mm))
+        elif isinstance(f, (list, tuple)) and len(f) >= 3:
+            u3, v3 = _project_3d_point_to_view([float(f[0]), float(f[1]), float(f[2])], view_plane)
+            pts_3d.append((u3, v3, 0.0))
+
+    if not pts_2d or not pts_3d:
+        return None
+
+    vp_clean = str(view_plane or "XY").upper()
+    plane_tag = "XZ" if ("XZ" in vp_clean or "FRONT" in vp_clean) else ("YZ" if ("YZ" in vp_clean or "SIDE" in vp_clean) else "XY")
+
+    if len(pts_2d) == 1 or len(pts_3d) == 1:
+        p0 = pts_2d[0]
+        q0 = pts_3d[0]
+        s = (q0[2] / p0[2]) if (p0[2] > 0.1 and q0[2] > 0.05) else 1.0
+        tu = q0[0] - s * p0[0]
+        tv = q0[1] - s * p0[1]
+        return {
+            "view_plane": plane_tag,
+            "scale": round(s, 6),
+            "flip_y": False,
+            "matrix": [[round(s, 6), 0.0], [0.0, round(s, 6)]],
+            "translation": [round(tu, 6), round(tv, 6)],
+            "inliers": 1,
+            "residual_error": 0.0,
+        }
+
+    us_3 = [p[0] for p in pts_3d]
+    vs_3 = [p[1] for p in pts_3d]
+    bbox_diag = math.hypot(max(us_3) - min(us_3), max(vs_3) - min(vs_3))
+    inlier_tol = max(1.5, bbox_diag * 0.04)
+
+    max_pts_2d = pts_2d[:16]
+    max_pts_3d = pts_3d[:16]
+
+    best_score: Optional[Tuple[int, float]] = None
+    best_model: Optional[Tuple[float, float, float, float, float, float, bool, float, List[Tuple[Tuple[float, float], Tuple[float, float]]]]] = None
+
+    for i1 in range(len(max_pts_2d)):
+        for i2 in range(i1 + 1, len(max_pts_2d)):
+            u1, v1, r2_1 = max_pts_2d[i1]
+            u2, v2, r2_2 = max_pts_2d[i2]
+            if math.hypot(u2 - u1, v2 - v1) < 1.0:
+                continue
+            for j1 in range(len(max_pts_3d)):
+                for j2 in range(len(max_pts_3d)):
+                    if j1 == j2:
+                        continue
+                    U1, V1, R3_1 = max_pts_3d[j1]
+                    U2, V2, R3_2 = max_pts_3d[j2]
+                    d3 = math.hypot(U2 - U1, V2 - V1)
+                    if d3 < 0.1:
+                        continue
+                    d2 = math.hypot(u2 - u1, v2 - v1)
+                    cand_s = d3 / d2
+                    if r2_1 > 0.5 and R3_1 > 0.1:
+                        if abs(r2_1 * cand_s - R3_1) > max(1.5, R3_1 * 0.35):
+                            continue
+                    if r2_2 > 0.5 and R3_2 > 0.1:
+                        if abs(r2_2 * cand_s - R3_2) > max(1.5, R3_2 * 0.35):
+                            continue
+
+                    for flip_y in (False, True):
+                        sy = -1.0 if flip_y else 1.0
+                        dx2 = u2 - u1
+                        dy2 = (v2 - v1) * sy
+                        denom = dx2 * dx2 + dy2 * dy2
+                        dX3 = U2 - U1
+                        dY3 = V2 - V1
+                        a_coef = (dx2 * dX3 + dy2 * dY3) / denom
+                        b_coef = (dx2 * dY3 - dy2 * dX3) / denom
+                        m00 = a_coef
+                        m01 = -b_coef * sy
+                        m10 = b_coef
+                        m11 = a_coef * sy
+                        tu = U1 - (m00 * u1 + m01 * v1)
+                        tv = V1 - (m10 * u1 + m11 * v1)
+
+                        inliers_pairs: List[Tuple[Tuple[float, float], Tuple[float, float]]] = []
+                        err_sum = 0.0
+                        for pu, pv, pr in max_pts_2d:
+                            pred_u = m00 * pu + m01 * pv + tu
+                            pred_v = m10 * pu + m11 * pv + tv
+                            min_d = float("inf")
+                            best_q = None
+                            for qU, qV, qR in max_pts_3d:
+                                dist = math.hypot(pred_u - qU, pred_v - qV)
+                                if dist < min_d:
+                                    min_d = dist
+                                    best_q = (qU, qV)
+                            if best_q is not None and min_d <= inlier_tol:
+                                inliers_pairs.append(((pu, pv), best_q))
+                                err_sum += min_d
+
+                        inlier_cnt = len(inliers_pairs)
+                        if inlier_cnt < 2:
+                            continue
+                        avg_err = err_sum / inlier_cnt
+                        rank_key = (inlier_cnt, -avg_err)
+                        if best_score is None or rank_key > best_score:
+                            best_score = rank_key
+                            best_model = (m00, m01, m10, m11, tu, tv, flip_y, cand_s, inliers_pairs)
+
+    if best_model is None:
+        return None
+
+    m00, m01, m10, m11, tu, tv, flip_y, scale_est, inliers_pairs = best_model
+
+    if len(inliers_pairs) >= 3:
+        ata = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+        atb_u = [0.0, 0.0, 0.0]
+        atb_v = [0.0, 0.0, 0.0]
+        for (pu, pv), (qU, qV) in inliers_pairs:
+            row = [pu, pv, 1.0]
+            for r in range(3):
+                atb_u[r] += row[r] * qU
+                atb_v[r] += row[r] * qV
+                for c_idx in range(3):
+                    ata[r][c_idx] += row[r] * row[c_idx]
+        sol_u = _solve_linear_3x3(ata, atb_u)
+        sol_v = _solve_linear_3x3(ata, atb_v)
+        if sol_u is not None and sol_v is not None:
+            m00, m01, tu = sol_u
+            m10, m11, tv = sol_v
+            scale_est = math.sqrt(max(1e-12, abs(m00 * m11 - m01 * m10)))
+
+    total_err = 0.0
+    for (pu, pv), (qU, qV) in inliers_pairs:
+        pred_u = m00 * pu + m01 * pv + tu
+        pred_v = m10 * pu + m11 * pv + tv
+        total_err += math.hypot(pred_u - qU, pred_v - qV)
+    residual = total_err / max(1, len(inliers_pairs))
+
+    return {
+        "view_plane": plane_tag,
+        "scale": round(scale_est, 6),
+        "flip_y": bool(flip_y),
+        "matrix": [[round(m00, 6), round(m01, 6)], [round(m10, 6), round(m11, 6)]],
+        "translation": [round(tu, 6), round(tv, 6)],
+        "inliers": len(inliers_pairs),
+        "residual_error": round(residual, 4),
+    }
+
+
+def transform_2d_to_3d(
+    point_2d: List[float],
+    alignment: Dict[str, Any],
+    step_bbox: Optional[Dict[str, Any]] = None,
+) -> List[float]:
+    u = float(point_2d[0])
+    v = float(point_2d[1])
+    mat = alignment.get("matrix", [[1.0, 0.0], [0.0, 1.0]])
+    trans = alignment.get("translation", [0.0, 0.0])
+    U = mat[0][0] * u + mat[0][1] * v + trans[0]
+    V = mat[1][0] * u + mat[1][1] * v + trans[1]
+
+    b_min = (step_bbox or {}).get("min", [0.0, 0.0, 0.0])
+    b_max = (step_bbox or {}).get("max", [0.0, 0.0, 0.0])
+    mid_x = (float(b_min[0]) + float(b_max[0])) * 0.5
+    mid_y = (float(b_min[1]) + float(b_max[1])) * 0.5
+    mid_z = (float(b_min[2]) + float(b_max[2])) * 0.5
+
+    vp = str(alignment.get("view_plane", "XY")).upper()
+    if vp == "XZ":
+        return [round(U, 4), round(mid_y, 4), round(V, 4)]
+    if vp == "YZ":
+        return [round(mid_x, 4), round(U, 4), round(V, 4)]
+    return [round(U, 4), round(V, 4), round(mid_z, 4)]
+
+
 def compute_topological_match_score(
     dim: Dict[str, Any],
     candidate_feature: Dict[str, Any],
     step_bbox: Dict[str, Any],
     view_name: Optional[str] = None,
+    alignment: Optional[Dict[str, Any]] = None,
 ) -> float:
     dim_nom = float(dim.get("nominal", 0.0))
     cand_nom = float(candidate_feature.get("nominal", candidate_feature.get("diameter", candidate_feature.get("radius", candidate_feature.get("value", 0.0)))))
@@ -1077,7 +1308,7 @@ def compute_topological_match_score(
         score_type = 20.0
     elif d_type == "RADIUS" and ("TOROID" in c_type or "RADIUS" in c_type or "FILLET" in c_type):
         score_type = 20.0
-    elif d_type in ("LINEAR", "CHAMFER") and ("PLANE" in c_type or "SPAN" in c_type or "DISTANCE" in c_type):
+    elif d_type in ("LINEAR", "CHAMFER") and ("PLANE" in c_type or "SPAN" in c_type or "DISTANCE" in c_type or "SLOT" in c_type or "STEP" in c_type):
         score_type = 20.0
     elif d_type == "THREAD" and ("CYLINDER" in c_type or "THREAD" in c_type):
         score_type = 20.0
@@ -1105,32 +1336,76 @@ def compute_topological_match_score(
     if not isinstance(center, (list, tuple)) or len(center) != 3:
         center = [0.0, 0.0, 0.0]
 
-    cx, cy, cz = center[0], center[1], center[2]
-    xmin, ymin, zmin = b_min[0], b_min[1], b_min[2]
-    xmax, ymax, zmax = b_max[0], b_max[1], b_max[2]
+    cx, cy, cz = float(center[0]), float(center[1]), float(center[2])
+    xmin, ymin, zmin = float(b_min[0]), float(b_min[1]), float(b_min[2])
+    xmax, ymax, zmax = float(b_max[0]), float(b_max[1]), float(b_max[2])
 
     v_clean = str(view_name or dim.get("view_name", "VIEW_FRONT_XZ")).upper()
-    if "XZ" in v_clean or "FRONT" in v_clean:
-        u_3d = (cx - xmin) / max(xmax - xmin, 1e-6)
-        v_3d = (cz - zmin) / max(zmax - zmin, 1e-6)
-    elif "YZ" in v_clean or "SIDE" in v_clean:
-        u_3d = (cy - ymin) / max(ymax - ymin, 1e-6)
-        v_3d = (cz - zmin) / max(zmax - zmin, 1e-6)
-    else:
-        u_3d = (cx - xmin) / max(xmax - xmin, 1e-6)
-        v_3d = (cy - ymin) / max(ymax - ymin, 1e-6)
 
-    u_3d = max(0.0, min(1.0, u_3d))
-    v_3d = max(0.0, min(1.0, v_3d))
+    active_align = alignment or dim.get("view_alignment")
+    att = dim.get("attachments") if isinstance(dim.get("attachments"), dict) else {}
+    target_2d: Optional[List[float]] = None
+    if att.get("circle_cx") is not None and att.get("circle_cy") is not None:
+        target_2d = [float(att["circle_cx"]), float(att["circle_cy"])]
+    elif isinstance(att.get("leader_tip"), (list, tuple)) and len(att["leader_tip"]) >= 2:
+        target_2d = [float(att["leader_tip"][0]), float(att["leader_tip"][1])]
+    elif isinstance(dim.get("bbox"), (list, tuple)) and len(dim["bbox"]) >= 4:
+        db = dim["bbox"]
+        target_2d = [(float(db[0]) + float(db[2])) * 0.5, (float(db[1]) + float(db[3])) * 0.5]
 
     score_proximity = 8.0
-    rel_pos = dim.get("rel_position")
-    if rel_pos and len(rel_pos) >= 2:
-        u_2d, v_2d = float(rel_pos[0]), float(rel_pos[1])
-        dist = math.sqrt((u_3d - u_2d)**2 + (v_3d - v_2d)**2)
-        score_proximity = max(0.0, 15.0 * (1.0 - dist / 1.4142))
+    if active_align and target_2d is not None:
+        pred_3d = transform_2d_to_3d(target_2d, active_align, step_bbox)
+        vp = str(active_align.get("view_plane", "XY")).upper()
+        if vp == "XZ":
+            dist_mm = math.hypot(cx - pred_3d[0], cz - pred_3d[2])
+            plane_diag = max(1.0, math.hypot(xmax - xmin, zmax - zmin))
+        elif vp == "YZ":
+            dist_mm = math.hypot(cy - pred_3d[1], cz - pred_3d[2])
+            plane_diag = max(1.0, math.hypot(ymax - ymin, zmax - zmin))
+        else:
+            dist_mm = math.hypot(cx - pred_3d[0], cy - pred_3d[1])
+            plane_diag = max(1.0, math.hypot(xmax - xmin, ymax - ymin))
+        score_proximity = max(0.0, 25.0 * math.exp(-dist_mm / max(2.0, plane_diag * 0.12)))
+    else:
+        if "XZ" in v_clean or "FRONT" in v_clean:
+            u_3d = (cx - xmin) / max(xmax - xmin, 1e-6)
+            v_3d = (cz - zmin) / max(zmax - zmin, 1e-6)
+        elif "YZ" in v_clean or "SIDE" in v_clean:
+            u_3d = (cy - ymin) / max(ymax - ymin, 1e-6)
+            v_3d = (cz - zmin) / max(zmax - zmin, 1e-6)
+        else:
+            u_3d = (cx - xmin) / max(xmax - xmin, 1e-6)
+            v_3d = (cy - ymin) / max(ymax - ymin, 1e-6)
 
-    total = score_nom + score_type + score_axis + score_datum + score_proximity
+        u_3d = max(0.0, min(1.0, u_3d))
+        v_3d = max(0.0, min(1.0, v_3d))
+
+        rel_pos = dim.get("rel_position")
+        if rel_pos and len(rel_pos) >= 2:
+            u_2d, v_2d = float(rel_pos[0]), float(rel_pos[1])
+            dist = math.sqrt((u_3d - u_2d)**2 + (v_3d - v_2d)**2)
+            score_proximity = max(0.0, 15.0 * (1.0 - dist / 1.4142))
+
+    score_section = 0.0
+    is_sec_view = bool(dim.get("is_section_view")) or ("SECTION" in v_clean)
+    if is_sec_view:
+        f_type_up = str(candidate_feature.get("feature_type", "")).upper()
+        is_internal_feat = (
+            bool(candidate_feature.get("is_internal"))
+            or bool(candidate_feature.get("is_blind"))
+            or "INTERNAL" in c_type
+            or "INTERNAL" in f_type_up
+            or "COUNTERBORE" in c_type
+            or "GROOVE" in c_type
+            or "STEP_HEIGHT" in c_type
+            or "BORE" in c_type
+            or "CYLINDER" in c_type
+        )
+        if is_internal_feat:
+            score_section = 20.0
+
+    total = score_nom + score_type + score_axis + score_datum + score_proximity + score_section
     return round(min(100.0, max(0.0, total)), 2)
 
 
@@ -1158,6 +1433,29 @@ def verify_dimensions_against_step(
 
     verified_dimensions = []
     pruned_dimensions = []
+
+    view_circles_by_view: Dict[str, List[Dict[str, Any]]] = {}
+    extra_view_circles = step_data.get("view_circles_2d")
+    if isinstance(extra_view_circles, dict):
+        for vk, clist in extra_view_circles.items():
+            if isinstance(clist, list):
+                view_circles_by_view[str(vk)] = list(clist)
+
+    for dim in dimensions:
+        att = dim.get("attachments")
+        if isinstance(att, dict) and att.get("circle_cx") is not None and att.get("circle_cy") is not None:
+            vkey = str(dim.get("view_name") or dim.get("view_cluster") or "VIEW_TOP_XY")
+            view_circles_by_view.setdefault(vkey, []).append({
+                "center": [float(att["circle_cx"]), float(att["circle_cy"])],
+                "radius_pt": float(att.get("circle_r_pt") or 0.0),
+            })
+
+    view_alignments: Dict[str, Optional[Dict[str, Any]]] = {}
+    for vkey, clist in view_circles_by_view.items():
+        if clist and step_cylinders:
+            v_up = vkey.upper()
+            vp = "XZ" if ("XZ" in v_up or "FRONT" in v_up) else ("YZ" if ("YZ" in v_up or "SIDE" in v_up) else "XY")
+            view_alignments[vkey] = align_view_to_3d_projection(clist, step_cylinders, view_plane=vp)
 
     for dim in dimensions:
         d_type = str(dim.get("type", "LINEAR")).upper()
@@ -1190,6 +1488,7 @@ def verify_dimensions_against_step(
                         "id": c["id"],
                         "center": c.get("center", [0.0, 0.0, 0.0]),
                         "axis": c.get("axis", [0.0, 0.0, 1.0]),
+                        "is_internal": c.get("is_internal", True),
                     })
             for circ in step_circles:
                 if abs(circ["diameter"] - nom) <= tol_dia:
@@ -1302,10 +1601,12 @@ def verify_dimensions_against_step(
 
         matched_feature: Optional[Dict[str, Any]] = None
         best_score = 0.0
+        vkey = str(dim.get("view_name") or dim.get("view_cluster") or "VIEW_TOP_XY")
+        dim_align = view_alignments.get(vkey)
 
         if candidate_features:
             for feat in candidate_features:
-                score = compute_topological_match_score(dim, feat, step_bbox, dim.get("view_name"))
+                score = compute_topological_match_score(dim, feat, step_bbox, dim.get("view_name"), alignment=dim_align)
                 if score > best_score:
                     best_score = score
                     matched_feature = feat

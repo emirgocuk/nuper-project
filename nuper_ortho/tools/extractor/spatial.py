@@ -828,31 +828,49 @@ def detect_orthographic_views(
             "plane": "XY",
             "bbox": [50.0, 50.0, round(w_half, 1), round(h_half, 1)],
             "view_scale_ratio": 1.0,
+            "is_section_view": False,
+            "section_label": None,
+            "section_plane_rel": None,
         },
         {
             "name": "VIEW_FRONT_XZ",
             "plane": "XZ",
             "bbox": [50.0, round(h_half, 1), round(w_half, 1), round(page_height - 50.0, 1)],
             "view_scale_ratio": 1.0,
+            "is_section_view": False,
+            "section_label": None,
+            "section_plane_rel": None,
         },
         {
             "name": "VIEW_SIDE_YZ",
             "plane": "YZ",
             "bbox": [round(w_half, 1), round(h_half, 1), round(page_width - 50.0, 1), round(page_height - 50.0, 1)],
             "view_scale_ratio": 1.0,
+            "is_section_view": False,
+            "section_label": None,
+            "section_plane_rel": None,
         },
         {
             "name": "VIEW_SECTION",
             "plane": "XZ",
             "bbox": [round(w_half, 1), 50.0, round(page_width - 50.0, 1), round(h_half, 1)],
             "view_scale_ratio": 1.0,
+            "is_section_view": False,
+            "section_label": None,
+            "section_plane_rel": None,
         },
     ]
 
+    cut_markers: Dict[str, List[Tuple[float, float]]] = {}
+
     if text_items:
         for it in text_items:
-            t = str(it.get("text", "")).upper()
+            t_raw = str(it.get("text", "")).strip()
+            t = t_raw.upper()
             b = it.get("bbox", [0, 0, 0, 0])
+            if re.match(r"^[A-Z]$", t) and len(b) >= 4:
+                cut_markers.setdefault(t, []).append(((b[0] + b[2]) * 0.5, (b[1] + b[3]) * 0.5))
+
             detail_match = re.search(r'(?:DETAY|DETAIL|ÖLÇEK|SCALE)\s*([A-Z])?\s*\(?\s*([1-9][0-9]*)\s*:\s*([1-9][0-9]*)', t)
             local_ratio = 1.0
             if detail_match:
@@ -862,15 +880,45 @@ def detect_orthographic_views(
             elif "DETAY" in t or "DETAIL" in t:
                 local_ratio = 2.0
 
-            if any(k in t for k in ("KESIT", "KESİT", "SECTION", "A-A", "B-B")):
+            sec_match = re.search(r'(?:KESIT|KESİT|SECTION)\s*([A-Z]\s*-\s*[A-Z])?', t)
+            plain_pair = re.search(r'\b([A-Z])\s*-\s*\1\b', t)
+            if sec_match or plain_pair:
+                sec_lbl = None
+                if sec_match and sec_match.group(1):
+                    sec_lbl = sec_match.group(1).replace(" ", "")
+                elif plain_pair:
+                    sec_lbl = f"{plain_pair.group(1)}-{plain_pair.group(1)}"
                 for v in views:
                     if v["bbox"][0] <= b[0] <= v["bbox"][2] and v["bbox"][1] <= b[1] <= v["bbox"][3]:
                         v["name"] = "VIEW_SECTION"
+                        v["is_section_view"] = True
+                        if sec_lbl:
+                            v["section_label"] = sec_lbl
             elif local_ratio > 1.0:
                 for v in views:
                     if v["bbox"][0] <= b[0] <= v["bbox"][2] and v["bbox"][1] <= b[1] <= v["bbox"][3]:
                         v["name"] = "VIEW_DETAIL"
                         v["view_scale_ratio"] = local_ratio
+
+    for v in views:
+        if v.get("is_section_view") and v.get("section_label"):
+            letter = v["section_label"].split("-")[0]
+            pts = cut_markers.get(letter, [])
+            if len(pts) >= 2:
+                mx = sum(p[0] for p in pts) / len(pts)
+                my = sum(p[1] for p in pts) / len(pts)
+                host_view = None
+                for hv in views:
+                    if not hv.get("is_section_view"):
+                        hb = hv["bbox"]
+                        if hb[0] <= mx <= hb[2] and hb[1] <= my <= hb[3]:
+                            host_view = hv
+                            break
+                if host_view:
+                    hb = host_view["bbox"]
+                    rx = (mx - hb[0]) / max(hb[2] - hb[0], 1.0)
+                    ry = (my - hb[1]) / max(hb[3] - hb[1], 1.0)
+                    v["section_plane_rel"] = [round(rx, 4), round(ry, 4)]
 
     return views
 
@@ -925,6 +973,9 @@ def assign_view_to_dimension(
         "inferred_axis": inferred_axis,
         "rel_position": [round(rel_x, 4), round(rel_y, 4)],
         "view_bbox": vb,
+        "is_section_view": bool(best_view.get("is_section_view", False)),
+        "section_label": best_view.get("section_label"),
+        "section_plane_rel": best_view.get("section_plane_rel"),
     }
 
 
