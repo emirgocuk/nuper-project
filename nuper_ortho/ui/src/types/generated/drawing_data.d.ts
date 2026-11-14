@@ -99,6 +99,11 @@ export interface DrawingExtractionResult {
      * @maxItems 4
      */
     bbox?: [number, number, number, number];
+    is_reference_dimension?: boolean;
+    requires_manual_3d_binding?: boolean;
+    cylinder_polarity?: "INTERNAL_BORE" | "EXTERNAL_BOSS" | "PLANAR" | "UNKNOWN";
+    recommended_stylus?: string;
+    learning_applied?: boolean;
     [k: string]: unknown;
   }[];
   similar_parts?: {
@@ -130,5 +135,7 @@ export interface DrawingExtractionResult {
     motion_count?: number;
     [k: string]: unknown;
   };
+  ollama_status?: string;
+  learning_applied?: boolean;
   [k: string]: unknown;
 }

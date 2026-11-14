@@ -82,6 +82,12 @@ export interface CadMetadata {
     floor_z?: number;
     minor_diameter?: number;
     thread_pitch?: number;
+    cylinder_polarity?: "INTERNAL_BORE" | "EXTERNAL_BOSS" | "PLANAR" | "UNKNOWN";
+    recommended_stylus?: string;
+    is_through?: boolean;
+    axial_min?: number;
+    axial_max?: number;
+    stem_blocked?: boolean;
     [k: string]: unknown;
   }[];
   /**

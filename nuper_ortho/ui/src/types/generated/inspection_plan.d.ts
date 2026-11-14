@@ -37,6 +37,10 @@ export interface InspectionPlanPayload {
     rel_position?: number[];
     inferred_axis?: "X" | "Y" | "Z";
     requires_manual_3d_binding?: boolean;
+    is_reference_dimension?: boolean;
+    cylinder_polarity?: "INTERNAL_BORE" | "EXTERNAL_BOSS" | "PLANAR" | "UNKNOWN";
+    recommended_stylus?: string;
+    learning_applied?: boolean;
     [k: string]: unknown;
   }[];
   similar_parts?: {
@@ -48,5 +52,7 @@ export interface InspectionPlanPayload {
   thermal_compensation_summary?: {
     [k: string]: unknown;
   };
+  ollama_status?: string;
+  learning_applied?: boolean;
   [k: string]: unknown;
 }
