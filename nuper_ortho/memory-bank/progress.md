@@ -206,6 +206,30 @@ Aşağıdaki sonuçlar 12 Kasım 2026 kapsamlı 8-Madde entegrasyon ve kalite g�
    - `cargo test --workspace`: 28 test paketi, 176 test başarılı (0 hata).
    - `npm run build`: Başarılı (`vite build` 700ms, 0 hata).
 
+### 4.5. Sistem Senkronizasyonu, Aktif Öğrenme Sıfırlama ve UNMATCHED Koruması (14 Kasım 2026)
+
+1. **Şema Senkronizasyonu & Codegen (`0dcc796`, `3f02b89`, `36b31fa`):**
+   - `schemas/drawing_data.schema.json`, `schemas/cad_metadata.schema.json` ve `schemas/inspection_plan.schema.json` dosyalarına `is_reference_dimension`, `requires_manual_3d_binding`, `cylinder_polarity`, `recommended_stylus`, `ollama_status`, `learning_applied` (+ `is_through`, `axial_min`, `axial_max`, `stem_blocked`) alanları eklendi ve `npm run codegen` ile Python Pydantic (`tools/models/generated_*.py`) + TypeScript (`ui/src/types/generated/*.d.ts`) tipleri yenilendi.
+2. **Rust Derleyici `UNMATCHED` Koruması (`7b376ae`, `acbbb3b`):**
+   - `crates/ortho-ast/src/feature.rs` içinde `match_status`, `requires_manual_3d_binding` ve `is_unmatched()` tanımlandı.
+   - `crates/ortho-emitter` (`lib.rs`, `calypso.rs`, `wenzel.rs`) ile `crates/ortho-cli/src/main.rs` ve `src-tauri/src/main.rs` içinde eşleşmemiş unsurlar için `(0,0,0)` noktasına fiziksel prob hareketi üretilmesi durdurulup `$$ [UYARI] UNSUR #<id> 3D YUZEYE BAGLANMADI - HAREKET ATLANDI` çıktısı üretildi.
+3. **Aktif Öğrenme Geri Alma / Sıfırlama (`7064873`, `f6f6526`, `44f8007`, `c34a27b`):**
+   - `tools/extractor/active_learning_engine.py` içine `part_hash` sütunu, `undo_last_feedback()`, `clear_feedback_for_part(part_hash)` ve `--undo-last` / `--clear-part` CLI uçları eklendi.
+   - `electron-main.js` (`ortho:undo-feedback`, `ortho:reset-learning`) ve `src-tauri/src/main.rs` (`undo_last_feedback_ipc`, `clear_feedback_for_part_ipc`) üzerinden UI `BalloonEditing.ts` (`undoLastFeedback`, `resetActiveLearning`) ve `SetupWizard.ts` (`#btn-reset-learning`, `#btn-top-reset-learning`) butonlarına bağlandı.
+   - `package.json` içindeki `test:rust` betiği Windows ortamında `cargo check --workspace` çalışacak şekilde düzeltildi.
+4. **`ui/index.html` Temizliği ve Işık Masası CSS İzolasyonu (`c34a27b`, `17329cf`, `5b42d32`, `e3ca15a`):**
+   - `ui/index.html` içindeki tüm sabit `VALVE_BODY_OP10` / `VALVE_BODY_OP20` kalıntıları `Parça Yüklenmedi` / `PARCA_YUKLENMEDI` olarak temizlendi.
+   - `SetupWizard.ts` içinde `#modal-drawing-audit` açıkken `overflow: hidden` ve `z-index: 99999 !important` uygulanarak arka plan `.timeline-drawer` / `#code-display` sızıntısı engellendi.
+5. **Geçici Derleyici Çıktılarının Depodan Kaldırılması (`494c626`):**
+   - `output_pcdmis.dmi`, `output_calypso.txt`, `setup_sheet.md` ve `crates/ortho-cli/output_pcdmis.dmi` Git takibinden kaldırıldı.
+6. **Doğrulama:**
+   - `npm run codegen`: Başarılı.
+   - `npm run check:types`: Başarılı (0 hata).
+   - `npm run test:python`: 92 test başarılı (`8.76s`).
+   - `npm run test:ui`: 35 test dosyası, 204 test başarılı (`30.00s`).
+   - `npm run test:rust`: `cargo check --workspace` başarılı (`0.34s`, not: yerel ortamda `link.exe`/`mingw32-gcc` olmadığı için `cargo check --workspace --tests` ile derleme ve test hedefleri doğrulandı, çalıştırılabilir Rust test binary linki atlandı).
+   - `npm run build`: `vite build` başarılı (`1.08s`, 0 hata).
+
 ## 5. Bağımlılık sırası ve görev boyutu
 
 **R0 → R1 → R2 → R3 → R4 → R5 → R6 → R7 → R8**
