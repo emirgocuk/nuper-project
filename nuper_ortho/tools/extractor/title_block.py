@@ -42,17 +42,29 @@ def extract_title_block_fields(text: str, filename: str) -> Dict[str, Any]:
     if hard_match:
         title_block["hardness"] = hard_match.group(1).strip()
 
-    rough_match = re.search(r"\b(Ra\s*[\d\.]+\s*(?:µm|um)?)\b", text, re.IGNORECASE)
+    rough_match = re.search(r"\b(Ra\s*[\d\.,]+\s*(?:µm|um)?)\b", text, re.IGNORECASE)
     if rough_match:
-        title_block["roughness"] = rough_match.group(1).strip()
+        title_block["roughness"] = rough_match.group(1).strip().replace(",", ".")
 
-    tol_match = re.search(r"\b(ISO\s*2768(?:-|\s*)([fmcvFMCV])([a-zA-Z])?|ASME\s*B1\.13M)\b", text, re.IGNORECASE)
-    if tol_match:
-        title_block["general_tolerance"] = tol_match.group(0).strip()
-        if tol_match.group(2):
-            title_block["iso_class"] = tol_match.group(2).lower()
-        else:
-            title_block["iso_class"] = "m"
+    cleaned_for_tol = re.sub(r"\b(?:ASME\s*B1\.13M|ISO\s*965(?:-[0-9A-Za-z]+)?)\b", " ", text, flags=re.IGNORECASE)
+    iso_match = re.search(r"\b(ISO\s*2768(?:-|\s*)([fmcvFMCV])([a-zA-Z])?)\b", cleaned_for_tol, re.IGNORECASE)
+    asme_y14_match = re.search(r"\b(ASME\s*Y14\.5(?:M)?(?:-\d{4})?)\b", cleaned_for_tol, re.IGNORECASE)
+    explicit_note_match = re.search(
+        r"(?:GENEL\s*TOLERANS\w*|GENERAL\s*TOLERANCE\w*)\s*[:\-]?\s*(±\s*[0-9]+(?:[.,][0-9]+)?(?:\s*mm)?)",
+        cleaned_for_tol,
+        re.IGNORECASE,
+    )
+
+    if iso_match:
+        title_block["general_tolerance"] = iso_match.group(0).strip()
+        title_block["iso_class"] = iso_match.group(2).lower() if iso_match.group(2) else "m"
+    elif asme_y14_match:
+        title_block["general_tolerance"] = asme_y14_match.group(1).strip()
+        title_block["iso_class"] = "m"
+    elif explicit_note_match:
+        raw_val = re.sub(r"(\d),(\d)", r"\1.\2", explicit_note_match.group(1).strip())
+        title_block["general_tolerance"] = raw_val
+        title_block["iso_class"] = "m"
     else:
         title_block["iso_class"] = "m"
 

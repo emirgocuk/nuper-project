@@ -1,27 +1,81 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import re
-from .tolerance import resolve_iso_fit, parse_symmetric_tolerance, parse_bilateral_tolerance
+from .tolerance import (
+    resolve_iso_fit,
+    parse_symmetric_tolerance,
+    parse_bilateral_tolerance,
+    apply_iso2768_tolerance,
+)
+
+
+def normalize_decimal_commas(text: str) -> str:
+    if not text:
+        return ""
+    return re.sub(r"(\d),(\d)", r"\1.\2", text)
+
+
+def is_reference_dimension(raw_text: str) -> bool:
+    if not raw_text:
+        return False
+    norm = normalize_decimal_commas(str(raw_text)).strip()
+    if re.match(r"^\(\s*[0-9]+(?:\.[0-9]+)?\s*\)$", norm):
+        return True
+    if re.search(r"\bREF\.?\b", norm, re.IGNORECASE):
+        return True
+    return False
+
+
+def parse_tolerance(
+    tol_str: str,
+    nominal: Optional[float] = None,
+    general_tol_class: Optional[str] = None,
+) -> Tuple[str, str]:
+    norm_tol = normalize_decimal_commas(tol_str or "").strip()
+    upper = ""
+    lower = ""
+    if "±" in norm_tol:
+        res = parse_symmetric_tolerance(norm_tol)
+        if res:
+            upper, lower = res
+    elif "+" in norm_tol or "/" in norm_tol:
+        parts = re.findall(r"([+-]?[0-9\.]+)", norm_tol)
+        if len(parts) >= 2:
+            upper, lower = parse_bilateral_tolerance(parts[0], parts[1])
+        elif len(parts) == 1:
+            upper = f"+{parts[0].lstrip('+')}"
+            lower = "0.000"
+    elif "(" in norm_tol:
+        parts = re.findall(r"([+-]?[0-9\.]+)", norm_tol)
+        if len(parts) >= 2:
+            upper, lower = parse_bilateral_tolerance(parts[0], parts[1])
+    elif general_tol_class and nominal is not None and nominal > 0.0:
+        u, l, _ = apply_iso2768_tolerance(nominal, general_tol_class)
+        upper, lower = u, l
+    return upper, lower
 
 
 def parse_diameter_callouts(text: str) -> List[Dict[str, Any]]:
+    text = normalize_decimal_commas(text)
     results = []
     pattern = re.compile(
-        r"(?:(\d+)[ \t]*x[ \t]*)?(?:[Ø\u00d8@⌀]|DIA|CAP|(?:(?<=\b)|(?<=^))[QD](?=[0-9]))[ \t]*([0-9]+(?:\.[0-9]+)?)[ \t]*(?:(H[678]|g6|f7|js7)|(MIN|MAKS|MAX)|(?:\([ \t]*([+-]?[0-9\.]+)[ \t]*(?:/|[ \t]+)[ \t]*([+-]?[0-9\.]+)[ \t]*\))|(?:([±\+])[ \t]*([0-9\.]+)))?",
+        r"(?:(\d+)[ \t]*x[ \t]*)?(?:[Ø\u00d8@⌀]|DIA|CAP|(?:(?<=\b)|(?<=^))[QD](?=[0-9]))[ \t]*([0-9]+(?:\.[0-9]+)?)[ \t]*(?:(H[678]|g6|f7|js7)|(MIN|MAKS|MAX)|(?:\([ \t]*([+-]?[0-9\.]+)[ \t]*(?:/|[ \t]+)[ \t]*([+-]?[0-9\.]+)[ \t]*\))|(?:([+-][0-9\.]+)[ \t]*/[ \t]*([+-]?[0-9\.]+))|(?:([±\+])[ \t]*([0-9\.]+)))?",
         re.IGNORECASE,
     )
     for m in pattern.finditer(text):
         count_str = m.group(1) or ""
         quantity = int(count_str) if count_str else 1
         nominal = float(m.group(2))
-        if nominal < 1.0 or nominal > 3000.0:
+        if nominal < 0.2 or nominal > 3000.0:
             continue
 
         fit = m.group(3) or ""
         limit = m.group(4) or ""
-        upper_raw = m.group(5) or ""
-        lower_raw = m.group(6) or ""
-        sym_sign = m.group(7) or ""
-        sym_val = m.group(8) or ""
+        upper_paren = m.group(5) or ""
+        lower_paren = m.group(6) or ""
+        upper_slash = m.group(7) or ""
+        lower_slash = m.group(8) or ""
+        sym_sign = m.group(9) or ""
+        sym_val = m.group(10) or ""
 
         nom_str = f"{count_str}x Ø{nominal}" if count_str else f"Ø{nominal}"
         if fit:
@@ -33,8 +87,10 @@ def parse_diameter_callouts(text: str) -> List[Dict[str, Any]]:
         lower = ""
         if fit or limit:
             upper, lower = resolve_iso_fit(fit or limit, nominal)
-        elif upper_raw and lower_raw:
-            upper, lower = parse_bilateral_tolerance(upper_raw, lower_raw)
+        elif upper_paren and lower_paren:
+            upper, lower = parse_bilateral_tolerance(upper_paren, lower_paren)
+        elif upper_slash and lower_slash:
+            upper, lower = parse_bilateral_tolerance(upper_slash, lower_slash)
         elif sym_val:
             res = None
             if sym_sign == "+":
@@ -59,6 +115,7 @@ def parse_diameter_callouts(text: str) -> List[Dict[str, Any]]:
 
 
 def parse_radius_callouts(text: str) -> List[Dict[str, Any]]:
+    text = normalize_decimal_commas(text)
     results = []
     pattern = re.compile(r"(?<![A-Za-z0-9_\-\.])(?:(\d+)[ \t]*x[ \t]*)?R[ \t]*([0-9]+(?:\.[0-9]+)?)", re.IGNORECASE)
     for m in pattern.finditer(text):
@@ -80,71 +137,59 @@ def parse_radius_callouts(text: str) -> List[Dict[str, Any]]:
     return results
 
 
-def parse_linear_callouts(text: str) -> List[Dict[str, Any]]:
+def parse_linear_callouts(text: str, include_reference: bool = True) -> List[Dict[str, Any]]:
+    text = normalize_decimal_commas(text)
     results = []
     seen = set()
 
     pattern = re.compile(
-        r"(?<![A-Za-z0-9_\-\.])([0-9]{1,4}(?:\.[0-9]+)?)[ \t]*(?:([±\+]\s*[0-9]+(?:\.[0-9]+)?(?:\s*[\/\-]\s*[-+]?[0-9]+(?:\.[0-9]+)?)?)|(\(\s*[-+]?[0-9\.]+\s*[\/\s]+\s*[-+]?[0-9\.]+\s*\)))"
+        r"(?:(\d+)[ \t]*x[ \t]+)?(?<![A-Za-z0-9_\-\.])([0-9]{1,4}(?:\.[0-9]+)?)(?!\s*[°\*\^]|\s*x\s*45)[ \t]*(?:([±\+]\s*[0-9]+(?:\.[0-9]+)?(?:\s*[\/\-]\s*[-+]?[0-9]+(?:\.[0-9]+)?)?)|(\(\s*[-+]?[0-9\.]+\s*[\/\s]+\s*[-+]?[0-9\.]+\s*\)))"
     )
     for m in pattern.finditer(text):
-        val = float(m.group(1))
-        tol_str = m.group(2) or m.group(3) or ""
-        if val < 2.0 or val > 2500.0:
+        count_str = m.group(1) or ""
+        quantity = int(count_str) if count_str else 1
+        val = float(m.group(2))
+        tol_str = m.group(3) or m.group(4) or ""
+        if val < 0.1 or val > 2500.0:
             continue
 
-        upper = ""
-        lower = ""
-        if "±" in tol_str:
-            res = parse_symmetric_tolerance(tol_str)
-            if res:
-                upper, lower = res
-        elif "+" in tol_str:
-            parts = re.findall(r"([+-]?[0-9\.]+)", tol_str)
-            if len(parts) >= 2:
-                upper, lower = parse_bilateral_tolerance(parts[0], parts[1])
-            elif len(parts) == 1:
-                upper = f"+{parts[0]}"
-                lower = "0.000"
-        elif "(" in tol_str:
-            parts = re.findall(r"([+-]?[0-9\.]+)", tol_str)
-            if len(parts) >= 2:
-                upper, lower = parse_bilateral_tolerance(parts[0], parts[1])
-
-        nom_str = f"{val} {tol_str}".strip()
+        upper, lower = parse_tolerance(tol_str, nominal=val)
+        prefix = f"{count_str}x " if count_str else ""
+        nom_str = f"{prefix}{val} {tol_str}".strip()
         seen.add(nom_str)
         seen.add(str(val))
         if val.is_integer():
             seen.add(str(int(val)))
         results.append({
             "type": "LINEAR",
-            "quantity": 1,
+            "quantity": quantity,
             "nominal": val,
             "nominal_str": nom_str,
             "upper_tol": upper,
             "lower_tol": lower,
+            "is_reference_dimension": False,
         })
 
-    # Referans ölçüler: (291.9), (125.1)
     ref_pattern = re.compile(r"\(\s*([0-9]{1,4}(?:\.[0-9]+)?)\s*\)")
     for m in ref_pattern.finditer(text):
         val = float(m.group(1))
         nom_str = f"({val})"
-        if nom_str not in seen and 2.0 <= val <= 3000.0:
+        if 0.2 <= val <= 3000.0:
             seen.add(nom_str)
             seen.add(str(val))
             if val.is_integer():
                 seen.add(str(int(val)))
-            results.append({
-                "type": "LINEAR",
-                "quantity": 1,
-                "nominal": val,
-                "nominal_str": nom_str,
-                "upper_tol": "",
-                "lower_tol": "",
-            })
+            if include_reference:
+                results.append({
+                    "type": "LINEAR",
+                    "quantity": 1,
+                    "nominal": val,
+                    "nominal_str": nom_str,
+                    "upper_tol": "",
+                    "lower_tol": "",
+                    "is_reference_dimension": True,
+                })
 
-    # Pah ölçüleri: 3 x45°, 1 x45*
     chamfer_pattern = re.compile(r"(?:(\d+)\s*x\s*)?([0-9]+(?:\.[0-9]+)?)\s*x\s*45[°\*\^]?", re.IGNORECASE)
     for m in chamfer_pattern.finditer(text):
         cnt = m.group(1) or ""
@@ -162,9 +207,9 @@ def parse_linear_callouts(text: str) -> List[Dict[str, Any]]:
                 "nominal_str": nom_str,
                 "upper_tol": "",
                 "lower_tol": "",
+                "is_reference_dimension": False,
             })
 
-    # Açısal ölçüler: 66.1°
     ang_pattern = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s*[°\^]")
     for m in ang_pattern.finditer(text):
         val = float(m.group(1))
@@ -182,10 +227,12 @@ def parse_linear_callouts(text: str) -> List[Dict[str, Any]]:
                     "nominal_str": nom_str,
                     "upper_tol": "+0.5°",
                     "lower_tol": "-0.5°",
+                    "is_reference_dimension": False,
                 })
 
-    # Standalone doğrusal ölçüler (ISO 2768 genel toleranslı tekil ölçüler: 146, 85, 14, 18)
-    standalone_pattern = re.compile(r"(?<![A-Za-z0-9_\-\.\/])([0-9]{1,4}(?:\.[0-9]+)?)(?![A-Za-z0-9_\-\.\/°\*])")
+    standalone_pattern = re.compile(
+        r"(?<![A-Za-z0-9_\-\.\/\(])([0-9]{1,4}(?:\.[0-9]+)?)(?![A-Za-z0-9_\-\.\/°\*\)]|\s*[°\^])"
+    )
     excluded_numbers = {1, 2, 3, 45, 163, 2024, 2025, 2026, 603181}
     for m in standalone_pattern.finditer(text):
         val = float(m.group(1))
@@ -199,6 +246,7 @@ def parse_linear_callouts(text: str) -> List[Dict[str, Any]]:
                 "nominal_str": str_val,
                 "upper_tol": "+0.200",
                 "lower_tol": "-0.200",
+                "is_reference_dimension": False,
             })
 
     return results

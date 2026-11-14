@@ -1,6 +1,6 @@
 import math
 import re
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Sequence
 
 
 def get_point_coords(pt: Any) -> Tuple[float, float]:
@@ -1072,4 +1072,237 @@ def validate_scale_consistency(
         ratio = computed / nominal_val
         return 0.35 <= ratio <= 3.0
     return True
+
+
+TABLE_HEADER_KEYWORDS = (
+    "YÜZEY",
+    "YUZEY",
+    "ADET",
+    "PARÇA NO",
+    "PARCA NO",
+    "REVİZYON",
+    "REVIZYON",
+    "MALZEME",
+    "MİKTAR",
+    "MIKTAR",
+    "SIRA",
+    "TANIM",
+    "AÇIKLAMA",
+    "ACIKLAMA",
+    "TOLERANS TABLOSU",
+    "DELİK TABLOSU",
+    "DELIK TABLOSU",
+    "HOLE TABLE",
+    "PART NO",
+    "DESCRIPTION",
+    "QTY",
+)
+
+
+def _contains_table_header(box: Sequence[float], text_spans: Sequence[Dict[str, Any]], pad: float = 6.0) -> bool:
+    rx0, ry0, rx1, ry1 = box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad
+    for sp in text_spans:
+        sb = sp.get("bbox")
+        if not sb or len(sb) < 4:
+            continue
+        cx = (float(sb[0]) + float(sb[2])) * 0.5
+        cy = (float(sb[1]) + float(sb[3])) * 0.5
+        if rx0 <= cx <= rx1 and ry0 <= cy <= ry1:
+            upper_t = str(sp.get("text", "")).upper()
+            if any(kw in upper_t for kw in TABLE_HEADER_KEYWORDS):
+                return True
+    return False
+
+
+def _merge_overlapping_regions(regions: List[List[float]]) -> List[List[float]]:
+    if not regions:
+        return []
+    merged: List[List[float]] = []
+    for reg in regions:
+        x0, y0, x1, y1 = reg
+        placed = False
+        for m in merged:
+            if not (x1 < m[0] - 4.0 or x0 > m[2] + 4.0 or y1 < m[1] - 4.0 or y0 > m[3] + 4.0):
+                m[0] = round(min(m[0], x0), 2)
+                m[1] = round(min(m[1], y0), 2)
+                m[2] = round(max(m[2], x1), 2)
+                m[3] = round(max(m[3], y1), 2)
+                placed = True
+                break
+        if not placed:
+            merged.append([round(x0, 2), round(y0, 2), round(x1, 2), round(y1, 2)])
+    return merged
+
+
+def detect_table_regions(
+    drawings: List[Dict[str, Any]],
+    text_spans: List[Dict[str, Any]],
+    page_w: float,
+    page_h: float,
+) -> List[List[float]]:
+    max_area = max(page_w * page_h, 1.0) * 0.55
+    cell_rects: List[List[float]] = []
+    horiz_segs: List[Tuple[float, float, float]] = []
+    vert_segs: List[Tuple[float, float, float]] = []
+
+    for d in drawings or []:
+        if d.get("is_hatching"):
+            continue
+        box = get_drawing_bbox(d)
+        if box:
+            w = box[2] - box[0]
+            h = box[3] - box[1]
+            if 8.0 <= w <= max(page_w * 0.65, 250.0) and 7.0 <= h <= 80.0:
+                cell_rects.append(box)
+        for it in d.get("items", []):
+            cmd = it[0] if isinstance(it, (list, tuple)) and len(it) > 0 else ""
+            if cmd == "re" and len(it) >= 2:
+                rb = get_drawing_bbox({"rect": it[1]})
+                if rb:
+                    rw = rb[2] - rb[0]
+                    rh = rb[3] - rb[1]
+                    if 8.0 <= rw <= max(page_w * 0.65, 250.0) and 7.0 <= rh <= 80.0:
+                        cell_rects.append(rb)
+            elif cmd == "l" and len(it) >= 3:
+                p1 = get_point_coords(it[1])
+                p2 = get_point_coords(it[2])
+                dx = p2[0] - p1[0]
+                dy = p2[1] - p1[1]
+                length = math.hypot(dx, dy)
+                if length < 12.0:
+                    continue
+                deg = math.degrees(math.atan2(abs(dy), abs(dx)))
+                if deg <= 5.0 and length >= 20.0:
+                    horiz_segs.append((min(p1[0], p2[0]), max(p1[0], p2[0]), (p1[1] + p2[1]) * 0.5))
+                elif deg >= 85.0:
+                    vert_segs.append(((p1[0] + p2[0]) * 0.5, min(p1[1], p2[1]), max(p1[1], p2[1])))
+
+    regions: List[List[float]] = []
+
+    if len(cell_rects) >= 4:
+        grid = SpatialHashGrid(cell_size=40.0)
+        for idx, rb in enumerate(cell_rects):
+            grid.insert(rb, idx)
+        visited = [False] * len(cell_rects)
+        for i in range(len(cell_rects)):
+            if visited[i]:
+                continue
+            visited[i] = True
+            stack = [i]
+            comp = [cell_rects[i]]
+            while stack:
+                curr = stack.pop()
+                for nb in grid.query_radius(cell_rects[curr], 4.0):
+                    if not visited[nb]:
+                        visited[nb] = True
+                        stack.append(nb)
+                        comp.append(cell_rects[nb])
+            if len(comp) >= 4:
+                gx0 = min(c[0] for c in comp)
+                gy0 = min(c[1] for c in comp)
+                gx1 = max(c[2] for c in comp)
+                gy1 = max(c[3] for c in comp)
+                distinct_rows = len({round(c[1] / 6.0) for c in comp})
+                distinct_cols = len({round(c[0] / 12.0) for c in comp})
+                area = (gx1 - gx0) * (gy1 - gy0)
+                if area < max_area and distinct_rows >= 2 and distinct_cols >= 2:
+                    gbox = [gx0, gy0, gx1, gy1]
+                    if _contains_table_header(gbox, text_spans) or len(comp) >= 6:
+                        regions.append(gbox)
+
+    if len(horiz_segs) >= 3 and len(vert_segs) >= 3:
+        used_h = [False] * len(horiz_segs)
+        used_v = [False] * len(vert_segs)
+        for hi in range(len(horiz_segs)):
+            if used_h[hi]:
+                continue
+            queue_h = [hi]
+            used_h[hi] = True
+            comp_h = [horiz_segs[hi]]
+            comp_v: List[Tuple[float, float, float]] = []
+            while queue_h:
+                cur_h = queue_h.pop()
+                hx0, hx1, hy = horiz_segs[cur_h]
+                for vi, (vx, vy0, vy1) in enumerate(vert_segs):
+                    if not used_v[vi] and hx0 - 2.5 <= vx <= hx1 + 2.5 and vy0 - 2.5 <= hy <= vy1 + 2.5:
+                        used_v[vi] = True
+                        comp_v.append((vx, vy0, vy1))
+                        for nh_i, (nhx0, nhx1, nhy) in enumerate(horiz_segs):
+                            if not used_h[nh_i] and nhx0 - 2.5 <= vx <= nhx1 + 2.5 and vy0 - 2.5 <= nhy <= vy1 + 2.5:
+                                used_h[nh_i] = True
+                                queue_h.append(nh_i)
+                                comp_h.append((nhx0, nhx1, nhy))
+            distinct_y = {round(h[2] / 5.0) for h in comp_h}
+            distinct_x = {round(v[0] / 8.0) for v in comp_v}
+            if len(distinct_y) >= 3 and len(distinct_x) >= 3:
+                lx0 = min(min(h[0] for h in comp_h), min(v[0] for v in comp_v))
+                lx1 = max(max(h[1] for h in comp_h), max(v[0] for v in comp_v))
+                ly0 = min(min(h[2] for h in comp_h), min(v[1] for v in comp_v))
+                ly1 = max(max(h[2] for h in comp_h), max(v[2] for v in comp_v))
+                area = (lx1 - lx0) * (ly1 - ly0)
+                if area < max_area:
+                    lbox = [lx0, ly0, lx1, ly1]
+                    if _contains_table_header(lbox, text_spans) or (len(distinct_y) >= 4 and len(distinct_x) >= 4):
+                        regions.append(lbox)
+
+    header_spans: List[Tuple[float, float, float, float]] = []
+    for sp in text_spans or []:
+        sb = sp.get("bbox")
+        if not sb or len(sb) < 4:
+            continue
+        up = str(sp.get("text", "")).upper()
+        if any(kw in up for kw in TABLE_HEADER_KEYWORDS):
+            header_spans.append((float(sb[0]), float(sb[1]), float(sb[2]), float(sb[3])))
+
+    if len(header_spans) >= 2:
+        header_spans.sort(key=lambda b: b[1])
+        row_groups: List[List[Tuple[float, float, float, float]]] = []
+        for hb in header_spans:
+            cy = (hb[1] + hb[3]) * 0.5
+            placed = False
+            for rg in row_groups:
+                rg_y = (rg[0][1] + rg[0][3]) * 0.5
+                if abs(cy - rg_y) <= 12.0:
+                    rg.append(hb)
+                    placed = True
+                    break
+            if not placed:
+                row_groups.append([hb])
+
+        for rg in row_groups:
+            if len(rg) >= 2:
+                rx0 = min(b[0] for b in rg) - 10.0
+                ry0 = min(b[1] for b in rg) - 4.0
+                rx1 = max(b[2] for b in rg) + 10.0
+                row_y_top = min(b[1] for b in rg)
+                max_row_y = max(b[3] for b in rg)
+                for sp in text_spans or []:
+                    sb = sp.get("bbox")
+                    if not sb or len(sb) < 4:
+                        continue
+                    scx = (float(sb[0]) + float(sb[2])) * 0.5
+                    scy = (float(sb[1]) + float(sb[3])) * 0.5
+                    if rx0 <= scx <= rx1 and row_y_top <= scy <= min(page_h, row_y_top + 180.0):
+                        max_row_y = max(max_row_y, float(sb[3]))
+                if (rx1 - rx0) * (max_row_y - ry0) < max_area:
+                    regions.append([rx0, ry0, rx1, max_row_y + 4.0])
+
+    return _merge_overlapping_regions(regions)
+
+
+def is_bbox_in_table_region(
+    bbox: Sequence[float],
+    table_regions: Sequence[Sequence[float]],
+    pad: float = 2.0,
+) -> bool:
+    if not bbox or len(bbox) < 4 or not table_regions:
+        return False
+    cx = (float(bbox[0]) + float(bbox[2])) * 0.5
+    cy = (float(bbox[1]) + float(bbox[3])) * 0.5
+    for reg in table_regions:
+        if len(reg) >= 4:
+            if (float(reg[0]) - pad) <= cx <= (float(reg[2]) + pad) and (float(reg[1]) - pad) <= cy <= (float(reg[3]) + pad):
+                return True
+    return False
+
 
