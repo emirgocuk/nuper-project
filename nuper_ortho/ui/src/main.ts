@@ -140,12 +140,27 @@ export class NuperApp {
   }
 
   public loadDrawingData(data: DrawingExtractionResult): void {
-    this.inspectionTable.setExtractionResult(data);
-    this.drawingCanvas.setTotalPages(data.page_count || 1);
+    const normalizedDims = data.dimensions
+      ? data.dimensions.map((dim) => {
+          const extDim = dim as typeof dim & { op?: string; datum_reference?: string };
+          return {
+            ...dim,
+            datum_reference: extDim.datum_reference || '',
+            op: extDim.op || 'OP10',
+          };
+        })
+      : data.dimensions;
+    const normalizedData: DrawingExtractionResult = {
+      ...data,
+      dimensions: normalizedDims,
+    };
 
-    if (data.dimensions) {
+    this.inspectionTable.setExtractionResult(normalizedData);
+    this.drawingCanvas.setTotalPages(normalizedData.page_count || 1);
+
+    if (normalizedData.dimensions) {
       this.drawingCanvas.setBalloons(
-        data.dimensions.map((dim) => ({
+        normalizedData.dimensions.map((dim) => ({
           id: dim.id,
           page: dim.page || 1,
           nominal: dim.nominal,
@@ -163,8 +178,8 @@ export class NuperApp {
       );
     }
 
-    if (data.similar_parts && data.similar_parts.length > 0 && typeof document !== 'undefined') {
-      const topPart = data.similar_parts[0];
+    if (normalizedData.similar_parts && normalizedData.similar_parts.length > 0 && typeof document !== 'undefined') {
+      const topPart = normalizedData.similar_parts[0];
       const rawSim = topPart.similarity_score ?? (typeof topPart.similarity === 'number' ? topPart.similarity : 0);
       const simPercent = Math.round(rawSim * (rawSim <= 1.0 ? 100 : 1));
       const hudDetails = document.getElementById('hud-feature-details');
@@ -173,13 +188,13 @@ export class NuperApp {
       }
     }
 
-    const rawData = data as unknown as {
+    const rawData = normalizedData as unknown as {
       similar_parts?: Array<{ part_name?: string; part_id?: string; similarity_pct?: number; similarity?: number }>;
       contract_summary?: { critical_count?: number; warning_count?: number; normal_count?: number; status?: string };
     };
     this.drawingCanvas.updateAuditMetadata(rawData.similar_parts, rawData.contract_summary);
 
-    this.setupWizard.setExtractedData(data);
+    this.setupWizard.setExtractedData(normalizedData);
   }
 
   public loadSampleData(data: DrawingExtractionResult): void {

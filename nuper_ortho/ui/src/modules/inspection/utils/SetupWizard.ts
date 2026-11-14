@@ -5,6 +5,7 @@ import {
 import {
   type BalloonItem,
   DEFAULT_GOBEK_BALLOONS,
+  resolveBalloonCollisions,
 } from '../../drawing/DrawingCanvas';
 import { parsePdfDrawing, renderPdfPageToCanvas } from './DrawingPdfParser';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
@@ -256,8 +257,19 @@ export class SetupWizard {
     label: string;
   }> = [];
 
-  private announceStylusRecommendations(plan: GeneratedMeasurementPlan): void {
-    if (typeof document === 'undefined' || plan.stylusRecommendations.length === 0) return;
+  private announceStylusRecommendations(plan: GeneratedMeasurementPlan, activeDims: PathFeatureInput[] = []): void {
+    if (typeof document === 'undefined') return;
+    const needsFineStylus =
+      plan.stylusRecommendations.some((r) => r.ballDiameterMm <= 1.0) ||
+      activeDims.some((f) => {
+        const isHole = f.type === 'DIAMETER' || f.type === 'THREAD' || /dia|çap|delik|thread|diş|helicoil/i.test(`${f.type_label ?? ''} ${f.cad_feature_id ?? ''}`);
+        return isHole && f.nominal > 0 && f.nominal <= 3.4;
+      });
+    const probeBadge = document.getElementById('titlebar-probe-badge');
+    if (probeBadge) {
+      probeBadge.textContent = needsFineStylus ? 'Prob: PH10M (Ø1x20) ⚙️' : 'Prob: PH10M (Ø2x20) ⚙️';
+    }
+    if (plan.stylusRecommendations.length === 0) return;
     const hudDetails = document.getElementById('hud-feature-details');
     if (!hudDetails) return;
     const notes = plan.stylusRecommendations.map((r) =>
@@ -314,7 +326,9 @@ export class SetupWizard {
         target.cad_feature_id = matchedDim.cad_feature_id;
         target.cad_center = matchedDim.cad_center;
         target.cad_normal = matchedDim.cad_normal;
-        target.operation = matchedDim.operation;
+        target.operation = target.operation || matchedDim.operation;
+        target.op = target.operation;
+        target.op_reason = matchedDim.op_reason || target.op_reason;
         target.match_confidence = matchedDim.match_confidence;
         targetExt.axial_min = matchedDim.axial_min;
         targetExt.axial_max = matchedDim.axial_max;
@@ -906,6 +920,7 @@ export class SetupWizard {
     }
 
     modalEl.style.display = 'flex';
+    document.body.classList.add('nuper-audit-open');
     this.renderDrawingAuditModal();
 
     if (!this.hasLoadedDrawing) {
@@ -917,6 +932,7 @@ export class SetupWizard {
     this.isAuditOpen = false;
     if (typeof document === 'undefined') return;
 
+    document.body.classList.remove('nuper-audit-open');
     const modalEl = document.getElementById('modal-drawing-audit');
     if (modalEl) {
       modalEl.style.display = 'none';
@@ -1098,7 +1114,7 @@ export class SetupWizard {
           <div class="nuper-audit-footer-left">
             ${
               this.hasLoadedDrawing && selectedDim
-                ? `<span>Aktif Unsur: <b style="color:#0284C7;">${selectedDim.balloon} [${selectedDim.type_label || selectedDim.nominal_str}]</b> • Nominal: <b>${selectedDim.nominal_str}</b> • Tol: <b>${selectedDim.lower_tol}/${selectedDim.upper_tol}</b> • Datum: <b>${selectedDim.datum_reference || '[A]'}</b> • Kurulum: <span class="audit-op-badge" style="background:${selectedDim.op === 'OP20' ? '#D97706' : '#0284C7'};color:#FFF;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;" title="${selectedDim.op_reason || ''}">${selectedDim.op || 'OP10'}</span> <i style="color:#64748B;">(${selectedDim.op_reason || 'Z- probu ile OP10'})</i></span>`
+                ? `<span>Aktif Unsur: <b style="color:#0284C7;">${selectedDim.balloon} [${selectedDim.type_label || selectedDim.nominal_str}]</b> • Nominal: <b>${selectedDim.nominal_str}</b> • Tol: <b>${selectedDim.lower_tol}/${selectedDim.upper_tol}</b> • Datum: <b>${selectedDim.datum_reference || '—'}</b> • Kurulum: <span class="audit-op-badge" style="background:${selectedDim.op === 'OP20' ? '#D97706' : '#0284C7'};color:#FFF;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;" title="${selectedDim.op_reason || ''}">${selectedDim.op || 'OP10'}</span> <i style="color:#64748B;">(${selectedDim.op_reason || 'Z- probu ile OP10'})</i></span>`
                 : `<span>Lütfen incelemek için bir teknik resim yükleyin veya balona tıklayın.</span>`
             }
           </div>
@@ -1133,18 +1149,28 @@ export class SetupWizard {
     }
   }
 
-  private renderDrawingStageContent(page: number): string {
-    const pageDims = this.dimensions.filter((d) => (d.page || 1) === page);
-
-    const balloonNodes = pageDims
-      .map((d) => {
+  private renderAuditBalloonSvgNodes(
+    pageDims: InspectionDimension[],
+    selFillOpacity = 0.22,
+    normFillOpacity = 0.15
+  ): string {
+    const placements = resolveBalloonCollisions(
+      pageDims,
+      (d) => {
         const pt = this.getBalloonStageCoords(d);
-        const cx = pt.cx;
-        const cy = pt.cy;
+        return { x: pt.cx, y: pt.cy };
+      },
+      38
+    );
 
+    return placements
+      .map((placed) => {
+        const d = placed.item;
+        const cx = placed.x;
+        const cy = placed.y;
         const isSel = d.id === this.selectedId;
         const stroke = isSel ? '#D97706' : '#0284C7';
-        const fill = isSel ? 'rgba(217, 119, 6, 0.22)' : 'rgba(2, 132, 199, 0.15)';
+        const fill = isSel ? `rgba(217, 119, 6, ${selFillOpacity})` : `rgba(2, 132, 199, ${normFillOpacity})`;
         const text = isSel ? '#B45309' : '#0284C7';
 
         const opTag = d.op ? ` [${d.op}]` : '';
@@ -1155,6 +1181,11 @@ export class SetupWizard {
 
         return `
           <g class="audit-balloon-node ${isSel ? 'active' : ''}" data-balloon-id="${d.id}" style="cursor: pointer;">
+            ${
+              placed.displaced
+                ? `<line x1="${placed.anchorX}" y1="${placed.anchorY}" x2="${cx}" y2="${cy}" stroke="#0284C7" stroke-width="1.2" stroke-dasharray="3,2" opacity="0.85"/>`
+                : ''
+            }
             <circle cx="${cx}" cy="${cy}" r="${isSel ? '22' : '18'}" fill="${fill}" stroke="${stroke}" stroke-width="${isSel ? '3' : '2'}"/>
             <text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="${isSel ? '12.5' : '11'}" font-weight="800" font-family="'JetBrains Mono', monospace" fill="${text}">
               ${d.balloon}
@@ -1178,6 +1209,11 @@ export class SetupWizard {
         `;
       })
       .join('');
+  }
+
+  private renderDrawingStageContent(page: number): string {
+    const pageDims = this.dimensions.filter((d) => (d.page || 1) === page);
+    const balloonNodes = this.renderAuditBalloonSvgNodes(pageDims, 0.22, 0.15);
 
     const pageImg = this.pageImages.get(page);
     if (pageImg) {
@@ -1289,7 +1325,7 @@ export class SetupWizard {
     const nominal = dim?.nominal ?? 0;
     const upper = dim?.upper_tol || '';
     const lower = dim?.lower_tol || '';
-    const datum = dim?.datum_reference || '[A]';
+    const datum = dim?.datum_reference || '—';
     const desc = dim?.type_label || '';
     const page = dim?.page || this.pendingAddPage;
 
@@ -1406,46 +1442,7 @@ export class SetupWizard {
 
   private renderDrawingSheetSvg(page: number): string {
     const pageDims = this.dimensions.filter((d) => (d.page || 1) === page);
-
-    const balloonNodes = pageDims
-      .map((d) => {
-        const pt = this.getBalloonStageCoords(d);
-        const isSel = d.id === this.selectedId;
-        const stroke = isSel ? '#D97706' : '#0284C7';
-        const fill = isSel ? 'rgba(217, 119, 6, 0.18)' : 'rgba(2, 132, 199, 0.12)';
-        const text = isSel ? '#B45309' : '#0284C7';
-
-        const opTag = d.op ? ` [${d.op}]` : '';
-        const labelText = (d.nominal_str || (d.nominal !== undefined && d.nominal !== null ? `${d.nominal}` : '')) + opTag;
-        const badgeWidth = Math.max(54, labelText.length * 7.5 + 14);
-        const badgeX = pt.cx - badgeWidth / 2;
-        const badgeY = pt.cy + 22;
-
-        return `
-          <g class="audit-balloon-node ${isSel ? 'active' : ''}" data-balloon-id="${d.id}" style="cursor: pointer;">
-            <circle cx="${pt.cx}" cy="${pt.cy}" r="${isSel ? '22' : '18'}" fill="${fill}" stroke="${stroke}" stroke-width="${isSel ? '3' : '2'}"/>
-            <text x="${pt.cx}" y="${pt.cy + 4}" text-anchor="middle" font-size="${isSel ? '12.5' : '11'}" font-weight="800" font-family="'JetBrains Mono', monospace" fill="${text}">
-              ${d.balloon}
-            </text>
-            ${
-              labelText
-                ? `
-            <g class="audit-balloon-badge" style="pointer-events: none;">
-              <rect x="${badgeX}" y="${badgeY}" width="${badgeWidth}" height="18" rx="4"
-                    fill="${isSel ? '#0284C7' : '#0F172A'}" opacity="0.94" stroke="${isSel ? '#38BDF8' : '#334155'}" stroke-width="1"/>
-              <text x="${pt.cx}" y="${badgeY + 12}" text-anchor="middle" font-size="9.5" font-weight="700"
-                    font-family="'JetBrains Mono', monospace" fill="#FFFFFF">
-                ${labelText}
-              </text>
-            </g>
-            `
-                : ''
-            }
-            <circle cx="${pt.cx}" cy="${pt.cy}" r="28" fill="transparent"/>
-          </g>
-        `;
-      })
-      .join('');
+    const balloonNodes = this.renderAuditBalloonSvgNodes(pageDims, 0.18, 0.12);
 
     let sheetContent = '';
     if (page === 1) {
@@ -2358,7 +2355,7 @@ export class SetupWizard {
     const plan = MeasurementPathGenerator.generatePlan(pathFeatures, bbox, {
       activeOperation: activeOp,
       verticalAxis: 'Y',
-      clearanceZMarginMm: 15.0,
+      clearanceZMarginMm: 25.0,
       includeDatumSetup: true,
       datumSurfacePoints: this.currentDatumSurfacePoints,
     });
@@ -2368,7 +2365,7 @@ export class SetupWizard {
     for (const fp of plan.featurePaths) {
       this.featureTotalHits.set(fp.featureId, Math.max(1, fp.touchPoints.length));
     }
-    this.announceStylusRecommendations(plan);
+    this.announceStylusRecommendations(plan, pathFeatures);
 
     const app = this.appInstance as { getCADViewer?: () => CADViewer } | null;
     if (app && typeof app.getCADViewer === 'function') {
@@ -2758,7 +2755,7 @@ export class SetupWizard {
     const plan = MeasurementPathGenerator.generatePlan(pathFeatures, bbox, {
       activeOperation: op,
       verticalAxis: 'Y',
-      clearanceZMarginMm: 15.0,
+      clearanceZMarginMm: 25.0,
       includeDatumSetup: true,
       datumSurfacePoints: this.currentDatumSurfacePoints,
     });
@@ -2768,7 +2765,7 @@ export class SetupWizard {
     for (const fp of plan.featurePaths) {
       this.featureTotalHits.set(fp.featureId, Math.max(1, fp.touchPoints.length));
     }
-    this.announceStylusRecommendations(plan);
+    this.announceStylusRecommendations(plan, pathFeatures);
 
     if (app && typeof app.getCADViewer === 'function') {
       const cadViewer = app.getCADViewer();
@@ -2910,7 +2907,7 @@ export class SetupWizard {
                   ${
                     !isExplicitUnmatched && d.cad_feature_id
                       ? `<span class="clean-cad-tag" title="CAD B-Rep Eşlendi: ${d.cad_feature_id}">🎯 ${d.cad_feature_id}</span>`
-                      : `<span>⚠️ 3D Yüzey Bağlanmadı (${d.datum_reference || '[A]'})</span>`
+                      : `<span>⚠️ 3D Yüzey Bağlanmadı (${d.datum_reference || '—'})</span>`
                   }
                   <button class="clean-snap-btn" data-snap-id="${d.id}" title="3D CAD Modelinde Yüzeye Kilitle">🎯 Yüzey Seç</button>
                 </div>
@@ -3297,7 +3294,10 @@ export class SetupWizard {
           hudName.innerText = `${dim.balloon} [${dim.type_label || dim.nominal_str}]${cadTag}`;
         }
         if (hudCoords) {
-          hudCoords.innerText = `Prob (PCS): X: ${state.currentPosition.x.toFixed(2)} | Y: ${state.currentPosition.y.toFixed(2)} | Z: ${state.currentPosition.z.toFixed(2)} mm | Faz: ${state.phase}`;
+          const cmmZ = (state.phase === 'IDLE' || state.phase === 'TRAVERSE')
+            ? Math.max(state.currentPosition.y, state.currentPosition.z)
+            : state.currentPosition.z;
+          hudCoords.innerText = `Prob (PCS): X: ${state.currentPosition.x.toFixed(2)} | Y: ${state.currentPosition.y.toFixed(2)} | Z: ${cmmZ.toFixed(2)} mm | Faz: ${state.phase}`;
         }
         if (hudDetails) {
           hudDetails.innerText = `${dim.gdt || 'ASME Y14.5'} | Tol: ${dim.lower_tol} / ${dim.upper_tol} | Ölçülen: ${dim.measured} mm (Δ ${dim.deviation || '+0.000'})`;
@@ -3306,7 +3306,10 @@ export class SetupWizard {
     } else {
       const hudCoords = document.getElementById('hud-feature-coords');
       if (hudCoords) {
-        hudCoords.innerText = `Prob (PCS): X: ${state.currentPosition.x.toFixed(2)} | Y: ${state.currentPosition.y.toFixed(2)} | Z: ${state.currentPosition.z.toFixed(2)} mm | Faz: ${state.phase}`;
+        const cmmZ = (state.phase === 'IDLE' || state.phase === 'TRAVERSE')
+          ? Math.max(state.currentPosition.y, state.currentPosition.z)
+          : state.currentPosition.z;
+        hudCoords.innerText = `Prob (PCS): X: ${state.currentPosition.x.toFixed(2)} | Y: ${state.currentPosition.y.toFixed(2)} | Z: ${cmmZ.toFixed(2)} mm | Faz: ${state.phase}`;
       }
     }
   }
@@ -3471,13 +3474,23 @@ export class SetupWizard {
       .nuper-audit-modal-overlay {
         position: fixed;
         inset: 0;
-        z-index: 10000;
+        z-index: 99999;
+        overflow: hidden;
+        isolation: isolate;
         background: rgba(15, 23, 42, 0.45);
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 20px;
         font-family: 'Inter', system-ui, sans-serif;
+      }
+      body.nuper-audit-open .timeline-drawer,
+      body.nuper-audit-open #code-display,
+      body:has(#modal-drawing-audit[style*="display: flex"]) .timeline-drawer,
+      body:has(#modal-drawing-audit[style*="display: flex"]) #code-display {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
       }
       .nuper-audit-dialog {
         width: 1400px;

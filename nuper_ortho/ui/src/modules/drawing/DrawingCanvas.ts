@@ -61,6 +61,111 @@ export interface BalloonItem {
   match_status?: string;
 }
 
+export interface ResolvedBalloonPlacement<T = BalloonItem> {
+  item: T;
+  x: number;
+  y: number;
+  anchorX: number;
+  anchorY: number;
+  displaced: boolean;
+}
+
+export function resolveBalloonCollisions<T>(
+  items: T[],
+  getAnchor: (item: T) => { x: number; y: number; labelWidth?: number; labelHeight?: number },
+  minDist = 38,
+  bounds?: { minX?: number; minY?: number; maxX?: number; maxY?: number }
+): ResolvedBalloonPlacement<T>[] {
+  const nodes = items.map((item) => {
+    const anchor = getAnchor(item);
+    return {
+      item,
+      x: anchor.x,
+      y: anchor.y,
+      anchorX: anchor.x,
+      anchorY: anchor.y,
+      labelWidth: anchor.labelWidth ?? 56,
+      labelHeight: anchor.labelHeight ?? 18,
+    };
+  });
+
+  const clampNode = (n: (typeof nodes)[number]) => {
+    if (!bounds) return;
+    if (bounds.minX !== undefined && n.x < bounds.minX) n.x = bounds.minX;
+    if (bounds.maxX !== undefined && n.x > bounds.maxX) n.x = bounds.maxX;
+    if (bounds.minY !== undefined && n.y < bounds.minY) n.y = bounds.minY;
+    if (bounds.maxY !== undefined && n.y > bounds.maxY) n.y = bounds.maxY;
+  };
+
+  for (let iter = 0; iter < 15; iter++) {
+    if (iter < 12) {
+      for (const n of nodes) {
+        n.x += (n.anchorX - n.x) * 0.06;
+        n.y += (n.anchorY - n.y) * 0.06;
+      }
+    }
+
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let dist = Math.hypot(dx, dy);
+
+        if (dist < 1e-3) {
+          const angle = ((i * 2.39996 + j * 1.0472) % (Math.PI * 2));
+          dx = Math.cos(angle);
+          dy = Math.sin(angle);
+          dist = 1e-3;
+        }
+
+        if (dist < minDist) {
+          const overlap = minDist - dist;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const push = overlap * 0.55;
+          a.x -= nx * push;
+          a.y -= ny * push;
+          b.x += nx * push;
+          b.y += ny * push;
+        } else if (iter < 12) {
+          const reqX = (a.labelWidth + b.labelWidth) * 0.5 + 4;
+          const reqY = (a.labelHeight + b.labelHeight) * 0.5 + 4;
+          const badgeDx = b.x - a.x;
+          const badgeDy = b.y - a.y;
+          if (Math.abs(badgeDx) < reqX && Math.abs(badgeDy) < reqY) {
+            const penX = reqX - Math.abs(badgeDx);
+            const penY = reqY - Math.abs(badgeDy);
+            if (penY <= penX) {
+              const sy = badgeDy >= 0 ? 1 : -1;
+              a.y -= sy * penY * 0.35;
+              b.y += sy * penY * 0.35;
+            } else {
+              const sx = badgeDx >= 0 ? 1 : -1;
+              a.x -= sx * penX * 0.35;
+              b.x += sx * penX * 0.35;
+            }
+          }
+        }
+      }
+    }
+
+    for (const n of nodes) {
+      clampNode(n);
+    }
+  }
+
+  return nodes.map((n) => ({
+    item: n.item,
+    x: n.x,
+    y: n.y,
+    anchorX: n.anchorX,
+    anchorY: n.anchorY,
+    displaced: Math.hypot(n.x - n.anchorX, n.y - n.anchorY) > 1.5,
+  }));
+}
+
 export const DEFAULT_GOBEK_BALLOONS: BalloonItem[] = [
   { id: 1, page: 2, nominal: 395.5, tolerance: '+0.800/-0.800', bbox: [409.0, 748.4, 464.3, 776.8], pageHeight: 595.28, confirmed: true, feature_label: '395.5 ±0.8' },
   { id: 2, page: 2, nominal: 305.2, tolerance: '+0.500/-0.500', bbox: [408.1, 262.9, 464.6, 291.5], pageHeight: 595.28, confirmed: true, feature_label: '305.2 ±0.5' },
@@ -225,11 +330,12 @@ export class DrawingCanvas {
       const clickX = (e.clientX - rect.left - this.panX) / this.zoom;
       const clickY = (e.clientY - rect.top - this.panY) / this.zoom;
 
-      const hitBalloon = this.getBalloonsForActivePage().find((b) => {
-        const pt = this.getBalloonPosition(b);
-        const dist = Math.hypot(pt.x + this.panX - (e.clientX - rect.left), pt.y + this.panY - (e.clientY - rect.top));
+      const placements = this.getResolvedActivePlacements(this.getVisibleBalloons());
+      const hitPlacement = placements.find((p) => {
+        const dist = Math.hypot(p.x + this.panX - (e.clientX - rect.left), p.y + this.panY - (e.clientY - rect.top));
         return dist <= 28 * this.zoom;
       });
+      const hitBalloon = hitPlacement?.item;
 
       FeatureDefinitionModal.getInstance().showContextMenu({
         clientX: e.clientX,
@@ -255,12 +361,11 @@ export class DrawingCanvas {
       if (this.tool !== 'select') return;
       const canvasPoint = this.canvasPointFromEvent(e);
       if (!canvasPoint) return;
-      const candidates = this.getBalloonsForActivePage()
-        .filter((balloon) => !!balloon.bbox)
-        .map((balloon) => {
-          const position = this.getBalloonPosition(balloon);
-          return { id: String(balloon.id), x: position.x + this.panX, y: position.y + this.panY };
-        });
+      const candidates = this.getResolvedActivePlacements(this.getVisibleBalloons()).map((placed) => ({
+        id: String(placed.item.id),
+        x: placed.x + this.panX,
+        y: placed.y + this.panY,
+      }));
       const hit = hitTestBalloons(candidates, canvasPoint, LIGHT_TABLE_HIT_RADIUS * this.zoom);
       this.selectBalloon(hit);
     });
@@ -738,6 +843,24 @@ export class DrawingCanvas {
     };
   }
 
+  private getResolvedActivePlacements(balloons: BalloonItem[]): ResolvedBalloonPlacement<BalloonItem>[] {
+    const renderable = balloons.filter((b) => !!b.bbox);
+    const bounds = this.canvas
+      ? {
+          minX: 24 * this.zoom,
+          minY: 24 * this.zoom,
+          maxX: Math.max(48 * this.zoom, this.canvas.width - 24 * this.zoom),
+          maxY: Math.max(64 * this.zoom, this.canvas.height - 40 * this.zoom),
+        }
+      : undefined;
+    return resolveBalloonCollisions(
+      renderable,
+      (b) => this.getBalloonPosition(b),
+      38 * this.zoom,
+      bounds
+    );
+  }
+
   public selectBalloon(id: string | null, emit = true): void {
     if (id !== null) {
       const match = this.balloons.find((b) => String(b.id) === String(id));
@@ -1057,11 +1180,21 @@ export class DrawingCanvas {
     ctx.save();
     ctx.translate(this.panX, this.panY);
 
-    const pageBalloons = this.getVisibleBalloons();
+    const placements = this.getResolvedActivePlacements(this.getVisibleBalloons());
 
-    for (const b of pageBalloons) {
+    for (const placed of placements) {
+      const b = placed.item;
       if (!b.bbox) continue;
-      const balloonPt = this.getBalloonPosition(b);
+      const balloonPt = { x: placed.x, y: placed.y };
+
+      if (placed.displaced) {
+        ctx.beginPath();
+        ctx.moveTo(balloonPt.x, balloonPt.y);
+        ctx.lineTo(b.bbox[0] * this.zoom, b.bbox[1] * this.zoom);
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 1.2 * this.zoom;
+        ctx.stroke();
+      }
 
       const isSelected = String(b.id) === this.selectedBalloonId;
       const isConfirmed = !!b.confirmed;
