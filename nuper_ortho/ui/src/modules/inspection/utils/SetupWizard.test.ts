@@ -604,5 +604,25 @@ describe('SetupWizard — Sıfır Durum ve Beyaz Temalı Işık Masası Modalı'
     expect(auditModal.innerHTML).toContain('btn-apply-recommended-setup');
     expect(auditModal.innerHTML).toContain('lightbox-risk-badges');
     expect(auditModal.innerHTML).toContain('Kritik: 2');
+    expect(auditModal.innerHTML).toContain('btn-reset-learning');
+    expect(auditModal.innerHTML).toContain('Öğrenmeyi Sıfırla');
+  });
+
+  it('resetLearningFeedback clears offsets and resets active learning without throwing', async () => {
+    const wizard = new SetupWizard();
+    wizard.setExtractedData({
+      filename: 'reset_test.pdf',
+      page_count: 1,
+      dimensions: [{ id: 1, balloon: '1', nominal: 12.0, lower_tol: '-0.1', upper_tol: '+0.1' }],
+    } as unknown as Parameters<typeof wizard.setExtractedData>[0]);
+
+    const auditModal = new MockElement('div');
+    auditModal.id = 'modal-drawing-audit';
+    mockDoc.body.appendChild(auditModal);
+    mockDoc.register('modal-drawing-audit', auditModal);
+
+    wizard.renderDrawingAuditModal();
+    await wizard.resetLearningFeedback();
+    expect(auditModal.innerHTML).toContain('btn-reset-learning');
   });
 });

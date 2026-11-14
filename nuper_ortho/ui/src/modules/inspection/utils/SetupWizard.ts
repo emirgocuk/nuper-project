@@ -23,6 +23,8 @@ import {
   saveBalloonSessionState,
   loadBalloonSessionState,
   recordFeedback,
+  undoLastFeedback,
+  resetActiveLearning,
   type LabelOffset,
 } from './BalloonEditing';
 import {
@@ -124,9 +126,61 @@ export class SetupWizard {
     }
     this.injectStyles();
     if (typeof window !== 'undefined') {
-      (window as unknown as { switchSetup?: (op: 'OP10' | 'OP20') => void }).switchSetup = (op: 'OP10' | 'OP20') => {
+      const win = window as unknown as {
+        switchSetup?: (op: 'OP10' | 'OP20') => void;
+        resetActiveLearning?: () => Promise<void>;
+        undoActiveLearning?: () => Promise<void>;
+        currentUploadedCad?: { name?: string };
+      };
+      win.switchSetup = (op: 'OP10' | 'OP20') => {
         this.switchOperationSetup(op);
       };
+      win.resetActiveLearning = () => this.resetLearningFeedback();
+      win.undoActiveLearning = async () => {
+        await undoLastFeedback();
+      };
+      if (win.currentUploadedCad?.name?.startsWith('VALVE_BODY')) {
+        win.currentUploadedCad.name = 'Parça Yüklenmedi';
+      }
+    }
+    if (typeof document !== 'undefined') {
+      if (typeof document.getElementById === 'function') {
+        const partBadge = document.getElementById('part-name-badge');
+        if (partBadge && partBadge.textContent && partBadge.textContent.includes('VALVE_BODY')) {
+          partBadge.textContent = 'Parça Yüklenmedi';
+        }
+      }
+      if (typeof document.querySelector === 'function' && !document.getElementById('btn-top-reset-learning')) {
+        const titlebarCenter = document.querySelector('.titlebar-center');
+        if (titlebarCenter && typeof document.createElement === 'function') {
+          const resetPill = document.createElement('button');
+          resetPill.id = 'btn-top-reset-learning';
+          resetPill.className = 'hw-pill';
+          resetPill.style.cursor = 'pointer';
+          resetPill.style.color = '#FBBF24';
+          resetPill.title = 'Aktif öğrenme geri bildirimlerini geri al ve sıfırla';
+          resetPill.textContent = '↺ Öğrenmeyi Sıfırla';
+          resetPill.addEventListener('click', () => {
+            void this.resetLearningFeedback();
+          });
+          titlebarCenter.appendChild(resetPill);
+        }
+      }
+    }
+  }
+
+  public async resetLearningFeedback(): Promise<void> {
+    const targetPart = this.activeCadModelName || this.loadedFileName || '*';
+    await resetActiveLearning(targetPart);
+    this.balloonLabelOffsets.clear();
+    if (typeof window !== 'undefined') {
+      const win = window as unknown as { showToast?: (msg: string, type?: string) => void };
+      if (typeof win.showToast === 'function') {
+        win.showToast('Aktif öğrenme geri bildirimleri sıfırlandı.', 'info');
+      }
+    }
+    if (this.isAuditOpen) {
+      this.renderDrawingAuditModal();
     }
   }
 
@@ -1042,6 +1096,9 @@ export class SetupWizard {
             <button class="audit-upload-btn" id="btn-audit-add-feature" style="background:#0284C7;color:#FFF;border-color:#0369A1;" title="Yeni Metroloji Unsuru / Ölçü Tanımla (veya çizime sağ tıklayın)">
               ➕ Unsur Ekle
             </button>
+            <button class="audit-tool-btn" id="btn-reset-learning" title="Aktif öğrenme geri bildirimlerini geri al ve sıfırla">
+              ↺ Öğrenmeyi Sıfırla
+            </button>
             <input type="file" id="audit-drawing-input-internal" accept=".pdf,.png,.jpg,.jpeg,.svg" style="display: none;" />
             <label class="audit-general-tol" title="Antette yazan genel tolerans. Toleransı verilmemiş ölçülere ve deliklerin konumuna bu sınıf uygulanır.">
               Genel Tolerans
@@ -1699,10 +1756,15 @@ export class SetupWizard {
         e.preventDefault();
       });
 
-      const addFeatureBtn = modalEl.querySelector('#btn-audit-add-feature');
-      addFeatureBtn?.addEventListener('click', () => {
-        this.promptAddFeature(500, 350, this.activePage);
-      });
+    const addFeatureBtn = modalEl.querySelector('#btn-audit-add-feature');
+    addFeatureBtn?.addEventListener('click', () => {
+      this.promptAddFeature(500, 350, this.activePage);
+    });
+
+    const resetLearningBtn = modalEl.querySelector('#btn-reset-learning');
+    resetLearningBtn?.addEventListener('click', () => {
+      void this.resetLearningFeedback();
+    });
     }
 
     this.attachInlineEditorEvents(modalEl);
@@ -3474,8 +3536,8 @@ export class SetupWizard {
       .nuper-audit-modal-overlay {
         position: fixed;
         inset: 0;
-        z-index: 99999;
-        overflow: hidden;
+        z-index: 99999 !important;
+        overflow: hidden !important;
         isolation: isolate;
         background: rgba(15, 23, 42, 0.45);
         display: flex;
@@ -3484,13 +3546,24 @@ export class SetupWizard {
         padding: 20px;
         font-family: 'Inter', system-ui, sans-serif;
       }
+      body.nuper-audit-open,
+      body:has(#modal-drawing-audit[style*="display: flex"]) {
+        overflow: hidden !important;
+      }
       body.nuper-audit-open .timeline-drawer,
       body.nuper-audit-open #code-display,
+      body.nuper-audit-open .bottom-panel,
+      body.nuper-audit-open .code-panel,
       body:has(#modal-drawing-audit[style*="display: flex"]) .timeline-drawer,
-      body:has(#modal-drawing-audit[style*="display: flex"]) #code-display {
+      body:has(#modal-drawing-audit[style*="display: flex"]) #code-display,
+      body:has(#modal-drawing-audit[style*="display: flex"]) .bottom-panel,
+      body:has(#modal-drawing-audit[style*="display: flex"]) .code-panel {
         display: none !important;
         visibility: hidden !important;
+        opacity: 0 !important;
+        z-index: -1 !important;
         pointer-events: none !important;
+        overflow: hidden !important;
       }
       .nuper-audit-dialog {
         width: 1400px;
