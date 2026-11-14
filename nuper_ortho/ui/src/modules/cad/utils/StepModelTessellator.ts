@@ -92,7 +92,114 @@ function decodeBase64Uint32(b64: string): Uint32Array {
   return new Uint32Array(bytes.buffer);
 }
 
+function applyBasisRotationToVector(
+  v: [number, number, number],
+  ex: [number, number, number],
+  ey: [number, number, number],
+  ez: [number, number, number]
+): [number, number, number] {
+  return [
+    v[0] * ex[0] + v[1] * ex[1] + v[2] * ex[2],
+    v[0] * ey[0] + v[1] * ey[1] + v[2] * ey[2],
+    v[0] * ez[0] + v[1] * ez[1] + v[2] * ez[2],
+  ];
+}
+
+export function canonicalizePartOrientation(
+  solidGeo: THREE.BufferGeometry,
+  edgeGeo?: THREE.BufferGeometry | null,
+  features?: CadFeatureItem[]
+): {
+  sizeX: number;
+  sizeY: number;
+  sizeZ: number;
+  rotated: boolean;
+  ex: [number, number, number];
+  ey: [number, number, number];
+  ez: [number, number, number];
+} {
+  solidGeo.computeBoundingBox();
+  const box = solidGeo.boundingBox;
+  if (!box) {
+    return { sizeX: 0, sizeY: 0, sizeZ: 0, rotated: false, ex: [1, 0, 0], ey: [0, 1, 0], ez: [0, 0, 1] };
+  }
+  const sx = Math.max(0, box.max.x - box.min.x);
+  const sy = Math.max(0, box.max.y - box.min.y);
+  const sz = Math.max(0, box.max.z - box.min.z);
+
+  if (sy <= Math.min(sx, sz) + 0.05 && sz <= sx + 0.05) {
+    return { sizeX: sx, sizeY: sy, sizeZ: sz, rotated: false, ex: [1, 0, 0], ey: [0, 1, 0], ez: [0, 0, 1] };
+  }
+
+  const axes: Array<{ span: number; vec: [number, number, number] }> = [
+    { span: sx, vec: [1, 0, 0] },
+    { span: sy, vec: [0, 1, 0] },
+    { span: sz, vec: [0, 0, 1] },
+  ];
+  axes.sort((a, b) => a.span - b.span);
+  const ey = axes[0].vec;
+  const ex = axes[2].vec;
+  const ezRaw: [number, number, number] = [
+    ex[1] * ey[2] - ex[2] * ey[1],
+    ex[2] * ey[0] - ex[0] * ey[2],
+    ex[0] * ey[1] - ex[1] * ey[0],
+  ];
+  const ezLen = Math.hypot(ezRaw[0], ezRaw[1], ezRaw[2]) || 1;
+  const ez: [number, number, number] = [ezRaw[0] / ezLen, ezRaw[1] / ezLen, ezRaw[2] / ezLen];
+
+  const rotateAttr = (attr: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined) => {
+    if (!attr) return;
+    for (let i = 0; i < attr.count; i++) {
+      const [rx, ry, rz] = applyBasisRotationToVector([attr.getX(i), attr.getY(i), attr.getZ(i)], ex, ey, ez);
+      attr.setXYZ(i, rx, ry, rz);
+    }
+    attr.needsUpdate = true;
+  };
+
+  rotateAttr(solidGeo.getAttribute('position'));
+  rotateAttr(solidGeo.getAttribute('normal'));
+  solidGeo.computeBoundingBox();
+  solidGeo.computeBoundingSphere();
+
+  if (edgeGeo) {
+    rotateAttr(edgeGeo.getAttribute('position'));
+    edgeGeo.computeBoundingBox();
+  }
+
+  if (features) {
+    for (const f of features) {
+      if (f.center) f.center = applyBasisRotationToVector(f.center, ex, ey, ez);
+      if (f.normal) f.normal = applyBasisRotationToVector(f.normal, ex, ey, ez);
+      if (f.raw_center) f.raw_center = applyBasisRotationToVector(f.raw_center, ex, ey, ez);
+      if (f.raw_normal) f.raw_normal = applyBasisRotationToVector(f.raw_normal, ex, ey, ez);
+      if (f.faceA_center) f.faceA_center = applyBasisRotationToVector(f.faceA_center, ex, ey, ez);
+      if (f.faceB_center) f.faceB_center = applyBasisRotationToVector(f.faceB_center, ex, ey, ez);
+      if (f.faceA_normal) f.faceA_normal = applyBasisRotationToVector(f.faceA_normal, ex, ey, ez);
+      if (f.faceB_normal) f.faceB_normal = applyBasisRotationToVector(f.faceB_normal, ex, ey, ez);
+      if (f.cad_instances) {
+        for (const inst of f.cad_instances) {
+          inst.center = applyBasisRotationToVector(inst.center, ex, ey, ez);
+          inst.normal = applyBasisRotationToVector(inst.normal, ex, ey, ez);
+        }
+      }
+    }
+  }
+
+  const nb = solidGeo.boundingBox!;
+  return {
+    sizeX: parseFloat((nb.max.x - nb.min.x).toFixed(3)),
+    sizeY: parseFloat((nb.max.y - nb.min.y).toFixed(3)),
+    sizeZ: parseFloat((nb.max.z - nb.min.z).toFixed(3)),
+    rotated: true,
+    ex,
+    ey,
+    ez,
+  };
+}
+
 export class StepModelTessellator {
+  public static canonicalizePartOrientation = canonicalizePartOrientation;
+
   public static isDcModulPlaka(_filename: string, _stepText?: string): boolean {
     return false;
   }
@@ -114,12 +221,14 @@ export class StepModelTessellator {
     sizeY: number,
     sizeZ: number,
     standoffHeight: number,
-    holes: DetectedHoleItem[]
+    holes: DetectedHoleItem[],
+    indexAttr?: THREE.BufferAttribute | null
   ): StandoffSupportItem[] {
     const pillarR = parseFloat(Math.max(2.0, Math.min(3.5, Math.min(sizeX, sizeZ) * 0.055)).toFixed(2));
     const halfX = sizeX / 2;
     const halfZ = sizeZ / 2;
     const bottomPts: Array<[number, number]> = [];
+    const bottomTris: Array<[number, number, number, number, number, number]> = [];
     const bandY = Math.max(1.8, Math.min(4.5, sizeY * 0.35));
 
     let cornerHits = [false, false, false, false];
@@ -138,7 +247,71 @@ export class StepModelTessellator {
           }
         }
       }
+
+      const triTotal = indexAttr ? Math.floor(indexAttr.count / 3) : Math.floor(posAttr.count / 3);
+      for (let t = 0; t < triTotal; t++) {
+        const i0 = indexAttr ? indexAttr.getX(t * 3) : t * 3;
+        const i1 = indexAttr ? indexAttr.getX(t * 3 + 1) : t * 3 + 1;
+        const i2 = indexAttr ? indexAttr.getX(t * 3 + 2) : t * 3 + 2;
+        if (
+          posAttr.getY(i0) <= standoffHeight + bandY &&
+          posAttr.getY(i1) <= standoffHeight + bandY &&
+          posAttr.getY(i2) <= standoffHeight + bandY
+        ) {
+          bottomTris.push([
+            posAttr.getX(i0),
+            posAttr.getZ(i0),
+            posAttr.getX(i1),
+            posAttr.getZ(i1),
+            posAttr.getX(i2),
+            posAttr.getZ(i2),
+          ]);
+        }
+      }
     }
+
+    const pointIn2DTriangle = (
+      px: number,
+      pz: number,
+      ax: number,
+      az: number,
+      bx: number,
+      bz: number,
+      cx: number,
+      cz: number
+    ): boolean => {
+      const v0x = cx - ax;
+      const v0z = cz - az;
+      const v1x = bx - ax;
+      const v1z = bz - az;
+      const v2x = px - ax;
+      const v2z = pz - az;
+      const dot00 = v0x * v0x + v0z * v0z;
+      const dot01 = v0x * v1x + v0z * v1z;
+      const dot02 = v0x * v2x + v0z * v2z;
+      const dot11 = v1x * v1x + v1z * v1z;
+      const dot12 = v1x * v2x + v1z * v2z;
+      const denom = dot00 * dot11 - dot01 * dot01;
+      if (Math.abs(denom) < 1e-8) return false;
+      const inv = 1 / denom;
+      const u = (dot11 * dot02 - dot01 * dot12) * inv;
+      const v = (dot00 * dot12 - dot01 * dot02) * inv;
+      return u >= -0.02 && v >= -0.02 && u + v <= 1.02;
+    };
+
+    const isPointOnSolidBottom = (px: number, pz: number): boolean => {
+      for (const [ax, az, bx, bz, cx, cz] of bottomTris) {
+        if (pointIn2DTriangle(px, pz, ax, az, bx, bz, cx, cz)) {
+          return true;
+        }
+      }
+      for (const [bx, bz] of bottomPts) {
+        if (Math.hypot(px - bx, pz - bz) <= pillarR * 1.2) {
+          return true;
+        }
+      }
+      return false;
+    };
 
     const activeCorners = cornerHits.filter(Boolean).length;
     const aspectDiff = Math.abs(sizeX - sizeZ) / Math.max(sizeX, sizeZ, 1);
@@ -146,8 +319,8 @@ export class StepModelTessellator {
 
     const rawTargets: Array<[number, number]> = [];
     if (isRectangular) {
-      const tx = Math.max(pillarR + 1.5, halfX * 0.68);
-      const tz = Math.max(pillarR + 1.5, halfZ * 0.66);
+      const tx = Math.max(pillarR + 1.5, halfX * 0.50);
+      const tz = Math.max(pillarR + 1.5, halfZ * 0.50);
       rawTargets.push([tx, tz], [-tx, tz], [-tx, -tz], [tx, -tz]);
       if (Math.max(sizeX, sizeZ) > 135) {
         if (sizeX >= sizeZ) {
@@ -184,6 +357,11 @@ export class StepModelTessellator {
     const marginX = Math.max(pillarR + 1.0, halfX - pillarR - 1.0);
     const marginZ = Math.max(pillarR + 1.0, halfZ - pillarR - 1.0);
 
+    const interiorCands: Array<[number, number]> = [...bottomPts];
+    for (const [ax, az, bx, bz, cx, cz] of bottomTris) {
+      interiorCands.push([(ax + bx + cx) / 3, (az + bz + cz) / 3]);
+    }
+
     const supports: StandoffSupportItem[] = [];
     for (const [tx, tz] of rawTargets) {
       let bestX = Math.max(-marginX, Math.min(marginX, tx));
@@ -208,28 +386,21 @@ export class StepModelTessellator {
         }
       }
 
-      if (bottomPts.length > 12) {
-        let minSurfDist = Infinity;
-        for (const [bx, bz] of bottomPts) {
-          const d = Math.hypot(bestX - bx, bestZ - bz);
-          if (d < minSurfDist) minSurfDist = d;
-        }
-        if (minSurfDist > pillarR * 2.4) {
-          let bestPt: [number, number] | null = null;
-          let bestScore = Infinity;
-          for (const [bx, bz] of bottomPts) {
-            if (Math.abs(bx) <= marginX && Math.abs(bz) <= marginZ && isSafeFromHoles(bx, bz)) {
-              const dTarget = Math.hypot(bx - tx, bz - tz);
-              if (dTarget < bestScore) {
-                bestScore = dTarget;
-                bestPt = [bx, bz];
-              }
+      if (bottomPts.length > 12 && !isPointOnSolidBottom(bestX, bestZ)) {
+        let bestPt: [number, number] | null = null;
+        let bestScore = Infinity;
+        for (const [bx, bz] of interiorCands) {
+          if (Math.abs(bx) <= marginX && Math.abs(bz) <= marginZ && isSafeFromHoles(bx, bz)) {
+            const dTarget = Math.hypot(bx - tx, bz - tz);
+            if (dTarget < bestScore) {
+              bestScore = dTarget;
+              bestPt = [bx, bz];
             }
           }
-          if (bestPt) {
-            bestX = bestPt[0];
-            bestZ = bestPt[1];
-          }
+        }
+        if (bestPt) {
+          bestX = bestPt[0];
+          bestZ = bestPt[1];
         }
       }
 
@@ -361,16 +532,55 @@ export class StepModelTessellator {
     solidGeo.userData.bRepFaces = bRepFaces;
     solidGeo.computeBoundingBox();
 
+    let edgeGeo: THREE.BufferGeometry | null = null;
+    if (meshData.edges_b64) {
+      const edgesFloats = decodeBase64Float32(meshData.edges_b64);
+      if (edgesFloats.length >= 6) {
+        edgeGeo = new T.BufferGeometry();
+        edgeGeo.setAttribute('position', new T.BufferAttribute(edgesFloats, 3));
+      }
+    }
+
     const rawBox = solidGeo.boundingBox;
     const bboxMeta = metadata.bbox || { min: [0, 0, 0], max: [0, 0, 0], size: [50, 20, 50] };
-    const sizeX = bboxMeta.size[0];
-    const sizeY = bboxMeta.size[1];
-    const sizeZ = bboxMeta.size[2];
+    const rawSpanX = rawBox ? Math.max(0, rawBox.max.x - rawBox.min.x) : 0;
+    const rawSpanY = rawBox ? Math.max(0, rawBox.max.y - rawBox.min.y) : 0;
+    const rawSpanZ = rawBox ? Math.max(0, rawBox.max.z - rawBox.min.z) : 0;
+    const isVolumetricMesh = rawSpanX > 0.1 && rawSpanY > 0.1 && rawSpanZ > 0.1;
+
+    let sizeX = bboxMeta.size[0];
+    let sizeY = bboxMeta.size[1];
+    let sizeZ = bboxMeta.size[2];
     const standoffHeight = 20.0;
-    const isAlreadyShiftedBbox = Math.abs(bboxMeta.min[1] - standoffHeight) < 0.05 && rawBox && Math.abs(rawBox.min.y - standoffHeight) > 1.0;
-    const centerX = isAlreadyShiftedBbox && rawBox ? (rawBox.min.x + rawBox.max.x) / 2 : (bboxMeta.min[0] + bboxMeta.max[0]) / 2;
-    const bottomY = isAlreadyShiftedBbox && rawBox ? rawBox.min.y : bboxMeta.min[1];
-    const centerZ = isAlreadyShiftedBbox && rawBox ? (rawBox.min.z + rawBox.max.z) / 2 : (bboxMeta.min[2] + bboxMeta.max[2]) / 2;
+    let canonRot: { ex: [number, number, number]; ey: [number, number, number]; ez: [number, number, number]; rotated: boolean } | null = null;
+
+    if (isVolumetricMesh && (rawSpanY > Math.min(rawSpanX, rawSpanZ) + 0.05 || bboxMeta.size[1] > Math.min(bboxMeta.size[0], bboxMeta.size[2]) + 0.05)) {
+      const oriented = canonicalizePartOrientation(solidGeo, edgeGeo);
+      if (oriented.rotated) {
+        canonRot = oriented;
+        sizeX = oriented.sizeX;
+        sizeY = oriented.sizeY;
+        sizeZ = oriented.sizeZ;
+      }
+    }
+
+    const updatedBox = solidGeo.boundingBox;
+    const isAlreadyShiftedBbox = !canonRot?.rotated && Math.abs(bboxMeta.min[1] - standoffHeight) < 0.05 && updatedBox && Math.abs(updatedBox.min.y - standoffHeight) > 1.0;
+    const centerX = canonRot?.rotated && updatedBox
+      ? (updatedBox.min.x + updatedBox.max.x) / 2
+      : isAlreadyShiftedBbox && updatedBox
+        ? (updatedBox.min.x + updatedBox.max.x) / 2
+        : (bboxMeta.min[0] + bboxMeta.max[0]) / 2;
+    const bottomY = canonRot?.rotated && updatedBox
+      ? updatedBox.min.y
+      : isAlreadyShiftedBbox && updatedBox
+        ? updatedBox.min.y
+        : bboxMeta.min[1];
+    const centerZ = canonRot?.rotated && updatedBox
+      ? (updatedBox.min.z + updatedBox.max.z) / 2
+      : isAlreadyShiftedBbox && updatedBox
+        ? (updatedBox.min.z + updatedBox.max.z) / 2
+        : (bboxMeta.min[2] + bboxMeta.max[2]) / 2;
 
     solidGeo.translate(-centerX, -bottomY + standoffHeight, -centerZ);
 
@@ -384,20 +594,15 @@ export class StepModelTessellator {
     solidMesh.name = `${filename}_brep_mesh`;
     group.add(solidMesh);
 
-    if (meshData.edges_b64) {
-      const edgesFloats = decodeBase64Float32(meshData.edges_b64);
-      if (edgesFloats.length >= 6) {
-        const edgeGeo = new T.BufferGeometry();
-        edgeGeo.setAttribute('position', new T.BufferAttribute(edgesFloats, 3));
-        edgeGeo.translate(-centerX, -bottomY + standoffHeight, -centerZ);
-        const edgeMat = new T.LineBasicMaterial({
-          color: 0x0f172a,
-          linewidth: 1.5,
-        });
-        const edgeLines = new T.LineSegments(edgeGeo, edgeMat);
-        edgeLines.name = `${filename}_brep_edges`;
-        group.add(edgeLines);
-      }
+    if (edgeGeo) {
+      edgeGeo.translate(-centerX, -bottomY + standoffHeight, -centerZ);
+      const edgeMat = new T.LineBasicMaterial({
+        color: 0x0f172a,
+        linewidth: 1.5,
+      });
+      const edgeLines = new T.LineSegments(edgeGeo, edgeMat);
+      edgeLines.name = `${filename}_brep_edges`;
+      group.add(edgeLines);
     }
 
     const posAttr = solidGeo.getAttribute('position');
@@ -609,12 +814,18 @@ export class StepModelTessellator {
 
     for (const feat of metadata.features || []) {
       const featWithRaw = feat as CadFeatureItem;
-      const origCenter: [number, number, number] = featWithRaw.raw_center
+      const rawOrigCenter: [number, number, number] = featWithRaw.raw_center
         ? [featWithRaw.raw_center[0], featWithRaw.raw_center[1], featWithRaw.raw_center[2]]
         : (feat.center ? [feat.center[0], feat.center[1], feat.center[2]] : [0, 0, 0]);
-      const origNormal: [number, number, number] = featWithRaw.raw_normal
+      const rawOrigNormal: [number, number, number] = featWithRaw.raw_normal
         ? [featWithRaw.raw_normal[0], featWithRaw.raw_normal[1], featWithRaw.raw_normal[2]]
         : ((feat.normal ? [feat.normal[0], feat.normal[1], feat.normal[2]] : [0, 1, 0]) as [number, number, number]);
+      const origCenter: [number, number, number] = canonRot?.rotated
+        ? applyBasisRotationToVector(rawOrigCenter, canonRot.ex, canonRot.ey, canonRot.ez)
+        : rawOrigCenter;
+      const origNormal: [number, number, number] = canonRot?.rotated
+        ? applyBasisRotationToVector(rawOrigNormal, canonRot.ex, canonRot.ey, canonRot.ez)
+        : rawOrigNormal;
 
       let cx = parseFloat((origCenter[0] - centerX).toFixed(3));
       let cy = parseFloat((origCenter[1] - bottomY + standoffHeight).toFixed(3));
@@ -682,8 +893,8 @@ export class StepModelTessellator {
         Math.abs(norm[1]) >= 0.7
       ) {
         const corridor = analyzeVerticalCylinderCorridor(cx, cy, cz, feat.nominal_dimension / 2);
-        axialMin = corridor.axialMin;
-        axialMax = corridor.axialMax;
+        axialMin = Math.max(standoffHeight, Math.min(standoffHeight + sizeY, corridor.axialMin));
+        axialMax = Math.max(axialMin, Math.min(standoffHeight + sizeY, corridor.axialMax));
         stemBlocked = corridor.stemBlocked;
         cy = parseFloat(((axialMin + axialMax) / 2).toFixed(3));
       }
@@ -708,33 +919,59 @@ export class StepModelTessellator {
       let shiftedFaceACenter: [number, number, number] | undefined;
       let shiftedFaceBCenter: [number, number, number] | undefined;
       if (featExt.faceA_center) {
+        const fcA = canonRot?.rotated
+          ? applyBasisRotationToVector(featExt.faceA_center, canonRot.ex, canonRot.ey, canonRot.ez)
+          : featExt.faceA_center;
         shiftedFaceACenter = [
-          parseFloat((featExt.faceA_center[0] - centerX).toFixed(3)),
-          parseFloat((featExt.faceA_center[1] - bottomY + standoffHeight).toFixed(3)),
-          parseFloat((featExt.faceA_center[2] - centerZ).toFixed(3)),
+          parseFloat((fcA[0] - centerX).toFixed(3)),
+          parseFloat((fcA[1] - bottomY + standoffHeight).toFixed(3)),
+          parseFloat((fcA[2] - centerZ).toFixed(3)),
         ];
       }
       if (featExt.faceB_center) {
+        const fcB = canonRot?.rotated
+          ? applyBasisRotationToVector(featExt.faceB_center, canonRot.ex, canonRot.ey, canonRot.ez)
+          : featExt.faceB_center;
         shiftedFaceBCenter = [
-          parseFloat((featExt.faceB_center[0] - centerX).toFixed(3)),
-          parseFloat((featExt.faceB_center[1] - bottomY + standoffHeight).toFixed(3)),
-          parseFloat((featExt.faceB_center[2] - centerZ).toFixed(3)),
+          parseFloat((fcB[0] - centerX).toFixed(3)),
+          parseFloat((fcB[1] - bottomY + standoffHeight).toFixed(3)),
+          parseFloat((fcB[2] - centerZ).toFixed(3)),
         ];
       }
+      const shiftedFaceANormal = featExt.faceA_normal && canonRot?.rotated
+        ? applyBasisRotationToVector(featExt.faceA_normal, canonRot.ex, canonRot.ey, canonRot.ez)
+        : featExt.faceA_normal;
+      const shiftedFaceBNormal = featExt.faceB_normal && canonRot?.rotated
+        ? applyBasisRotationToVector(featExt.faceB_normal, canonRot.ex, canonRot.ey, canonRot.ez)
+        : featExt.faceB_normal;
       let shiftedFloorZ = featExt.floor_z;
       if (shiftedFloorZ !== undefined) {
-        shiftedFloorZ = parseFloat((shiftedFloorZ - bottomY + standoffHeight).toFixed(3));
+        shiftedFloorZ = Math.max(
+          standoffHeight,
+          Math.min(standoffHeight + sizeY, parseFloat((shiftedFloorZ - bottomY + standoffHeight).toFixed(3)))
+        );
       }
       let shiftedInstances = featExt.cad_instances;
       if (shiftedInstances && shiftedInstances.length > 0) {
-        shiftedInstances = shiftedInstances.map((inst) => ({
-          ...inst,
-          center: [
-            parseFloat((inst.center[0] - centerX).toFixed(3)),
-            parseFloat((inst.center[1] - bottomY + standoffHeight).toFixed(3)),
-            parseFloat((inst.center[2] - centerZ).toFixed(3)),
-          ],
-        }));
+        shiftedInstances = shiftedInstances.map((inst) => {
+          const ic = canonRot?.rotated
+            ? applyBasisRotationToVector(inst.center, canonRot.ex, canonRot.ey, canonRot.ez)
+            : inst.center;
+          const inorm = canonRot?.rotated
+            ? applyBasisRotationToVector(inst.normal, canonRot.ex, canonRot.ey, canonRot.ez)
+            : inst.normal;
+          return {
+            ...inst,
+            center: [
+              parseFloat((ic[0] - centerX).toFixed(3)),
+              parseFloat((ic[1] - bottomY + standoffHeight).toFixed(3)),
+              parseFloat((ic[2] - centerZ).toFixed(3)),
+            ],
+            normal: inorm,
+            axial_min: axialMin,
+            axial_max: axialMax,
+          };
+        });
       }
 
       const shiftedCenter: [number, number, number] = [cx, cy, cz];
@@ -754,8 +991,8 @@ export class StepModelTessellator {
         description: feat.description || feat.id,
         faceA_center: shiftedFaceACenter,
         faceB_center: shiftedFaceBCenter,
-        faceA_normal: featExt.faceA_normal,
-        faceB_normal: featExt.faceB_normal,
+        faceA_normal: shiftedFaceANormal,
+        faceB_normal: shiftedFaceBNormal,
         distance_type: featExt.distance_type as CadFeatureItem['distance_type'],
         is_blind: featExt.is_blind,
         floor_z: shiftedFloorZ,
@@ -779,7 +1016,8 @@ export class StepModelTessellator {
       sizeY,
       sizeZ,
       standoffHeight,
-      detectedHoles
+      detectedHoles,
+      solidGeo.getIndex()
     );
     group.add(this.createStandoffRiserGroup(standoffSupports));
 
@@ -1532,6 +1770,54 @@ export class StepModelTessellator {
       triNormals[i + 2] = nx * ez[0] + ny * ez[1] + nz * ez[2];
     }
 
+    if (triPositions.length > 0 && isFinite(alignedMaxY - alignedMinY)) {
+      const curSx = Math.max(0, alignedMaxX - alignedMinX);
+      const curSy = Math.max(0, alignedMaxY - alignedMinY);
+      const curSz = Math.max(0, alignedMaxZ - alignedMinZ);
+      if (curSy > Math.min(curSx, curSz) + 0.05) {
+        const swapAxes: Array<{ span: number; vec: [number, number, number] }> = [
+          { span: curSx, vec: [1, 0, 0] },
+          { span: curSy, vec: [0, 1, 0] },
+          { span: curSz, vec: [0, 0, 1] },
+        ];
+        swapAxes.sort((a, b) => a.span - b.span);
+        const sEy = swapAxes[0].vec;
+        const sEx = swapAxes[2].vec;
+        const sEzRaw: [number, number, number] = [
+          sEx[1] * sEy[2] - sEx[2] * sEy[1],
+          sEx[2] * sEy[0] - sEx[0] * sEy[2],
+          sEx[0] * sEy[1] - sEx[1] * sEy[0],
+        ];
+        const sEzLen = Math.hypot(sEzRaw[0], sEzRaw[1], sEzRaw[2]) || 1;
+        const sEz: [number, number, number] = [sEzRaw[0] / sEzLen, sEzRaw[1] / sEzLen, sEzRaw[2] / sEzLen];
+
+        ex = applyBasisRotationToVector(ex, sEx, sEy, sEz);
+        ey = applyBasisRotationToVector(ey, sEx, sEy, sEz);
+        ez = applyBasisRotationToVector(ez, sEx, sEy, sEz);
+
+        alignedMinX = Infinity; alignedMaxX = -Infinity;
+        alignedMinY = Infinity; alignedMaxY = -Infinity;
+        alignedMinZ = Infinity; alignedMaxZ = -Infinity;
+        for (let i = 0; i < triPositions.length; i += 3) {
+          const [rx, ry, rz] = applyBasisRotationToVector([triPositions[i], triPositions[i + 1], triPositions[i + 2]], sEx, sEy, sEz);
+          triPositions[i] = rx;
+          triPositions[i + 1] = ry;
+          triPositions[i + 2] = rz;
+          if (rx < alignedMinX) alignedMinX = rx;
+          if (rx > alignedMaxX) alignedMaxX = rx;
+          if (ry < alignedMinY) alignedMinY = ry;
+          if (ry > alignedMaxY) alignedMaxY = ry;
+          if (rz < alignedMinZ) alignedMinZ = rz;
+          if (rz > alignedMaxZ) alignedMaxZ = rz;
+
+          const [rnx, rny, rnz] = applyBasisRotationToVector([triNormals[i], triNormals[i + 1], triNormals[i + 2]], sEx, sEy, sEz);
+          triNormals[i] = rnx;
+          triNormals[i + 1] = rny;
+          triNormals[i + 2] = rnz;
+        }
+      }
+    }
+
     const finalSizeX = isFinite(alignedMaxX - alignedMinX) && alignedMaxX > alignedMinX
       ? parseFloat((alignedMaxX - alignedMinX).toFixed(2))
       : sizeX;
@@ -1648,7 +1934,8 @@ export class StepModelTessellator {
       finalSizeY,
       finalSizeZ,
       standoffHeight,
-      detectedHoles
+      detectedHoles,
+      solidGeo.getIndex()
     );
     group.add(this.createStandoffRiserGroup(standoffSupports));
 
@@ -1670,30 +1957,6 @@ export class StepModelTessellator {
         description: h.name,
       })),
     ];
-
-    let distIdx = 1;
-    const seenDists = new Set<number>();
-    for (let i = 0; i < detectedHoles.length; i++) {
-      for (let j = i + 1; j < detectedHoles.length; j++) {
-        const h1 = detectedHoles[i], h2 = detectedHoles[j];
-        const dXz = parseFloat(Math.hypot(h1.center[0] - h2.center[0], h1.center[2] - h2.center[2]).toFixed(2));
-        if (dXz > 1.0 && !seenDists.has(dXz)) {
-          seenDists.add(dXz);
-          genericCadFeatures.push({
-            id: `CAD_DIST_${dXz.toFixed(2)}_${distIdx++}`,
-            feature_type: 'PLANE',
-            nominal_dimension: dXz,
-            center: [
-              parseFloat(((h1.center[0] + h2.center[0]) / 2).toFixed(2)),
-              Math.max(h1.center[1], h2.center[1]),
-              parseFloat(((h1.center[2] + h2.center[2]) / 2).toFixed(2)),
-            ],
-            normal: [0, 1, 0],
-            description: `Eksenler Arası Mesafe (${dXz.toFixed(2)} mm)`,
-          });
-        }
-      }
-    }
 
     return {
       group,

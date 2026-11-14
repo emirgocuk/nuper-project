@@ -437,17 +437,20 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
         mean_z = sum(c[2] for c in c_list) / len(c_list)
         o = grp["axis_origin"]
         a = grp["axis"]
+        p_start = None
+        p_end = None
+        axial_axis = 1 if abs(a[1]) >= abs(a[2]) and abs(a[1]) >= abs(a[0]) else (2 if abs(a[2]) >= abs(a[0]) else 0)
         if math.isfinite(grp["proj_min"]) and math.isfinite(grp["proj_max"]) and grp["proj_max"] >= grp["proj_min"]:
             t = (grp["proj_min"] + grp["proj_max"]) / 2.0
             p_start = [o[i] + grp["proj_min"] * a[i] for i in range(3)]
             p_end = [o[i] + grp["proj_max"] * a[i] for i in range(3)]
-            axial_axis = 1 if abs(a[1]) >= abs(a[2]) and abs(a[1]) >= abs(a[0]) else (2 if abs(a[2]) >= abs(a[0]) else 0)
             ax_min = min(p_start[axial_axis], p_end[axial_axis])
             ax_max = max(p_start[axial_axis], p_end[axial_axis])
         else:
             t = (mean_x - o[0]) * a[0] + (mean_y - o[1]) * a[1] + (mean_z - o[2]) * a[2]
-            ax_min = avg_y if abs(a[1]) >= abs(a[2]) else avg_z
-            ax_max = ax_min
+            avg_tmp = o[axial_axis] + t * a[axial_axis]
+            ax_min = avg_tmp
+            ax_max = avg_tmp
         avg_x = o[0] + t * a[0]
         avg_y = o[1] + t * a[1]
         avg_z = o[2] + t * a[2]
@@ -472,6 +475,8 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
             "floor_z": round(floor_z, 4) if floor_z is not None else None,
             "face_ids": grp["face_ids"],
             "description": f"{label} Ø{grp['diameter']:.2f} mm ({len(grp['face_ids'])} yüzey parçası)",
+            "_p_start": p_start,
+            "_p_end": p_end,
         })
         cyl_idx += 1
 
@@ -606,6 +611,12 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
                 fn = feat["normal"]
                 rnx, rny, rnz = _apply_rot((float(fn[0]), float(fn[1]), float(fn[2])), ex, ey, ez)
                 feat["normal"] = [round(rnx, 4), round(rny, 4), round(rnz, 4)]
+            if feat.get("_p_start") is not None:
+                ps = feat["_p_start"]
+                feat["_p_start"] = list(_apply_rot((float(ps[0]), float(ps[1]), float(ps[2])), ex, ey, ez))
+            if feat.get("_p_end") is not None:
+                pe = feat["_p_end"]
+                feat["_p_end"] = list(_apply_rot((float(pe[0]), float(pe[1]), float(pe[2])), ex, ey, ez))
 
         xs_aligned = all_positions[0::3]
         ys_aligned = all_positions[1::3]
@@ -616,6 +627,59 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
         size_x = max_x - min_x
         size_y = max_y - min_y
         size_z = max_z - min_z
+
+        if size_y > min(size_x, size_z) + 0.05:
+            dims_with_axes = [
+                (size_x, (1.0, 0.0, 0.0)),
+                (size_y, (0.0, 1.0, 0.0)),
+                (size_z, (0.0, 0.0, 1.0)),
+            ]
+            dims_with_axes.sort(key=lambda item: item[0])
+            new_ey = dims_with_axes[0][1]
+            new_ex = dims_with_axes[2][1]
+            new_ez = _norm_vec(_cross(new_ex, new_ey))
+            ex = _apply_rot(ex, new_ex, new_ey, new_ez)
+            ey = _apply_rot(ey, new_ex, new_ey, new_ez)
+            ez = _apply_rot(ez, new_ex, new_ey, new_ez)
+            for i in range(0, len(all_positions), 3):
+                rx, ry, rz = _apply_rot((all_positions[i], all_positions[i + 1], all_positions[i + 2]), new_ex, new_ey, new_ez)
+                all_positions[i] = round(rx, 4)
+                all_positions[i + 1] = round(ry, 4)
+                all_positions[i + 2] = round(rz, 4)
+            for i in range(0, len(all_normals), 3):
+                nx, ny, nz = _apply_rot((all_normals[i], all_normals[i + 1], all_normals[i + 2]), new_ex, new_ey, new_ez)
+                all_normals[i] = round(nx, 4)
+                all_normals[i + 1] = round(ny, 4)
+                all_normals[i + 2] = round(nz, 4)
+            for i in range(0, len(all_edge_segments), 3):
+                ex_p, ey_p, ez_p = _apply_rot((all_edge_segments[i], all_edge_segments[i + 1], all_edge_segments[i + 2]), new_ex, new_ey, new_ez)
+                all_edge_segments[i] = round(ex_p, 4)
+                all_edge_segments[i + 1] = round(ey_p, 4)
+                all_edge_segments[i + 2] = round(ez_p, 4)
+            for feat in extracted_features:
+                if feat.get("center"):
+                    fc = feat["center"]
+                    rcx, rcy, rcz = _apply_rot((float(fc[0]), float(fc[1]), float(fc[2])), new_ex, new_ey, new_ez)
+                    feat["center"] = [round(rcx, 4), round(rcy, 4), round(rcz, 4)]
+                if feat.get("normal"):
+                    fn = feat["normal"]
+                    rnx, rny, rnz = _apply_rot((float(fn[0]), float(fn[1]), float(fn[2])), new_ex, new_ey, new_ez)
+                    feat["normal"] = [round(rnx, 4), round(rny, 4), round(rnz, 4)]
+                if feat.get("_p_start") is not None:
+                    ps = feat["_p_start"]
+                    feat["_p_start"] = list(_apply_rot((float(ps[0]), float(ps[1]), float(ps[2])), new_ex, new_ey, new_ez))
+                if feat.get("_p_end") is not None:
+                    pe = feat["_p_end"]
+                    feat["_p_end"] = list(_apply_rot((float(pe[0]), float(pe[1]), float(pe[2])), new_ex, new_ey, new_ez))
+            xs_aligned = all_positions[0::3]
+            ys_aligned = all_positions[1::3]
+            zs_aligned = all_positions[2::3]
+            min_x, max_x = min(xs_aligned), max(xs_aligned)
+            min_y, max_y = min(ys_aligned), max(ys_aligned)
+            min_z, max_z = min(zs_aligned), max(zs_aligned)
+            size_x = max_x - min_x
+            size_y = max_y - min_y
+            size_z = max_z - min_z
 
         shift_x = (min_x + max_x) / 2.0
         shift_y = min_y
@@ -639,10 +703,42 @@ def extract_cad_metadata_ocp(step_path: str) -> Dict[str, Any]:
                     round(float(fc[1]) - shift_y, 4),
                     round(float(fc[2]) - shift_z, 4),
                 ]
+            ps = feat.pop("_p_start", None)
+            pe = feat.pop("_p_end", None)
+            if ps is not None and pe is not None and feat.get("feature_type") in ("INTERNAL_CYLINDER", "EXTERNAL_CYLINDER"):
+                ps_s = [ps[0] - shift_x, ps[1] - shift_y, ps[2] - shift_z]
+                pe_s = [pe[0] - shift_x, pe[1] - shift_y, pe[2] - shift_z]
+                fn = feat.get("normal") or [0.0, 1.0, 0.0]
+                if abs(fn[1]) >= abs(fn[0]) and abs(fn[1]) >= abs(fn[2]):
+                    ax_idx = 1
+                    bound_min, bound_max = 0.0, size_y
+                elif abs(fn[0]) >= abs(fn[2]):
+                    ax_idx = 0
+                    bound_min, bound_max = -size_x / 2.0, size_x / 2.0
+                else:
+                    ax_idx = 2
+                    bound_min, bound_max = -size_z / 2.0, size_z / 2.0
+                raw_ax_min = min(ps_s[ax_idx], pe_s[ax_idx])
+                raw_ax_max = max(ps_s[ax_idx], pe_s[ax_idx])
+                ax_min = max(bound_min, min(bound_max, raw_ax_min))
+                ax_max = max(ax_min, min(bound_max, raw_ax_max))
+                is_int = feat.get("feature_type") == "INTERNAL_CYLINDER"
+                is_blind = is_int and (ax_min > bound_min + 0.8) and (ax_idx == 1)
+                floor_z = ax_min if is_blind else None
+                feat["axial_min"] = round(ax_min, 4)
+                feat["axial_max"] = round(ax_max, 4)
+                feat["z_top"] = round(ax_max, 4)
+                feat["z_bottom"] = round(ax_min, 4)
+                feat["is_blind"] = is_blind
+                feat["floor_z"] = round(floor_z, 4) if floor_z is not None else None
 
         min_x, max_x = round(-size_x / 2.0, 4), round(size_x / 2.0, 4)
         min_y, max_y = 0.0, round(size_y, 4)
         min_z, max_z = round(-size_z / 2.0, 4), round(size_z / 2.0, 4)
+
+    for feat in extracted_features:
+        feat.pop("_p_start", None)
+        feat.pop("_p_end", None)
 
     pos_bytes = struct.pack(f"<{len(all_positions)}f", *all_positions)
     norm_bytes = struct.pack(f"<{len(all_normals)}f", *all_normals)
@@ -865,6 +961,82 @@ def parse_step_file(step_path: str) -> Dict[str, Any]:
         size_x = round(max(xs) - min(xs), 4)
         size_y = round(max(ys) - min(ys), 4)
         size_z = round(max(zs) - min(zs), 4)
+
+        if size_y > min(size_x, size_z) + 0.05 or size_z > size_x + 0.05:
+            dims_with_axes = [
+                (size_x, (1.0, 0.0, 0.0)),
+                (size_y, (0.0, 1.0, 0.0)),
+                (size_z, (0.0, 0.0, 1.0)),
+            ]
+            dims_with_axes.sort(key=lambda item: item[0])
+            ey = dims_with_axes[0][1]
+            ex = dims_with_axes[2][1]
+            ez = _norm_vec(_cross(ex, ey))
+
+            for pid, pt in list(points.items()):
+                rx, ry, rz = _apply_rot(pt, ex, ey, ez)
+                points[pid] = (rx, ry, rz)
+
+            xs_r = [p[0] for p in points.values()]
+            ys_r = [p[1] for p in points.values()]
+            zs_r = [p[2] for p in points.values()]
+            shift_x = (min(xs_r) + max(xs_r)) / 2.0
+            shift_y = min(ys_r)
+            shift_z = (min(zs_r) + max(zs_r)) / 2.0
+
+            for pid, pt in list(points.items()):
+                points[pid] = (round(pt[0] - shift_x, 4), round(pt[1] - shift_y, 4), round(pt[2] - shift_z, 4))
+
+            def _xform_pt(p: Tuple[float, float, float]) -> Tuple[float, float, float]:
+                rx, ry, rz = _apply_rot((float(p[0]), float(p[1]), float(p[2])), ex, ey, ez)
+                return (round(rx - shift_x, 4), round(ry - shift_y, 4), round(rz - shift_z, 4))
+
+            def _xform_vec(v: Tuple[float, float, float]) -> Tuple[float, float, float]:
+                rx, ry, rz = _apply_rot((float(v[0]), float(v[1]), float(v[2])), ex, ey, ez)
+                return (round(rx, 4), round(ry, 4), round(rz, 4))
+
+            for c in cylinders:
+                c["center"] = _xform_pt(c["center"])
+                c["axis"] = _xform_vec(c["axis"])
+                c["canon_axis"] = _canon_vec(c["axis"])
+
+            planes_by_normal.clear()
+            for p in planes:
+                p["origin"] = _xform_pt(p["origin"])
+                p["axis"] = _xform_vec(p["axis"])
+                p["canon_axis"] = _canon_vec(p["axis"])
+                p["offset"] = round(_dot(p["origin"], p["canon_axis"]), 4)
+                planes_by_normal[tuple(round(v, 3) for v in p["canon_axis"])].append(p["offset"])
+
+            for cone in cones:
+                cone["placement"]["origin"] = _xform_pt(cone["placement"]["origin"])
+                cone["placement"]["axis"] = _xform_vec(cone["placement"]["axis"])
+
+            for tor in toroids:
+                tor["placement"]["origin"] = _xform_pt(tor["placement"]["origin"])
+                tor["placement"]["axis"] = _xform_vec(tor["placement"]["axis"])
+
+            for sph in spheres:
+                sph["placement"]["origin"] = _xform_pt(sph["placement"]["origin"])
+                sph["placement"]["axis"] = _xform_vec(sph["placement"]["axis"])
+                sph["center"] = sph["placement"]["origin"]
+
+            for circ in circles:
+                circ["center"] = _xform_pt(circ["center"])
+                circ["axis"] = _xform_vec(circ["axis"])
+
+            xs = [p[0] for p in points.values()]
+            ys = [p[1] for p in points.values()]
+            zs = [p[2] for p in points.values()]
+            size_x = round(max(xs) - min(xs), 4)
+            size_y = round(max(ys) - min(ys), 4)
+            size_z = round(max(zs) - min(zs), 4)
+
+        for c in cylinders:
+            if abs(c["canon_axis"][1]) >= 0.7:
+                c["axial_min"] = round(min(ys), 4)
+                c["axial_max"] = round(max(ys), 4)
+
         bbox = {
             "min": [round(min(xs), 3), round(min(ys), 3), round(min(zs), 3)],
             "max": [round(max(xs), 3), round(max(ys), 3), round(max(zs), 3)],

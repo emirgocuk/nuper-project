@@ -170,8 +170,44 @@ export class CADViewer {
     }
   }
 
-  public setModelGeometry(geometry: THREE.BufferGeometry): void {
+  public canonicalizePartOrientation(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+    geometry.computeBoundingBox();
+    const box = geometry.boundingBox;
+    if (!box) return geometry;
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const sx = size.x;
+    const sy = size.y;
+    const sz = size.z;
+
+    if (sy > Math.min(sx, sz) + 0.05) {
+      if (sz <= sx && sz <= sy) {
+        geometry.rotateX(Math.PI / 2);
+      } else if (sx <= sy && sx <= sz) {
+        geometry.rotateZ(Math.PI / 2);
+      }
+      geometry.computeBoundingBox();
+    }
+
+    if (geometry.boundingBox) {
+      geometry.boundingBox.getSize(size);
+      if (size.z > size.x + 0.05) {
+        geometry.rotateY(Math.PI / 2);
+        geometry.computeBoundingBox();
+      }
+    }
+
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    return geometry;
+  }
+
+  public setModelGeometry(geometry: THREE.BufferGeometry, canonicalize = false): void {
     if (this.isDestroyed) return;
+
+    if (canonicalize) {
+      this.canonicalizePartOrientation(geometry);
+    }
 
     this.currentGeometry = geometry;
 
