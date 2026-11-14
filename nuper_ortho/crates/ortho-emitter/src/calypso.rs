@@ -68,6 +68,14 @@ impl CalypsoEmitter {
 
         writeln!(out, "[FEATURES]")?;
         for feature in &plan.features {
+            if feature.is_unmatched() {
+                writeln!(
+                    out,
+                    "$$ [UYARI] UNSUR #{} 3D YUZEYE BAGLANMADI - HAREKET ATLANDI",
+                    feature.id
+                )?;
+                continue;
+            }
             let is_critical = feature.name.to_uppercase().contains("CRIT")
                 || plan.tolerances.iter().any(|t| t.feature_id == feature.id && (t.upper_tolerance - t.lower_tolerance).abs() <= 0.025);
             let feedrate = if is_critical { 2.0 } else { 5.0 };

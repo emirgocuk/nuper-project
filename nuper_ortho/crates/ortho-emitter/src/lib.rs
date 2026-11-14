@@ -339,6 +339,14 @@ impl DmisEmitter {
         writeln!(out, "$$ ==============================================================")?;
 
         for feature in &plan.features {
+            if feature.is_unmatched() {
+                writeln!(
+                    out,
+                    "$$ [UYARI] UNSUR #{} 3D YUZEYE BAGLANMADI - HAREKET ATLANDI",
+                    feature.id
+                )?;
+                continue;
+            }
             let is_critical = feature.name.to_uppercase().contains("CRIT")
                 || plan.tolerances.iter().any(|t| t.feature_id == feature.id && (t.upper_tolerance - t.lower_tolerance).abs() <= 0.025);
             let feedrate = if is_critical { 2.0 } else { 5.0 };
@@ -1156,6 +1164,34 @@ mod tests {
         assert!(code.contains("CONST/PLANE, F(PLN_SYM_MID_10), MID"));
         assert!(code.contains("T(TOL_10) = TOL/SYMM"));
         assert!(code.contains("T(TOL_11) = TOL/CRUN"));
+    }
+
+    #[test]
+    fn test_unmatched_feature_skips_physical_motion() {
+        let drf = DatumReferenceFrame::new_3_2_1("PCS_UNMATCHED", 1, 2, 3);
+        let mut plan = InspectionPlan::new("UNMATCHED_PART", "part.step", drf);
+        let mut feat = GeometricFeature::new_internal_cylinder(
+            77,
+            "CYL_UNMATCHED",
+            DVec3::ZERO,
+            DVec3::Z,
+            10.0,
+            5.0,
+            100.0,
+            5.0,
+        )
+        .unwrap();
+        feat.match_status = Some("UNMATCHED".to_string());
+        feat.requires_manual_3d_binding = true;
+        plan.features.push(feat);
+
+        let clearance = ClearanceBox::from_bounding_box(DVec3::ZERO, DVec3::new(50.0, 50.0, 20.0));
+        let traj = CertifiedCollisionFreeTrajectory::new(vec![], clearance, vec![]);
+        let emitter = DmisEmitter::new();
+        let code = emitter.emit_pcdmis(&plan, &traj).unwrap();
+        assert!(code.contains("$$ [UYARI] UNSUR #77 3D YUZEYE BAGLANMADI - HAREKET ATLANDI"));
+        assert!(!code.contains("F(CYL_UNMATCHED)"));
+        assert!(!code.contains("PTMEAS/CART, 0.0000, 0.0000, 0.0000"));
     }
 }
 

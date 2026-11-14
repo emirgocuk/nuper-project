@@ -51,10 +51,12 @@ pub struct GeometricFeature {
     pub is_datum_candidate: bool,
     /// Unsur vida dişi içeriyor mu? (M-Thread vb.)
     pub is_threaded: bool,
-    /// Varsa ayrıntılı vida dişi teknik özellikleri
     pub thread_spec: Option<crate::threads::ThreadSpecification>,
-    /// Yüzeyin dış sınır tel poligonu (mm cinsinden köşe koordinatları)
     pub boundary_polygon: Vec<DVec3>,
+    #[serde(default)]
+    pub match_status: Option<String>,
+    #[serde(default)]
+    pub requires_manual_3d_binding: bool,
 }
 
 impl GeometricFeature {
@@ -83,6 +85,8 @@ impl GeometricFeature {
             is_threaded: false,
             thread_spec: None,
             boundary_polygon: Vec::new(),
+            match_status: None,
+            requires_manual_3d_binding: false,
         };
         feature.validate()?;
         Ok(feature)
@@ -123,6 +127,8 @@ impl GeometricFeature {
             is_threaded: false,
             thread_spec: None,
             boundary_polygon: Vec::new(),
+            match_status: None,
+            requires_manual_3d_binding: false,
         };
         feature.validate()?;
         Ok(feature)
@@ -155,6 +161,8 @@ impl GeometricFeature {
             is_threaded: false,
             thread_spec: None,
             boundary_polygon: Vec::new(),
+            match_status: None,
+            requires_manual_3d_binding: false,
         };
         feature.validate()?;
         Ok(feature)
@@ -186,6 +194,8 @@ impl GeometricFeature {
             is_threaded: true,
             thread_spec: Some(thread),
             boundary_polygon: Vec::new(),
+            match_status: None,
+            requires_manual_3d_binding: false,
         };
         feature.validate()?;
         Ok(feature)
@@ -218,6 +228,8 @@ impl GeometricFeature {
             is_threaded: false,
             thread_spec: None,
             boundary_polygon: Vec::new(),
+            match_status: None,
+            requires_manual_3d_binding: false,
         };
         feature.validate()?;
         Ok(feature)
@@ -252,6 +264,8 @@ impl GeometricFeature {
             is_threaded: false,
             thread_spec: None,
             boundary_polygon: Vec::new(),
+            match_status: None,
+            requires_manual_3d_binding: false,
         };
         feature.validate()?;
         Ok(feature)
@@ -284,6 +298,8 @@ impl GeometricFeature {
             is_threaded: false,
             thread_spec: None,
             boundary_polygon: Vec::new(),
+            match_status: None,
+            requires_manual_3d_binding: false,
         };
         feature.validate()?;
         Ok(feature)
@@ -313,6 +329,8 @@ impl GeometricFeature {
             is_threaded: false,
             thread_spec: None,
             boundary_polygon: Vec::new(),
+            match_status: None,
+            requires_manual_3d_binding: false,
         };
         feature.validate()?;
         Ok(feature)
@@ -362,8 +380,12 @@ impl GeometricFeature {
         self.min_wall_thickness > 0.0 && self.min_wall_thickness < 2.5
     }
 
-    /// Probun bu yüzeye yaklaşması gereken teorik yön vektörü (ters normal)
     pub fn approach_vector(&self) -> DVec3 {
         -self.normal_vector
+    }
+
+    pub fn is_unmatched(&self) -> bool {
+        self.requires_manual_3d_binding
+            || matches!(self.match_status.as_deref(), Some("UNMATCHED"))
     }
 }
