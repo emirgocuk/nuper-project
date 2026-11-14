@@ -392,7 +392,7 @@ def generate_inspection_plan(
                 feature_id=dim.get("feature_key") or f"FEAT_{dim_id:03d}",
                 balloon_id=balloon_id,
                 type=entry["type"],
-                datum_reference=entry["datums"] or ["A"],
+                datum_reference=entry["datums"] if entry["datums"] else None,
                 priority=entry["priority"],
                 feature_key=dim.get("feature_key"),
                 characteristic=dim.get("type_label") or dim.get("type", "DIMENSION"),

@@ -371,24 +371,23 @@ export function matchCadWithDrawing(
       descLower.includes('taban') ||
       descLower.includes('b-b') ||
       descLower.includes('kesit b') ||
-      descLower.includes('datum d');
+      descLower.includes('datum d') ||
+      Boolean(dim.page && dim.page >= 3);
 
-    if (assignedNormal) {
-      if (assignedNormal[2] < -0.15) {
-        operation = 'OP20';
-        opReason = 'Yüzey normali granit tablaya bakıyor (Normal Z < 0)';
-      } else {
-        operation = 'OP10';
-      }
-    } else if (isRearOrBottomKeyword) {
+    const matchedFeat = assignedCadId
+      ? (cadFeatures.find((f) => f.id === assignedCadId) as ((typeof cadFeatures)[0] & { is_through?: boolean }) | undefined)
+      : undefined;
+
+    if (isRearOrBottomKeyword) {
       operation = 'OP20';
-      opReason = 'Teknik resim ifadesinde alt/arka görünüş unsuru';
-    } else if (dim.page && dim.page >= 3) {
+      opReason = dim.page && dim.page >= 3
+        ? 'Sayfa 3 ters bağlama (OP20) unsuru'
+        : 'Teknik resim ifadesinde alt/arka görünüş unsuru';
+    } else if (assignedNormal && assignedNormal[1] < -0.85 && matchedFeat && !matchedFeat.is_through) {
       operation = 'OP20';
-      opReason = 'Sayfa 3 ters bağlama (OP20) unsuru';
-    } else if (dim.page && dim.page === 2 && (/delik|montaj|hole|bore|slot/i.test(descLower) || isRearOrBottomKeyword)) {
-      operation = 'OP20';
-      opReason = 'Sayfa 2 arka yüzey montaj / delik grubu (OP20)';
+      opReason = 'Kör alt yüzey unsuru granit tablaya bakıyor (Normal Y < -0.85)';
+    } else {
+      operation = 'OP10';
     }
 
     if (operation === 'OP10') {

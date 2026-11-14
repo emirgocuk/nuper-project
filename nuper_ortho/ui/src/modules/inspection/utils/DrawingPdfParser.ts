@@ -90,12 +90,15 @@ function clusterTextItems(rawItems: RawPdfItem[], pageWidth: number, pageHeight:
     const y = it.transform[5];
     const w = it.width || 10;
     const h = it.height || 10;
+    const token = it.str.trim();
 
     let merged = false;
     for (const c of clusters) {
       if (c.dir !== 'H') continue;
-      if (Math.abs(c.y - y) <= 4.0 && x - (c.x + c.w) >= -3 && x - (c.x + c.w) <= 25) {
-        c.str += ' ' + it.str.trim();
+      const isMultToRef = (/^\d+\s*[xX]$/.test(c.str.trim()) && /^\(.*\)$/.test(token)) ||
+        (/^\d+\s*[xX]$/.test(token) && /^\(.*\)$/.test(c.str.trim()));
+      if (!isMultToRef && Math.abs(c.y - y) <= 3.0 && x - (c.x + c.w) >= -2 && x - (c.x + c.w) <= 12) {
+        c.str += ' ' + token;
         c.w = x + w - c.x;
         merged = true;
         break;
@@ -104,7 +107,7 @@ function clusterTextItems(rawItems: RawPdfItem[], pageWidth: number, pageHeight:
     if (!merged) {
       clusters.push({
         dir: 'H',
-        str: it.str.trim(),
+        str: token,
         x,
         y,
         w,
@@ -118,12 +121,15 @@ function clusterTextItems(rawItems: RawPdfItem[], pageWidth: number, pageHeight:
     const x = it.transform[4];
     const y = it.transform[5];
     const len = it.width || 10;
+    const token = it.str.trim();
 
     let merged = false;
     for (const c of clusters) {
       if (c.dir !== 'V') continue;
-      if (Math.abs(c.x - x) <= 4.0 && y - (c.y + (c.len || 10)) >= -3 && y - (c.y + (c.len || 10)) <= 25) {
-        c.str += ' ' + it.str.trim();
+      const isMultToRef = (/^\d+\s*[xX]$/.test(c.str.trim()) && /^\(.*\)$/.test(token)) ||
+        (/^\d+\s*[xX]$/.test(token) && /^\(.*\)$/.test(c.str.trim()));
+      if (!isMultToRef && Math.abs(c.x - x) <= 3.0 && y - (c.y + (c.len || 10)) >= -2 && y - (c.y + (c.len || 10)) <= 12) {
+        c.str += ' ' + token;
         c.len = y + len - c.y;
         c.h = c.len;
         merged = true;
@@ -133,7 +139,7 @@ function clusterTextItems(rawItems: RawPdfItem[], pageWidth: number, pageHeight:
     if (!merged) {
       clusters.push({
         dir: 'V',
-        str: it.str.trim(),
+        str: token,
         x,
         y,
         w: 12,
@@ -230,6 +236,7 @@ export async function parsePdfDrawing(
 
         if (/^[A-Z]$/.test(raw) || raw === '0') continue;
         if (/^(SECTION|KESİT|DETAIL|DETAYI|YERDE|PLC)/i.test(raw)) continue;
+        if (/^\(\s*[0-9]+(?:[.,][0-9]+)?\s*\)$/.test(raw) || /\bREF\.?\b/i.test(raw)) continue;
 
         const canvasY = Math.max(20, Math.min(pageHeight - 20, pageHeight - c.y));
         const canvasX = Math.max(20, Math.min(pageWidth - 20, c.x));
@@ -240,7 +247,6 @@ export async function parsePdfDrawing(
           parseFloat(canvasY.toFixed(1)),
         ];
 
-        // 1. Thread Dimensions (M3, M4, HELICOIL)
         const threadMatch = raw.match(
           /(?:(\d+)X\s*)?M([0-9]+(?:\.[0-9]+)?)(?:\s*X\s*(\d+)D)?(\s*HELICOIL)?(?:\s*THRU)?/i
         );
@@ -266,7 +272,7 @@ export async function parsePdfDrawing(
               status: 'UNMEASURED',
               verification: 'PARSED',
               feature_key: `thread_m${nom}_${balloonCounter}`,
-              gdt: '⌖ Ø 0.100 | A | B',
+              gdt: '',
               bbox,
             });
             balloonCounter++;
@@ -274,7 +280,6 @@ export async function parsePdfDrawing(
           }
         }
 
-        // 2. Diameter / Hole (Ø, ⌀, DIA)
         const diaMatch = raw.match(
           /(?:(\d+)X\s*)?(?:Ø|⌀|DIA)\s*([0-9]+(?:\.[0-9]+)?)(?:\s*(?:THRU|\([^\)]+\)|[+-][0-9\.]+|±\s*[0-9\.]+))?/i
         );
@@ -301,7 +306,7 @@ export async function parsePdfDrawing(
                 status: 'UNMEASURED',
                 verification: 'PARSED',
                 feature_key: `dia_${nom}_${balloonCounter}`.replace('.', '_'),
-                gdt: '⌖ Ø 0.050 | A | B',
+                gdt: '',
                 bbox,
               });
               balloonCounter++;
@@ -310,7 +315,6 @@ export async function parsePdfDrawing(
           }
         }
 
-        // 3. Radius (R, RAD)
         const radMatch = raw.match(/(?:(\d+)X\s*)?R\s*([0-9]+(?:\.[0-9]+)?)(?:\s*±\s*([0-9\.]+))?/i);
         if (radMatch) {
           const count = radMatch[1] ? `${radMatch[1]}x ` : '';
@@ -335,7 +339,7 @@ export async function parsePdfDrawing(
                 status: 'UNMEASURED',
                 verification: 'PARSED',
                 feature_key: `rad_${nom}_${balloonCounter}`.replace('.', '_'),
-                gdt: '⌒ 0.050 | A',
+                gdt: '',
                 bbox,
               });
               balloonCounter++;
@@ -344,7 +348,6 @@ export async function parsePdfDrawing(
           }
         }
 
-        // 4. GD&T Feature Control Frame (⌖, ⌒, O 0.5 A, etc.)
         const gdtMatch = raw.match(
           /(?:([⌖⌒⏥⟂∠◎⌭⌰]|Profil|Profile)|(?:^|\s)O\s+([0-9]+(?:\.[0-9]+)?))\s*(?:[Ø⌀]?\s*([0-9]+(?:\.[0-9]+)?))?(?:\s*(?:Ⓜ|Ⓛ)?\s*([A-Z])(?:\s*(?:Ⓜ|Ⓛ)?\s*([A-Z]))?(?:\s*(?:Ⓜ|Ⓛ)?\s*([A-Z]))?)?/i
         );
@@ -378,14 +381,13 @@ export async function parsePdfDrawing(
           }
         }
 
-        // 5. Linear Dimension with Explicit Tolerance (± or +/-)
         const linTolMatch = raw.match(
           /(?:(\d+)X\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:±\s*([0-9]+(?:\.[0-9]+)?)|([+-][0-9\.]+)\s*[\/–-]\s*([+-]?[0-9\.]+))/
         );
         if (linTolMatch) {
           const count = linTolMatch[1] ? `${linTolMatch[1]}x ` : '';
           const nom = parseFloat(linTolMatch[2]);
-          if (!isNaN(nom) && nom > 0 && nom < 5000 && nom !== 2024 && nom !== 2025 && nom !== 2026) {
+          if (!isNaN(nom) && nom >= 1.0 && nom < 5000 && nom !== 2024 && nom !== 2025 && nom !== 2026) {
             const upper = linTolMatch[3] ? `+${linTolMatch[3]}` : linTolMatch[4] || '+0.100';
             const lower = linTolMatch[3] ? `-${linTolMatch[3]}` : linTolMatch[5] || '-0.100';
             const sig = `LINTOL_${pageNum}_${nom}_${Math.round(canvasX / 40)}`;
@@ -407,7 +409,7 @@ export async function parsePdfDrawing(
                 status: 'UNMEASURED',
                 verification: 'PARSED',
                 feature_key: `lin_${nom}_${balloonCounter}`.replace('.', '_'),
-                gdt: '| A | B',
+                gdt: '',
                 bbox,
               });
               balloonCounter++;
@@ -416,7 +418,6 @@ export async function parsePdfDrawing(
           }
         }
 
-        // 6. Standalone Linear Dimension (Nominal only, e.g. 55, 46.2, 48, 26.3, 2X 6.7)
         const linNomMatch = raw.match(/^(?:(\d+)X\s*)?([0-9]+(?:\.[0-9]+)?)$/);
         if (linNomMatch) {
           const count = linNomMatch[1] ? `${linNomMatch[1]}x ` : '';
@@ -441,7 +442,7 @@ export async function parsePdfDrawing(
                 status: 'UNMEASURED',
                 verification: 'PARSED',
                 feature_key: `lin_${nom}_${balloonCounter}`.replace('.', '_'),
-                gdt: '| A | B',
+                gdt: '',
                 bbox,
               });
               balloonCounter++;
@@ -451,7 +452,7 @@ export async function parsePdfDrawing(
         }
       }
     } catch {
-      // Continue processing other pages
+      void 0;
     }
   }
 
