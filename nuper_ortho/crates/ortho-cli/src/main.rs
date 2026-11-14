@@ -86,6 +86,23 @@ fn execute_emit_all_json(
                 let nom = dim.get("nominal").and_then(|v| v.as_f64()).unwrap_or(0.0);
                 let upper = dim.get("upper_tol").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.05);
                 let lower = dim.get("lower_tol").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(-0.05);
+                let match_status = dim.get("match_status").and_then(|v| v.as_str()).unwrap_or("");
+                let requires_manual = dim.get("requires_manual_3d_binding").and_then(|v| v.as_bool()).unwrap_or(false);
+                if requires_manual || match_status == "UNMATCHED" {
+                    if let Ok(mut unmatched_feat) = ortho_ast::GeometricFeature::new_plane(
+                        1000 + id,
+                        format!("UNMATCHED_DIM_{}", id),
+                        DVec3::ZERO,
+                        DVec3::Z,
+                        1.0,
+                        1.0,
+                    ) {
+                        unmatched_feat.match_status = Some("UNMATCHED".to_string());
+                        unmatched_feat.requires_manual_3d_binding = true;
+                        plan.features.push(unmatched_feat);
+                    }
+                    continue;
+                }
                 if let Some(matched) = plan.features.iter().find(|f| {
                     f.diameter.map(|d| (d - nom).abs() < 0.2).unwrap_or(false)
                         || f.depth_or_length.map(|l| (l - nom).abs() < 0.2).unwrap_or(false)
@@ -99,6 +116,17 @@ fn execute_emit_all_json(
                         lower,
                     );
                     plan.tolerances.push(tol);
+                } else if let Ok(mut unmatched_feat) = ortho_ast::GeometricFeature::new_plane(
+                    1000 + id,
+                    format!("UNMATCHED_DIM_{}", id),
+                    DVec3::ZERO,
+                    DVec3::Z,
+                    1.0,
+                    1.0,
+                ) {
+                    unmatched_feat.match_status = Some("UNMATCHED".to_string());
+                    unmatched_feat.requires_manual_3d_binding = true;
+                    plan.features.push(unmatched_feat);
                 }
             }
         }
