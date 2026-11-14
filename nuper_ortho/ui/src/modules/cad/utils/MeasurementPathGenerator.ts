@@ -72,6 +72,7 @@ export interface StylusRecommendation extends StylusChoice {
   balloon: string;
   holeDiameterMm: number;
   recommendedModel?: string;
+  recommended_stylus?: string;
   recommendedEwlMm?: number;
   reason?: string;
 }
@@ -160,7 +161,10 @@ export class MeasurementPathGenerator {
     options: PathGeneratorOptions = {}
   ): GeneratedMeasurementPlan {
     const activeOp = options.activeOperation ?? 'OP10';
-    const isYAxis = options.verticalAxis === 'Y';
+    const spanY = Math.abs((bbox.max[1] ?? 50) - (bbox.min[1] ?? 0));
+    const spanZ = Math.abs((bbox.max[2] ?? 50) - (bbox.min[2] ?? 0));
+    const isYAxis = options.verticalAxis !== undefined ? options.verticalAxis === 'Y' : spanY < spanZ;
+    const effectiveVerticalAxis: 'Y' | 'Z' = isYAxis ? 'Y' : 'Z';
     const approachDist = options.approachDistanceMm ?? 8.0;
     const retractDist = options.retractDistanceMm ?? 5.0;
     const probeTipRadius = options.probeTipRadiusMm ?? 1.0;
@@ -206,7 +210,7 @@ export class MeasurementPathGenerator {
           f.match_status !== 'UNMATCHED' &&
           f.cad_feature_id !== 'UNMATCHED'
       ),
-      options.verticalAxis ?? 'Y'
+      options.verticalAxis ?? effectiveVerticalAxis
     );
 
     const clampBoxes =
@@ -554,12 +558,32 @@ export class MeasurementPathGenerator {
       const featWaypoints: ExtendedWaypoint[] = [];
       const touchRecords: TouchPointRecord[] = [];
 
-      if (isDiameter && nom > 0.5 && isInternalHole) {
-        const stylus = selectStylusForHole(nom);
-        if (stylus.changedFromDefault) {
-          stylusRecommendations.push({ ...stylus, featureId: feat.id, balloon: feat.balloon, holeDiameterMm: nom });
-        }
+      const isThreadFeat =
+        feat.type === 'THREAD' ||
+        /diş|thread|\bm[0-9]|unf|unc/i.test(feat.type_label ?? '') ||
+        /diş|thread|\bm[0-9]/i.test(feat.balloon);
+      const effectiveHoleDia = isThreadFeat && nom > 0.5
+        ? Math.max(0.8, nom - 1.082532 * (feat.pitch ?? lookupMetricPitch(nom)))
+        : nom;
+      const holeStylusChoice =
+        isDiameter && nom > 0.5 && isInternalHole
+          ? selectStylusForHole(effectiveHoleDia, probeTipRadius * 2.0)
+          : null;
+      if (holeStylusChoice?.changedFromDefault) {
+        stylusRecommendations.push({
+          ...holeStylusChoice,
+          recommendedModel: holeStylusChoice.recommendedModel || 'PH10M (Ø1x20)',
+          recommended_stylus: holeStylusChoice.recommended_stylus || 'Ø1x20',
+          recommendedEwlMm: 20.0,
+          reason: `Delik çapı (Ø${effectiveHoleDia.toFixed(2)} mm) mevcut Ø${(probeTipRadius * 2).toFixed(1)} mm prob ile uyumlu değil; Ø1x20 mikro prob atandı.`,
+          featureId: feat.id,
+          balloon: feat.balloon,
+          holeDiameterMm: nom,
+        });
       }
+      const activeTipRadius = holeStylusChoice?.changedFromDefault
+        ? holeStylusChoice.ballDiameterMm / 2.0
+        : probeTipRadius;
 
       let effectiveAngleObj = isYAxis
         ? ({ aDeg: 0, bDeg: 0, direction: [0, -1, 0], label: 'A0° B0°' } as PH10Angle)
@@ -573,7 +597,8 @@ export class MeasurementPathGenerator {
         const normal: [number, number, number] = [inst.normal[0], inst.normal[1], inst.normal[2]];
 
         if (inst.axial_min !== undefined && inst.axial_max !== undefined && isYAxis) {
-          center[1] = (inst.axial_min + inst.axial_max) / 2;
+          const midAx = (inst.axial_min + inst.axial_max) / 2;
+          center[1] = Math.max(yMinPart, Math.min(yMaxPart, midAx));
         }
 
         const isExtCyl =
@@ -721,12 +746,19 @@ export class MeasurementPathGenerator {
             effectiveAngleLabel = 'A0° B0°';
             effectiveAngleObj = { aDeg: 0, bDeg: 0, direction: isYAxis ? [0, -1, 0] : [0, 0, -1], label: 'A0° B0°' };
 
-            const holeTop = isYAxis
-              ? (inst.axial_max ?? yMaxPart)
-              : (inst.axial_max ?? zMaxPart);
-            const holeBottom = isYAxis
-              ? (inst.axial_min ?? yMinPart)
-              : (inst.axial_min ?? zMinPart);
+            const partBottom = isYAxis ? yMinPart : zMinPart;
+            const partTop = isYAxis ? yMaxPart : zMaxPart;
+            const rawHoleTop =
+              inst.axial_max !== undefined
+                ? Math.min(partTop, Math.max(partBottom, inst.axial_max))
+                : partTop;
+            const rawHoleBottom =
+              inst.axial_min !== undefined
+                ? Math.max(partBottom, Math.min(partTop, inst.axial_min))
+                : partBottom;
+            const hasValidHoleSpan = rawHoleTop - rawHoleBottom >= 0.5;
+            const holeTop = hasValidHoleSpan ? rawHoleTop : partTop;
+            const holeBottom = hasValidHoleSpan ? rawHoleBottom : partBottom;
             const holeDepth = Math.max(1.0, holeTop - holeBottom);
             if (holeDepth > stylusEwl - 2.0) {
               stylusRecommendations.push({
@@ -748,9 +780,10 @@ export class MeasurementPathGenerator {
               (inst as { floor_z?: number }).floor_z !== undefined ||
               feat.floor_z !== undefined
             );
-            const floorZ = (inst as { floor_z?: number }).floor_z ?? feat.floor_z ?? holeBottom;
+            const rawFloorZ = (inst as { floor_z?: number }).floor_z ?? feat.floor_z ?? holeBottom;
+            const floorZ = Math.max(partBottom, Math.min(holeTop - 0.5, rawFloorZ));
             const minSafeAltitude = isBlindHole
-              ? floorZ + probeTipRadius + 2.0
+              ? floorZ + activeTipRadius + 2.0
               : holeBottom + 0.2;
             const measOffset = Math.min(holeDepth * 0.5, Math.max(3.0, effectiveNominal * 0.4));
             const measAltitude = Math.max(minSafeAltitude, holeTop - measOffset);
@@ -781,11 +814,9 @@ export class MeasurementPathGenerator {
               const cosT = Math.cos(theta);
               const sinT = Math.sin(theta);
               const helicalDelta = isThread && threadPitch ? (i / pointCount) * threadPitch : 0;
-              const pointMeasAlt = isYAxis
-                ? Math.min(holeTop - 1.0, measAltitude + helicalDelta)
-                : Math.min(holeTop - 1.0, measAltitude + helicalDelta);
+              const pointMeasAlt = Math.max(minSafeAltitude, Math.min(holeTop - 0.5, measAltitude + helicalDelta));
 
-              const centerRadius = Math.max(0.1, radius - probeTipRadius);
+              const centerRadius = Math.max(0.1, radius - activeTipRadius);
               const surfPos: [number, number, number] = isYAxis
                 ? [cx + radius * cosT, pointMeasAlt, cz + radius * sinT]
                 : [cx + radius * cosT, cz + radius * sinT, pointMeasAlt];

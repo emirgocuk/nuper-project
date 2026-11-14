@@ -31,7 +31,7 @@ export type SupportedSpeed = (typeof SUPPORTED_SPEEDS)[number];
 export class SimulationController {
   private speedMultiplier = 1.0;
   private isPlaying = false;
-  private currentPosition: THREE.Vector3 = new THREE.Vector3(0, 23.63, 0);
+  private currentPosition: THREE.Vector3 = new THREE.Vector3(0, 45.0, 0);
   private waypoints: Waypoint[] = [];
   private currentWaypointIndex = 0;
   private currentPhase: ProbePhase = 'IDLE';
@@ -219,9 +219,10 @@ export class SimulationController {
         const hudCoords = document.getElementById('hud-feature-coords');
         if (hudCoords) {
           const posX = isFinite(state.currentPosition.x) ? state.currentPosition.x : 0.0;
-          const posY = isFinite(state.currentPosition.y) ? state.currentPosition.y : 23.63;
+          const posY = isFinite(state.currentPosition.y) ? state.currentPosition.y : 45.0;
           const posZ = isFinite(state.currentPosition.z) ? state.currentPosition.z : 0.0;
-          hudCoords.innerText = `Prob: X: ${posX.toFixed(2)} mm | Y: ${posY.toFixed(2)} mm | Z: ${posZ.toFixed(2)} mm | Faz: ${state.phase} | Hız: ${state.speedMultiplier}x`;
+          const cmmZ = state.phase === 'IDLE' || state.phase === 'TRAVERSE' ? Math.max(posY, posZ) : posZ;
+          hudCoords.innerText = `Prob: X: ${posX.toFixed(2)} mm | Y: ${posY.toFixed(2)} mm | Z: ${cmmZ.toFixed(2)} mm | Faz: ${state.phase} | Hız: ${state.speedMultiplier}x`;
         }
         const footerSpans = document.querySelectorAll('footer span');
         footerSpans.forEach((s) => {
@@ -397,7 +398,7 @@ export class SimulationController {
       this.currentWaypointIndex = this.waypoints.length > 1 ? 1 : 0;
       this.currentPhase = this.waypoints[this.currentWaypointIndex].phase;
     } else {
-      this.currentPosition.set(0, 100, 0);
+      this.currentPosition.set(0, 45.0, 0);
       this.currentWaypointIndex = 0;
       this.currentPhase = 'IDLE';
     }

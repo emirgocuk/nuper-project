@@ -8,6 +8,8 @@ export interface StylusChoice {
   ballDiameterMm: number;
   feasible: boolean;
   changedFromDefault: boolean;
+  recommended_stylus?: string;
+  recommendedModel?: string;
 }
 
 export type SurfaceType = 'PLANE' | 'CYLINDER' | 'CONE' | 'SPHERE' | 'TORUS' | 'OTHER';
@@ -33,16 +35,26 @@ export interface OptimalStylusConfig {
   effectiveDia: number;
 }
 
-export function selectStylusForHole(holeDiameterMm: number): StylusChoice {
-  const fits = (ball: number): boolean => ball <= holeDiameterMm * MAX_BALL_TO_HOLE_RATIO;
+export function selectStylusForHole(
+  holeDiameterMm: number,
+  currentProbeDiameterMm = DEFAULT_STYLUS_BALL_MM
+): StylusChoice {
+  const fits = (ball: number): boolean =>
+    ball <= holeDiameterMm * MAX_BALL_TO_HOLE_RATIO && holeDiameterMm > ball + 0.4;
 
-  if (fits(DEFAULT_STYLUS_BALL_MM)) {
-    return { ballDiameterMm: DEFAULT_STYLUS_BALL_MM, feasible: true, changedFromDefault: false };
+  if (fits(currentProbeDiameterMm)) {
+    return {
+      ballDiameterMm: currentProbeDiameterMm,
+      feasible: true,
+      changedFromDefault: false,
+    };
   }
   return {
     ballDiameterMm: FALLBACK_STYLUS_BALL_MM,
-    feasible: fits(FALLBACK_STYLUS_BALL_MM),
+    feasible: FALLBACK_STYLUS_BALL_MM <= holeDiameterMm * MAX_BALL_TO_HOLE_RATIO,
     changedFromDefault: true,
+    recommended_stylus: 'Ø1x20',
+    recommendedModel: 'PH10M (Ø1x20)',
   };
 }
 
