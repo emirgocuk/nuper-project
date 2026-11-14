@@ -24,6 +24,7 @@ export interface PathFeatureInput {
   cad_center?: [number, number, number];
   cad_normal?: [number, number, number];
   cad_feature_id?: string;
+  match_status?: string;
   feature_type?: string;
   operation?: 'OP10' | 'OP20';
   axial_min?: number;
@@ -199,7 +200,12 @@ export class MeasurementPathGenerator {
     const safeOuterR = maxPartRadius + 18.0;
 
     const opFeatures = orderFeaturesByMetrologyDiscipline(
-      features.filter((f) => (f.operation ?? 'OP10') === activeOp),
+      features.filter(
+        (f) =>
+          (f.operation ?? 'OP10') === activeOp &&
+          f.match_status !== 'UNMATCHED' &&
+          f.cad_feature_id !== 'UNMATCHED'
+      ),
       options.verticalAxis ?? 'Y'
     );
 

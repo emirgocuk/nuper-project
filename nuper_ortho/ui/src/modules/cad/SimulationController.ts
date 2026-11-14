@@ -235,10 +235,7 @@ export class SimulationController {
           } else if (txt.includes('Dokunma:')) {
             const b = s.querySelector('b');
             if (b) {
-              if (state.phase === 'TOUCH') b.innerText = '5.0 mm/s';
-              else if (state.phase === 'RETRACT') b.innerText = '50.0 mm/s';
-              else if (state.phase === 'TRAVERSE') b.innerText = `${(state.feedRate || 150.0).toFixed(0)} mm/s`;
-              else b.innerText = '5.0 mm/s';
+              b.innerText = state.phase === 'TOUCH' ? '2.0 mm/s' : '5.0 mm/s';
             }
           } else if (txt.includes('Kafa Dönüş:')) {
             const b = s.querySelector('b');
