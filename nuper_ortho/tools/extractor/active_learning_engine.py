@@ -65,6 +65,13 @@ def _text_similarity(a: str, b: str) -> float:
     return inter / max(1, union)
 
 
+def _ensure_column(cur: sqlite3.Cursor, table: str, column: str, col_type: str) -> None:
+    cur.execute(f"PRAGMA table_info({table})")
+    existing = {str(row[1]) for row in cur.fetchall()}
+    if column not in existing:
+        cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+
+
 def ensure_learning_tables(db_path: Optional[str] = None) -> str:
     target = os.path.abspath(db_path or DEFAULT_LEARNING_DB_PATH)
     parent = os.path.dirname(target)
@@ -83,6 +90,7 @@ def ensure_learning_tables(db_path: Optional[str] = None) -> str:
                 has_leader_line INTEGER,
                 relative_page_y REAL,
                 surrounding_tokens TEXT,
+                part_hash TEXT,
                 created_at TEXT
             )
             """
@@ -96,6 +104,7 @@ def ensure_learning_tables(db_path: Optional[str] = None) -> str:
                 corrected_upper_tol TEXT,
                 corrected_lower_tol TEXT,
                 corrected_type TEXT,
+                part_hash TEXT,
                 created_at TEXT
             )
             """
@@ -107,10 +116,14 @@ def ensure_learning_tables(db_path: Optional[str] = None) -> str:
                 feature_2d_json TEXT,
                 surface_3d_json TEXT,
                 label INTEGER,
+                part_hash TEXT,
                 created_at TEXT
             )
             """
         )
+        _ensure_column(cur, "false_positive_patterns", "part_hash", "TEXT")
+        _ensure_column(cur, "parsing_corrections", "part_hash", "TEXT")
+        _ensure_column(cur, "surface_binding_samples", "part_hash", "TEXT")
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS learning_weights (
@@ -372,7 +385,14 @@ class ActiveLearningMatcher:
 
     def record_feedback(self, event: Dict[str, Any]) -> Dict[str, Any]:
         ev_type = str(event.get("type") or event.get("event_type") or "").upper().strip()
+        part_hash = str(event.get("part_hash") or event.get("part_name") or "").strip()
         now = _utc_now_iso()
+
+        if ev_type == "UNDO_LAST":
+            return self.undo_last_feedback()
+
+        if ev_type == "CLEAR_PART":
+            return self.clear_feedback_for_part(part_hash or "*")
 
         if ev_type in ("FALSE_POSITIVE_BALLOON", "FALSE_POSITIVE"):
             feat = event.get("feature") or event.get("candidate") or event
@@ -394,10 +414,10 @@ class ActiveLearningMatcher:
                 cur.execute(
                     """
                     INSERT INTO false_positive_patterns
-                    (raw_text, aspect_ratio, in_table_region, has_leader_line, relative_page_y, surrounding_tokens, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (raw_text, aspect_ratio, in_table_region, has_leader_line, relative_page_y, surrounding_tokens, part_hash, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (raw_text, aspect_ratio, in_table, has_leader, rel_y, surrounding, now),
+                    (raw_text, aspect_ratio, in_table, has_leader, rel_y, surrounding, part_hash, now),
                 )
                 conn.commit()
             finally:
@@ -431,10 +451,10 @@ class ActiveLearningMatcher:
                 cur.execute(
                     """
                     INSERT INTO parsing_corrections
-                    (raw_ocr_text, corrected_nominal, corrected_upper_tol, corrected_lower_tol, corrected_type, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    (raw_ocr_text, corrected_nominal, corrected_upper_tol, corrected_lower_tol, corrected_type, part_hash, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (raw_text, corrected_nominal, corrected_upper, corrected_lower, corrected_type, now),
+                    (raw_text, corrected_nominal, corrected_upper, corrected_lower, corrected_type, part_hash, now),
                 )
                 conn.commit()
             finally:
@@ -452,10 +472,10 @@ class ActiveLearningMatcher:
                 cur.execute(
                     """
                     INSERT INTO surface_binding_samples
-                    (feature_2d_json, surface_3d_json, label, created_at)
-                    VALUES (?, ?, ?, ?)
+                    (feature_2d_json, surface_3d_json, label, part_hash, created_at)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (json.dumps(f2, ensure_ascii=False), json.dumps(s3, ensure_ascii=False), label, now),
+                    (json.dumps(f2, ensure_ascii=False), json.dumps(s3, ensure_ascii=False), label, part_hash, now),
                 )
                 conn.commit()
             finally:
@@ -520,19 +540,102 @@ class ActiveLearningMatcher:
             for r in rows
         ]
 
+    def _reset_weights_if_empty(self, cur: sqlite3.Cursor) -> None:
+        now = _utc_now_iso()
+        cur.execute("SELECT COUNT(*) FROM false_positive_patterns")
+        if int(cur.fetchone()[0]) == 0:
+            cur.execute(
+                "INSERT OR REPLACE INTO learning_weights (model_key, weights_json, updated_at) VALUES (?, ?, ?)",
+                ("dimension_validity", json.dumps(DEFAULT_DIMENSION_WEIGHTS), now),
+            )
+        cur.execute("SELECT COUNT(*) FROM surface_binding_samples")
+        if int(cur.fetchone()[0]) == 0:
+            cur.execute(
+                "INSERT OR REPLACE INTO learning_weights (model_key, weights_json, updated_at) VALUES (?, ?, ?)",
+                ("surface_match", json.dumps(DEFAULT_SURFACE_WEIGHTS), now),
+            )
+
+    def undo_last_feedback(self) -> Dict[str, Any]:
+        tables = ("false_positive_patterns", "parsing_corrections", "surface_binding_samples")
+        conn = self._connect()
+        latest_table: Optional[str] = None
+        latest_id: Optional[int] = None
+        latest_ts = ""
+        try:
+            cur = conn.cursor()
+            for table in tables:
+                cur.execute(f"SELECT id, COALESCE(created_at, '') FROM {table} ORDER BY created_at DESC, id DESC LIMIT 1")
+                row = cur.fetchone()
+                if row is not None:
+                    row_id = int(row[0])
+                    row_ts = str(row[1] or "")
+                    if latest_table is None or row_ts > latest_ts:
+                        latest_table = table
+                        latest_id = row_id
+                        latest_ts = row_ts
+            if latest_table is None or latest_id is None:
+                return {"status": "empty", "undone_table": None, "undone_id": None}
+            cur.execute(f"DELETE FROM {latest_table} WHERE id = ?", (latest_id,))
+            self._reset_weights_if_empty(cur)
+            conn.commit()
+        finally:
+            conn.close()
+        return {"status": "ok", "undone_table": latest_table, "undone_id": latest_id}
+
+    def clear_feedback_for_part(self, part_hash: str = "") -> Dict[str, Any]:
+        target_hash = str(part_hash or "").strip()
+        tables = ("false_positive_patterns", "parsing_corrections", "surface_binding_samples")
+        deleted_total = 0
+        conn = self._connect()
+        try:
+            cur = conn.cursor()
+            if not target_hash or target_hash == "*":
+                for table in tables:
+                    cur.execute(f"DELETE FROM {table}")
+                    deleted_total += max(0, int(cur.rowcount))
+            else:
+                for table in tables:
+                    cur.execute(f"DELETE FROM {table} WHERE part_hash = ?", (target_hash,))
+                    deleted_total += max(0, int(cur.rowcount))
+            self._reset_weights_if_empty(cur)
+            conn.commit()
+        finally:
+            conn.close()
+        return {"status": "ok", "part_hash": target_hash or "*", "deleted_count": deleted_total}
+
 
 def record_feedback(event: Dict[str, Any], db_path: Optional[str] = None) -> Dict[str, Any]:
     matcher = ActiveLearningMatcher(db_path=db_path)
     return matcher.record_feedback(event)
 
 
+def undo_last_feedback(db_path: Optional[str] = None) -> Dict[str, Any]:
+    matcher = ActiveLearningMatcher(db_path=db_path)
+    return matcher.undo_last_feedback()
+
+
+def clear_feedback_for_part(part_hash: str = "", db_path: Optional[str] = None) -> Dict[str, Any]:
+    matcher = ActiveLearningMatcher(db_path=db_path)
+    return matcher.clear_feedback_for_part(part_hash)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Nuper Ortho Active Learning Feedback Engine")
     parser.add_argument("--record-json", type=str, default="", help="JSON string describing feedback event")
+    parser.add_argument("--undo-last", action="store_true", help="Undo most recent active learning feedback")
+    parser.add_argument("--clear-part", nargs="?", const="*", default=None, help="Clear active learning feedback for a part hash or all")
     parser.add_argument("--db-path", type=str, default="", help="Optional SQLite DB path")
     args = parser.parse_args()
 
     matcher = ActiveLearningMatcher(db_path=args.db_path or None)
+    if args.undo_last:
+        print(json.dumps(matcher.undo_last_feedback(), ensure_ascii=False))
+        return
+
+    if args.clear_part is not None:
+        print(json.dumps(matcher.clear_feedback_for_part(args.clear_part), ensure_ascii=False))
+        return
+
     if args.record_json:
         payload = json.loads(args.record_json)
         res = matcher.record_feedback(payload)

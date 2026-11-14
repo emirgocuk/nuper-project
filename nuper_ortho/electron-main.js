@@ -585,16 +585,15 @@ print(json.dumps(res))
     }
   });
 
-  ipcMain.handle('ortho:record-feedback', async (event, feedbackPayload) => {
+  async function runActiveLearningCli(cliArgs) {
     try {
       const { execFile } = require('child_process');
       const pyBin = await resolvePythonPath();
       const scriptPath = path.join(__dirname, 'tools', 'extractor', 'active_learning_engine.py');
-      const payloadJson = JSON.stringify(feedbackPayload || {});
       return await new Promise((resolve) => {
-        execFile(pyBin, [scriptPath, '--record-json', payloadJson], { timeout: 5000 }, (err, stdout, stderr) => {
+        execFile(pyBin, [scriptPath, ...cliArgs], { timeout: 5000 }, (err, stdout, stderr) => {
           if (err) {
-            resolve({ success: false, error: err?.message || stderr || 'Feedback write error' });
+            resolve({ success: false, error: err?.message || stderr || 'Feedback execution error' });
           } else {
             try {
               resolve({ success: true, result: JSON.parse(stdout) });
@@ -607,6 +606,18 @@ print(json.dumps(res))
     } catch (e) {
       return { success: false, error: e.message };
     }
+  }
+
+  ipcMain.handle('ortho:record-feedback', async (event, feedbackPayload) => {
+    return runActiveLearningCli(['--record-json', JSON.stringify(feedbackPayload || {})]);
+  });
+
+  ipcMain.handle('ortho:undo-feedback', async () => {
+    return runActiveLearningCli(['--undo-last']);
+  });
+
+  ipcMain.handle('ortho:reset-learning', async (event, partHash) => {
+    return runActiveLearningCli(['--clear-part', String(partHash || '*')]);
   });
 }
 

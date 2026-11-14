@@ -12,7 +12,12 @@ if TOOLS_DIR not in sys.path:
     sys.path.insert(0, TOOLS_DIR)
 
 import drawing_extractor
-from extractor.active_learning_engine import ActiveLearningMatcher, ensure_learning_tables
+from extractor.active_learning_engine import (
+    ActiveLearningMatcher,
+    clear_feedback_for_part,
+    ensure_learning_tables,
+    undo_last_feedback,
+)
 from extractor.brep_verifier import OCP_AVAILABLE, extract_cad_metadata_ocp, verify_dimensions_against_step
 from extractor.contract_guard import classify_dimension_risk
 from extractor.parse.dimension import is_reference_dimension, parse_linear_callouts
@@ -279,3 +284,37 @@ def test_active_learning_sqlite_feedback_and_few_shot_prompt(tmp_path, monkeypat
     assert ollama_status["generate_ready"] is True
     assert ollama_status["selected_model"] == "qwen2.5vl:3b"
     assert ollama_status["status_label"] == "GPU: Aktif | Yerel AI + Öğrenen Motor"
+
+
+def test_undo_and_clear_feedback_for_part(tmp_path):
+    db_path = str(tmp_path / "undo_clear_test.db")
+    matcher = ActiveLearningMatcher(db_path=db_path)
+
+    matcher.record_feedback(
+        {
+            "event_type": "PARSING_CORRECTION",
+            "part_hash": "PART_A",
+            "raw_text": "12,5±0,1",
+            "corrected": {"nominal": 12.5, "upper_tol": "+0.1", "lower_tol": "-0.1", "type": "LINEAR"},
+        }
+    )
+    matcher.record_feedback(
+        {
+            "event_type": "FALSE_POSITIVE_BALLOON",
+            "part_hash": "PART_B",
+            "raw_text": "TABLO HUCRESI",
+            "in_table_region": True,
+        }
+    )
+
+    undo_res = undo_last_feedback(db_path=db_path)
+    assert undo_res["status"] == "ok"
+    assert undo_res["undone_table"] == "false_positive_patterns"
+
+    part_a_corr = matcher.apply_learned_parsing_correction("12,5±0,1")
+    assert part_a_corr is not None
+
+    clear_a = clear_feedback_for_part("PART_A", db_path=db_path)
+    assert clear_a["status"] == "ok"
+    assert clear_a["deleted_count"] == 1
+    assert matcher.apply_learned_parsing_correction("12,5±0,1") is None
