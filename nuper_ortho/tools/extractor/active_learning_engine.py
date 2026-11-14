@@ -371,11 +371,11 @@ class ActiveLearningMatcher:
         return weights
 
     def record_feedback(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        ev_type = str(event.get("type") or "").upper().strip()
+        ev_type = str(event.get("type") or event.get("event_type") or "").upper().strip()
         now = _utc_now_iso()
 
         if ev_type in ("FALSE_POSITIVE_BALLOON", "FALSE_POSITIVE"):
-            feat = event.get("feature") or event.get("candidate") or {}
+            feat = event.get("feature") or event.get("candidate") or event
             raw_text = str(feat.get("raw_text") or feat.get("feature_label") or feat.get("nominal_str") or feat.get("nominal") or "").strip()
             bbox = feat.get("bbox")
             aspect_ratio = float(feat.get("aspect_ratio") or 1.0)
@@ -418,11 +418,12 @@ class ActiveLearningMatcher:
 
         if ev_type == "PARSING_CORRECTION":
             corr = event.get("correctedFeature") or event.get("corrected") or {}
-            raw_text = str(event.get("rawText") or event.get("raw_ocr_text") or corr.get("raw_text") or "").strip()
-            corrected_nominal = float(corr.get("nominal") or 0.0)
-            corrected_upper = str(corr.get("upper_tol") or "")
-            corrected_lower = str(corr.get("lower_tol") or "")
-            corrected_type = str(corr.get("type") or "LINEAR")
+            raw_text = str(event.get("rawText") or event.get("raw_ocr_text") or event.get("raw_text") or corr.get("raw_text") or "").strip()
+            raw_nominal = corr.get("nominal") if corr.get("nominal") is not None else event.get("nominal")
+            corrected_nominal = float(raw_nominal if raw_nominal is not None else 0.0)
+            corrected_upper = str(corr.get("upper_tol") or corr.get("upper_tolerance") or event.get("upper_tol") or "")
+            corrected_lower = str(corr.get("lower_tol") or corr.get("lower_tolerance") or event.get("lower_tol") or "")
+            corrected_type = str(corr.get("type") or corr.get("feature_type") or event.get("feature_type") or "LINEAR")
 
             conn = self._connect()
             try:

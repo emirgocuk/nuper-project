@@ -148,8 +148,15 @@ def build_few_shot_system_prompt(db_path: Optional[str] = None) -> str:
     ]
     import json as _json
     for idx, corr in enumerate(corrections, start=1):
-        raw_t = str(corr.get("raw_text") or "").strip()
+        raw_t = str(corr.get("raw_ocr_text") or corr.get("raw_text") or "").strip()
         corr_obj = corr.get("corrected_json")
+        if corr_obj is None and "corrected_nominal" in corr:
+            corr_obj = {
+                "nominal": corr.get("corrected_nominal"),
+                "upper_tol": corr.get("corrected_upper_tol", ""),
+                "lower_tol": corr.get("corrected_lower_tol", ""),
+                "type": corr.get("corrected_type", "LINEAR"),
+            }
         corr_str = _json.dumps(corr_obj, ensure_ascii=False) if corr_obj is not None else "{}"
         if raw_t:
             lines.append(f"Example {idx}: input '{raw_t}' -> {corr_str}")
