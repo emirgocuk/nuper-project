@@ -134,5 +134,29 @@ describe('Ölçüm kuralları: delik yolu, aşama sırası ve stylus', () => {
     expect(plan.featurePaths[0].touchPoints).toHaveLength(16);
     expect(plan.featurePaths[0].touchPoints[0].position[1]).toBeCloseTo(2.15, 2);
   });
+
+  it('68.6 x 5.7 x 39.8 mm plakada dikey eksen (Y=5.7) otomatik seçilir ve Ø2.4 / M3 delikler için Ø1x20 stylus atanır', () => {
+    const dcPlateBbox = {
+      min: [-34.3, 0, -19.9] as [number, number, number],
+      max: [34.3, 5.7, 19.9] as [number, number, number],
+      size: [68.6, 5.7, 39.8] as [number, number, number],
+    };
+    const m3Hole: PathFeatureInput = {
+      id: 1,
+      balloon: '#1',
+      type: 'THREAD',
+      type_label: '4x M3 Helicoil',
+      nominal: 2.4,
+      cad_center: [23.6, 2.85, 13.08],
+      cad_normal: [0, -1, 0],
+      feature_type: 'INTERNAL_CYLINDER',
+      operation: 'OP10',
+    };
+    const plan = MeasurementPathGenerator.generatePlan([m3Hole], dcPlateBbox, {
+      clearanceZMarginMm: 25.0,
+    });
+    expect(plan.zClearance).toBeCloseTo(30.7, 2);
+    expect(plan.stylusRecommendations.some((r) => r.ballDiameterMm === 1.0)).toBe(true);
+  });
 });
 

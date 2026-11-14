@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { DrawingCanvas, resolveRiskTheme, type BalloonItem } from './DrawingCanvas';
+import { DrawingCanvas, resolveRiskTheme, resolveBalloonCollisions, type BalloonItem } from './DrawingCanvas';
 import type { DrawingExtractionResult } from '../../types/generated/drawing_data';
 
 class SimpleMockElement {
@@ -241,5 +241,26 @@ describe('DrawingCanvas — Gerçek PDF Render ve Balon Koordinat Sabitleme', ()
 
     const fallback = resolveRiskTheme(undefined);
     expect(fallback.stroke).toBe('#10b981');
+  });
+
+  it('6. resolveBalloonCollisions üst üste binen 3 balonu >= 38 px merkez mesafesiyle ayrıştırır', () => {
+    const overlapping: BalloonItem[] = [
+      { id: 1, page: 1, bbox: [215, 200, 245, 212], feature_label: '59.2' },
+      { id: 2, page: 1, bbox: [215, 200, 245, 212], feature_label: '60.6' },
+      { id: 3, page: 1, bbox: [215, 200, 245, 212], feature_label: '45.3' },
+    ];
+    const placements = resolveBalloonCollisions(
+      overlapping,
+      (b) => ({ x: b.bbox ? b.bbox[0] - 15 : 0, y: b.bbox ? b.bbox[1] : 0 }),
+      38
+    );
+    expect(placements).toHaveLength(3);
+    for (let i = 0; i < placements.length; i++) {
+      for (let j = i + 1; j < placements.length; j++) {
+        const dist = Math.hypot(placements[j].x - placements[i].x, placements[j].y - placements[i].y);
+        expect(dist).toBeGreaterThanOrEqual(37.9);
+      }
+    }
+    expect(placements.some((p) => p.displaced)).toBe(true);
   });
 });
