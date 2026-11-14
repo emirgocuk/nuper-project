@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { StepModelTessellator, type TessellatedModelResult } from './StepModelTessellator';
+import { SetupPrep, type BoundingBoxEnvelope, type CadFeatureInput } from './SetupPrep';
 import type { CadMetadata } from '../../../types/generated/cad_metadata';
 
 export interface CadTelemetryData {
@@ -84,7 +85,7 @@ export function generateSafeProbeTrajectory(tess: TessellatedModelResult): THREE
 
   const T = win.THREE || THREE;
   const maxY = isFinite(tess.bbox.max[1]) ? tess.bbox.max[1] : 10.0;
-  const clearanceY = maxY + 15.0;
+  const clearanceY = maxY + 25.0;
   const homePos = new T.Vector3(0, clearanceY, 0);
 
   const waypoints: Array<{ position: THREE.Vector3; phase: 'TRAVERSE' | 'TOUCH' | 'RETRACT'; label?: string }> = [];
@@ -164,7 +165,7 @@ export function generateSafeProbeTrajectory(tess: TessellatedModelResult): THREE
   if (typeof document !== 'undefined') {
     const hudCoords = document.getElementById('hud-feature-coords');
     if (hudCoords) {
-      hudCoords.textContent = `Prob: X: 0.00 mm | Y: ${clearanceY.toFixed(2)} mm | Z: 0.00 mm | Faz: TRAVERSE | Hız: 1x`;
+      hudCoords.textContent = `Prob: X: 0.00 mm | Y: ${clearanceY.toFixed(2)} mm | Z: ${clearanceY.toFixed(2)} mm | Faz: TRAVERSE | Hız: 1x`;
     }
   }
 
@@ -568,6 +569,7 @@ export function installCadImportInterceptor(): void {
     close321Modal?: () => void;
     uploadedMeshGroup?: THREE.Group | null;
     blockGroup?: THREE.Group | null;
+    datumTriadGroup?: THREE.Group | null;
     setupWizard?: {
       getDimensions?: () => unknown[];
       applyActivePlanToWorkspace?: (dims?: unknown) => void;
@@ -588,6 +590,41 @@ export function installCadImportInterceptor(): void {
 
     if (typeof origApply321 === 'function') {
       origApply321();
+    }
+
+    if (target && wAlign.datumTriadGroup) {
+      target.updateMatrixWorld(true);
+      const worldBox = new THREE.Box3().setFromObject(target);
+      if (isFinite(worldBox.min.x) && isFinite(worldBox.max.x)) {
+        const sizeVec = new THREE.Vector3();
+        worldBox.getSize(sizeVec);
+        const bboxEnv: BoundingBoxEnvelope = {
+          min: [worldBox.min.x, worldBox.min.y, worldBox.min.z],
+          max: [worldBox.max.x, worldBox.max.y, worldBox.max.z],
+          size: [sizeVec.x, sizeVec.y, sizeVec.z],
+        };
+        const anchors = SetupPrep.computeDatumBadgeAnchors(
+          bboxEnv,
+          (cachedCadMetadata?.features as unknown as CadFeatureInput[]) || [],
+          worldBox.min.y
+        );
+        const keys: Array<'A' | 'B' | 'C'> = ['A', 'B', 'C'];
+        let fallbackIdx = 0;
+        for (const child of wAlign.datumTriadGroup.children) {
+          const textHint = `${child.name || ''} ${String((child.userData as { label?: string; datum?: string })?.label || '')} ${String((child.userData as { datum?: string })?.datum || '')}`.toUpperCase();
+          let matchedKey: 'A' | 'B' | 'C' | null = null;
+          if (textHint.includes('[A]') || textHint.includes('DATUM_A') || textHint === ' A ') matchedKey = 'A';
+          else if (textHint.includes('[B]') || textHint.includes('DATUM_B') || textHint === ' B ') matchedKey = 'B';
+          else if (textHint.includes('[C]') || textHint.includes('DATUM_C') || textHint === ' C ') matchedKey = 'C';
+          else if ((child as THREE.Sprite).isSprite && fallbackIdx < keys.length) {
+            matchedKey = keys[fallbackIdx++];
+          }
+          if (matchedKey) {
+            const pos = anchors[matchedKey].badgePosition;
+            child.position.set(pos[0], pos[1], pos[2]);
+          }
+        }
+      }
     }
 
     if (typeof document !== 'undefined') {

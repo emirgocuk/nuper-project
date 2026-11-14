@@ -18,6 +18,13 @@ export interface KeepOutZoneDto {
   max: [number, number, number];
 }
 
+export interface DatumBadgeAnchor {
+  datum: 'A' | 'B' | 'C';
+  position: [number, number, number];
+  normal: [number, number, number];
+  badgePosition: [number, number, number];
+}
+
 export interface CadBboxInput {
   size: [number, number, number];
   min?: [number, number, number];
@@ -398,5 +405,81 @@ export class SetupPrep {
       min: c.min,
       max: c.max,
     }));
+  }
+
+  public static computeDatumBadgeAnchors(
+    bbox: BoundingBoxEnvelope,
+    features: CadFeatureInput[] = [],
+    standoffHeight = 20.0
+  ): Record<'A' | 'B' | 'C', DatumBadgeAnchor> {
+    const cx = (bbox.min[0] + bbox.max[0]) / 2;
+    const midY = (bbox.min[1] + bbox.max[1]) / 2;
+    const cz = (bbox.min[2] + bbox.max[2]) / 2;
+    const baseBottomY = Math.max(standoffHeight, bbox.min[1]);
+
+    const clampPt = (p: [number, number, number]): [number, number, number] => [
+      parseFloat(Math.max(bbox.min[0], Math.min(bbox.max[0], p[0])).toFixed(3)),
+      parseFloat(Math.max(bbox.min[1], Math.min(bbox.max[1], p[1])).toFixed(3)),
+      parseFloat(Math.max(bbox.min[2], Math.min(bbox.max[2], p[2])).toFixed(3)),
+    ];
+
+    const findPlaneByNormal = (targetNorm: [number, number, number]): CadFeatureInput | undefined => {
+      let best: CadFeatureInput | undefined;
+      let bestDot = 0.85;
+      for (const f of features) {
+        if (f.feature_type !== 'PLANE' || !f.normal || !f.center) continue;
+        const nLen = Math.hypot(f.normal[0], f.normal[1], f.normal[2]) || 1;
+        const dot =
+          (f.normal[0] / nLen) * targetNorm[0] +
+          (f.normal[1] / nLen) * targetNorm[1] +
+          (f.normal[2] / nLen) * targetNorm[2];
+        if (dot > bestDot) {
+          bestDot = dot;
+          best = f;
+        }
+      }
+      return best;
+    };
+
+    const planeA = findPlaneByNormal([0, -1, 0]);
+    const planeB = findPlaneByNormal([0, 0, -1]);
+    const planeC = findPlaneByNormal([-1, 0, 0]);
+
+    const posA: [number, number, number] = planeA?.center
+      ? clampPt(planeA.center)
+      : [parseFloat(cx.toFixed(3)), parseFloat(baseBottomY.toFixed(3)), parseFloat(cz.toFixed(3))];
+    const normA: [number, number, number] = [0, -1, 0];
+
+    const posB: [number, number, number] = planeB?.center
+      ? clampPt(planeB.center)
+      : [parseFloat(cx.toFixed(3)), parseFloat(midY.toFixed(3)), parseFloat(bbox.min[2].toFixed(3))];
+    const normB: [number, number, number] = [0, 0, -1];
+
+    const posC: [number, number, number] = planeC?.center
+      ? clampPt(planeC.center)
+      : [parseFloat(bbox.min[0].toFixed(3)), parseFloat(midY.toFixed(3)), parseFloat(cz.toFixed(3))];
+    const normC: [number, number, number] = [-1, 0, 0];
+
+    const makeAnchor = (
+      datum: 'A' | 'B' | 'C',
+      position: [number, number, number],
+      normal: [number, number, number],
+      offsetMm = 2.0
+    ): DatumBadgeAnchor => ({
+      datum,
+      position,
+      normal,
+      badgePosition: [
+        parseFloat((position[0] + normal[0] * offsetMm).toFixed(3)),
+        parseFloat((position[1] + normal[1] * offsetMm).toFixed(3)),
+        parseFloat((position[2] + normal[2] * offsetMm).toFixed(3)),
+      ],
+    });
+
+    return {
+      A: makeAnchor('A', posA, normA, 2.0),
+      B: makeAnchor('B', posB, normB, 2.0),
+      C: makeAnchor('C', posC, normC, 2.0),
+    };
   }
 }
