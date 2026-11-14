@@ -7,6 +7,10 @@ import {
   screenDeltaToStage,
   applyLabelOffset,
   escapeHtmlText,
+  recordFeedback,
+  getRecordedFeedbackHistory,
+  undoLastFeedback,
+  resetActiveLearning,
   type BalloonSessionState,
 } from './BalloonEditing';
 
@@ -61,5 +65,21 @@ describe('BalloonEditing', () => {
 
     const escaped = escapeHtmlText('A & B < C > "D" \'E\'');
     expect(escaped).toBe('A &amp; B &lt; C &gt; &quot;D&quot; &#39;E&#39;');
+  });
+
+  it('undoes last feedback and resets active learning state', async () => {
+    await recordFeedback({ event_type: 'FALSE_POSITIVE_BALLOON', raw_text: 'TABLO', part_name: 'PART_1' });
+    await recordFeedback({ event_type: 'PARSING_CORRECTION', raw_text: '12,5', part_name: 'PART_1' });
+    expect(getRecordedFeedbackHistory().length).toBe(2);
+
+    await undoLastFeedback();
+    expect(getRecordedFeedbackHistory().length).toBe(1);
+
+    const fp = computeDrawingFingerprint('PART_1', 10);
+    saveBalloonSessionState({ fingerprint: fp, timestamp: Date.now(), dimensions: [{ id: 1 }] });
+    expect(loadBalloonSessionState(fp)).not.toBeNull();
+
+    await resetActiveLearning('PART_1');
+    expect(loadBalloonSessionState(fp)).toBeNull();
   });
 });

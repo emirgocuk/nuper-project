@@ -92,7 +92,9 @@ export function saveBalloonSessionState(state: BalloonSessionState): void {
 export type LearningFeedbackEventType =
   | 'FALSE_POSITIVE_BALLOON'
   | 'PARSING_CORRECTION'
-  | 'SURFACE_BINDING_POSITIVE';
+  | 'SURFACE_BINDING_POSITIVE'
+  | 'UNDO_LAST'
+  | 'CLEAR_PART';
 
 export interface LearningFeedbackEvent {
   event_type: LearningFeedbackEventType;
@@ -131,47 +133,108 @@ export function clearRecordedFeedbackHistory(): void {
   } catch {}
 }
 
+interface ElectronFeedbackBridge {
+  electronAPI?: {
+    recordFeedback?: (payload: LearningFeedbackEvent) => Promise<unknown>;
+    undoFeedback?: () => Promise<unknown>;
+    resetLearning?: (partHash?: string) => Promise<unknown>;
+  };
+  electronIpc?: {
+    invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>;
+  };
+  ipcRenderer?: {
+    invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>;
+  };
+}
+
+async function dispatchFeedbackIpc(channel: string, payload?: unknown): Promise<unknown> {
+  try {
+    if (typeof window === 'undefined') return null;
+    const win = window as unknown as ElectronFeedbackBridge;
+    if (channel === 'ortho:undo-feedback' && typeof win.electronAPI?.undoFeedback === 'function') {
+      return await win.electronAPI.undoFeedback();
+    }
+    if (channel === 'ortho:reset-learning' && typeof win.electronAPI?.resetLearning === 'function') {
+      return await win.electronAPI.resetLearning(typeof payload === 'string' ? payload : undefined);
+    }
+    if (channel === 'ortho:record-feedback' && typeof win.electronAPI?.recordFeedback === 'function') {
+      return await win.electronAPI.recordFeedback(payload as LearningFeedbackEvent);
+    }
+    if (typeof win.electronIpc?.invoke === 'function') {
+      return payload !== undefined
+        ? await win.electronIpc.invoke(channel, payload)
+        : await win.electronIpc.invoke(channel);
+    }
+    if (typeof win.ipcRenderer?.invoke === 'function') {
+      return payload !== undefined
+        ? await win.ipcRenderer.invoke(channel, payload)
+        : await win.ipcRenderer.invoke(channel);
+    }
+  } catch {}
+  return null;
+}
+
 export async function recordFeedback(event: LearningFeedbackEvent): Promise<unknown> {
   const enriched: LearningFeedbackEvent = {
     ...event,
     timestamp: event.timestamp ?? Date.now(),
   };
-  recordedFeedbackHistory.push(enriched);
-  if (recordedFeedbackHistory.length > 200) {
-    recordedFeedbackHistory.shift();
+  if (event.event_type !== 'UNDO_LAST' && event.event_type !== 'CLEAR_PART') {
+    recordedFeedbackHistory.push(enriched);
+    if (recordedFeedbackHistory.length > 200) {
+      recordedFeedbackHistory.shift();
+    }
+    try {
+      if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+        localStorage.setItem('ortho_learning_feedback_history', JSON.stringify(recordedFeedbackHistory));
+      }
+    } catch {}
+  }
+
+  return await dispatchFeedbackIpc('ortho:record-feedback', enriched);
+}
+
+export async function undoLastFeedback(): Promise<unknown> {
+  if (recordedFeedbackHistory.length > 0) {
+    recordedFeedbackHistory.pop();
+    try {
+      if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+        localStorage.setItem('ortho_learning_feedback_history', JSON.stringify(recordedFeedbackHistory));
+      }
+    } catch {}
+  }
+
+  const res = await dispatchFeedbackIpc('ortho:undo-feedback');
+  if (res !== null) return res;
+  return await dispatchFeedbackIpc('ortho:record-feedback', { event_type: 'UNDO_LAST' });
+}
+
+export async function resetActiveLearning(partHash: string = '*'): Promise<unknown> {
+  clearRecordedFeedbackHistory();
+  for (const key of Object.keys(memorySessionStore)) {
+    delete memorySessionStore[key];
   }
   try {
-    if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
-      localStorage.setItem('ortho_learning_feedback_history', JSON.stringify(recordedFeedbackHistory));
-    }
-  } catch {}
-
-  try {
-    if (typeof window !== 'undefined') {
-      const win = window as unknown as {
-        electronAPI?: {
-          recordFeedback?: (payload: LearningFeedbackEvent) => Promise<unknown>;
-        };
-        electronIpc?: {
-          invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>;
-        };
-        ipcRenderer?: {
-          invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>;
-        };
-      };
-      if (typeof win.electronAPI?.recordFeedback === 'function') {
-        return await win.electronAPI.recordFeedback(enriched);
-      }
-      if (typeof win.electronIpc?.invoke === 'function') {
-        return await win.electronIpc.invoke('ortho:record-feedback', enriched);
-      }
-      if (typeof win.ipcRenderer?.invoke === 'function') {
-        return await win.ipcRenderer.invoke('ortho:record-feedback', enriched);
+    if (typeof localStorage !== 'undefined' && typeof localStorage.removeItem === 'function') {
+      localStorage.removeItem('ortho_latest_session');
+      if (typeof localStorage.length === 'number' && typeof localStorage.key === 'function') {
+        const toDelete: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('ortho_cache_') || k.startsWith('nuper_balloon_session_v1'))) {
+            toDelete.push(k);
+          }
+        }
+        for (const k of toDelete) {
+          localStorage.removeItem(k);
+        }
       }
     }
   } catch {}
 
-  return null;
+  const res = await dispatchFeedbackIpc('ortho:reset-learning', partHash);
+  if (res !== null) return res;
+  return await dispatchFeedbackIpc('ortho:record-feedback', { event_type: 'CLEAR_PART', part_name: partHash });
 }
 
 export function loadBalloonSessionState(fingerprint: string): BalloonSessionState | null {
